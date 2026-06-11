@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Scenario {
+  id               String   @id
+  name             String   @default("Default")
+  constructionCost Int      @default(10000000)
+  equipmentCost    Int      @default(4000000)
+  jobsPerMonth     Int      @default(200)
+  pricePerJob      Int      @default(25000)
+  cogsPercent      Int      @default(70)
+  staffCost        Int      @default(430000)
+  rent             Int      @default(70000)
+  paintCost        Int      @default(300000)
+  utilities        Int      @default(120000)
+  misc             Int      @default(100000)
+  software         Int      @default(30000)
+  capacityPercent  Int      @default(100)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime
+}
+
+model LineRegistration {
+  id            Int       @id @default(autoincrement())
+  lineUserId    String    @unique @map("line_user_id") @db.VarChar(50)
+  displayName   String?   @map("display_name") @db.VarChar(255)
+  pictureUrl    String?   @map("picture_url") @db.Text
+  statusMessage String?   @map("status_message") @db.VarChar(255)
+  system        String    @default("EV7") @map("system") @db.VarChar(50)
+  isActive      Boolean   @default(true) @map("is_active")
+  registeredAt  DateTime  @default(now()) @map("registered_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("line_registrations")
+}
