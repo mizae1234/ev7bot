@@ -97,6 +97,65 @@ export default function ChatPage() {
     return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
   }
 
+  const renderMessageText = (content: string) => {
+    const linkRegex = /(?:🔗\s*ดูเพิ่มเติม:\s*|ดูเพิ่มเติมได้ที่นี่:\s*)(https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/gi
+    const parts = content.split(linkRegex)
+    
+    if (parts.length <= 1) {
+      return content
+    }
+
+    const textBefore = parts[0]
+    const rawUrl = parts[1]
+    const textAfter = parts.slice(2).join('')
+
+    let displayUrl = rawUrl
+    try {
+      if (rawUrl.startsWith('http')) {
+        const urlObj = new URL(rawUrl)
+        displayUrl = urlObj.pathname + urlObj.search
+      }
+    } catch {
+      // Ignore
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <span style={{ whiteSpace: 'pre-wrap' }}>{textBefore}</span>
+        <a
+          href={displayUrl}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            alignSelf: 'flex-start',
+            padding: '8px 16px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            color: '#ffffff',
+            textDecoration: 'none',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.3)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'
+          }}
+        >
+          <span>🔗 ดูรายละเอียดรถเพิ่มเติม</span>
+        </a>
+        {textAfter && <span style={{ whiteSpace: 'pre-wrap' }}>{textAfter}</span>}
+      </div>
+    )
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -239,13 +298,14 @@ export default function ChatPage() {
               color: '#f1f5f9',
               fontSize: '14px',
               lineHeight: '1.6',
-              whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               boxShadow: msg.role === 'user'
                 ? '0 2px 10px rgba(59, 130, 246, 0.3)'
                 : '0 2px 10px rgba(0, 0, 0, 0.2)',
             }}>
-              {msg.content}
+              {msg.role === 'bot' ? renderMessageText(msg.content) : (
+                <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+              )}
               <div style={{
                 fontSize: '10px',
                 color: msg.role === 'user' ? 'rgba(255,255,255,0.6)' : '#64748b',

@@ -278,7 +278,7 @@ export async function searchVehicle(params: { keyword: string }) {
       i.VinNo,
       i.RegisterNo,
       i.Model,
-      i.StatusCode,
+      i.Status AS StatusCode,
       i.StatusType,
       i.Project,
       i.ProjectType,

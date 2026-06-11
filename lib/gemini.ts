@@ -23,7 +23,7 @@ const SYSTEM_PROMPT = `คุณคือ "Butter" (🧈) ผู้ช่วย 
 คอลัมน์สำคัญ: InventoryItemID, VinNo, MotorNo, RegisterNo (ทะเบียนรถ เช่น ทอ-3791),
 Model (รุ่น เช่น ES, Y Plus 490, Y Plus 410 Premium),
 Project, ProjectType (เช่น EV7, Line Man, Grab),
-Company (EV7/GI), StatusCode (PRODUCTION/AVAILABLE/ON_RENT/MAINTENANCE/REPLACEMENT/WAITING_FOR_GR),
+Company (EV7/GI), Status (PRODUCTION/AVAILABLE/ON_RENT/MAINTENANCE/REPLACEMENT/WAITING_FOR_GR),
 StatusType (เช่น AVAILABLE_NEW, AVAILABLE_USE, ON_RENT_MAINTENANCE),
 Exterior_Color, Interior_Color, IsActive (bit)
 
@@ -60,12 +60,12 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร")
 1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน:
-   SELECT InventoryItemID, VinNo, RegisterNo, Model, StatusCode, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%'
-2. ถ้า StatusCode = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
+   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%'
+2. ถ้า Status = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
    SELECT IssueTitle, CarStatusCode, ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
-4. ถ้า StatusCode = 'ON_RENT' → ดึงจาก EV_RentItem:
+4. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
    SELECT ContractNo, FirstName, LastName, ReleaseDate FROM EV_RentItem WHERE InventoryItemID = <id> AND IsActive = 1
 
 ### ถามทะเบียน ให้ search แบบ LIKE
@@ -73,7 +73,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - ให้ search: WHERE RegisterNo LIKE '%3791%' หรือ WHERE RegisterNo LIKE '%ทอ-3791%'
 
 ### ถามจำนวนรถ ตามสถานะ
-- นับจาก EV_InventoryItem: SELECT StatusCode, COUNT(*) as Total FROM EV_InventoryItem WHERE IsActive = 1 GROUP BY StatusCode
+- นับจาก EV_InventoryItem: SELECT Status, COUNT(*) as Total FROM EV_InventoryItem WHERE IsActive = 1 GROUP BY Status
 
 ### ถามจำนวนรถซ่อมค้าง
 - SELECT COUNT(*) FROM EV_MaintenanceItem WHERE CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE') AND IsActive = 1
@@ -106,7 +106,17 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - ตอบเป็นภาษาไทยเสมอ ยกเว้นชื่อ model รถหรือ technical terms
 - ถ้าถามเรื่องที่ไม่เกี่ยวกับรถหรือระบบ ให้ตอบสุภาพว่า Butter เชี่ยวชาญเรื่องข้อมูลรถ แล้วเชิญชวนให้ถามเรื่องรถแทน
 - ตอบกระชับ ไม่เกิน 500 ตัวอักษร เพราะอ่านใน LINE
-- วันที่ปัจจุบัน: ${new Date().toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok' })}`
+
+## ความเป็นส่วนตัวของข้อมูล
+- ห้ามแสดงนามสกุลจริงของลูกค้า ให้แสดงเป็น *** เช่น "สมชาย ***"
+- ห้ามแสดงเลขบัตรประชาชนโดยเด็ดขาด
+- เบอร์โทร ให้แสดงเฉพาะ 4 ตัวท้าย เช่น "***-1234"
+
+## ลิงก์ดูเพิ่มเติม
+- เมื่อตอบเรื่องสถานะรถเฉพาะคัน (ระบุทะเบียนได้) ที่เป็น MAINTENANCE หรือ ON_RENT ให้ต่อท้ายข้อความด้วย:
+  "\\n\\n🔗 ดูเพิ่มเติม: {{APP_URL}}/vehicle/<ทะเบียนรถ>"
+  โดย {{APP_URL}} = ${process.env.NEXT_PUBLIC_APP_URL || 'https://icare-services.cloud'}
+- สถานะอื่น ไม่ต้องแนบลิงก์`
 
 // ─── Function Declarations for Gemini ──────────────────────────────
 
@@ -275,6 +285,7 @@ async function _askButterOnce(userMessage: string): Promise<string> {
     const functionResponses = []
     for (const part of functionCalls) {
       const fc = part.functionCall!
+      console.log(`[askButter] AI requested function call: ${fc.name} with args:`, fc.args)
       const fn = botFunctions[fc.name]
 
       let result: unknown
@@ -288,6 +299,8 @@ async function _askButterOnce(userMessage: string): Promise<string> {
       } else {
         result = { error: `ไม่พบฟังก์ชัน ${fc.name}` }
       }
+
+      console.log(`[askButter] Function ${fc.name} returned:`, JSON.stringify(result).substring(0, 300))
 
       functionResponses.push({
         functionResponse: {
@@ -304,6 +317,7 @@ async function _askButterOnce(userMessage: string): Promise<string> {
 
   // Extract text response
   const text = response.response.text()
+  console.log(`[askButter] Final text response: "${text}"`)
   return text || 'Butter ไม่สามารถประมวลผลได้ในตอนนี้ค่ะ 🤔 ลองถามใหม่อีกทีนะคะ'
 }
 

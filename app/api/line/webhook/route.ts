@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
+import { getMSSQLPool, sql } from '@/lib/mssql'
 
 const BOT_NAME = 'Butter'
 const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
@@ -23,6 +24,11 @@ function verifySignature(body: string, signature: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    // Extract app URL dynamically from request headers
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3001'
+    const protocol = req.headers.get('x-forwarded-proto') || 'https'
+    const appUrl = `${protocol}://${host}`
+
     const body = await req.text()
     const signature = req.headers.get('x-line-signature') ?? ''
 
@@ -32,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const { events }: { events: WebhookEvent[] } = JSON.parse(body)
 
-    await Promise.allSettled(events.map(handleEvent))
+    await Promise.allSettled(events.map(event => handleEvent(event, appUrl)))
 
     return NextResponse.json({ ok: true })
   } catch (error) {
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function handleEvent(event: WebhookEvent) {
+async function handleEvent(event: WebhookEvent, appUrl: string) {
   const sourceType = event.source.type // 'user' | 'group' | 'room'
   const isGroup = sourceType === 'group' || sourceType === 'room'
 
@@ -95,7 +101,7 @@ async function handleEvent(event: WebhookEvent) {
       }
 
       // Chat with stripped message
-      await handleChat(strippedText, lower, event.source.userId!, event.replyToken)
+      await handleChat(strippedText, lower, event.source.userId!, event.replyToken, appUrl)
       return
     }
 
@@ -116,7 +122,7 @@ async function handleEvent(event: WebhookEvent) {
     }
 
     // All other messages → Butter chat
-    await handleChat(text, lower, event.source.userId!, event.replyToken)
+    await handleChat(text, lower, event.source.userId!, event.replyToken, appUrl)
     return
   }
 
@@ -139,7 +145,7 @@ async function handleEvent(event: WebhookEvent) {
 
 // ─── Butter Chat Handler ───────────────────────────────────────────
 
-async function handleChat(text: string, lower: string, userId: string, replyToken: string) {
+async function handleChat(text: string, lower: string, userId: string, replyToken: string, appUrl: string) {
   // Greeting patterns
   if (matchAny(lower, ['สวัสดี', 'หวัดดี', 'ดีครับ', 'ดีค่ะ', 'ดีจ้า', 'hi', 'hello', 'hey'])) {
     let name = ''
@@ -193,7 +199,24 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
     const aiResponse = await askButter(text)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 100)}..."`)
-    await replyText(replyToken, aiResponse)
+
+    // Extract link if any, and try to send Flex Message
+    const vehicleLinkRegex = /(?:🔗\s*ดูเพิ่มเติม:\s*|ดูเพิ่มเติมได้ที่นี่:\s*)(https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/i
+    const linkMatch = aiResponse.match(vehicleLinkRegex)
+    let flexSent = false
+
+    if (linkMatch) {
+      const rawUrl = linkMatch[1]
+      const registerNoMatch = rawUrl.match(/\/vehicle\/([^\s\/?#]+)/i)
+      if (registerNoMatch) {
+        const registerNo = decodeURIComponent(registerNoMatch[1]).trim()
+        flexSent = await trySendVehicleFlexMessage(replyToken, registerNo, aiResponse, appUrl)
+      }
+    }
+
+    if (!flexSent) {
+      await replyText(replyToken, aiResponse)
+    }
   } catch (error) {
     console.error(`[${BOT_NAME} AI Error]`, error)
     await replyText(
@@ -218,6 +241,424 @@ async function replyText(replyToken: string, message: string) {
     await lineClient.replyMessage(replyToken, { type: 'text', text: message })
   } catch (err) {
     console.error(`[${BOT_NAME} replyText Error]`, err)
+  }
+}
+
+function formatDateTh(dateStr: string | Date | null | undefined): string {
+  if (!dateStr) return '-'
+  try {
+    return new Date(dateStr).toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Bangkok',
+    })
+  } catch {
+    return String(dateStr)
+  }
+}
+
+async function trySendVehicleFlexMessage(
+  replyToken: string,
+  registerNo: string,
+  aiResponse: string,
+  appUrl: string
+): Promise<boolean> {
+  try {
+    const pool = await getMSSQLPool()
+    if (!pool) return false
+
+    // Query inventory item
+    const carResult = await pool.request()
+      .input('registerNo', sql.NVarChar, `%${registerNo}%`)
+      .query(`
+        SELECT TOP 1 InventoryItemID, VinNo, RegisterNo, Model, Status AS StatusCode, StatusType, Project, ProjectType
+        FROM dbo.EV_InventoryItem
+        WHERE RegisterNo LIKE @registerNo AND IsActive = 1
+      `)
+
+    if (carResult.recordset.length === 0) return false
+    const car = carResult.recordset[0]
+    const statusCode = car.StatusCode
+
+    if (statusCode !== 'MAINTENANCE' && statusCode !== 'ON_RENT') {
+      return false
+    }
+
+    const cleanedText = aiResponse
+      .replace(/(?:\n\r?|\r)?(?:🔗\s*)?ดูเพิ่มเติม:\s*(?:https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/gi, '')
+      .trim()
+
+    let flexContents: any = null
+
+    if (statusCode === 'MAINTENANCE') {
+      const maintResult = await pool.request()
+        .input('inventoryItemId', sql.Int, car.InventoryItemID)
+        .query(`
+          SELECT TOP 1 IssueTitle, ProblemTypeDescription, ServiceLocation, MaintenanceStartDate, CarStatusCode
+          FROM dbo.EV_MaintenanceItem
+          WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
+          ORDER BY ReportDate DESC
+        `)
+      const maint = maintResult.recordset[0] || {}
+
+      flexContents = {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#059669',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'text',
+              text: '🔧 ข้อมูลงานซ่อมรถ',
+              color: '#ffffff',
+              weight: 'bold',
+              size: 'lg'
+            },
+            {
+              type: 'text',
+              text: `ทะเบียน: ${car.RegisterNo || '-'}`,
+              color: '#d1fae5',
+              size: 'sm',
+              margin: 'xs'
+            }
+          ]
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'รุ่น',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: car.Model || '-',
+                  color: '#111827',
+                  size: 'sm',
+                  weight: 'bold',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'สถานะรถ',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: 'ซ่อม (MAINTENANCE)',
+                  color: '#d97706',
+                  size: 'sm',
+                  weight: 'bold',
+                  flex: 4
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'อาการ',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: maint.IssueTitle || '-',
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'สถานที่ซ่อม',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: maint.ServiceLocation || '-',
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'วันที่เริ่มซ่อม',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: formatDateTh(maint.MaintenanceStartDate),
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4
+                }
+              ]
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#059669',
+              action: {
+                type: 'uri',
+                label: 'ดูรายละเอียดเพิ่มเติม',
+                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo)}`
+              }
+            }
+          ]
+        }
+      }
+    } else if (statusCode === 'ON_RENT') {
+      const rentResult = await pool.request()
+        .input('inventoryItemId', sql.Int, car.InventoryItemID)
+        .query(`
+          SELECT TOP 1 ContractNo, FirstName, LastName, ReleaseDate, ExpectedReleaseDate
+          FROM dbo.EV_RentItem
+          WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
+          ORDER BY ReleaseDate DESC
+        `)
+      const rent = rentResult.recordset[0] || {}
+
+      const customerName = rent.FirstName
+        ? `${rent.FirstName} ${rent.LastName ? '***' : ''}`.trim()
+        : '-'
+
+      flexContents = {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#059669',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'text',
+              text: '🚗 ข้อมูลการปล่อยรถ',
+              color: '#ffffff',
+              weight: 'bold',
+              size: 'lg'
+            },
+            {
+              type: 'text',
+              text: `ทะเบียน: ${car.RegisterNo || '-'}`,
+              color: '#d1fae5',
+              size: 'sm',
+              margin: 'xs'
+            }
+          ]
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'รุ่น',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: car.Model || '-',
+                  color: '#111827',
+                  size: 'sm',
+                  weight: 'bold',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'สถานะรถ',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: 'ปล่อยรถแล้ว (ON_RENT)',
+                  color: '#2563eb',
+                  size: 'sm',
+                  weight: 'bold',
+                  flex: 4
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'ลูกค้า',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: customerName,
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'เลขสัญญา',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: rent.ContractNo || '-',
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4,
+                  wrap: true
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'วันส่งมอบจริง',
+                  color: '#6b7280',
+                  size: 'sm',
+                  flex: 2
+                },
+                {
+                  type: 'text',
+                  text: formatDateTh(rent.ReleaseDate || rent.ExpectedReleaseDate),
+                  color: '#111827',
+                  size: 'sm',
+                  flex: 4
+                }
+              ]
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          paddingAll: '16px',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#059669',
+              action: {
+                type: 'uri',
+                label: 'ดูรายละเอียดเพิ่มเติม',
+                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo)}`
+              }
+            }
+          ]
+        }
+      }
+    }
+
+    if (flexContents) {
+      if (env.MOCK_MODE) {
+        console.log(`[Mock ${BOT_NAME}] Sending Flex Message for ${car.RegisterNo}:`, JSON.stringify(flexContents))
+        return true
+      }
+
+      await lineClient.replyMessage(replyToken, [
+        {
+          type: 'text',
+          text: cleanedText
+        },
+        {
+          type: 'flex',
+          altText: `ข้อมูลรถ ${car.RegisterNo}`,
+          contents: flexContents
+        }
+      ])
+      return true
+    }
+
+    return false
+  } catch (err) {
+    console.error('[trySendVehicleFlexMessage Error]', err)
+    return false
   }
 }
 
