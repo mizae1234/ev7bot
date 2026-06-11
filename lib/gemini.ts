@@ -37,9 +37,9 @@ ContractCancellationDate, IsActive (bit, เอาแค่ IsActive=1)
 คอลัมน์: MaintenanceItemID, InventoryItemID, ReportDate, IncidentDate,
 MaintenanceStartDate, MaintenanceFinishDate, MaintenanceReturnDate,
 CarStatusCode (COMPLETE/IN_MAINTENANCE/WAITING_FOR_MAINTENANCE/STILL_WORK),
-IssueTitle (หัวข้อปัญหา), ProblemTypeDescription (ประเภท เช่น อุบัติเหตุ/ผลิตภัณฑ์),
-FaultParty (คนขับ/คู่กรณี/อื่นๆ), CarCase (เคสซ่อมเบา/เคสซ่อมหนัก),
-ServiceLocation (สถานที่ซ่อม), Insurance (ประกัน),
+IssueTitle (หัวข้อปัญหา), ProblemTypeCode (ประเภท เช่น อุบัติเหตุ/ผลิตภัณฑ์),
+FaultPartyCode (คนขับ/คู่กรณี/อื่นๆ), CarCaseCode (เคสซ่อมเบา/เคสซ่อมหนัก),
+ServiceLocationCode (สถานที่ซ่อม), InsuranceCode (ประกัน),
 FollowUpDetail, IsActive (bit)
 
 ### ตาราง: dbo.EV_ReplacementItem (รถทดแทน)
@@ -62,7 +62,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน (รองรับทั้งทะเบียนรถและเลข VIN):
    SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%'
 2. ถ้า Status = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
-   SELECT IssueTitle, CarStatusCode, ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
+   SELECT IssueTitle, CarStatusCode, ProblemTypeCode AS ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocationCode AS ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
 4. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
