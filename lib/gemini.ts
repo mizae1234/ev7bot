@@ -114,9 +114,8 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - เบอร์โทร ให้แสดงเฉพาะ 4 ตัวท้าย เช่น "***-1234"
 
 ## ลิงก์ดูเพิ่มเติม
-- เมื่อตอบเรื่องสถานะรถเฉพาะคัน (ระบุทะเบียนหรือเลข VIN ได้) ที่เป็น MAINTENANCE หรือ ON_RENT ให้ต่อท้ายข้อความด้วย:
-  "\\n\\n🔗 ดูเพิ่มเติม: {{APP_URL}}/vehicle/<ทะเบียนรถ หรือ เลข VIN (ถ้ายังไม่มีทะเบียน)>"
-  โดย {{APP_URL}} = ${process.env.NEXT_PUBLIC_APP_URL || 'https://icare-services.cloud'}
+- เมื่อตอบเรื่องสถานะรถเฉพาะคัน (ระบุทะเบียนหรือเลข VIN ได้) ที่เป็น MAINTENANCE หรือ ON_RENT ให้ต่อท้ายข้อความด้วยรูปแบบนี้เสมอ:
+  "\n\n🔗 ดูเพิ่มเติม: https://icare-services.cloud/vehicle/<ทะเบียนรถ หรือ เลข VIN>"
 - สถานะอื่น ไม่ต้องแนบลิงก์`
 
 // ─── Function Declarations for Gemini ──────────────────────────────
