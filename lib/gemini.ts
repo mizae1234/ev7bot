@@ -58,9 +58,9 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ## วิธี Query ตามสถานการณ์
 
-### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร")
-1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน:
-   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%'
+### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร") หรือถามด้วยเลข VIN (เลขตัวถัง)
+1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน (รองรับทั้งทะเบียนรถและเลข VIN):
+   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%'
 2. ถ้า Status = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
    SELECT IssueTitle, CarStatusCode, ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
@@ -68,9 +68,10 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 4. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
    SELECT ContractNo, FirstName, LastName, ReleaseDate FROM EV_RentItem WHERE InventoryItemID = <id> AND IsActive = 1
 
-### ถามทะเบียน ให้ search แบบ LIKE
+### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE
 - RegisterNo อาจมี - หรือไม่มี (เช่น ทอ-3791 หรือ ทอ3791)
-- ให้ search: WHERE RegisterNo LIKE '%3791%' หรือ WHERE RegisterNo LIKE '%ทอ-3791%'
+- ให้ search: WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%' หรือใช้ฟังก์ชัน searchVehicle
+- หากรถคันนั้นยังไม่มีเลขทะเบียน (RegisterNo เป็น NULL หรือว่างเปล่า) ให้ดึงข้อมูลและระบุถึงรถด้วยเลข VIN (เลขตัวถัง) เสมอ และสร้างลิงก์สำหรับดูเพิ่มเติมโดยใช้เลข VIN เช่น '/vehicle/<เลข VIN>' แทนทะเบียนรถ
 
 ### ถามจำนวนรถ ตามสถานะ
 - นับจาก EV_InventoryItem: SELECT Status, COUNT(*) as Total FROM EV_InventoryItem WHERE IsActive = 1 GROUP BY Status
@@ -258,7 +259,7 @@ export async function askButter(userMessage: string): Promise<string> {
 
 async function _askButterOnce(userMessage: string): Promise<string> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations }],
   })

@@ -319,7 +319,7 @@ async function trySendVehicleFlexMessage(
             },
             {
               type: 'text',
-              text: `ทะเบียน: ${car.RegisterNo || '-'}`,
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
               color: '#d1fae5',
               size: 'sm',
               margin: 'xs'
@@ -492,7 +492,7 @@ async function trySendVehicleFlexMessage(
             },
             {
               type: 'text',
-              text: `ทะเบียน: ${car.RegisterNo || '-'}`,
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
               color: '#d1fae5',
               size: 'sm',
               margin: 'xs'
@@ -637,7 +637,7 @@ async function trySendVehicleFlexMessage(
 
     if (flexContents) {
       if (env.MOCK_MODE) {
-        console.log(`[Mock ${BOT_NAME}] Sending Flex Message for ${car.RegisterNo}:`, JSON.stringify(flexContents))
+        console.log(`[Mock ${BOT_NAME}] Sending Flex Message for ${car.RegisterNo || car.VinNo}:`, JSON.stringify(flexContents))
         return true
       }
 
@@ -648,7 +648,7 @@ async function trySendVehicleFlexMessage(
         },
         {
           type: 'flex',
-          altText: `ข้อมูลรถ ${car.RegisterNo}`,
+          altText: `ข้อมูลรถ ${car.RegisterNo || car.VinNo}`,
           contents: flexContents
         }
       ])
