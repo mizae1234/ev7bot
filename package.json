@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^9.3.0",
+    "@line/liff": "^2.29.0",
     "@prisma/client": "^5.14.0",
     "mssql": "^10.0.4",
     "next": "14.2.35",

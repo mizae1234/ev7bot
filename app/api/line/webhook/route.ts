@@ -454,7 +454,7 @@ async function trySendVehicleFlexMessage(
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
-                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo || car.VinNo)}`
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
               }
             }
           ]
@@ -627,7 +627,7 @@ async function trySendVehicleFlexMessage(
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
-                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo || car.VinNo)}`
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
               }
             }
           ]

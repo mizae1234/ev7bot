@@ -11,6 +11,7 @@ const envSchema = z.object({
   LINE_CHANNEL_ACCESS_TOKEN: z.string().min(1),
   NEXT_PUBLIC_APP_URL: z.string().url(),
   GEMINI_API_KEY: z.string().min(1),
+  NEXT_PUBLIC_LINE_LIFF_ID: z.string().min(1),
   MOCK_MODE: z.preprocess((val) => val === 'true' || val === '1' || val === true, z.boolean()).default(false),
 })
 
@@ -25,6 +26,7 @@ const mockEnvSchema = z.object({
   LINE_CHANNEL_ACCESS_TOKEN: z.string().default('mock_token'),
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
   GEMINI_API_KEY: z.string().default('mock_gemini_key'),
+  NEXT_PUBLIC_LINE_LIFF_ID: z.string().default('mock_liff_id'),
   MOCK_MODE: z.preprocess((val) => val === 'true' || val === '1' || val === true, z.boolean()).default(true),
 })
 
