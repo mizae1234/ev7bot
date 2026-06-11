@@ -198,20 +198,40 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   try {
     console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
     const aiResponse = await askButter(text)
-    console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 100)}..."`)
+    console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
 
-    // Extract link if any, and try to send Flex Message
-    const vehicleLinkRegex = /(?:🔗\s*ดูเพิ่มเติม:\s*|ดูเพิ่มเติมได้ที่นี่:\s*)(https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/i
-    const linkMatch = aiResponse.match(vehicleLinkRegex)
+    // ─── Try to detect a vehicle identifier for Flex Message ───
+    let vehicleIdentifier: string | null = null
     let flexSent = false
 
-    if (linkMatch) {
-      const rawUrl = linkMatch[1]
-      const registerNoMatch = rawUrl.match(/\/vehicle\/([^\s\/?#]+)/i)
-      if (registerNoMatch) {
-        const registerNo = decodeURIComponent(registerNoMatch[1]).trim()
-        flexSent = await trySendVehicleFlexMessage(replyToken, registerNo, aiResponse, appUrl)
+    // Strategy 1: Detect VIN pattern from user's original message (17-char VIN starting with L)
+    const vinFromUser = text.match(/\b(L[A-Z0-9]{16})\b/i)
+    if (vinFromUser) {
+      vehicleIdentifier = vinFromUser[1].toUpperCase()
+      console.log(`[${BOT_NAME}] Detected VIN from user input: ${vehicleIdentifier}`)
+    }
+
+    // Strategy 2: Extract from /vehicle/xxx link in AI response (broad regex)
+    if (!vehicleIdentifier) {
+      const linkMatch = aiResponse.match(/\/vehicle\/([^\s"')\]]+)/i)
+      if (linkMatch) {
+        vehicleIdentifier = decodeURIComponent(linkMatch[1]).trim()
+        console.log(`[${BOT_NAME}] Detected vehicle from AI link: ${vehicleIdentifier}`)
       }
+    }
+
+    // Strategy 3: Detect VIN pattern from AI response text
+    if (!vehicleIdentifier) {
+      const vinFromAi = aiResponse.match(/\b(L[A-Z0-9]{16})\b/i)
+      if (vinFromAi) {
+        vehicleIdentifier = vinFromAi[1].toUpperCase()
+        console.log(`[${BOT_NAME}] Detected VIN from AI response: ${vehicleIdentifier}`)
+      }
+    }
+
+    // Try to send Flex Message if we found a vehicle identifier
+    if (vehicleIdentifier) {
+      flexSent = await trySendVehicleFlexMessage(replyToken, vehicleIdentifier, aiResponse, appUrl)
     }
 
     if (!flexSent) {
@@ -286,21 +306,141 @@ async function trySendVehicleFlexMessage(
     }
 
     const cleanedText = aiResponse
-      .replace(/(?:\n\r?|\r)?(?:🔗\s*)?ดูเพิ่มเติม:\s*(?:https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/gi, '')
+      .replace(/(?:\n\r?|\r)?(?:🔗\s*)?(?:ดูเพิ่มเติม|ดูเพิ่มเติมได้ที่นี่|ดูข้อมูลเพิ่มเติม)[:\s]*(?:https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
 
     let flexContents: any = null
-
     if (statusCode === 'MAINTENANCE') {
       const maintResult = await pool.request()
         .input('inventoryItemId', sql.Int, car.InventoryItemID)
         .query(`
-          SELECT TOP 1 IssueTitle, ProblemTypeDescription, ServiceLocation, MaintenanceStartDate, CarStatusCode
-          FROM dbo.EV_MaintenanceItem
-          WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
-          ORDER BY ReportDate DESC
+           SELECT TOP 1 MaintenanceItemID, IssueTitle, ProblemTypeCode, ServiceLocationCode, MaintenanceStartDate, MaintenanceFinishDate, CarStatusCode, ReportDate
+           FROM dbo.EV_MaintenanceItem
+           WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
+           ORDER BY ReportDate DESC
         `)
       const maint = maintResult.recordset[0] || {}
+
+      // Query replacement car if exists
+      let replacement: any = null
+      if (maint.MaintenanceItemID) {
+        const replResult = await pool.request()
+          .input('maintId', sql.Int, maint.MaintenanceItemID)
+          .query(`
+            SELECT TOP 1 r.VinNo, i.RegisterNo AS ReplRegisterNo, r.ReplacementStartDate, r.Location
+            FROM dbo.EV_ReplacementItem r
+            LEFT JOIN dbo.EV_InventoryItem i ON r.VinNo = i.VinNo
+            WHERE r.MaintenanceItemID = @maintId AND r.IsActive = 1
+            ORDER BY r.ReplacementStartDate DESC
+          `)
+        replacement = replResult.recordset[0] || null
+      }
+
+      // Map CarStatusCode to Thai
+      const statusMap: Record<string, string> = {
+        'IN_MAINTENANCE': '🔧 อยู่ระหว่างการซ่อม',
+        'WAITING_FOR_MAINTENANCE': '⏳ รอเข้าซ่อม',
+        'STILL_WORK': '🚗 ยังวิ่งอยู่',
+        'COMPLETE': '✅ ซ่อมเสร็จแล้ว',
+      }
+      const carStatusText = statusMap[maint.CarStatusCode] || maint.CarStatusCode || '-'
+
+      // Build body rows
+      const bodyContents: any[] = [
+        {
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            { type: 'text', text: 'VIN', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: car.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'md',
+          contents: [
+            { type: 'text', text: 'รุ่น', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: car.Model || '-', color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'md',
+          contents: [
+            { type: 'text', text: 'สถานะรถ', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: carStatusText, color: '#d97706', size: 'sm', weight: 'bold', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'md',
+          contents: [
+            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: maint.IssueTitle || '-', color: '#111827', size: 'sm', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'md',
+          contents: [
+            { type: 'text', text: 'สถานที่ซ่อม', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: maint.ServiceLocationCode || '-', color: '#111827', size: 'sm', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'md',
+          contents: [
+            { type: 'text', text: 'วันที่แจ้งซ่อม', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: formatDateTh(maint.ReportDate || maint.MaintenanceStartDate), color: '#111827', size: 'sm', flex: 5 }
+          ]
+        },
+      ]
+
+      // Add replacement car section if exists
+      if (replacement) {
+        bodyContents.push(
+          {
+            type: 'separator',
+            margin: 'lg',
+            color: '#e5e7eb'
+          },
+          {
+            type: 'text',
+            text: '🚙 รถทดแทน',
+            weight: 'bold',
+            size: 'sm',
+            color: '#059669',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'VIN', color: '#6b7280', size: 'sm', flex: 3 },
+              { type: 'text', text: replacement.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
+            ]
+          }
+        )
+        if (replacement.ReplRegisterNo) {
+          bodyContents.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'ทะเบียน', color: '#6b7280', size: 'sm', flex: 3 },
+              { type: 'text', text: replacement.ReplRegisterNo, color: '#111827', size: 'sm', flex: 5, wrap: true }
+            ]
+          })
+        }
+      }
 
       flexContents = {
         type: 'bubble',
@@ -319,7 +459,7 @@ async function trySendVehicleFlexMessage(
             },
             {
               type: 'text',
-              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `VIN: ${car.VinNo}`,
               color: '#d1fae5',
               size: 'sm',
               margin: 'xs'
@@ -330,117 +470,7 @@ async function trySendVehicleFlexMessage(
           type: 'box',
           layout: 'vertical',
           paddingAll: '16px',
-          contents: [
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: [
-                {
-                  type: 'text',
-                  text: 'รุ่น',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: car.Model || '-',
-                  color: '#111827',
-                  size: 'sm',
-                  weight: 'bold',
-                  flex: 4,
-                  wrap: true
-                }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              margin: 'md',
-              contents: [
-                {
-                  type: 'text',
-                  text: 'สถานะรถ',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: 'ซ่อม (MAINTENANCE)',
-                  color: '#d97706',
-                  size: 'sm',
-                  weight: 'bold',
-                  flex: 4
-                }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              margin: 'md',
-              contents: [
-                {
-                  type: 'text',
-                  text: 'อาการ',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: maint.IssueTitle || '-',
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4,
-                  wrap: true
-                }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              margin: 'md',
-              contents: [
-                {
-                  type: 'text',
-                  text: 'สถานที่ซ่อม',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: maint.ServiceLocation || '-',
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4,
-                  wrap: true
-                }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              margin: 'md',
-              contents: [
-                {
-                  type: 'text',
-                  text: 'วันที่เริ่มซ่อม',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: formatDateTh(maint.MaintenanceStartDate),
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4
-                }
-              ]
-            }
-          ]
+          contents: bodyContents
         },
         footer: {
           type: 'box',
