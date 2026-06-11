@@ -163,7 +163,7 @@ export default function VehicleDetailPage() {
             Dashboard
           </a>
           <span className="text-zinc-300">|</span>
-          <h1 className="text-sm font-bold text-zinc-800">🚗 ข้อมูลรถ {car.RegisterNo}</h1>
+          <h1 className="text-sm font-bold text-zinc-800">🚗 ข้อมูลรถ {car.RegisterNo || car.VinNo}</h1>
         </div>
       </header>
 
@@ -173,8 +173,12 @@ export default function VehicleDetailPage() {
           <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-emerald-100 text-xs font-medium">ทะเบียน</p>
-                <h2 className="text-2xl font-extrabold text-white tracking-wide">{car.RegisterNo || '-'}</h2>
+                <p className="text-emerald-100 text-xs font-medium">
+                  {car.RegisterNo ? 'ทะเบียน' : 'เลข VIN (ยังไม่มีทะเบียน)'}
+                </p>
+                <h2 className="text-2xl font-extrabold text-white tracking-wide">
+                  {car.RegisterNo || car.VinNo || '-'}
+                </h2>
               </div>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${statusInfo.bg} ${statusInfo.color}`}>
                 {statusInfo.icon} {statusInfo.label}

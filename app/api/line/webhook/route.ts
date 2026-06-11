@@ -270,11 +270,11 @@ async function trySendVehicleFlexMessage(
 
     // Query inventory item
     const carResult = await pool.request()
-      .input('registerNo', sql.NVarChar, `%${registerNo}%`)
+      .input('identifier', sql.NVarChar, `%${registerNo}%`)
       .query(`
         SELECT TOP 1 InventoryItemID, VinNo, RegisterNo, Model, Status AS StatusCode, StatusType, Project, ProjectType
         FROM dbo.EV_InventoryItem
-        WHERE RegisterNo LIKE @registerNo AND IsActive = 1
+        WHERE (RegisterNo LIKE @identifier OR VinNo LIKE @identifier) AND IsActive = 1
       `)
 
     if (carResult.recordset.length === 0) return false
@@ -454,7 +454,7 @@ async function trySendVehicleFlexMessage(
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
-                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo)}`
+                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo || car.VinNo)}`
               }
             }
           ]
@@ -627,7 +627,7 @@ async function trySendVehicleFlexMessage(
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
-                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo)}`
+                uri: `${appUrl}/vehicle/${encodeURIComponent(car.RegisterNo || car.VinNo)}`
               }
             }
           ]

@@ -48,8 +48,8 @@ export async function GET(
   { params }: { params: { registerNo: string } }
 ) {
   try {
-    const registerNo = decodeURIComponent(params.registerNo)
-    console.log(`[Vehicle API] Querying for registerNo: "${registerNo}" (raw params: "${params.registerNo}")`)
+    const identifier = decodeURIComponent(params.registerNo).trim()
+    console.log(`[Vehicle API] Querying for identifier: "${identifier}"`)
     const pool = await getMSSQLPool()
     if (!pool) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
@@ -57,14 +57,14 @@ export async function GET(
 
     // 1. ดึงข้อมูลรถหลัก
     const carReq = pool.request()
-    carReq.input('registerNo', sql.NVarChar, `%${registerNo}%`)
+    carReq.input('identifier', sql.NVarChar, `%${identifier}%`)
     const carResult = await carReq.query(`
       SELECT TOP 1
         InventoryItemID, VinNo, MotorNo, RegisterNo, Model,
         Project, ProjectType, Company, Status AS StatusCode, StatusType,
         Exterior_Color, Interior_Color, IsActive
       FROM dbo.EV_InventoryItem
-      WHERE RegisterNo LIKE @registerNo AND IsActive = 1
+      WHERE (RegisterNo LIKE @identifier OR VinNo LIKE @identifier) AND IsActive = 1
     `)
 
     if (carResult.recordset.length === 0) {
