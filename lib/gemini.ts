@@ -259,7 +259,7 @@ export async function askButter(userMessage: string): Promise<string> {
 
 async function _askButterOnce(userMessage: string): Promise<string> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3-flash-preview',
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations }],
   })
