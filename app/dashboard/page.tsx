@@ -213,6 +213,13 @@ export default function DashboardPage() {
               </span>
             ) : null}
 
+            <a
+              href="/chat"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-zinc-900 text-xs font-bold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md"
+            >
+              🧈 Chat Butter
+            </a>
+
             <button
               onClick={handleManualRefresh}
               disabled={isLoading || isValidating}

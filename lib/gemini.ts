@@ -14,27 +14,95 @@ const SYSTEM_PROMPT = `คุณคือ "Butter" (🧈) ผู้ช่วย 
 
 ## หน้าที่หลัก
 - ตอบคำถามเกี่ยวกับข้อมูลรถยนต์ไฟฟ้า (EV) ในระบบ
-- รายงานสถานะการส่งมอบรถ (deliveries), งานซ่อม (repairs), การทดแทน (replacements), การรับคืน (returns)
-- ค้นหาข้อมูลรถตามเลข VIN, รุ่น, ชื่อลูกค้า
+- รายงานสถานะการส่งมอบรถ, งานซ่อม, การทดแทน, การรับคืน
+- ค้นหาข้อมูลรถตามทะเบียน, เลข VIN, รุ่น, ชื่อลูกค้า
 
-## ฐานข้อมูลที่เข้าถึงได้ (SQL Server, read-only)
-ตารางหลัก:
-- dbo.EV_InventoryItem — ข้อมูลรถ (VinNo, Model, Project, ProjectType, Company)
-- dbo.EV_RentItem — สัญญาเช่า/ส่งมอบ (ExpectedReleaseDate, ReleaseDate, IsActive, FirstName, LastName, PhoneNo, ContractNo)
-- dbo.EV_MaintenanceItem — งานซ่อม (ReportDate, MaintenanceStartDate, MaintenanceFinishDate, CarStatusCode: COMPLETE/IN_MAINTENANCE/WAITING_FOR_MAINTENANCE/STILL_WORK, IssueTitle, IsActive)
-- dbo.EV_ReplacementItem — รถทดแทน (ReplacementStartDate, ReplacementReturnDate, VinNo, Location)
-- dbo.EV_ReturnItem — รับคืนรถ (ReceiveDate, ReturnDate, CustomerName, Model, VinNo, Mileage, ParkLocation)
+## ฐานข้อมูล (SQL Server, read-only)
+
+### ตาราง: dbo.EV_InventoryItem (ข้อมูลหลักของรถทุกคัน)
+คอลัมน์สำคัญ: InventoryItemID, VinNo, MotorNo, RegisterNo (ทะเบียนรถ เช่น ทอ-3791),
+Model (รุ่น เช่น ES, Y Plus 490, Y Plus 410 Premium),
+Project, ProjectType (เช่น EV7, Line Man, Grab),
+Company (EV7/GI), StatusCode (PRODUCTION/AVAILABLE/ON_RENT/MAINTENANCE/REPLACEMENT/WAITING_FOR_GR),
+StatusType (เช่น AVAILABLE_NEW, AVAILABLE_USE, ON_RENT_MAINTENANCE),
+Exterior_Color, Interior_Color, IsActive (bit)
+
+### ตาราง: dbo.EV_RentItem (สัญญาเช่า/ส่งมอบ)
+คอลัมน์: RentItemID, InventoryItemID, ContractNo, ContractType,
+FirstName, LastName, PhoneNo,
+ExpectedReleaseDate (วันนัดส่งมอบ), ReleaseDate (วันส่งมอบจริง),
+ContractCancellationDate, IsActive (bit, เอาแค่ IsActive=1)
+
+### ตาราง: dbo.EV_MaintenanceItem (งานซ่อม)
+คอลัมน์: MaintenanceItemID, InventoryItemID, ReportDate, IncidentDate,
+MaintenanceStartDate, MaintenanceFinishDate, MaintenanceReturnDate,
+CarStatusCode (COMPLETE/IN_MAINTENANCE/WAITING_FOR_MAINTENANCE/STILL_WORK),
+IssueTitle (หัวข้อปัญหา), ProblemTypeDescription (ประเภท เช่น อุบัติเหตุ/ผลิตภัณฑ์),
+FaultParty (คนขับ/คู่กรณี/อื่นๆ), CarCase (เคสซ่อมเบา/เคสซ่อมหนัก),
+ServiceLocation (สถานที่ซ่อม), Insurance (ประกัน),
+FollowUpDetail, IsActive (bit)
+
+### ตาราง: dbo.EV_ReplacementItem (รถทดแทน)
+คอลัมน์: ReplacementItemID, MaintenanceItemID, VinNo (VIN ของรถทดแทน),
+ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
+
+### ตาราง: dbo.EV_ReturnItem (รับคืนรถ)
+คอลัมน์: ReturnItemID, VinNo, CustomerName, Model, ContractNo,
+ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ## ความสัมพันธ์ระหว่างตาราง
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MaintenanceItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_ReplacementItem.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
-- EV_ReturnItem เก็บข้อมูลแยก (ไม่มี FK เชื่อม)
+- EV_ReturnItem เก็บข้อมูลแยก (ใช้ VinNo เชื่อม)
+
+## วิธี Query ตามสถานการณ์
+
+### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร")
+1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน:
+   SELECT InventoryItemID, VinNo, RegisterNo, Model, StatusCode, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%'
+2. ถ้า StatusCode = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
+   SELECT IssueTitle, CarStatusCode, ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
+3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
+   SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
+4. ถ้า StatusCode = 'ON_RENT' → ดึงจาก EV_RentItem:
+   SELECT ContractNo, FirstName, LastName, ReleaseDate FROM EV_RentItem WHERE InventoryItemID = <id> AND IsActive = 1
+
+### ถามทะเบียน ให้ search แบบ LIKE
+- RegisterNo อาจมี - หรือไม่มี (เช่น ทอ-3791 หรือ ทอ3791)
+- ให้ search: WHERE RegisterNo LIKE '%3791%' หรือ WHERE RegisterNo LIKE '%ทอ-3791%'
+
+### ถามจำนวนรถ ตามสถานะ
+- นับจาก EV_InventoryItem: SELECT StatusCode, COUNT(*) as Total FROM EV_InventoryItem WHERE IsActive = 1 GROUP BY StatusCode
+
+### ถามจำนวนรถซ่อมค้าง
+- SELECT COUNT(*) FROM EV_MaintenanceItem WHERE CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE') AND IsActive = 1
+
+### ถามรถส่งมอบวันนี้
+- ใช้ function getDeliveryToday ก่อน ถ้าต้องการ detail ใช้:
+  SELECT i.RegisterNo, i.Model, r.FirstName, r.LastName, r.ContractNo FROM EV_RentItem r JOIN EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID WHERE CAST(r.ReleaseDate AS DATE) = CAST(GETDATE() AS DATE) AND r.IsActive = 1
+
+## Stored Procedures ที่ใช้ได้ (EXEC)
+- EXEC GetEV_HeadlineDashboard @DateBegin, @DateEnd → สรุปภาพรวมรถทั้งระบบ
+- EXEC GetEV_DeliveryCalendar @BeginDate, @EndDate → ปฏิทินส่งมอบ (Date, Project, Model, CarCount)
+- EXEC GetEv_MsModel → รายการรุ่นรถทั้งหมด
+- EXEC GetEv_MsColor → รายการสีรถ
+- EXEC GetEV_MsStatus → สถานะหลัก 7 สถานะ
+- EXEC GetEV_LocationSummary → จำนวนรถแยกตาม Location/Model/Status
+- EXEC GetEV_Report_OnRentCar → รถปล่อยเช่าทั้งหมด
+- EXEC GetEV_Report_AvailableCar → รถพร้อมส่ง
+- EXEC GetEV_Report_AllCarMaintenance → งานซ่อมทั้งหมด
+- EXEC GetEV_Report_CompleteCarMaintenance → ซ่อมเสร็จแล้ว
+- EXEC GetEV_CarInMaintenance_InYard → รถซ่อมที่จอดใน Yard
+- EXEC GetEV_CarInMaintenance_NotInYard → รถซ่อมที่ยังวิ่งอยู่
+- EXEC GetEV_Report_ReplacementHistory → ประวัติรถทดแทน
+- EXEC GetEV_Report_WaitingForGr → รถรอ GR
+- EXEC GetEV_CarInfo @RegisterNo → ข้อมูลรถ 1 คัน
 
 ## กฎสำคัญ
-- ใช้ฟังก์ชันที่มีให้ก่อนเสมอ (getDeliveryToday, getRepairStatus, etc.)
-- ถ้าคำถามซับซ้อนเกินฟังก์ชันที่มี ให้ใช้ runCustomQuery เพื่อเขียน SQL เอง
-- SQL ที่เขียนต้องเป็น SELECT เท่านั้น ห้ามมี INSERT/UPDATE/DELETE
+- ใช้ฟังก์ชันที่มีให้ก่อนเสมอ (getDeliveryToday, getRepairStatus, searchVehicle, etc.)
+- ถ้าคำถามซับซ้อนเกินฟังก์ชันที่มี ให้ใช้ runCustomQuery เพื่อเขียน SQL หรือ EXEC SP เอง
+- SQL ที่เขียนต้องเป็น SELECT หรือ EXEC เท่านั้น ห้ามมี INSERT/UPDATE/DELETE
 - ตอบเป็นภาษาไทยเสมอ ยกเว้นชื่อ model รถหรือ technical terms
 - ถ้าถามเรื่องที่ไม่เกี่ยวกับรถหรือระบบ ให้ตอบสุภาพว่า Butter เชี่ยวชาญเรื่องข้อมูลรถ แล้วเชิญชวนให้ถามเรื่องรถแทน
 - ตอบกระชับ ไม่เกิน 500 ตัวอักษร เพราะอ่านใน LINE
@@ -115,13 +183,13 @@ const functionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: 'runCustomQuery',
-    description: 'รัน SQL query แบบ custom สำหรับคำถามที่ฟังก์ชันอื่นตอบไม่ได้ — ใช้ได้เฉพาะ SELECT เท่านั้น ห้ามมี INSERT/UPDATE/DELETE/DROP ตารางที่ใช้ได้: dbo.EV_InventoryItem, dbo.EV_RentItem, dbo.EV_MaintenanceItem, dbo.EV_ReplacementItem, dbo.EV_ReturnItem',
+    description: 'รัน SQL query หรือ Stored Procedure แบบ custom สำหรับคำถามที่ฟังก์ชันอื่นตอบไม่ได้ — ใช้ได้เฉพาะ SELECT หรือ EXEC Get* (SP ที่ขึ้นต้นด้วย Get) เท่านั้น ตาราง: dbo.EV_InventoryItem, dbo.EV_RentItem, dbo.EV_MaintenanceItem, dbo.EV_ReplacementItem, dbo.EV_ReturnItem',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         sqlQuery: {
           type: SchemaType.STRING,
-          description: 'คำสั่ง SQL SELECT ที่ต้องการรัน ต้องขึ้นต้นด้วย SELECT เท่านั้น',
+          description: 'คำสั่ง SQL SELECT หรือ EXEC GetXxx ที่ต้องการรัน เช่น "SELECT ... FROM ..." หรือ "EXEC GetEV_CarInfo @RegisterNo=\'ทอ-3791\'"',
         },
       },
       required: ['sqlQuery'],
@@ -129,80 +197,113 @@ const functionDeclarations: FunctionDeclaration[] = [
   },
 ]
 
-// ─── Main Chat Function ────────────────────────────────────────────
+// ─── Helper: delay ─────────────────────────────────────────────────
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// ─── Main Chat Function (with retry) ──────────────────────────────
+
+const MAX_RETRIES = 3
+const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
 export async function askButter(userMessage: string): Promise<string> {
-  try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: SYSTEM_PROMPT,
-      tools: [{ functionDeclarations }],
-    })
+  let lastError: unknown = null
 
-    const chat = model.startChat()
-    let response = await chat.sendMessage(userMessage)
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await _askButterOnce(userMessage)
+    } catch (error) {
+      lastError = error
+      const message = error instanceof Error ? error.message : String(error)
+      const is429 = message.includes('429') || message.includes('quota') || message.includes('Too Many Requests') || message.includes('RESOURCE_EXHAUSTED')
 
-    // Handle function calling loop (max 5 iterations to prevent infinite loops)
-    let iterations = 0
-    const maxIterations = 5
-
-    while (iterations < maxIterations) {
-      const candidate = response.response.candidates?.[0]
-      if (!candidate) break
-
-      const parts = candidate.content?.parts
-      if (!parts) break
-
-      // Check if there are function calls
-      const functionCalls = parts.filter(p => p.functionCall)
-      if (functionCalls.length === 0) break
-
-      // Execute each function call
-      const functionResponses = []
-      for (const part of functionCalls) {
-        const fc = part.functionCall!
-        const fn = botFunctions[fc.name]
-
-        let result: unknown
-        if (fn) {
-          try {
-            result = await fn((fc.args as Record<string, unknown>) || {})
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err)
-            result = { error: `เกิดข้อผิดพลาดในการดึงข้อมูล: ${message}` }
-          }
-        } else {
-          result = { error: `ไม่พบฟังก์ชัน ${fc.name}` }
-        }
-
-        functionResponses.push({
-          functionResponse: {
-            name: fc.name,
-            response: result as object,
-          },
-        })
+      if (is429 && attempt < MAX_RETRIES) {
+        const waitMs = RETRY_DELAYS[attempt] || 5000
+        console.log(`[askButter] 429 rate limit hit, retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`)
+        await delay(waitMs)
+        continue
       }
 
-      // Send function results back to Gemini
-      response = await chat.sendMessage(functionResponses)
-      iterations++
+      // Non-retryable error or max retries exceeded
+      break
     }
-
-    // Extract text response
-    const text = response.response.text()
-    return text || 'Butter ไม่สามารถประมวลผลได้ในตอนนี้ค่ะ 🤔 ลองถามใหม่อีกทีนะคะ'
-  } catch (error) {
-    console.error('[askButter Error]', error)
-    const message = error instanceof Error ? error.message : String(error)
-
-    // Friendly error messages
-    if (message.includes('API key')) {
-      return 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑'
-    }
-    if (message.includes('quota') || message.includes('429')) {
-      return 'Butter ถูกใช้งานเยอะมากค่ะ 😅 รอสักครู่แล้วลองใหม่นะคะ'
-    }
-
-    return `Butter เกิดข้อผิดพลาดค่ะ 😅 ลองใหม่อีกทีนะคะ`
   }
+
+  // All retries failed
+  console.error('[askButter Error]', lastError)
+  const message = lastError instanceof Error ? lastError.message : String(lastError)
+
+  if (message.includes('API key') || message.includes('API_KEY_INVALID')) {
+    return 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑'
+  }
+  if (message.includes('quota') || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+    return 'ขออภัยค่ะ 🧈 ตอนนี้ Butter ใช้ Token เกินโควต้าที่กำหนดไว้แล้วค่ะ กรุณารอสักครู่แล้วลองถามใหม่อีกครั้งนะคะ 💛'
+  }
+
+  return 'ขออภัยค่ะ 🧈 Butter มีปัญหาเล็กน้อย กรุณาลองใหม่อีกสักครู่นะคะ 💛'
 }
+
+// ─── Single attempt ────────────────────────────────────────────────
+
+async function _askButterOnce(userMessage: string): Promise<string> {
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3-flash-preview',
+    systemInstruction: SYSTEM_PROMPT,
+    tools: [{ functionDeclarations }],
+  })
+
+  const chat = model.startChat()
+  let response = await chat.sendMessage(userMessage)
+
+  // Handle function calling loop (max 5 iterations to prevent infinite loops)
+  let iterations = 0
+  const maxIterations = 5
+
+  while (iterations < maxIterations) {
+    const candidate = response.response.candidates?.[0]
+    if (!candidate) break
+
+    const parts = candidate.content?.parts
+    if (!parts) break
+
+    // Check if there are function calls
+    const functionCalls = parts.filter(p => p.functionCall)
+    if (functionCalls.length === 0) break
+
+    // Execute each function call
+    const functionResponses = []
+    for (const part of functionCalls) {
+      const fc = part.functionCall!
+      const fn = botFunctions[fc.name]
+
+      let result: unknown
+      if (fn) {
+        try {
+          result = await fn((fc.args as Record<string, unknown>) || {})
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          result = { error: `เกิดข้อผิดพลาดในการดึงข้อมูล: ${errMsg}` }
+        }
+      } else {
+        result = { error: `ไม่พบฟังก์ชัน ${fc.name}` }
+      }
+
+      functionResponses.push({
+        functionResponse: {
+          name: fc.name,
+          response: result as object,
+        },
+      })
+    }
+
+    // Send function results back to Gemini
+    response = await chat.sendMessage(functionResponses)
+    iterations++
+  }
+
+  // Extract text response
+  const text = response.response.text()
+  return text || 'Butter ไม่สามารถประมวลผลได้ในตอนนี้ค่ะ 🤔 ลองถามใหม่อีกทีนะคะ'
+}
+

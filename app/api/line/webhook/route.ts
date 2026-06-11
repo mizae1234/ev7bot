@@ -7,6 +7,7 @@ import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
 
 const BOT_NAME = 'Butter'
+const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
 
 // Verify Line signature
 function verifySignature(body: string, signature: string): boolean {
@@ -41,16 +42,72 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleEvent(event: WebhookEvent) {
+  const sourceType = event.source.type // 'user' | 'group' | 'room'
+  const isGroup = sourceType === 'group' || sourceType === 'room'
+
   // Handle follow event (user adds Line OA as friend)
   if (event.type === 'follow') {
     await handleFollow(event.source.userId!)
     return
   }
 
+  // Handle join event (bot added to group/room)
+  if (event.type === 'join') {
+    await replyText(
+      event.replyToken,
+      `สวัสดีค่า~ ${BOT_NAME} มาแล้วนะ 🧈✨\n\nเรียก ${BOT_NAME} ได้โดยพิมพ์ชื่อนำหน้า เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter สรุปเดือนนี้"\n💬 "butter ซ่อมค้างกี่คัน"\n\nพิมพ์ "butter เมนู" เพื่อดูคำสั่งทั้งหมดค่ะ 💛`
+    )
+    return
+  }
+
   // Handle message event
   if (event.type === 'message' && event.message.type === 'text') {
-    const text = event.message.text.trim()
-    const lower = text.toLowerCase()
+    const rawText = event.message.text.trim()
+    const rawLower = rawText.toLowerCase()
+
+    // ─── Group mode: ต้องพิมพ์ "butter" นำหน้าก่อน ─────────────
+    if (isGroup) {
+      // Check if message starts with bot trigger
+      const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
+      if (!trigger) {
+        // ไม่ได้เรียก Butter → ไม่ตอบ (เงียบ)
+        return
+      }
+
+      // Strip bot name prefix and process the rest
+      const strippedText = rawText.substring(trigger.length).trim()
+
+      // ถ้าพิมพ์แค่ "butter" เฉยๆ → ทักทาย
+      if (!strippedText) {
+        await replyText(
+          event.replyToken,
+          `ว่าไงคะ~ 🧈✨ ${BOT_NAME} พร้อมช่วยเหลือแล้วค่ะ!\n\nลองถาม เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter เมนู"\n💬 "butter ซ่อมค้างกี่คัน" 💛`
+        )
+        return
+      }
+
+      const lower = strippedText.toLowerCase()
+
+      // Registration
+      if (lower === 'ลงทะเบียน' || lower === 'register') {
+        await handleRegister(event.source.userId!, event.replyToken)
+        return
+      }
+
+      // Chat with stripped message
+      await handleChat(strippedText, lower, event.source.userId!, event.replyToken)
+      return
+    }
+
+    // ─── DM (1:1): ตอบทุกข้อความเหมือนเดิม ───────────────────
+    // ถ้าผู้ใช้พิมพ์ "butter xxx" ใน DM ก็ strip prefix ให้ด้วย
+    let text = rawText
+    let lower = rawLower
+    const dmTrigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
+    if (dmTrigger && rawText.length > dmTrigger.length) {
+      text = rawText.substring(dmTrigger.length).trim()
+      lower = text.toLowerCase()
+    }
 
     // Registration keywords
     if (lower === 'ลงทะเบียน' || lower === 'register') {
@@ -63,24 +120,20 @@ async function handleEvent(event: WebhookEvent) {
     return
   }
 
-  // Handle sticker messages
+  // Handle sticker messages (only reply in DM, stay quiet in groups)
   if (event.type === 'message' && event.message.type === 'sticker') {
-    await replyText(event.replyToken, `${BOT_NAME} เห็นสติกเกอร์น่ารักแล้วนะ 🧈✨`)
+    if (!isGroup) {
+      await replyText(event.replyToken, `${BOT_NAME} เห็นสติกเกอร์น่ารักแล้วนะ 🧈✨`)
+    }
     return
   }
 
-  // Handle image messages
+  // Handle image/video messages (only reply in DM)
   if (event.type === 'message' && (event.message.type === 'image' || event.message.type === 'video')) {
-    await replyText(event.replyToken, `${BOT_NAME} รับรูป/วิดีโอไว้แล้วนะคะ 📸 ถ้ามีอะไรให้ช่วยพิมพ์บอกได้เลย~`)
+    if (!isGroup) {
+      await replyText(event.replyToken, `${BOT_NAME} รับรูป/วิดีโอไว้แล้วนะคะ 📸 ถ้ามีอะไรให้ช่วยพิมพ์บอกได้เลย~`)
+    }
     return
-  }
-
-  // Handle join event (bot added to group)
-  if (event.type === 'join') {
-    await replyText(
-      event.replyToken,
-      `สวัสดีค่า~ ${BOT_NAME} มาแล้วนะ 🧈✨\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมด\nหรือพิมพ์ "ลงทะเบียน" เพื่อเข้าใช้งานระบบ EV7 ค่ะ 🚗`
-    )
   }
 }
 

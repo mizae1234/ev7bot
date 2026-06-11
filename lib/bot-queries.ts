@@ -276,7 +276,10 @@ export async function searchVehicle(params: { keyword: string }) {
     SELECT TOP 5
       i.InventoryItemID,
       i.VinNo,
+      i.RegisterNo,
       i.Model,
+      i.StatusCode,
+      i.StatusType,
       i.Project,
       i.ProjectType,
       i.Company,
@@ -290,6 +293,7 @@ export async function searchVehicle(params: { keyword: string }) {
     FROM dbo.EV_InventoryItem i
     LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
     WHERE i.VinNo LIKE @keyword
+      OR i.RegisterNo LIKE @keyword
       OR i.Model LIKE @keyword
       OR r.ContractNo LIKE @keyword
       OR r.FirstName LIKE @keyword
@@ -304,21 +308,24 @@ export async function searchVehicle(params: { keyword: string }) {
   }
 }
 
-// ─── Function: runCustomQuery (AI-generated SQL, SELECT only) ──────
+// ─── Function: runCustomQuery (AI-generated SQL, SELECT + EXEC Get* only) ──────
 export async function runCustomQuery(params: { sqlQuery: string }) {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
-  // Safety: only allow SELECT statements
+  // Safety: only allow SELECT and EXEC Get* statements
   const trimmed = params.sqlQuery.trim().toUpperCase()
-  const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'EXEC', 'EXECUTE', 'GRANT', 'REVOKE', 'MERGE']
+  const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE', 'MERGE']
   for (const word of forbidden) {
-    if (trimmed.startsWith(word)) {
-      return { error: `ไม่อนุญาตให้ใช้คำสั่ง ${word} — อนุญาตเฉพาะ SELECT เท่านั้น` }
+    if (trimmed.includes(word)) {
+      return { error: `ไม่อนุญาตให้ใช้คำสั่ง ${word} — อนุญาตเฉพาะ SELECT หรือ EXEC Get* เท่านั้น` }
     }
   }
-  if (!trimmed.startsWith('SELECT')) {
-    return { error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }
+
+  const isSelect = trimmed.startsWith('SELECT')
+  const isExecGet = (trimmed.startsWith('EXEC ') || trimmed.startsWith('EXECUTE ')) && /EXEC(?:UTE)?\s+GET/i.test(trimmed)
+  if (!isSelect && !isExecGet) {
+    return { error: 'อนุญาตเฉพาะ SELECT หรือ EXEC Get* (Stored Procedures ขึ้นต้นด้วย Get) เท่านั้น' }
   }
 
   try {
