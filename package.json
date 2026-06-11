@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^9.3.0",
     "@prisma/client": "^5.14.0",
     "mssql": "^10.0.4",

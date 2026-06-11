@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { lineClient, lineConfig } from '@/lib/line'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
 
 const BOT_NAME = 'Butter'
@@ -88,7 +88,7 @@ async function handleEvent(event: WebhookEvent) {
 
 async function handleChat(text: string, lower: string, userId: string, replyToken: string) {
   // Greeting patterns
-  if (matchAny(lower, ['สวัสดี', 'หวัดดี', 'ดีครับ', 'ดีค่ะ', 'ดีจ้า', 'hi', 'hello', 'hey', 'butter', 'บัตเตอร์'])) {
+  if (matchAny(lower, ['สวัสดี', 'หวัดดี', 'ดีครับ', 'ดีค่ะ', 'ดีจ้า', 'hi', 'hello', 'hey'])) {
     let name = ''
     try {
       if (!env.MOCK_MODE) {
@@ -98,7 +98,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     } catch { /* ignore */ }
     await replyText(
       replyToken,
-      `สวัสดีค่า${name}~ 🧈✨\n${BOT_NAME} พร้อมช่วยเหลือแล้วนะคะ!\n\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมดได้เลย 💛`
+      `สวัสดีค่า${name}~ 🧈✨\n${BOT_NAME} พร้อมช่วยเหลือแล้วนะคะ!\n\nพิมพ์ "เมนู" เพื่อดูคำสั่ง หรือจะถาม ${BOT_NAME} อะไรก็ได้เลย เช่น\n💬 "วันนี้ปล่อยรถกี่คัน"\n💬 "รถรุ่น Y Plus 490 ซ่อมค้างกี่คัน"\n💬 "สรุปเดือนนี้หน่อย" 💛`
     )
     return
   }
@@ -107,25 +107,13 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   if (matchAny(lower, ['เมนู', 'menu', 'help', 'ช่วย', 'คำสั่ง', 'ทำอะไรได้บ้าง'])) {
     await replyText(
       replyToken,
-      `🧈 เมนู ${BOT_NAME}\n━━━━━━━━━━━━━━━\n📊 "สถานะ" — ดูสรุปส่งมอบ & ซ่อมวันนี้\n📅 "สรุปเดือน" — สรุปรายเดือน\n📋 "ลงทะเบียน" — ลงทะเบียนเข้าระบบ\n🔗 "dashboard" — ลิงก์เปิดหน้า Dashboard\n👋 "สวัสดี" — ทักทาย ${BOT_NAME}\n━━━━━━━━━━━━━━━\nพิมพ์คำสั่งไหนก็ได้เลยนะคะ~ 💛`
+      `🧈 เมนู ${BOT_NAME}\n━━━━━━━━━━━━━━━\n🤖 ถามอะไรก็ได้! เช่น:\n   💬 "วันนี้ปล่อยรถกี่คัน"\n   💬 "ซ่อมค้างกี่คัน"\n   💬 "ค้นหา VIN LNADH..."\n━━━━━━━━━━━━━━━\n📊 "สถานะ" — สรุปส่งมอบ & ซ่อมวันนี้\n📅 "สรุปเดือน" — สรุปรายเดือน\n📋 "ลงทะเบียน" — ลงทะเบียนเข้าระบบ\n🔗 "dashboard" — ลิงก์ Dashboard\n━━━━━━━━━━━━━━━\n${BOT_NAME} ใช้ AI ตอบคำถามได้อัจฉริยะ~ 💛`
     )
     return
   }
 
-  // Status / สถานะ — pull live data from SQL Server
-  if (matchAny(lower, ['สถานะ', 'status', 'วันนี้', 'today', 'สรุปวันนี้'])) {
-    await handleStatusToday(replyToken)
-    return
-  }
-
-  // Monthly summary
-  if (matchAny(lower, ['สรุปเดือน', 'monthly', 'รายเดือน', 'เดือนนี้'])) {
-    await handleStatusMonth(replyToken)
-    return
-  }
-
-  // Dashboard link
-  if (matchAny(lower, ['dashboard', 'แดชบอร์ด', 'เว็บ', 'link', 'ลิงก์'])) {
+  // Dashboard link (exact match only)
+  if (lower === 'dashboard' || lower === 'แดชบอร์ด' || lower === 'ลิงก์') {
     const url = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     await replyText(
       replyToken,
@@ -146,136 +134,19 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     return
   }
 
-  // Default fallback
-  await replyText(
-    replyToken,
-    `${BOT_NAME} ยังไม่เข้าใจคำว่า "${text}" น่ะค่ะ 🤔\n\nลองพิมพ์ "เมนู" เพื่อดูคำสั่งที่ใช้ได้นะคะ~ 🧈💛`
-  )
-}
-
-// ─── Live Status Handlers ──────────────────────────────────────────
-
-async function handleStatusToday(replyToken: string) {
+  // ─── AI-Powered Response (Gemini) ──────────────────────────────
+  // ทุกข้อความที่ไม่ตรงกับ keyword ข้างบน → ส่งให้ AI ตอบ
   try {
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    const todayStart = new Date(`${todayStr}T00:00:00.000Z`)
-    const todayEnd = new Date(`${todayStr}T23:59:59.999Z`)
-
-    const pool = await getMSSQLPool()
-    if (!pool) {
-      await replyText(replyToken, `📊 สถานะวันนี้\n━━━━━━━━━━━━━━━\nยังไม่สามารถเชื่อมต่อฐานข้อมูลได้ค่ะ\nลองเปิดดูที่ Dashboard แทนนะคะ 🧈`)
-      return
-    }
-
-    // Delivery count today
-    const deliveryReq = pool.request()
-    deliveryReq.input('startDate', sql.DateTime, todayStart)
-    deliveryReq.input('endDate', sql.DateTime, todayEnd)
-    const deliveryRes = await deliveryReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
-      FROM dbo.EV_RentItem
-      WHERE IsActive = 1
-        AND (
-          (ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate)
-          OR (ReleaseDate >= @startDate AND ReleaseDate <= @endDate)
-        )
-    `)
-    const d = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
-
-    // Repair count today
-    const repairReq = pool.request()
-    repairReq.input('startDate', sql.DateTime, todayStart)
-    repairReq.input('endDate', sql.DateTime, todayEnd)
-    const repairRes = await repairReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
-        SUM(CASE WHEN CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END) AS [open]
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
-        AND (
-          (ReportDate >= @startDate AND ReportDate <= @endDate)
-          OR (MaintenanceStartDate >= @startDate AND MaintenanceStartDate <= @endDate)
-          OR (MaintenanceFinishDate >= @startDate AND MaintenanceFinishDate <= @endDate)
-        )
-    `)
-    const r = repairRes.recordset[0] || { total: 0, closed: 0, open: 0 }
-
-    const thaiDate = today.toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })
-
+    console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
+    const aiResponse = await askButter(text)
+    console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 100)}..."`)
+    await replyText(replyToken, aiResponse)
+  } catch (error) {
+    console.error(`[${BOT_NAME} AI Error]`, error)
     await replyText(
       replyToken,
-      `📊 สรุปวันนี้ (${thaiDate})\n━━━━━━━━━━━━━━━\n🚗 ส่งมอบรถ: ${d.total} คัน\n   ✅ ปล่อยแล้ว: ${d.completed}\n   ⏳ เตรียมการ: ${d.pending}\n\n🔧 งานซ่อม: ${r.total} รายการ\n   ✅ ซ่อมเสร็จ: ${r.closed}\n   🔴 ค้างซ่อม: ${r.open}\n━━━━━━━━━━━━━━━\nดูรายละเอียดเพิ่มเติมที่ Dashboard นะคะ 🧈💛`
+      `${BOT_NAME} ขัดข้องชั่วคราวค่ะ 😅 ลองพิมพ์ "สถานะ" หรือ "สรุปเดือน" เพื่อใช้คำสั่งเร็วแทนนะคะ 🧈💛`
     )
-  } catch (error) {
-    console.error('[handleStatusToday Error]', error)
-    await replyText(replyToken, `${BOT_NAME} ดึงข้อมูลไม่ได้ตอนนี้ค่ะ 😅 ลองอีกทีนะคะ`)
-  }
-}
-
-async function handleStatusMonth(replyToken: string) {
-  try {
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
-    const pool = await getMSSQLPool()
-    if (!pool) {
-      await replyText(replyToken, `📅 สรุปเดือน\n━━━━━━━━━━━━━━━\nยังไม่สามารถเชื่อมต่อฐานข้อมูลได้ค่ะ\nลองเปิดดูที่ Dashboard แทนนะคะ 🧈`)
-      return
-    }
-
-    // Delivery summary for the month
-    const deliveryReq = pool.request()
-    deliveryReq.input('startDate', sql.DateTime, monthStart)
-    deliveryReq.input('endDate', sql.DateTime, monthEnd)
-    const deliveryRes = await deliveryReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
-      FROM dbo.EV_RentItem
-      WHERE IsActive = 1
-        AND (
-          (ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate)
-          OR (ReleaseDate >= @startDate AND ReleaseDate <= @endDate)
-        )
-    `)
-    const d = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
-
-    // Repair summary for the month
-    const repairReq = pool.request()
-    repairReq.input('startDate', sql.DateTime, monthStart)
-    repairReq.input('endDate', sql.DateTime, monthEnd)
-    const repairRes = await repairReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
-        SUM(CASE WHEN CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END) AS [open]
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
-        AND (
-          (ReportDate >= @startDate AND ReportDate <= @endDate)
-          OR (MaintenanceStartDate >= @startDate AND MaintenanceStartDate <= @endDate)
-          OR (MaintenanceFinishDate >= @startDate AND MaintenanceFinishDate <= @endDate)
-        )
-    `)
-    const r = repairRes.recordset[0] || { total: 0, closed: 0, open: 0 }
-
-    const thaiMonth = now.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })
-    const completionRate = d.total > 0 ? Math.round((Number(d.completed) / Number(d.total)) * 100) : 0
-
-    await replyText(
-      replyToken,
-      `📅 สรุปเดือน ${thaiMonth}\n━━━━━━━━━━━━━━━\n🚗 ส่งมอบรถ: ${d.total} คัน\n   ✅ ปล่อยแล้ว: ${d.completed} (${completionRate}%)\n   ⏳ เตรียมการ: ${d.pending}\n\n🔧 งานซ่อม: ${r.total} รายการ\n   ✅ ซ่อมเสร็จ: ${r.closed}\n   🔴 ค้างซ่อม: ${r.open}\n━━━━━━━━━━━━━━━\n🧈 ${BOT_NAME} รายงานจบค่ะ~ 💛`
-    )
-  } catch (error) {
-    console.error('[handleStatusMonth Error]', error)
-    await replyText(replyToken, `${BOT_NAME} ดึงข้อมูลรายเดือนไม่ได้ตอนนี้ค่ะ 😅 ลองอีกทีนะคะ`)
   }
 }
 
