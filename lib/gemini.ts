@@ -266,9 +266,9 @@ async function _askButterOnce(userMessage: string): Promise<string> {
   const chat = model.startChat()
   let response = await chat.sendMessage(userMessage)
 
-  // Handle function calling loop (max 5 iterations to prevent infinite loops)
+  // Handle function calling loop (max 8 iterations to prevent infinite loops)
   let iterations = 0
-  const maxIterations = 5
+  const maxIterations = 8
 
   while (iterations < maxIterations) {
     const candidate = response.response.candidates?.[0]
@@ -280,6 +280,12 @@ async function _askButterOnce(userMessage: string): Promise<string> {
     // Check if there are function calls
     const functionCalls = parts.filter(p => p.functionCall)
     if (functionCalls.length === 0) break
+
+    // If there's text alongside function calls, log it
+    const textParts = parts.filter(p => p.text).map(p => p.text).join('')
+    if (textParts) {
+      console.log(`[askButter] Intermediate text: "${textParts.substring(0, 100)}"`)
+    }
 
     // Execute each function call
     const functionResponses = []
@@ -315,9 +321,24 @@ async function _askButterOnce(userMessage: string): Promise<string> {
     iterations++
   }
 
-  // Extract text response
-  const text = response.response.text()
-  console.log(`[askButter] Final text response: "${text}"`)
-  return text || 'Butter ไม่สามารถประมวลผลได้ในตอนนี้ค่ะ 🤔 ลองถามใหม่อีกทีนะคะ'
+  if (iterations >= maxIterations) {
+    console.warn(`[askButter] Hit max iterations (${maxIterations}), forcing text extraction`)
+  }
+
+  // Extract text response (with fallback)
+  let text = ''
+  try {
+    text = response.response.text()
+  } catch {
+    // text() can throw if response has no text parts — try extracting from parts directly
+    const parts = response.response.candidates?.[0]?.content?.parts
+    if (parts) {
+      text = parts.filter(p => p.text).map(p => p.text).join('')
+    }
+    console.warn(`[askButter] text() threw, extracted from parts: "${text.substring(0, 100)}"`)
+  }
+
+  console.log(`[askButter] Final text response (${iterations} iterations): "${text.substring(0, 200)}"`)
+  return text || 'ขออภัยค่ะ 🧈 Butter ดึงข้อมูลมาแล้วแต่ยังสรุปไม่ได้ค่ะ ลองถามใหม่แบบเจาะจงขึ้นนะคะ เช่น "ซ่อมค้างกี่คัน" หรือ "สถานะรถ ทอ-3791" 💛'
 }
 
