@@ -129,6 +129,28 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
+      // ตั้งค่ากลุ่มนี้ → บันทึก Group ID + เปิด enableReport
+      if (lower === 'ตั้งค่ากลุ่มนี้' || lower === 'ตั้งค่ากลุ่ม') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableReport: true },
+            })
+            await replyText(
+              event.replyToken,
+              `✅ ตั้งค่าเรียบร้อยค่ะ!\n\n🧈 ${BOT_NAME} จะส่งรายงานสรุปเมื่อวานมาที่กลุ่มนี้ทุกเช้า 08:30 น. นะคะ 💛`
+            )
+          } catch (err) {
+            console.error('[Setup Group Error]', err)
+            await replyText(event.replyToken, `❌ ตั้งค่าไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
       // Chat with stripped message
       const srcId = (event.source as any).groupId || (event.source as any).roomId || event.source.userId
       await handleChat(strippedText, lower, event.source.userId!, event.replyToken, appUrl, sourceType, srcId || null)
