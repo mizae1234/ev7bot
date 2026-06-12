@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     // ── Fetch active groups ─────────────────────────────────────
     const activeGroups = await prisma.lineGroup.findMany({
-      where: { isActive: true },
+      where: { isActive: true, enableReport: true },
     })
 
     if (activeGroups.length === 0) {
