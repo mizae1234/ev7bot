@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLPool, sql } from '@/lib/mssql'
 
+export const dynamic = 'force-dynamic';
 // ─── Data Masking Helpers ──────────────────────────────────────────
 
 /** ชื่อ → แสดงเต็ม, นามสกุล → *** */
