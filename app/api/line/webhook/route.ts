@@ -7,6 +7,8 @@ import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
 import { getMSSQLPool, sql } from '@/lib/mssql'
 
+export const dynamic = 'force-dynamic';
+
 const BOT_NAME = 'Butter'
 const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
 
