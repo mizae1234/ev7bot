@@ -51,6 +51,15 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
   const sourceType = event.source.type // 'user' | 'group' | 'room'
   const isGroup = sourceType === 'group' || sourceType === 'room'
 
+  // Log source info for debugging (especially to capture Group ID)
+  if (sourceType === 'group') {
+    console.log(`[Webhook] 📌 GROUP ID: ${(event.source as any).groupId}`)
+  } else if (sourceType === 'room') {
+    console.log(`[Webhook] 📌 ROOM ID: ${(event.source as any).roomId}`)
+  } else {
+    console.log(`[Webhook] 👤 USER ID: ${event.source.userId}`)
+  }
+
   // Handle follow event (user adds Line OA as friend)
   if (event.type === 'follow') {
     await handleFollow(event.source.userId!)
