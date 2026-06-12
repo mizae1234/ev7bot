@@ -48,6 +48,7 @@ interface MaintenanceInfo {
   MaintenanceFinishDate: string | null
   MaintenanceReturnDate: string | null
   CarStatusCode: string
+  CarStatusDescription: string
   IssueTitle: string
   ProblemTypeDescription: string
   FaultParty: string
@@ -220,18 +221,21 @@ export default function VehicleDetailPage() {
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <InfoItem label="อาการ" value={activeMaint.IssueTitle || '-'} />
-                <InfoItem label="ประเภท" value={activeMaint.ProblemTypeDescription || '-'} />
-                <InfoItem label="สถานที่ซ่อม" value={activeMaint.ServiceLocation || '-'} />
-                <InfoItem label="ฝ่ายที่รับผิดชอบ" value={activeMaint.FaultParty || '-'} />
-                <InfoItem label="วันแจ้งซ่อม" value={formatDate(activeMaint.ReportDate)} />
-                <InfoItem label="วันเริ่มซ่อม" value={formatDate(activeMaint.MaintenanceStartDate)} />
-                <InfoItem label="เคสซ่อม" value={activeMaint.CarCase || '-'} />
+                <InfoItem label="วันที่เกิดเหตุ" value={formatDate(activeMaint.IncidentDate)} />
+                <InfoItem label="วันที่รับแจ้ง" value={formatDate(activeMaint.ReportDate)} />
                 <InfoItem label="ประกัน" value={activeMaint.Insurance || '-'} />
+                <InfoItem label="ประเภทของปัญหา" value={activeMaint.ProblemTypeDescription || '-'} />
+                <InfoItem label="ฝ่ายผิด" value={activeMaint.FaultParty || '-'} />
+                <InfoItem label="เรื่องที่แจ้ง" value={activeMaint.IssueTitle || '-'} />
+                <InfoItem label="กรณีรถ" value={activeMaint.CarCase || '-'} />
+                <InfoItem label="สถานที่ซ่อม" value={activeMaint.ServiceLocation || '-'} />
+                <InfoItem label="วันเริ่มซ่อม" value={formatDate(activeMaint.MaintenanceStartDate)} />
+                <InfoItem label="ซ่อมเสร็จ" value={formatDate(activeMaint.MaintenanceFinishDate)} />
+                <InfoItem label="สถานะใบแจ้งซ่อม" value={activeMaint.CarStatusDescription || '-'} />
               </div>
               {activeMaint.FollowUpDetail && (
                 <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
-                  <p className="text-xs text-amber-600 font-medium mb-1">📝 หมายเหตุ</p>
+                  <p className="text-xs text-amber-600 font-medium mb-1">📝 ติดตามล่าสุด</p>
                   <p className="text-sm text-zinc-700">{activeMaint.FollowUpDetail}</p>
                 </div>
               )}
@@ -263,8 +267,12 @@ export default function VehicleDetailPage() {
                       <span className={`text-xs font-bold ${repairStatus.color}`}>{repairStatus.label}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-zinc-500">วันเกิดเหตุ: <span className="text-zinc-700">{formatDate(m.IncidentDate)}</span></span>
                       <span className="text-zinc-500">วันแจ้ง: <span className="text-zinc-700">{formatDate(m.ReportDate)}</span></span>
+                      <span className="text-zinc-500">ประเภท: <span className="text-zinc-700">{m.ProblemTypeDescription || '-'}</span></span>
+                      <span className="text-zinc-500">ฝ่ายผิด: <span className="text-zinc-700">{m.FaultParty || '-'}</span></span>
                       <span className="text-zinc-500">สถานที่: <span className="text-zinc-700">{m.ServiceLocation || '-'}</span></span>
+                      <span className="text-zinc-500">กรณีรถ: <span className="text-zinc-700">{m.CarCase || '-'}</span></span>
                       <span className="text-zinc-500">เริ่มซ่อม: <span className="text-zinc-700">{formatDate(m.MaintenanceStartDate)}</span></span>
                       <span className="text-zinc-500">ซ่อมเสร็จ: <span className="text-zinc-700">{formatDate(m.MaintenanceFinishDate)}</span></span>
                     </div>

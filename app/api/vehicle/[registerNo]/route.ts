@@ -87,20 +87,20 @@ export async function GET(
       ORDER BY ReleaseDate DESC
     `)
 
-    // 3. ดึงประวัติซ่อมทั้งหมด (ล่าสุดก่อน)
+    // 3. ดึงประวัติซ่อมทั้งหมด (ใช้ SP ที่ return description แทน code)
     const maintReq = pool.request()
     maintReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
     const maintResult = await maintReq.query(`
       SELECT
-        MaintenanceItemID, ReportDate, IncidentDate,
-        MaintenanceStartDate, MaintenanceFinishDate, MaintenanceReturnDate,
-        CarStatusCode, IssueTitle, ProblemTypeCode AS ProblemTypeDescription,
-        FaultPartyCode AS FaultParty, CarCaseCode AS CarCase, 
-        ServiceLocationCode AS ServiceLocation, InsuranceCode AS Insurance,
-        FollowUpDetail, IsActive
-      FROM dbo.EV_MaintenanceItem
-      WHERE InventoryItemID = @inventoryItemId
-      ORDER BY ReportDate DESC
+        m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
+        m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
+        m.CarStatusCode, m.IssueTitle,
+        m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
+        m.ServiceLocationCode, m.InsuranceCode,
+        m.FollowUpDetail, m.IsActive
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.InventoryItemID = @inventoryItemId
+      ORDER BY m.ReportDate DESC
     `)
 
     // 4. ดึงรถทดแทน (ถ้ามี) สำหรับแต่ละงานซ่อม
@@ -155,8 +155,47 @@ export async function GET(
         }
       : null
 
+    // ─── Code → Description mapping ─────────────────────────────
+    const carStatusMap: Record<string, string> = {
+      'COMPLETE': 'ซ่อมเสร็จ',
+      'IN_MAINTENANCE': 'อยู่ระหว่างการซ่อม',
+      'WAITING_FOR_MAINTENANCE': 'รอเข้าซ่อม',
+      'STILL_WORK': 'ยังวิ่งอยู่',
+    }
+    const problemTypeMap: Record<string, string> = {
+      'PRODUCT': 'ผลิตภัณฑ์',
+      'ACCIDENT': 'อุบัติเหตุ',
+      'USAGE': 'การใช้งาน',
+      'WEAR': 'สึกหรอ',
+    }
+    const faultPartyMap: Record<string, string> = {
+      'DRIVER': 'คนขับ',
+      'COUNTERPART': 'คู่กรณี',
+      'OTHER': 'อื่นๆ',
+      'MANUFACTURER': 'ผู้ผลิต',
+    }
+    const carCaseMap: Record<string, string> = {
+      'DAMAGE_LIGHT': 'เคสซ่อมเบา',
+      'DAMAGE_HEAVY': 'เคสซ่อมหนัก',
+    }
+    const insuranceMap: Record<string, string> = {
+      'ICARE_INSURANCE': 'ไอแคร์ประกันภัย',
+      'NO_INSURANCE': 'ไม่มีประกัน',
+    }
+
+    function mapCode(code: unknown, map: Record<string, string>): string {
+      const s = (code as string) || ''
+      return map[s] || s.replace(/_/g, ' ') || '-'
+    }
+
     const maintenance = maintResult.recordset.map((m: Record<string, unknown>) => ({
       ...stripSensitiveFields(m),
+      ProblemTypeDescription: mapCode(m.ProblemTypeCode, problemTypeMap),
+      FaultParty: mapCode(m.FaultPartyCode, faultPartyMap),
+      CarCase: mapCode(m.CarCaseCode, carCaseMap),
+      ServiceLocation: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
+      Insurance: mapCode(m.InsuranceCode, insuranceMap),
+      CarStatusDescription: carStatusMap[m.CarStatusCode as string] || (m.CarStatusCode as string) || '-',
       replacements: replacements[m.MaintenanceItemID as number] || [],
     }))
 
