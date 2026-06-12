@@ -2,12 +2,14 @@
 import React, { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { DeliveryRecord } from '@/types'
+import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
 
 interface DeliveryTableProps {
   records: DeliveryRecord[]
+  periodLabel?: string
 }
 
-export function DeliveryTable({ records = [] }: DeliveryTableProps) {
+export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
@@ -38,24 +40,70 @@ export function DeliveryTable({ records = [] }: DeliveryTableProps) {
     }
   }
 
-  const formatTime = (dateStr: string | null) => {
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'complete': case 'delivered': return 'เสร็จสิ้น'
+      case 'in_progress': return 'กำลังเตรียมการ'
+      case 'pending': return 'รอดำเนินการ'
+      default: return status
+    }
+  }
+
+  const formatDateTimeTh = (dateStr: string | null) => {
     if (!dateStr) return '-'
     try {
-      return new Date(dateStr).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+      const date = new Date(dateStr)
+      const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0
+      
+      const dateFormatted = date.toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Bangkok'
+      })
+      
+      if (hasTime) {
+        const timeFormatted = date.toLocaleTimeString('th-TH', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Asia/Bangkok'
+        }) + ' น.'
+        return `${dateFormatted} ${timeFormatted}`
+      }
+      
+      return dateFormatted
     } catch {
       return dateStr
     }
+  }
+
+  const handleExport = () => {
+    exportToExcel({
+      reportName: 'รายการปล่อยรถ',
+      periodLabel: periodLabel || '-',
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'วันที่คาดว่าจะปล่อย', 'วันที่ปล่อยจริง', 'สถานะ'],
+      rows: filteredRecords.map(rec => [
+        rec.vehicle_id,
+        rec.vin,
+        rec.model,
+        rec.project || '-',
+        formatDateForExcel(rec.expected_release_date),
+        formatDateForExcel(rec.release_date || rec.delivered_at),
+        getStatusText(rec.status),
+      ]),
+      fileName: 'รายการปล่อยรถ',
+    })
   }
 
   return (
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายการปล่อยรถวันนี้</h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">รายการรถและ PDI เตรียมส่งมอบประจำวัน</p>
+          <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายการปล่อยรถ</h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">รายการรถและ PDI เตรียมส่งมอบ</p>
         </div>
         
-        {/* Search & Filters */}
+        {/* Search & Filters & Export */}
         <div className="flex flex-wrap gap-2 items-center">
           <input
             type="text"
@@ -74,6 +122,7 @@ export function DeliveryTable({ records = [] }: DeliveryTableProps) {
             <option value="in_progress">กำลังเตรียมการ</option>
             <option value="pending">รอดำเนินการ</option>
           </select>
+          <ExportButton onClick={handleExport} />
         </div>
       </div>
 
@@ -84,8 +133,9 @@ export function DeliveryTable({ records = [] }: DeliveryTableProps) {
               <th className="pb-3 pr-2">ID รถ</th>
               <th className="pb-3 pr-2">เลขตัวถัง (VIN)</th>
               <th className="pb-3 pr-2">รุ่น</th>
-              <th className="pb-3 pr-2 text-center">สถานะ</th>
-              <th className="pb-3 text-right">เวลาส่งมอบ</th>
+              <th className="pb-3 pr-2">วันที่คาดว่าจะปล่อย</th>
+              <th className="pb-3 pr-2">วันที่ปล่อยจริง</th>
+              <th className="pb-3 text-right">สถานะ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
@@ -95,13 +145,14 @@ export function DeliveryTable({ records = [] }: DeliveryTableProps) {
                   <td className="py-3.5 pr-2 font-mono font-medium">{rec.vehicle_id}</td>
                   <td className="py-3.5 pr-2 font-mono text-zinc-500 dark:text-zinc-400">{rec.vin}</td>
                   <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{rec.model}</td>
-                  <td className="py-3.5 pr-2 text-center">{getStatusBadge(rec.status)}</td>
-                  <td className="py-3.5 text-right font-semibold text-zinc-900 dark:text-zinc-100">{formatTime(rec.delivered_at)}</td>
+                  <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{formatDateTimeTh(rec.expected_release_date)}</td>
+                  <td className="py-3.5 pr-2 text-zinc-650 dark:text-zinc-350">{formatDateTimeTh(rec.release_date || rec.delivered_at)}</td>
+                  <td className="py-3.5 text-right">{getStatusBadge(rec.status)}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-zinc-400 dark:text-zinc-500 font-medium">
+                <td colSpan={6} className="py-10 text-center text-zinc-400 dark:text-zinc-500 font-medium">
                   ไม่พบข้อมูลรายการส่งมอบ
                 </td>
               </tr>

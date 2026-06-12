@@ -53,7 +53,13 @@ function getMockDashboardData(startDateStr: string, endDateStr: string): Dashboa
         report_date: `${dateStr}T09:00:00.000Z`,
         start_date: `${dateStr}T10:00:00.000Z`,
         finish_date: status === 'closed' ? `${dateStr}T15:30:00.000Z` : null,
-        status_code: status === 'closed' ? 'COMPLETE' : status === 'in_progress' ? 'IN_MAINTENANCE' : 'WAITING_FOR_MAINTENANCE'
+        status_code: status === 'closed' ? 'COMPLETE' : status === 'in_progress' ? 'IN_MAINTENANCE' : 'WAITING_FOR_MAINTENANCE',
+        service_location: Math.random() > 0.5 ? 'AION_GI_SALAYA' : 'EV7_HEAD_OFFICE',
+        problem_type: Math.random() > 0.5 ? 'PRODUCT' : 'ACCIDENT',
+        fault_party: Math.random() > 0.5 ? 'DRIVER' : 'MANUFACTURER',
+        car_case: Math.random() > 0.5 ? 'DAMAGE_LIGHT' : 'DAMAGE_HEAVY',
+        insurance: 'ICARE_INSURANCE',
+        project: null
       })
     }
   }
@@ -324,7 +330,13 @@ export async function GET(req: NextRequest) {
         m.ReportDate AS report_date,
         m.MaintenanceStartDate AS start_date,
         m.MaintenanceFinishDate AS finish_date,
-        m.CarStatusCode AS status_code
+        m.CarStatusCode AS status_code,
+        m.ServiceLocationCode AS service_location,
+        m.ProblemTypeCode AS problem_type,
+        m.FaultPartyCode AS fault_party,
+        m.CarCaseCode AS car_case,
+        m.InsuranceCode AS insurance,
+        i.ProjectType AS project
       FROM dbo.EV_MaintenanceItem m
       LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       WHERE m.IsActive = 1

@@ -29,15 +29,24 @@ export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState<number>(5) // 0-indexed, 5 = June
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   
+  // Custom date range state
+  const [filterMode, setFilterMode] = useState<'month' | 'range'>('month')
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
+
   // Toggle between deliveries and repairs in the calendar
   const [calendarViewMode, setCalendarViewMode] = useState<'deliveries' | 'repairs'>('deliveries')
   
   // Tabs for the detail tables
   const [activeTab, setActiveTab] = useState<'deliveries' | 'repairs' | 'replacements' | 'returns'>('deliveries')
 
-  // Calculate start/end dates of selected month
-  const startDateStr = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
-  const endDateStr = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+  // Calculate start/end dates
+  const startDateStr = filterMode === 'month'
+    ? new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
+    : (customStartDate || new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0])
+  const endDateStr = filterMode === 'month'
+    ? new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+    : (customEndDate || new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0])
 
   // Query database dynamically using SWR
   const { data, error, isLoading, mutate, isValidating } = useSWR<DashboardData>(
@@ -80,7 +89,7 @@ export default function DashboardPage() {
   // Filter lists based on selectedDate if set, otherwise show all of month
   const getFilteredDeliveries = () => {
     if (!data) return []
-    if (!selectedDate) return data.deliveryList
+    if (!selectedDate || filterMode !== 'month') return data.deliveryList
     return data.deliveryList.filter(d => {
       const dt = d.release_date || d.expected_release_date
       return dt && dt.startsWith(selectedDate)
@@ -89,7 +98,7 @@ export default function DashboardPage() {
 
   const getFilteredRepairs = () => {
     if (!data) return []
-    if (!selectedDate) return data.repairList
+    if (!selectedDate || filterMode !== 'month') return data.repairList
     return data.repairList.filter(r => {
       return (
         (r.report_date && r.report_date.startsWith(selectedDate)) ||
@@ -101,7 +110,7 @@ export default function DashboardPage() {
 
   const getFilteredReplacements = () => {
     if (!data) return []
-    if (!selectedDate) return data.replacementList
+    if (!selectedDate || filterMode !== 'month') return data.replacementList
     return data.replacementList.filter(r => {
       return (
         (r.start_date && r.start_date.startsWith(selectedDate)) ||
@@ -113,7 +122,7 @@ export default function DashboardPage() {
 
   const getFilteredReturns = () => {
     if (!data) return []
-    if (!selectedDate) return data.returnList
+    if (!selectedDate || filterMode !== 'month') return data.returnList
     return data.returnList.filter(r => {
       return (
         (r.receive_date && r.receive_date.startsWith(selectedDate)) ||
@@ -241,91 +250,160 @@ export default function DashboardPage() {
         </div>
 
         {/* Date Filter & Calendar View Controls (Matches screenshot layout) */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/60 dark:bg-zinc-900/40 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm backdrop-blur-md">
-          {/* Month/Year toggle controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-            </button>
-            
-            <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 min-w-[120px] text-center">
-              {thaiMonths[selectedMonth]} {selectedYear + 543}
-            </span>
-            
-            <button
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-              </svg>
-            </button>
-            
-            <button
-              onClick={handleGoToToday}
-              className="text-xs font-semibold px-2.5 py-1.5 border border-zinc-200 hover:bg-zinc-50 rounded-lg dark:border-zinc-800 dark:hover:bg-zinc-850"
-            >
-              วันนี้
-            </button>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/60 dark:bg-zinc-900/40 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm backdrop-blur-md">
+          {/* Mode Selector & Main Date Controls */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Range vs Month Toggle */}
+            <div className="bg-zinc-100 dark:bg-zinc-850 p-1 rounded-xl flex gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
+              <button
+                onClick={() => {
+                  setFilterMode('month')
+                  setSelectedDate(null)
+                }}
+                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 ${
+                  filterMode === 'month'
+                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-300'
+                }`}
+              >
+                รายเดือน
+              </button>
+              <button
+                onClick={() => {
+                  setFilterMode('range')
+                  setSelectedDate(null)
+                  if (!customStartDate) {
+                    const firstDay = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
+                    setCustomStartDate(firstDay)
+                  }
+                  if (!customEndDate) {
+                    const lastDay = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+                    setCustomEndDate(lastDay)
+                  }
+                }}
+                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 ${
+                  filterMode === 'range'
+                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-300'
+                }`}
+              >
+                เลือกช่วงวันที่
+              </button>
+            </div>
+
+            {filterMode === 'month' ? (
+              /* Month/Year toggle controls */
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 min-w-[120px] text-center">
+                  {thaiMonths[selectedMonth]} {selectedYear + 543}
+                </span>
+                
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+                
+                <button
+                  onClick={handleGoToToday}
+                  className="text-xs font-semibold px-2.5 py-1.5 border border-zinc-200 hover:bg-zinc-50 rounded-lg dark:border-zinc-800 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300"
+                >
+                  วันนี้
+                </button>
+              </div>
+            ) : (
+              /* Custom Date Range Pickers */
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">จาก:</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">ถึง:</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="text-xs px-2.5 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Calendar Mode Toggles and Selectors */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl flex gap-1 shadow-inner">
-              <button
-                onClick={() => setCalendarViewMode('deliveries')}
-                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-150 ${
-                  calendarViewMode === 'deliveries'
-                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                }`}
-              >
-                ปฏิทินส่งมอบรถ
-              </button>
-              <button
-                onClick={() => setCalendarViewMode('repairs')}
-                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-150 ${
-                  calendarViewMode === 'repairs'
-                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                }`}
-              >
-                ปฏิทินงานซ่อม
-              </button>
-            </div>
+            {/* View Mode Toggle (Only in Month Mode) */}
+            {filterMode === 'month' && (
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl flex gap-1 shadow-inner">
+                <button
+                  onClick={() => setCalendarViewMode('deliveries')}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-150 ${
+                    calendarViewMode === 'deliveries'
+                      ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  ปฏิทินส่งมอบรถ
+                </button>
+                <button
+                  onClick={() => setCalendarViewMode('repairs')}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-150 ${
+                    calendarViewMode === 'repairs'
+                      ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  ปฏิทินงานซ่อม
+                </button>
+              </div>
+            )}
 
-            {/* Quick dropdown selectors */}
-            <div className="flex gap-2">
-              <select
-                value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(Number(e.target.value))
-                  setSelectedDate(null)
-                }}
-                className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
-              >
-                <option value={2025}>2025</option>
-                <option value={2026}>2026</option>
-              </select>
-              <select
-                value={selectedMonth}
-                onChange={(e) => {
-                  setSelectedMonth(Number(e.target.value))
-                  setSelectedDate(null)
-                }}
-                className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
-              >
-                {thaiMonthsShort.map((m, i) => (
-                  <option key={i} value={i}>{m}</option>
-                ))}
-              </select>
-            </div>
+            {/* Quick dropdown selectors (Only in Month Mode) */}
+            {filterMode === 'month' && (
+              <div className="flex gap-2">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => {
+                    setSelectedYear(Number(e.target.value))
+                    setSelectedDate(null)
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+                >
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
+                </select>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    setSelectedMonth(Number(e.target.value))
+                    setSelectedDate(null)
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+                >
+                  {thaiMonthsShort.map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -338,7 +416,7 @@ export default function DashboardPage() {
           ) : data ? (
             <>
               <StatCard
-                title="คิวส่งมอบเดือนนี้"
+                title={filterMode === 'month' ? "คิวส่งมอบเดือนนี้" : "คิวส่งมอบช่วงที่เลือก"}
                 value={data.delivery.total}
                 icon={carIcon}
                 subValue={[
@@ -347,7 +425,7 @@ export default function DashboardPage() {
                 ]}
               />
               <StatCard
-                title="งานซ่อมแจ้งเดือนนี้"
+                title={filterMode === 'month' ? "งานซ่อมแจ้งเดือนนี้" : "งานซ่อมแจ้งช่วงที่เลือก"}
                 value={data.repair.total}
                 icon={repairIcon}
                 subValue={[
@@ -376,22 +454,24 @@ export default function DashboardPage() {
         </div>
 
         {/* Master Calendar Section */}
-        {isLoading ? (
-          <LoadingSkeleton className="h-[550px] w-full" />
-        ) : data ? (
-          <DeliveryCalendar
-            deliveries={data.deliveryList}
-            repairs={data.repairList}
-            selectedYear={selectedYear}
-            selectedMonth={selectedMonth}
-            selectedDate={selectedDate}
-            onDateClick={(dateStr) => {
-              // Toggle selection: click same date again to clear filter
-              setSelectedDate(prev => prev === dateStr ? null : dateStr)
-            }}
-            viewMode={calendarViewMode}
-          />
-        ) : null}
+        {filterMode === 'month' && (
+          isLoading ? (
+            <LoadingSkeleton className="h-[550px] w-full" />
+          ) : data ? (
+            <DeliveryCalendar
+              deliveries={data.deliveryList}
+              repairs={data.repairList}
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              selectedDate={selectedDate}
+              onDateClick={(dateStr) => {
+                // Toggle selection: click same date again to clear filter
+                setSelectedDate(prev => prev === dateStr ? null : dateStr)
+              }}
+              viewMode={calendarViewMode}
+            />
+          ) : null
+        )}
 
         {/* 7-day trend chart */}
         {!isLoading && data && data.trend && data.trend.length > 0 && (
@@ -464,14 +544,31 @@ export default function DashboardPage() {
           <div className="transition-all duration-300">
             {isLoading ? (
               <LoadingSkeleton className="h-96 w-full" />
-            ) : data ? (
-              <>
-                {activeTab === 'deliveries' && <DeliveryTable records={filteredDeliveries} />}
-                {activeTab === 'repairs' && <RepairTable records={filteredRepairs} />}
-                {activeTab === 'replacements' && <ReplacementTable records={filteredReplacements} />}
-                {activeTab === 'returns' && <ReturnTable records={filteredReturns} />}
-              </>
-            ) : null}
+            ) : data ? (() => {
+              const periodLabel = filterMode === 'month'
+                ? `${thaiMonths[selectedMonth]} ${selectedYear + 543}`
+                : `${new Date(startDateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(endDateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              return (
+                <>
+                  {activeTab === 'deliveries' && <DeliveryTable records={filteredDeliveries} periodLabel={periodLabel} />}
+                  {activeTab === 'repairs' && (
+                    <>
+                      <div className="flex justify-end mb-3">
+                        <a
+                          href="/maintenance"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 px-3 py-1.5 rounded-xl transition-all border border-emerald-500/10"
+                        >
+                          🔧 ดูรายละเอียดงานซ่อมทั้งหมด →
+                        </a>
+                      </div>
+                      <RepairTable records={filteredRepairs} periodLabel={periodLabel} />
+                    </>
+                  )}
+                  {activeTab === 'replacements' && <ReplacementTable records={filteredReplacements} periodLabel={periodLabel} />}
+                  {activeTab === 'returns' && <ReturnTable records={filteredReturns} periodLabel={periodLabel} />}
+                </>
+              )
+            })() : null}
           </div>
         </div>
 

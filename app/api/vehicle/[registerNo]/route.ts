@@ -184,7 +184,7 @@ export async function GET(
       'NO_INSURANCE': 'ไม่มีประกัน',
     }
 
-    function mapCode(code: unknown, map: Record<string, string>): string {
+    const mapCode = (code: unknown, map: Record<string, string>): string => {
       const s = (code as string) || ''
       return map[s] || s.replace(/_/g, ' ') || '-'
     }

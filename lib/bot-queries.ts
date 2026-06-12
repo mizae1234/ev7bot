@@ -343,6 +343,80 @@ export async function runCustomQuery(params: { sqlQuery: string }) {
   }
 }
 
+// ─── Function: getPortfolioSummary (ภาพรวม Portfolio ทั้ง port) ─────
+export async function getPortfolioSummary() {
+  const pool = await getMSSQLPool()
+  if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
+
+  // 1. Overall status breakdown (excluding Active)
+  const statusReq = pool.request()
+  const statusResult = await statusReq.query(`
+    SELECT Status, StatusType, COUNT(*) AS Total
+    FROM dbo.EV_InventoryItem
+    WHERE IsActive = 1
+    GROUP BY Status, StatusType
+    ORDER BY Status, StatusType
+  `)
+
+  // Build summary from status breakdown
+  let onRentTotal = 0, onRoadCount = 0, underMaintenanceOnRent = 0
+  let productionTotal = 0, pendingCount = 0, inProcessCount = 0, waitingGRCount = 0
+  let replacementTotal = 0, replacementAvailable = 0, replacementCar = 0
+  let maintenanceTotal = 0, newMaintenance = 0, onRentMaintenance = 0, useMaintenance = 0
+  let availableTotal = 0
+
+  for (const row of statusResult.recordset) {
+    const st = row.Status as string
+    const stType = (row.StatusType as string) || ''
+    const count = row.Total as number
+
+    switch (st) {
+      case 'ON_RENT':
+        onRentTotal += count
+        if (stType.includes('MAINTENANCE')) {
+          underMaintenanceOnRent += count
+        } else {
+          onRoadCount += count
+        }
+        break
+      case 'PRODUCTION':
+        productionTotal += count
+        if (stType.includes('PENDING')) pendingCount += count
+        else if (stType.includes('PROCESS') || stType.includes('IN_PROCESS')) inProcessCount += count
+        else pendingCount += count // fallback
+        break
+      case 'WAITING_FOR_GR':
+        productionTotal += count
+        waitingGRCount += count
+        break
+      case 'REPLACEMENT':
+        replacementTotal += count
+        if (stType.includes('AVAILABLE')) replacementAvailable += count
+        else replacementCar += count
+        break
+      case 'MAINTENANCE':
+        maintenanceTotal += count
+        if (stType.includes('ON_RENT')) onRentMaintenance += count
+        else if (stType.includes('USE')) useMaintenance += count
+        else newMaintenance += count
+        break
+      case 'AVAILABLE':
+        availableTotal += count
+        break
+      // Active excluded
+    }
+  }
+
+  return {
+    onRent: { total: onRentTotal, onRoad: onRoadCount, underMaintenance: underMaintenanceOnRent },
+    onProduction: { total: productionTotal, pending: pendingCount, inProcess: inProcessCount, waitingGR: waitingGRCount },
+    replacement: { total: replacementTotal, available: replacementAvailable, car: replacementCar },
+    underMaintenance: { total: maintenanceTotal, new: newMaintenance, onRent: onRentMaintenance, use: useMaintenance },
+    available: { total: availableTotal },
+    rawBreakdown: statusResult.recordset,
+  }
+}
+
 // ─── Function registry (for AI dispatch) ───────────────────────────
 export const botFunctions: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
   getDeliveryToday: () => getDeliveryToday(),
@@ -351,4 +425,6 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
   getMonthlyStats: (p) => getMonthlyStats(p as { year?: number; month?: number }),
   searchVehicle: (p) => searchVehicle(p as { keyword: string }),
   runCustomQuery: (p) => runCustomQuery(p as { sqlQuery: string }),
+  getPortfolioSummary: () => getPortfolioSummary(),
 }
+

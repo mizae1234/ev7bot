@@ -1,12 +1,14 @@
 'use client'
 import React, { useState } from 'react'
 import type { ReturnRecord } from '@/types'
+import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
 
 interface ReturnTableProps {
   records: ReturnRecord[]
+  periodLabel?: string
 }
 
-export function ReturnTable({ records = [] }: ReturnTableProps) {
+export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps) {
   const [search, setSearch] = useState('')
 
   const filteredRecords = records.filter((rec) => {
@@ -28,6 +30,25 @@ export function ReturnTable({ records = [] }: ReturnTableProps) {
     }
   }
 
+  const handleExport = () => {
+    exportToExcel({
+      reportName: 'รายการรับคืนรถ',
+      periodLabel: periodLabel || '-',
+      headers: ['ID รับคืน', 'ทะเบียน', 'รุ่น', 'เลขตัวถัง (VIN)', 'เลขไมล์ (กม.)', 'จุดจอดรถ', 'วันที่รับคืน', 'หมายเหตุ'],
+      rows: filteredRecords.map(rec => [
+        rec.return_id,
+        rec.register_no || '-',
+        rec.model,
+        rec.vin,
+        rec.mileage,
+        rec.park_location || '-',
+        formatDateForExcel(rec.receive_date || rec.return_date),
+        rec.remark || '-',
+      ]),
+      fileName: 'รายการรับคืนรถ',
+    })
+  }
+
   return (
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -44,6 +65,7 @@ export function ReturnTable({ records = [] }: ReturnTableProps) {
             onChange={(e) => setSearch(e.target.value)}
             className="px-3 py-1.5 text-xs rounded-xl border border-zinc-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
           />
+          <ExportButton onClick={handleExport} />
         </div>
       </div>
 

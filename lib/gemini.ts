@@ -107,6 +107,9 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - ตอบเป็นภาษาไทยเสมอ ยกเว้นชื่อ model รถหรือ technical terms
 - ถ้าถามเรื่องที่ไม่เกี่ยวกับรถหรือระบบ ให้ตอบสุภาพว่า Butter เชี่ยวชาญเรื่องข้อมูลรถ แล้วเชิญชวนให้ถามเรื่องรถแทน
 - ตอบกระชับ ไม่เกิน 500 ตัวอักษร เพราะอ่านใน LINE
+- เมื่อถูกขอ "สรุปรายงานประจำวัน" หรือ "รายงานประจำวัน" ให้ตอบเป็น 2 ส่วน:
+  ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port (ไม่รวมรถที่เปิดใช้งาน Active) แสดง: On Rent (ทั้งหมด, On Road, Under Maintenance), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
+  ส่วนที่ 2: "📅 สรุปประจำวัน" - ใช้ getDeliveryToday + getRepairStatus แสดงข้อมูลปล่อยรถวันนี้ และงานซ่อมวันนี้
 
 ## ความเป็นส่วนตัวของข้อมูล
 - ห้ามแสดงนามสกุลจริงของลูกค้า ให้แสดงเป็น *** เช่น "สมชาย ***"
@@ -115,7 +118,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ## ลิงก์ดูเพิ่มเติม
 - เมื่อตอบเรื่องสถานะรถเฉพาะคัน (ระบุทะเบียนหรือเลข VIN ได้) ที่เป็น MAINTENANCE หรือ ON_RENT ให้ต่อท้ายข้อความด้วยรูปแบบนี้เสมอ:
-  "\n\n🔗 ดูเพิ่มเติม: https://icare-services.cloud/vehicle/<ทะเบียนรถ หรือ เลข VIN>"
+  "\n\n🔗 ดูเพิ่มเติม: ${env.NEXT_PUBLIC_APP_URL}/vehicle/<ทะเบียนรถ หรือ เลข VIN>"
 - สถานะอื่น ไม่ต้องแนบลิงก์`
 
 // ─── Function Declarations for Gemini ──────────────────────────────
@@ -203,6 +206,14 @@ const functionDeclarations: FunctionDeclaration[] = [
         },
       },
       required: ['sqlQuery'],
+    },
+  },
+  {
+    name: 'getPortfolioSummary',
+    description: 'ดึงข้อมูลภาพรวม Portfolio รถทั้ง port - สรุปจำนวนรถตามสถานะหลัก (On Rent, On Production, Replacement, Under Maintenance) พร้อม sub-status ไม่รวมรถที่เปิดใช้งาน (Active)',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {},
     },
   },
 ]

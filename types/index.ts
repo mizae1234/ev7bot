@@ -41,6 +41,12 @@ export interface RepairRecord {
   start_date: string | null
   finish_date: string | null
   status_code: string | null
+  service_location: string | null
+  problem_type: string | null
+  fault_party: string | null
+  car_case: string | null
+  insurance: string | null
+  project: string | null
 }
 
 export interface ReplacementRecord {

@@ -487,6 +487,7 @@ async function trySendVehicleFlexMessage(
           type: 'box',
           layout: 'vertical',
           paddingAll: '16px',
+          spacing: 'sm',
           contents: [
             {
               type: 'button',
@@ -496,6 +497,15 @@ async function trySendVehicleFlexMessage(
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
                 uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
+              }
+            },
+            {
+              type: 'button',
+              style: 'secondary',
+              action: {
+                type: 'uri',
+                label: '🔧 ดูรายการซ่อมทั้งหมด',
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/maintenance')}`
               }
             }
           ]

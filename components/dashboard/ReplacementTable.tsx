@@ -2,12 +2,14 @@
 import React, { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { ReplacementRecord } from '@/types'
+import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
 
 interface ReplacementTableProps {
   records: ReplacementRecord[]
+  periodLabel?: string
 }
 
-export function ReplacementTable({ records = [] }: ReplacementTableProps) {
+export function ReplacementTable({ records = [], periodLabel = '' }: ReplacementTableProps) {
   const [search, setSearch] = useState('')
 
   const filteredRecords = records.filter((rec) => {
@@ -27,6 +29,24 @@ export function ReplacementTable({ records = [] }: ReplacementTableProps) {
     }
   }
 
+  const handleExport = () => {
+    exportToExcel({
+      reportName: 'รายการรถทดแทน',
+      periodLabel: periodLabel || '-',
+      headers: ['ID รถทดแทน', 'เลขใบสั่งซ่อม', 'เลขตัวถัง (VIN)', 'วันที่เริ่มใช้', 'วันที่ส่งคืน', 'สถานที่ปล่อยรถ', 'หมายเหตุ'],
+      rows: filteredRecords.map(rec => [
+        rec.replacement_id,
+        rec.maintenance_id,
+        rec.vin,
+        formatDateForExcel(rec.start_date),
+        rec.return_date ? formatDateForExcel(rec.return_date) : 'ยังไม่คืน',
+        rec.location || '-',
+        rec.remark || '-',
+      ]),
+      fileName: 'รายการรถทดแทน',
+    })
+  }
+
   return (
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -43,6 +63,7 @@ export function ReplacementTable({ records = [] }: ReplacementTableProps) {
             onChange={(e) => setSearch(e.target.value)}
             className="px-3 py-1.5 text-xs rounded-xl border border-zinc-200 bg-white/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
           />
+          <ExportButton onClick={handleExport} />
         </div>
       </div>
 
