@@ -39,3 +39,27 @@ model LineRegistration {
 
   @@map("line_registrations")
 }
+
+model LineGroup {
+  id          Int      @id @default(autoincrement())
+  groupId     String   @unique @map("group_id") @db.VarChar(50)
+  groupName   String?  @map("group_name") @db.VarChar(255)
+  groupType   String   @default("group") @map("group_type") @db.VarChar(20)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("line_groups")
+}
+
+model ChatLog {
+  id          Int      @id @default(autoincrement())
+  sourceType  String   @map("source_type") @db.VarChar(20)
+  sourceId    String?  @map("source_id") @db.VarChar(50)
+  userName    String?  @map("user_name") @db.VarChar(255)
+  userMessage String   @map("user_message") @db.Text
+  botReply    String   @map("bot_reply") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("chat_logs")
+}

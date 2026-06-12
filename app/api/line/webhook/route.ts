@@ -53,11 +53,15 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
   const sourceType = event.source.type // 'user' | 'group' | 'room'
   const isGroup = sourceType === 'group' || sourceType === 'room'
 
-  // Log source info for debugging (especially to capture Group ID)
+  // Auto-save Group/Room ID to database
   if (sourceType === 'group') {
-    console.log(`[Webhook] 📌 GROUP ID: ${(event.source as any).groupId}`)
+    const gid = (event.source as any).groupId as string
+    console.log(`[Webhook] 📌 GROUP ID: ${gid}`)
+    saveGroupToDb(gid, 'group').catch(err => console.error('[saveGroup Error]', err))
   } else if (sourceType === 'room') {
-    console.log(`[Webhook] 📌 ROOM ID: ${(event.source as any).roomId}`)
+    const rid = (event.source as any).roomId as string
+    console.log(`[Webhook] 📌 ROOM ID: ${rid}`)
+    saveGroupToDb(rid, 'room').catch(err => console.error('[saveGroup Error]', err))
   } else {
     console.log(`[Webhook] 👤 USER ID: ${event.source.userId}`)
   }
@@ -68,8 +72,22 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     return
   }
 
+  // Handle leave event (bot removed from group/room)
+  if (event.type === 'leave') {
+    const leaveId = sourceType === 'group'
+      ? (event.source as any).groupId as string
+      : (event.source as any).roomId as string
+    console.log(`[Webhook] 👋 Bot left ${sourceType}: ${leaveId}`)
+    await deactivateGroupInDb(leaveId)
+    return
+  }
+
   // Handle join event (bot added to group/room)
   if (event.type === 'join') {
+    const joinId = sourceType === 'group'
+      ? (event.source as any).groupId as string
+      : (event.source as any).roomId as string
+    await saveGroupToDb(joinId, sourceType === 'group' ? 'group' : 'room')
     await replyText(
       event.replyToken,
       `สวัสดีค่า~ ${BOT_NAME} มาแล้วนะ 🧈✨\n\nเรียก ${BOT_NAME} ได้โดยพิมพ์ชื่อนำหน้า เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter สรุปเดือนนี้"\n💬 "butter ซ่อมค้างกี่คัน"\n\nพิมพ์ "butter เมนู" เพื่อดูคำสั่งทั้งหมดค่ะ 💛`
@@ -112,7 +130,8 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
       }
 
       // Chat with stripped message
-      await handleChat(strippedText, lower, event.source.userId!, event.replyToken, appUrl)
+      const srcId = (event.source as any).groupId || (event.source as any).roomId || event.source.userId
+      await handleChat(strippedText, lower, event.source.userId!, event.replyToken, appUrl, sourceType, srcId || null)
       return
     }
 
@@ -133,7 +152,8 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     }
 
     // All other messages → Butter chat
-    await handleChat(text, lower, event.source.userId!, event.replyToken, appUrl)
+    const srcId = (event.source as any).groupId || (event.source as any).roomId || event.source.userId
+    await handleChat(text, lower, event.source.userId!, event.replyToken, appUrl, sourceType, srcId || null)
     return
   }
 
@@ -156,7 +176,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
 
 // ─── Butter Chat Handler ───────────────────────────────────────────
 
-async function handleChat(text: string, lower: string, userId: string, replyToken: string, appUrl: string) {
+async function handleChat(text: string, lower: string, userId: string, replyToken: string, appUrl: string, chatSourceType: string = 'user', chatSourceId: string | null = null) {
   // Greeting patterns
   if (matchAny(lower, ['สวัสดี', 'หวัดดี', 'ดีครับ', 'ดีค่ะ', 'ดีจ้า', 'hi', 'hello', 'hey'])) {
     let name = ''
@@ -210,6 +230,17 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
     const aiResponse = await askButter(text)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
+
+    // ─── Log chat to database ────────────────────────────────────
+    let userName: string | undefined
+    try {
+      if (!env.MOCK_MODE && userId) {
+        const profile = await lineClient.getProfile(userId)
+        userName = profile.displayName
+      }
+    } catch { /* ignore profile errors */ }
+    logChatToDb(chatSourceType, chatSourceId || userId, userName, text, aiResponse)
+      .catch(err => console.error('[logChat Error]', err))
 
     // ─── Try to detect a vehicle identifier for Flex Message ───
     let vehicleIdentifier: string | null = null
@@ -866,3 +897,66 @@ async function replyOrPush(userId: string, message: string) {
   }
 }
 
+// ─── Group & Chat Logging Functions ─────────────────────────────────
+
+async function saveGroupToDb(groupId: string, type: 'group' | 'room') {
+  try {
+    let groupName: string | null = null
+    if (!env.MOCK_MODE && type === 'group') {
+      try {
+        const summary = await lineClient.getGroupSummary(groupId)
+        groupName = summary.groupName || null
+      } catch { /* ignore - may not have permission */ }
+    }
+
+    await prisma.lineGroup.upsert({
+      where: { groupId },
+      update: {
+        isActive: true,
+        ...(groupName ? { groupName } : {}),
+      },
+      create: {
+        groupId,
+        groupName,
+        groupType: type,
+      },
+    })
+    console.log(`[DB] Saved ${type} ${groupId} (${groupName || 'unknown'}) to database`)
+  } catch (err) {
+    console.error(`[DB Error] Failed to save group ${groupId}:`, err)
+  }
+}
+
+async function deactivateGroupInDb(groupId: string) {
+  try {
+    await prisma.lineGroup.updateMany({
+      where: { groupId },
+      data: { isActive: false },
+    })
+    console.log(`[DB] Deactivated group ${groupId}`)
+  } catch (err) {
+    console.error(`[DB Error] Failed to deactivate group ${groupId}:`, err)
+  }
+}
+
+export async function logChatToDb(
+  sourceType: string,
+  sourceId: string | null,
+  userName: string | undefined,
+  userMessage: string,
+  botReply: string
+) {
+  try {
+    await prisma.chatLog.create({
+      data: {
+        sourceType,
+        sourceId: sourceId || null,
+        userName: userName || null,
+        userMessage: userMessage.substring(0, 2000),
+        botReply: botReply.substring(0, 5000),
+      },
+    })
+  } catch (err) {
+    console.error('[DB Error] Failed to log chat:', err)
+  }
+}
