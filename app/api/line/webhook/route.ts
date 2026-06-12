@@ -143,9 +143,9 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               event.replyToken,
               `✅ ตั้งค่าเรียบร้อยค่ะ!\n\n🧈 ${BOT_NAME} จะส่งรายงานสรุปเมื่อวานมาที่กลุ่มนี้ทุกเช้า 08:30 น. นะคะ 💛`
             )
-          } catch (err) {
-            console.error('[Setup Group Error]', err)
-            await replyText(event.replyToken, `❌ ตั้งค่าไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          } catch (err: any) {
+            console.error('[Setup Group Error]', err?.message || err, err?.code)
+            await replyText(event.replyToken, `❌ ตั้งค่าไม่สำเร็จค่ะ (${err?.code || 'unknown'})\n${err?.message?.substring(0, 100) || ''}\nลองใหม่อีกครั้งนะคะ 🧈`)
           }
         }
         return
