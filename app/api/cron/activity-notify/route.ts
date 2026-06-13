@@ -163,11 +163,11 @@ export async function GET(req: NextRequest) {
     const sentMaintIds = new Set(sentMaint.map(s => s.recordId))
     const sentDeliveryIds = new Set(sentDelivery.map(s => s.recordId))
 
-    // ── Poll new records since 07:00 AM today (Bangkok time) ─────
+    // ── Poll new records since start of today (Bangkok midnight) ──
     const now = new Date()
-    // Build today 07:00 AM in Bangkok (UTC+7 → 00:00 UTC)
     const bangkokDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
-    const since = new Date(`${bangkokDate}T00:00:00.000Z`) // 07:00 Bangkok = 00:00 UTC
+    // Midnight Bangkok = 17:00 UTC previous day
+    const since = new Date(`${bangkokDate}T00:00:00+07:00`)
 
     const maintResult = await pool.request()
       .input('since', sql.DateTime, since)
