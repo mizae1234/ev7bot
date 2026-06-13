@@ -223,10 +223,34 @@ export async function getRepairDailySummary(dateStr: string) {
       AND m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate
   `)
 
+  // รถทดแทน — นับจาก ReplacementStartDate
+  const replReq = pool.request()
+  replReq.input('startDate', sql.DateTime, start)
+  replReq.input('endDate', sql.DateTime, end)
+  const replResult = await replReq.query(`
+    SELECT COUNT(DISTINCT r.VinNoReplacement) AS replacements
+    FROM dbo.EV_ReplacementItem r
+    WHERE r.IsActive = 1
+      AND r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate
+  `)
+
+  // รถคืน — นับจาก ReplacementReturnDate (คืนรถทดแทน)
+  const returnReq = pool.request()
+  returnReq.input('startDate', sql.DateTime, start)
+  returnReq.input('endDate', sql.DateTime, end)
+  const returnResult = await returnReq.query(`
+    SELECT COUNT(DISTINCT r.VinNoReplacement) AS returns
+    FROM dbo.EV_ReplacementItem r
+    WHERE r.IsActive = 1
+      AND r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
+  `)
+
   return {
     date: dateStr,
     newReports: reportResult.recordset[0]?.newReports || 0,
     completed: finishResult.recordset[0]?.completed || 0,
+    replacements: replResult.recordset[0]?.replacements || 0,
+    returns: returnResult.recordset[0]?.returns || 0,
   }
 }
 

@@ -399,6 +399,20 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: 'ซ่อมเสร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
+          { type: 'separator' },
+          // Replacement & Return
+          { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: '🔄 รถทดแทน', weight: 'bold', size: 'xs', color: '#E65100', align: 'center' },
+              { type: 'text', text: String(repairData.replacements), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'คัน', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: '📥 รถคืน', weight: 'bold', size: 'xs', color: '#1565C0', align: 'center' },
+              { type: 'text', text: String(repairData.returns), size: 'xl', weight: 'bold', color: '#1565C0', align: 'center' },
+              { type: 'text', text: 'คัน', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+          ]},
         ], paddingAll: 'lg' },
       }
 
