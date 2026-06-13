@@ -164,7 +164,7 @@ export default function ChatPage() {
       flexDirection: 'column',
     }}>
       {/* Header */}
-      <header style={{
+      <header className="chat-header" style={{
         background: 'rgba(15, 23, 42, 0.8)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(250, 204, 21, 0.15)',
@@ -176,7 +176,7 @@ export default function ChatPage() {
         top: 0,
         zIndex: 10,
       }}>
-        <a href="/dashboard" style={{
+        <a href="/dashboard" className="back-btn" style={{
           color: '#94a3b8',
           textDecoration: 'none',
           fontSize: '14px',
@@ -232,7 +232,7 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-        <div style={{
+        <div className="ai-badge" style={{
           padding: '4px 12px',
           borderRadius: '20px',
           background: 'rgba(250, 204, 21, 0.1)',
@@ -283,7 +283,7 @@ export default function ChatPage() {
                 🧈
               </div>
             )}
-            <div style={{
+            <div className="msg-bubble" style={{
               maxWidth: '75%',
               padding: '12px 16px',
               borderRadius: msg.role === 'user'
@@ -534,6 +534,22 @@ export default function ChatPage() {
         }
         ::-webkit-scrollbar-thumb:hover {
           background: rgba(250, 204, 21, 0.4);
+        }
+        @media (max-width: 640px) {
+          .ai-badge {
+            display: none !important;
+          }
+          .back-btn {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+          }
+          .chat-header {
+            padding: 12px 16px !important;
+            gap: 10px !important;
+          }
+          .msg-bubble {
+            max-width: 85% !important;
+          }
         }
       `}</style>
     </div>

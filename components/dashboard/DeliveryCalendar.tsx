@@ -80,7 +80,7 @@ export function DeliveryCalendar({
   }
 
   return (
-    <div className="w-full bg-white dark:bg-zinc-900/60 rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 p-6 shadow-sm backdrop-blur-md">
+    <div className="w-full bg-white dark:bg-zinc-900/60 rounded-2xl md:rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 p-3 md:p-6 shadow-sm backdrop-blur-md">
       
       {/* Weekdays header */}
       <div className="grid grid-cols-7 gap-px text-center mb-2">
@@ -145,14 +145,14 @@ export function DeliveryCalendar({
             <div
               key={cellDateStr}
               onClick={() => onDateClick(cellDateStr)}
-              className={`group relative bg-white dark:bg-zinc-900 min-h-[120px] p-2 flex flex-col justify-between cursor-pointer hover:bg-indigo-500/5 dark:hover:bg-indigo-500/5 transition-all duration-150 ${
+              className={`group relative bg-white dark:bg-zinc-900 min-h-[55px] md:min-h-[120px] p-1 md:p-2 flex flex-col justify-between cursor-pointer hover:bg-indigo-500/5 dark:hover:bg-indigo-500/5 transition-all duration-150 ${
                 isSelected ? 'ring-2 ring-indigo-550 dark:ring-indigo-400 bg-indigo-500/5 dark:bg-indigo-550/10' : ''
               }`}
             >
               
               {/* Day Number and Actions */}
               <div className="flex justify-between items-start">
-                <span className={`text-xs font-semibold ${
+                <span className={`text-[10px] md:text-xs font-semibold ${
                   dayOfWeek === 0 ? 'text-rose-500' : dayOfWeek === 6 ? 'text-indigo-500' : 'text-zinc-500'
                 }`}>
                   {dayNum}
@@ -160,12 +160,12 @@ export function DeliveryCalendar({
                 
                 {/* Visual indicator dot if selected */}
                 {isSelected && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                  <span className="h-1 w-1 md:h-1.5 md:w-1.5 rounded-full bg-indigo-500" />
                 )}
               </div>
 
-              {/* Day Contents based on active View Mode */}
-              <div className="mt-1 flex-1 flex flex-col justify-end gap-0.5 overflow-hidden">
+              {/* Desktop detailed view (hidden on mobile) */}
+              <div className="hidden md:flex md:flex-col md:flex-1 md:justify-end md:gap-0.5 md:overflow-hidden md:mt-1">
                 {viewMode === 'deliveries' ? (
                   // --- DELIVERIES CALENDAR VIEW (with model breakdown) ---
                   Object.entries(deliveryByProject).map(([proj, list]) => {
@@ -206,6 +206,35 @@ export function DeliveryCalendar({
                         <span>ซ่อมเสร็จ:</span>
                         <span>{dayRepairsFinished.length} คัน</span>
                       </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Mobile simple indicators view (hidden on desktop) */}
+              <div className="flex md:hidden flex-wrap gap-0.5 mt-0.5 justify-center items-center">
+                {viewMode === 'deliveries' ? (
+                  Object.keys(deliveryByProject).map((proj) => {
+                    const p = proj.toUpperCase()
+                    let dotColor = 'bg-zinc-400'
+                    if (p.includes('EV7') || p.includes('TAXI')) dotColor = 'bg-cyan-500'
+                    else if (p.includes('LINE') || p.includes('MAN')) dotColor = 'bg-orange-500'
+                    else if (p.includes('GRAB')) dotColor = 'bg-emerald-500'
+                    return (
+                      <span
+                        key={proj}
+                        className={`h-1.5 w-1.5 rounded-full ${dotColor}`}
+                        title={`${proj}: ${deliveryByProject[proj].length}`}
+                      />
+                    )
+                  })
+                ) : (
+                  <>
+                    {dayRepairsReported.length > 0 && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title={`แจ้งซ่อม: ${dayRepairsReported.length}`} />
+                    )}
+                    {dayRepairsFinished.length > 0 && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title={`ซ่อมเสร็จ: ${dayRepairsFinished.length}`} />
                     )}
                   </>
                 )}
