@@ -329,6 +329,38 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
   `)
   const planTotal = planRes.recordset[0]?.planTotal || 0
 
+  // Get planned breakdown by ProjectType from EV_DeliveryPlan
+  const planBreakdownReq = pool.request()
+  planBreakdownReq.input('startDate', sql.DateTime, start)
+  planBreakdownReq.input('endDate', sql.DateTime, end)
+  const planBreakdownRes = await planBreakdownReq.query(`
+    SELECT 
+      ProjectType,
+      SUM(ISNULL(ES_Count, 0)) AS ES_Count,
+      SUM(ISNULL(Y490_Count, 0)) AS Y490_Count,
+      SUM(ISNULL(Y410_Count, 0)) AS Y410_Count
+    FROM dbo.EV_DeliveryPlan
+    WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+    GROUP BY ProjectType
+  `)
+
+  // Get actual breakdown by ProjectType and Model from EV_RentItem
+  const actualBreakdownReq = pool.request()
+  actualBreakdownReq.input('startDate', sql.DateTime, start)
+  actualBreakdownReq.input('endDate', sql.DateTime, end)
+  const actualBreakdownRes = await actualBreakdownReq.query(`
+    SELECT 
+      ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+      ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+      COUNT(*) AS Count
+    FROM dbo.EV_RentItem r
+    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+    WHERE r.IsActive = 1
+      AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+      AND r.ReleaseDate IS NOT NULL
+    GROUP BY i.ProjectType, i.Model
+  `)
+
   const deliveryData = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
   deliveryData.total = planTotal
   deliveryData.pending = Math.max(0, planTotal - (deliveryData.completed || 0))
@@ -339,6 +371,8 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     delivery: deliveryData,
     repair: repairRes.recordset[0] || { total: 0, closed: 0, open: 0 },
     projectBreakdown: projectRes.recordset,
+    plans: planBreakdownRes.recordset,
+    actuals: actualBreakdownRes.recordset,
   }
 }
 

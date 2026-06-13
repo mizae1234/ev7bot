@@ -633,34 +633,116 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   }
 
   // ─── Monthly Delivery Summary as Flex Message ──────────────────
-  if (matchAny(lower, ['สรุปส่งมอบประจำเดือน', 'สรุปเดือนนี้', 'สรุปประจำเดือน'])) {
+  if (matchAny(lower, ['สรุปส่งมอบประจำเดือน', 'ส่งมอบประจำเดือน', 'สรุปประจำเดือน', 'สรุปส่งมอบ', 'สรุปเดือนนี้'])) {
     try {
       const { getMonthlyStats } = await import('@/lib/bot-queries')
-      const now = new Date()
-      const bangkokYear = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric' }).format(now)
-      const bangkokMonth = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', month: 'numeric' }).format(now)
       
-      const stats = await getMonthlyStats({ year: parseInt(bangkokYear), month: parseInt(bangkokMonth) })
+      const parsedDate = parseMonthYear(text)
+      const targetYear = parsedDate.year
+      const targetMonth = parsedDate.month
+      
+      const stats = await getMonthlyStats({ year: targetYear, month: targetMonth })
       if ('error' in stats) {
         await replyText(replyToken, `❌ ดึงข้อมูลประจำเดือนไม่สำเร็จค่ะ: ${stats.error}`)
         return
       }
 
       const delivery = stats.delivery || { total: 0, completed: 0, pending: 0 }
-      const projectBreakdown = stats.projectBreakdown || []
 
-      const breakdownRows = projectBreakdown.map((item: any) => ({
-        type: 'box',
-        layout: 'horizontal',
-        contents: [
-          { type: 'text', text: `• ${item.project || 'ไม่ระบุ'}`, size: 'sm', color: '#555555', flex: 5 },
-          { type: 'text', text: `${item.count} คัน`, size: 'sm', weight: 'bold', color: '#1a1a1a', align: 'end', flex: 3 }
-        ]
-      }))
+      const planRows: any[] = []
+      if (stats.plans && stats.actuals) {
+        const { plans = [], actuals = [] } = stats as any
+        const comparison: Record<string, {
+          ES: { plan: number; actual: number };
+          Y490: { plan: number; actual: number };
+          Y410: { plan: number; actual: number };
+        }> = {}
+
+        for (const p of plans) {
+          const proj = p.ProjectType || 'ไม่ระบุ'
+          if (!comparison[proj]) {
+            comparison[proj] = {
+              ES: { plan: 0, actual: 0 },
+              Y490: { plan: 0, actual: 0 },
+              Y410: { plan: 0, actual: 0 },
+            }
+          }
+          comparison[proj].ES.plan += p.ES_Count || 0
+          comparison[proj].Y490.plan += p.Y490_Count || 0
+          comparison[proj].Y410.plan += p.Y410_Count || 0
+        }
+
+        const categorizeModel = (modelName: string) => {
+          const m = (modelName || '').toUpperCase()
+          if (m.includes('ES')) return 'ES'
+          if (m.includes('490')) return 'Y490'
+          if (m.includes('410')) return 'Y410'
+          return 'Other'
+        }
+
+        for (const a of actuals) {
+          const proj = a.ProjectType || 'ไม่ระบุ'
+          if (!comparison[proj]) {
+            comparison[proj] = {
+              ES: { plan: 0, actual: 0 },
+              Y490: { plan: 0, actual: 0 },
+              Y410: { plan: 0, actual: 0 },
+            }
+          }
+          const modelCat = categorizeModel(a.Model)
+          if (modelCat === 'ES') {
+            comparison[proj].ES.actual += a.Count || 0
+          } else if (modelCat === 'Y490') {
+            comparison[proj].Y490.actual += a.Count || 0
+          } else if (modelCat === 'Y410') {
+            comparison[proj].Y410.actual += a.Count || 0
+          }
+        }
+
+        for (const proj of Object.keys(comparison)) {
+          const models = comparison[proj]
+          for (const model of ['ES', 'Y490', 'Y410'] as const) {
+            const { plan, actual } = models[model]
+            if (plan > 0 || actual > 0) {
+              let valColor = '#1a1a1a'
+              if (actual >= plan && plan > 0) {
+                valColor = '#2E7D32' // green (target met)
+              } else if (actual < plan && actual > 0) {
+                valColor = '#E65100' // orange (in progress/shortfall)
+              } else if (actual === 0 && plan > 0) {
+                valColor = '#C62828' // red (not started)
+              }
+
+              planRows.push({
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `• ${proj} (${model})`,
+                    size: 'xs',
+                    color: '#555555',
+                    flex: 5
+                  },
+                  {
+                    type: 'text',
+                    text: `${actual}/${plan}`,
+                    size: 'xs',
+                    weight: 'bold',
+                    color: valColor,
+                    align: 'end',
+                    flex: 3
+                  }
+                ]
+              })
+            }
+          }
+        }
+      }
 
       const flexMessage = {
         type: 'flex' as const,
-        altText: `📅 สรุปส่งมอบประจำเดือน ${bangkokMonth}/${bangkokYear}`,
+        altText: `📅 สรุปส่งมอบประจำเดือน ${targetMonth}/${targetYear}`,
         contents: {
           type: 'bubble' as const,
           size: 'mega' as const,
@@ -669,7 +751,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             layout: 'vertical',
             contents: [
               { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
-              { type: 'text', text: `ข้อมูล ณ เดือนที่ ${bangkokMonth}/${bangkokYear}`, size: 'xs', color: '#888888' }
+              { type: 'text', text: `ข้อมูล ณ เดือนที่ ${targetMonth}/${targetYear}`, size: 'xs', color: '#888888' }
             ],
             backgroundColor: '#FFF3E0',
             paddingAll: 'lg'
@@ -714,10 +796,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   }
                 ]
               },
-              ...(breakdownRows.length > 0 ? [
+              ...(planRows.length > 0 ? [
                 { type: 'separator', margin: 'lg' },
-                { type: 'text', text: '📋 แยกตามโครงการ', weight: 'bold', size: 'xs', color: '#555555', margin: 'md' },
-                ...breakdownRows
+                { type: 'text', text: '📋 เทียบแผนส่งมอบรายโครงการ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'md' },
+                ...planRows
               ] : [])
             ],
             paddingAll: 'lg'
@@ -947,6 +1029,64 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────
+
+function parseMonthYear(text: string) {
+  const now = new Date()
+  const formatterYear = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric' })
+  const formatterMonth = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', month: 'numeric' })
+  let year = parseInt(formatterYear.format(now))
+  let month = parseInt(formatterMonth.format(now))
+
+  const lowerText = text.toLowerCase()
+
+  const thMonths = [
+    { names: ['มกราคม', 'มกรา', 'ม.ค.'], val: 1 },
+    { names: ['กุมภาพันธ์', 'กุมภา', 'ก.พ.'], val: 2 },
+    { names: ['มีนาคม', 'มีนา', 'มี.ค.'], val: 3 },
+    { names: ['เมษายน', 'เมษา', 'เม.ย.'], val: 4 },
+    { names: ['พฤษภาคม', 'พฤษภา', 'พ.ค.'], val: 5 },
+    { names: ['มิถุนายน', 'มิถุนา', 'มิ.ย.'], val: 6 },
+    { names: ['กรกฎาคม', 'กรกฎา', 'ก.ค.'], val: 7 },
+    { names: ['สิงหาคม', 'สิงหา', 'ส.ค.'], val: 8 },
+    { names: ['กันยายน', 'กันยา', 'ก.ย.'], val: 9 },
+    { names: ['ตุลาคม', 'ตุลา', 'ต.ค.'], val: 10 },
+    { names: ['พฤศจิกายน', 'พฤศจิกา', 'พ.ย.'], val: 11 },
+    { names: ['ธันวาคม', 'ธันวา', 'ธ.ค.'], val: 12 }
+  ]
+
+  for (const m of thMonths) {
+    if (m.names.some(name => lowerText.includes(name))) {
+      month = m.val
+      break
+    }
+  }
+
+  const slashRegex = /(\d{1,2})\/(\d{2,4})/
+  const slashMatch = lowerText.match(slashRegex)
+  if (slashMatch) {
+    month = parseInt(slashMatch[1])
+    let y = parseInt(slashMatch[2])
+    if (y < 100) y += 2000
+    year = y
+  }
+
+  const yearRegex = /(20\d{2})|(25\d{2})/
+  const yearMatch = lowerText.match(yearRegex)
+  if (yearMatch) {
+    const yStr = yearMatch[0]
+    let y = parseInt(yStr)
+    if (y > 2500) y -= 543
+    year = y
+  }
+
+  const monthWordRegex = /เดือน\s*(\d{1,2})/
+  const monthWordMatch = lowerText.match(monthWordRegex)
+  if (monthWordMatch && !lowerText.includes('/')) {
+    month = parseInt(monthWordMatch[1])
+  }
+
+  return { month, year }
+}
 
 function matchAny(text: string, keywords: string[]): boolean {
   return keywords.some(kw => text.includes(kw))
