@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
-import { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary } from '@/lib/bot-queries'
+import { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual } from '@/lib/bot-queries'
 import { prisma } from '@/lib/prisma'
 import * as line from '@line/bot-sdk'
 
@@ -16,7 +16,7 @@ function fmt(n: number): string {
 }
 
 // ─── Build Flex Message (carousel: portfolio + daily activity) ─────
-function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any): any {
+function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any, deliveryPlanData?: any): any {
   const todayFormatted = new Date().toLocaleDateString('th-TH', {
     weekday: 'long',
     year: 'numeric',
@@ -32,6 +32,116 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     replacements: repairDaily?.replacements || 0,
     returns: repairDaily?.returns || 0,
   }
+
+  // Build Delivery Plan Comparison (if available)
+  const planRows: any[] = []
+  if (deliveryPlanData && !('error' in deliveryPlanData)) {
+    const { plans = [], actuals = [] } = deliveryPlanData
+    const comparison: Record<string, {
+      ES: { plan: number; actual: number };
+      Y490: { plan: number; actual: number };
+      Y410: { plan: number; actual: number };
+    }> = {}
+
+    for (const p of plans) {
+      const proj = p.ProjectType || 'ไม่ระบุ'
+      if (!comparison[proj]) {
+        comparison[proj] = {
+          ES: { plan: 0, actual: 0 },
+          Y490: { plan: 0, actual: 0 },
+          Y410: { plan: 0, actual: 0 },
+        }
+      }
+      comparison[proj].ES.plan += p.ES_Count || 0
+      comparison[proj].Y490.plan += p.Y490_Count || 0
+      comparison[proj].Y410.plan += p.Y410_Count || 0
+    }
+
+    const categorizeModel = (modelName: string) => {
+      const m = (modelName || '').toUpperCase()
+      if (m.includes('ES')) return 'ES'
+      if (m.includes('490')) return 'Y490'
+      if (m.includes('410')) return 'Y410'
+      return 'Other'
+    }
+
+    for (const a of actuals) {
+      const proj = a.ProjectType || 'ไม่ระบุ'
+      if (!comparison[proj]) {
+        comparison[proj] = {
+          ES: { plan: 0, actual: 0 },
+          Y490: { plan: 0, actual: 0 },
+          Y410: { plan: 0, actual: 0 },
+        }
+      }
+      const modelCat = categorizeModel(a.Model)
+      if (modelCat === 'ES') {
+        comparison[proj].ES.actual += a.Count || 0
+      } else if (modelCat === 'Y490') {
+        comparison[proj].Y490.actual += a.Count || 0
+      } else if (modelCat === 'Y410') {
+        comparison[proj].Y410.actual += a.Count || 0
+      }
+    }
+
+    for (const proj of Object.keys(comparison)) {
+      const models = comparison[proj]
+      for (const model of ['ES', 'Y490', 'Y410'] as const) {
+        const { plan, actual } = models[model]
+        if (plan > 0 || actual > 0) {
+          let valColor = '#1a1a1a'
+          if (actual >= plan && plan > 0) {
+            valColor = '#2E7D32' // green (target met)
+          } else if (actual < plan && actual > 0) {
+            valColor = '#E65100' // orange (in progress/shortfall)
+          } else if (actual === 0 && plan > 0) {
+            valColor = '#C62828' // red (not started)
+          }
+
+          planRows.push({
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `• ${proj} (${model})`,
+                size: 'xs',
+                color: '#555555',
+                flex: 5
+              },
+              {
+                type: 'text',
+                text: `${actual}/${plan}`,
+                size: 'xs',
+                weight: 'bold',
+                color: valColor,
+                align: 'end',
+                flex: 3
+              }
+            ]
+          })
+        }
+      }
+    }
+  }
+
+  const comparisonBox = planRows.length > 0 ? {
+    type: 'box',
+    layout: 'vertical',
+    spacing: 'xs',
+    margin: 'md',
+    contents: [
+      {
+        type: 'text',
+        text: '📋 เทียบแผนส่งมอบ (จริง/แผน)',
+        size: 'xs',
+        weight: 'bold',
+        color: '#1a1a1a',
+        margin: 'xs'
+      },
+      ...planRows
+    ]
+  } : null
 
   // Bubble 1: Portfolio
   const portfolioBubble = {
@@ -177,6 +287,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
             ], flex: 1 },
           ],
         },
+        ...(comparisonBox ? [comparisonBox] : []),
         { type: 'separator' },
         // Repair
         { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
@@ -252,10 +363,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch all data in parallel
-    const [portfolio, delivery, repair] = await Promise.all([
+    const [portfolio, delivery, repair, deliveryPlanData] = await Promise.all([
       getPortfolioSummary(),
       getDeliveryByDate({ date: yesterdayStr }),
       getRepairDailySummary(yesterdayStr),
+      getDeliveryPlanAndActual({ date: yesterdayStr }),
     ])
 
     if ('error' in portfolio) {
@@ -266,7 +378,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Build Flex Message (carousel: portfolio + daily activity)
-    const flexMessage = buildFlexMessage(yesterdayStr, portfolio, delivery, repair)
+    const flexMessage = buildFlexMessage(yesterdayStr, portfolio, delivery, repair, deliveryPlanData)
 
     // Send to groups
     const results: { groupId: string; groupName: string | null; success: boolean; error?: string }[] = []

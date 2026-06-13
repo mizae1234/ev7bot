@@ -270,11 +270,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         reportDate = bangkokFormatter.format(new Date())
       }
 
-      const { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary } = await import('@/lib/bot-queries')
-      const [portfolio, delivery, repairDaily] = await Promise.all([
+      const { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual } = await import('@/lib/bot-queries')
+      const [portfolio, delivery, repairDaily, deliveryPlanData] = await Promise.all([
         getPortfolioSummary(),
         getDeliveryByDate({ date: reportDate }),
         getRepairDailySummary(reportDate),
+        getDeliveryPlanAndActual({ date: reportDate }),
       ])
 
       if ('error' in portfolio) {
@@ -283,6 +284,116 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       }
 
       const fmt = (n: number) => n.toLocaleString('en-US')
+
+      // Build Delivery Plan Comparison (if available)
+      const planRows: any[] = []
+      if (deliveryPlanData && !('error' in deliveryPlanData)) {
+        const { plans = [], actuals = [] } = deliveryPlanData as any
+        const comparison: Record<string, {
+          ES: { plan: number; actual: number };
+          Y490: { plan: number; actual: number };
+          Y410: { plan: number; actual: number };
+        }> = {}
+
+        for (const p of plans) {
+          const proj = p.ProjectType || 'ไม่ระบุ'
+          if (!comparison[proj]) {
+            comparison[proj] = {
+              ES: { plan: 0, actual: 0 },
+              Y490: { plan: 0, actual: 0 },
+              Y410: { plan: 0, actual: 0 },
+            }
+          }
+          comparison[proj].ES.plan += p.ES_Count || 0
+          comparison[proj].Y490.plan += p.Y490_Count || 0
+          comparison[proj].Y410.plan += p.Y410_Count || 0
+        }
+
+        const categorizeModel = (modelName: string) => {
+          const m = (modelName || '').toUpperCase()
+          if (m.includes('ES')) return 'ES'
+          if (m.includes('490')) return 'Y490'
+          if (m.includes('410')) return 'Y410'
+          return 'Other'
+        }
+
+        for (const a of actuals) {
+          const proj = a.ProjectType || 'ไม่ระบุ'
+          if (!comparison[proj]) {
+            comparison[proj] = {
+              ES: { plan: 0, actual: 0 },
+              Y490: { plan: 0, actual: 0 },
+              Y410: { plan: 0, actual: 0 },
+            }
+          }
+          const modelCat = categorizeModel(a.Model)
+          if (modelCat === 'ES') {
+            comparison[proj].ES.actual += a.Count || 0
+          } else if (modelCat === 'Y490') {
+            comparison[proj].Y490.actual += a.Count || 0
+          } else if (modelCat === 'Y410') {
+            comparison[proj].Y410.actual += a.Count || 0
+          }
+        }
+
+        for (const proj of Object.keys(comparison)) {
+          const models = comparison[proj]
+          for (const model of ['ES', 'Y490', 'Y410'] as const) {
+            const { plan, actual } = models[model]
+            if (plan > 0 || actual > 0) {
+              let valColor = '#1a1a1a'
+              if (actual >= plan && plan > 0) {
+                valColor = '#2E7D32' // green (target met)
+              } else if (actual < plan && actual > 0) {
+                valColor = '#E65100' // orange (in progress/shortfall)
+              } else if (actual === 0 && plan > 0) {
+                valColor = '#C62828' // red (not started)
+              }
+
+              planRows.push({
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `• ${proj} (${model})`,
+                    size: 'xs',
+                    color: '#555555',
+                    flex: 5
+                  },
+                  {
+                    type: 'text',
+                    text: `${actual}/${plan}`,
+                    size: 'xs',
+                    weight: 'bold',
+                    color: valColor,
+                    align: 'end',
+                    flex: 3
+                  }
+                ]
+              })
+            }
+          }
+        }
+      }
+
+      const comparisonBox = planRows.length > 0 ? {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'xs',
+        margin: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '📋 เทียบแผนส่งมอบ (จริง/แผน)',
+            size: 'xs',
+            weight: 'bold',
+            color: '#1a1a1a',
+            margin: 'xs'
+          },
+          ...planRows
+        ]
+      } : null
       const todayFormatted = new Date().toLocaleDateString('th-TH', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
       })
@@ -392,6 +503,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
+          ...(comparisonBox ? [comparisonBox] : []),
           { type: 'separator' },
           { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [

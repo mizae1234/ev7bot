@@ -465,6 +465,52 @@ export async function getPortfolioSummary() {
   }
 }
 
+// ─── Function: getDeliveryPlanAndActual ───────────────────────────
+export async function getDeliveryPlanAndActual(params: { date: string }) {
+  const pool = await getMSSQLPool()
+  if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
+
+  const { start, end } = getDateRange(params.date)
+
+  try {
+    // 1. Fetch Plan
+    const planReq = pool.request()
+    planReq.input('targetDate', sql.Date, params.date)
+    const planResult = await planReq.query(`
+      SELECT ProjectType, ES_Count, Y490_Count, Y410_Count
+      FROM dbo.EV_DeliveryPlan
+      WHERE PlanDate = @targetDate
+    `)
+
+    // 2. Fetch Actuals
+    const actualReq = pool.request()
+    actualReq.input('startDate', sql.DateTime, start)
+    actualReq.input('endDate', sql.DateTime, end)
+    const actualResult = await actualReq.query(`
+      SELECT 
+        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        COUNT(*) AS Count
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+        AND r.ReleaseDate IS NOT NULL
+        AND i.Status = 'ON_RENT'
+      GROUP BY i.ProjectType, i.Model
+    `)
+
+    return {
+      plans: planResult.recordset,
+      actuals: actualResult.recordset,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[getDeliveryPlanAndActual] Error:', message)
+    return { error: `ดึงข้อมูลแผนเปรียบเทียบไม่สำเร็จ: ${message}` }
+  }
+}
+
 // ─── Function registry (for AI dispatch) ───────────────────────────
 export const botFunctions: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
   getDeliveryToday: () => getDeliveryToday(),
@@ -474,5 +520,6 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
   searchVehicle: (p) => searchVehicle(p as { keyword: string }),
   runCustomQuery: (p) => runCustomQuery(p as { sqlQuery: string }),
   getPortfolioSummary: () => getPortfolioSummary(),
+  getDeliveryPlanAndActual: (p) => getDeliveryPlanAndActual(p as { date: string }),
 }
 

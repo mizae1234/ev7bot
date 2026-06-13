@@ -742,6 +742,10 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บประวัติการรับรถกลับเข้าระบบ
 * **คอลัมน์สำคัญ**: `ReturnItemID` (PK), `VinNo`, `CustomerName`, `Model`, `ContractNo`, `ReceiveDate`, `ReturnDate`, `Mileage` (เลขไมล์ตอนรับคืน), `ParkLocation` (สถานที่จอดเก็บรถ)
 
+### 11.6 ตาราง: `dbo.EV_DeliveryPlan` (แผนการส่งมอบรถยนต์)
+เก็บข้อมูลแผนการส่งมอบรถประจำวัน แยกตามประเภทโครงการและรุ่นรถยนต์
+* **คอลัมน์สำคัญ**: `PlanID` (PK, bigint), `PlanDate` (date, วันที่ในแผนการส่งมอบ), `ProjectType` (varchar(20), ประเภทโครงการ เช่น EV7, Grab, Line Man), `ES_Count` (int, จำนวนแผนส่งมอบของรุ่น MG ES), `Y490_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 490), `Y410_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 410)
+
 ---
 
 ## 12. ความสัมพันธ์และเงื่อนไขการ Query
