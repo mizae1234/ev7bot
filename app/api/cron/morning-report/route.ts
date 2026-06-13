@@ -216,7 +216,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     altText: `🧈 Butter สรุปข่าว ${todayFormatted}`,
     contents: {
       type: 'carousel',
-      contents: [portfolioBubble, activityBubble],
+      contents: [activityBubble, portfolioBubble],
     },
   }
 }

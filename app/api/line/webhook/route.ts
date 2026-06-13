@@ -425,7 +425,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         await lineClient.replyMessage(replyToken, {
           type: 'flex',
           altText: `🧈 Butter สรุปรายงาน ${reportDate}`,
-          contents: { type: 'carousel', contents: [portfolioBubble, activityBubble] },
+          contents: { type: 'carousel', contents: [activityBubble, portfolioBubble] },
         })
       }
       return
