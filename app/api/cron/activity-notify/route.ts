@@ -213,12 +213,12 @@ export async function GET(req: NextRequest) {
         ORDER BY r.ReleaseDate DESC
       `)
 
-    // Filter out already-sent
+    // Filter out already-sent (cast string/bigint to number to match PostgreSQL type)
     const newMaint = maintResult.recordset.filter(
-      (m: any) => !sentMaintIds.has(m.MaintenanceItemID)
+      (m: any) => !sentMaintIds.has(Number(m.MaintenanceItemID))
     )
     const newDelivery = deliveryResult.recordset.filter(
-      (d: any) => !sentDeliveryIds.has(d.RentItemID)
+      (d: any) => !sentDeliveryIds.has(Number(d.RentItemID))
     )
 
     console.log(`[Activity] Found ${newMaint.length} new maintenance, ${newDelivery.length} new deliveries`)
@@ -238,9 +238,9 @@ export async function GET(req: NextRequest) {
           console.error(`[Activity] ❌ Maint push failed:`, err.message)
         }
       }
-      // Mark as sent
+      // Mark as sent (cast to number to match Prisma schema)
       await prisma.activityNotification.create({
-        data: { recordType: 'MAINTENANCE', recordId: item.MaintenanceItemID },
+        data: { recordType: 'MAINTENANCE', recordId: Number(item.MaintenanceItemID) },
       }).catch(() => { /* unique constraint = already sent */ })
       alertsSent++
     }
@@ -258,9 +258,9 @@ export async function GET(req: NextRequest) {
           console.error(`[Activity] ❌ Delivery push failed:`, err.message)
         }
       }
-      // Mark as sent
+      // Mark as sent (cast to number to match Prisma schema)
       await prisma.activityNotification.create({
-        data: { recordType: 'DELIVERY', recordId: item.RentItemID },
+        data: { recordType: 'DELIVERY', recordId: Number(item.RentItemID) },
       }).catch(() => { /* unique constraint = already sent */ })
       alertsSent++
     }

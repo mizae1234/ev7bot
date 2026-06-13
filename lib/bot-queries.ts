@@ -41,9 +41,10 @@ export async function getDeliveryToday() {
   const result = await req.query(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      SUM(CASE WHEN r.ReleaseDate IS NOT NULL AND i.Status = 'ON_RENT' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN r.ReleaseDate IS NULL OR i.Status != 'ON_RENT' THEN 1 ELSE 0 END) AS pending
     FROM dbo.EV_RentItem r
+    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
     WHERE r.IsActive = 1
       AND (
         (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
@@ -91,9 +92,10 @@ export async function getDeliveryByDate(params: { date: string }) {
   const result = await req.query(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      SUM(CASE WHEN r.ReleaseDate IS NOT NULL AND i.Status = 'ON_RENT' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN r.ReleaseDate IS NULL OR i.Status != 'ON_RENT' THEN 1 ELSE 0 END) AS pending
     FROM dbo.EV_RentItem r
+    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
     WHERE r.IsActive = 1
       AND (
         (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
@@ -268,9 +270,10 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
   const deliveryRes = await deliveryReq.query(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      SUM(CASE WHEN r.ReleaseDate IS NOT NULL AND i.Status = 'ON_RENT' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN r.ReleaseDate IS NULL OR i.Status != 'ON_RENT' THEN 1 ELSE 0 END) AS pending
     FROM dbo.EV_RentItem r
+    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
     WHERE r.IsActive = 1
       AND (
         (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
