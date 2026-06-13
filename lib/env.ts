@@ -32,6 +32,21 @@ const mockEnvSchema = z.object({
   MOCK_MODE: z.preprocess((val) => val === 'true' || val === '1' || val === true, z.boolean()).default(true),
 })
 
-const isMock = process.env.MOCK_MODE === 'true'
-export const env = isMock ? mockEnvSchema.parse(process.env) : envSchema.parse(process.env)
+const isBuildPhase = process.env.npm_lifecycle_event === 'build' || process.env.NEXT_PHASE === 'phase-production-build'
+
+function createEnv() {
+  if (isBuildPhase) {
+    return new Proxy({} as z.infer<typeof envSchema>, {
+      get(target, prop) {
+        if (typeof prop !== 'string') return undefined;
+        return process.env[prop] || 'dummy-build-value';
+      }
+    });
+  }
+
+  const isMock = process.env.MOCK_MODE === 'true'
+  return isMock ? mockEnvSchema.parse(process.env) : envSchema.parse(process.env)
+}
+
+export const env = createEnv()
 export type Env = z.infer<typeof envSchema>
