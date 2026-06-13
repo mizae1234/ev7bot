@@ -59,6 +59,15 @@ interface MaintenanceInfo {
   FollowUpDetail: string
   IsActive: boolean
   replacements: ReplacementInfo[]
+  DriverName?: string | null
+  RootCauseFound?: string | null
+  FixAction?: string | null
+  LastFollowUpDate?: string | null
+  ParentMaintenanceItemID?: number | string | null
+  CreateDate?: string | null
+  UpdateDate?: string | null
+  CreateUserID?: number | null
+  UpdateUserID?: number | null
 }
 
 interface ReturnInfo {
@@ -260,6 +269,14 @@ export default function VehicleDetailPage() {
                 <InfoItem label="วันเริ่มซ่อม" value={formatDate(activeMaint.MaintenanceStartDate)} />
                 <InfoItem label="ซ่อมเสร็จ" value={formatDate(activeMaint.MaintenanceFinishDate)} />
                 <InfoItem label="สถานะใบแจ้งซ่อม" value={activeMaint.CarStatusDescription || '-'} />
+                <InfoItem label="คนขับ (Driver)" value={activeMaint.DriverName || '-'} />
+                <InfoItem label="สาเหตุที่พบ (Root Cause)" value={activeMaint.RootCauseFound || '-'} />
+                <InfoItem label="การแก้ไข (Fix Action)" value={activeMaint.FixAction || '-'} />
+                <InfoItem label="วันติดตามล่าสุด" value={formatDate(activeMaint.LastFollowUpDate)} />
+                <InfoItem label="ใบสั่งซ่อมหลัก ID" value={activeMaint.ParentMaintenanceItemID?.toString() || '-'} />
+                <InfoItem label="วันที่สร้าง" value={formatDate(activeMaint.CreateDate)} />
+                <InfoItem label="วันที่อัปเดต" value={formatDate(activeMaint.UpdateDate)} />
+                <InfoItem label="ผู้สร้าง / ผู้แก้ไข (ID)" value={`${activeMaint.CreateUserID || '-'} / ${activeMaint.UpdateUserID || '-'}`} />
               </div>
               {activeMaint.FollowUpDetail && (
                 <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-100">
@@ -307,6 +324,14 @@ export default function VehicleDetailPage() {
                       <span className="text-zinc-500">เริ่มซ่อม: <span className="text-zinc-700">{formatDate(m.MaintenanceStartDate)}</span></span>
                       <span className="text-zinc-500">ซ่อมเสร็จ: <span className="text-zinc-700">{formatDate(m.MaintenanceFinishDate)}</span></span>
                       <span className="text-zinc-500">วันรับรถคืน: <span className="text-zinc-700">{formatDate(m.MaintenanceReturnDate)}</span></span>
+                      <span className="text-zinc-500">คนขับ (Driver): <span className="text-zinc-700">{m.DriverName || '-'}</span></span>
+                      <span className="text-zinc-500">สาเหตุที่พบ: <span className="text-zinc-700">{m.RootCauseFound || '-'}</span></span>
+                      <span className="text-zinc-500">การแก้ไข: <span className="text-zinc-700">{m.FixAction || '-'}</span></span>
+                      <span className="text-zinc-500">วันติดตามล่าสุด: <span className="text-zinc-700">{formatDate(m.LastFollowUpDate)}</span></span>
+                      <span className="text-zinc-500">ใบสั่งซ่อมหลัก ID: <span className="text-zinc-700">{m.ParentMaintenanceItemID || '-'}</span></span>
+                      <span className="text-zinc-500">วันที่สร้าง: <span className="text-zinc-700">{formatDate(m.CreateDate)}</span></span>
+                      <span className="text-zinc-500">วันที่อัปเดต: <span className="text-zinc-700">{formatDate(m.UpdateDate)}</span></span>
+                      <span className="text-zinc-500">ผู้สร้าง/แก้ไข (ID): <span className="text-zinc-700">{m.CreateUserID || '-'} / {m.UpdateUserID || '-'}</span></span>
                     </div>
                     {m.FollowUpDetail && (
                       <div className="mt-2 text-xs bg-zinc-100 dark:bg-zinc-800 p-2 rounded-lg text-zinc-600 dark:text-zinc-300">

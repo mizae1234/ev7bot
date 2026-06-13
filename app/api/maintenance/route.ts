@@ -43,6 +43,37 @@ const mapCode = (code: unknown, map: Record<string, string>): string => {
   return map[s] || s.replace(/_/g, ' ') || '-'
 }
 
+function maskDriverName(driverName?: string): string {
+  if (!driverName) return '-'
+  const trimmed = driverName.trim()
+  if (trimmed === 'รถใหม่ยังไม่มีเจ้าของ' || trimmed === 'รถทดแทน') return trimmed
+  
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    const firstName = parts[1]
+    const remaining = parts.slice(2)
+    if (remaining.length === 0) {
+      return `คุณ ${firstName}`
+    }
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `คุณ ${firstName} ${maskedRemaining}`
+  } else {
+    const firstName = parts[0]
+    const remaining = parts.slice(1)
+    if (remaining.length === 0) return firstName
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `${firstName} ${maskedRemaining}`
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const statusFilter = searchParams.get('status') // e.g. 'IN_MAINTENANCE', 'COMPLETE', 'all'
@@ -136,7 +167,16 @@ export async function GET(req: NextRequest) {
         m.MaintenanceStartDate,
         m.MaintenanceFinishDate,
         m.MaintenanceReturnDate,
-        m.FollowUpDetail
+        m.FollowUpDetail,
+        m.DriverName,
+        m.RootCauseFound,
+        m.FixAction,
+        m.LastFollowUpDate,
+        m.ParentMaintenanceItemID,
+        m.CreateDate,
+        m.UpdateDate,
+        m.CreateUserID,
+        m.UpdateUserID
       FROM dbo.EV_MaintenanceItem m
       LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
@@ -194,6 +234,15 @@ export async function GET(req: NextRequest) {
         register_no: r.RegisterNo,
         start_date: r.ReplacementStartDate,
       })),
+      driver_name: maskDriverName(m.DriverName as string),
+      root_cause: m.RootCauseFound || null,
+      fix_action: m.FixAction || null,
+      last_follow_up_date: m.LastFollowUpDate || null,
+      parent_maintenance_id: m.ParentMaintenanceItemID || null,
+      create_date: m.CreateDate || null,
+      update_date: m.UpdateDate || null,
+      create_user_id: m.CreateUserID || null,
+      update_user_id: m.UpdateUserID || null,
     }))
 
     return NextResponse.json({

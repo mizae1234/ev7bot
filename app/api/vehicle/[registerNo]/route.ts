@@ -44,6 +44,37 @@ function stripSensitiveFields(obj: Record<string, unknown>): Record<string, unkn
   return cleaned
 }
 
+function maskDriverName(driverName?: string): string {
+  if (!driverName) return '-'
+  const trimmed = driverName.trim()
+  if (trimmed === 'รถใหม่ยังไม่มีเจ้าของ' || trimmed === 'รถทดแทน') return trimmed
+  
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    const firstName = parts[1]
+    const remaining = parts.slice(2)
+    if (remaining.length === 0) {
+      return `คุณ ${firstName}`
+    }
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `คุณ ${firstName} ${maskedRemaining}`
+  } else {
+    const firstName = parts[0]
+    const remaining = parts.slice(1)
+    if (remaining.length === 0) return firstName
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `${firstName} ${maskedRemaining}`
+  }
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { registerNo: string } }
@@ -98,7 +129,10 @@ export async function GET(
         m.CarStatusCode, m.IssueTitle,
         m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
         m.ServiceLocationCode, m.InsuranceCode,
-        m.FollowUpDetail, m.IsActive
+        m.FollowUpDetail, m.IsActive,
+        m.DriverName, m.RootCauseFound, m.FixAction,
+        m.LastFollowUpDate, m.ParentMaintenanceItemID,
+        m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID
       FROM dbo.EV_MaintenanceItem m
       WHERE m.InventoryItemID = @inventoryItemId
       ORDER BY m.ReportDate DESC
@@ -198,6 +232,7 @@ export async function GET(
 
     const maintenance = maintResult.recordset.map((m: Record<string, unknown>) => ({
       ...stripSensitiveFields(m),
+      DriverName: maskDriverName(m.DriverName as string),
       ProblemTypeDescription: mapCode(m.ProblemTypeCode, problemTypeMap),
       FaultParty: mapCode(m.FaultPartyCode, faultPartyMap),
       CarCase: mapCode(m.CarCaseCode, carCaseMap),

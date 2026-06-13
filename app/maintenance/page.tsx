@@ -28,6 +28,15 @@ interface MaintenanceItem {
   return_date: string | null
   follow_up: string | null
   replacements: { vin: string; register_no: string | null; start_date: string | null }[]
+  driver_name: string | null
+  root_cause: string | null
+  fix_action: string | null
+  last_follow_up_date: string | null
+  parent_maintenance_id: number | string | null
+  create_date: string | null
+  update_date: string | null
+  create_user_id: number | null
+  update_user_id: number | null
 }
 
 interface MaintenanceData {
@@ -384,6 +393,42 @@ function MaintenanceContent() {
                                   <div>
                                     <span className="text-zinc-450 font-bold block mb-1">📅 วันรับรถคืน (Return):</span>
                                     <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.return_date)}</span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">👤 คนขับ (Driver):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.driver_name || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🔍 สาเหตุที่พบ (Root Cause):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.root_cause || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🛠️ การแก้ไข (Fix Action):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.fix_action || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันติดตามล่าสุด:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.last_follow_up_date)}</span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🔗 ใบสั่งซ่อมหลัก ID:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200 font-mono">{item.parent_maintenance_id || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันที่สร้างใบสั่งซ่อม:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.create_date)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันที่อัปเดตล่าสุด:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.update_date)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">👤 ID ผู้สร้าง / ผู้แก้ไข:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">
+                                      {item.create_user_id || '-'} / {item.update_user_id || '-'}
+                                    </span>
                                   </div>
                                 </div>
 
