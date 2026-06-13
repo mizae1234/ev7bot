@@ -288,7 +288,6 @@ export async function GET(req: NextRequest) {
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
           AND r.ReleaseDate IS NOT NULL
-          AND i.Status = 'ON_RENT'
         ORDER BY r.ReleaseDate DESC
       `)
 
