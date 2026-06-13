@@ -1,7 +1,7 @@
 # Stage 1: Install dependencies
 FROM node:20-alpine AS deps
+RUN apk add --no-cache openssl
 WORKDIR /app
-
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 
@@ -12,15 +12,14 @@ RUN npx prisma generate
 
 # Stage 2: Build application
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
-
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN cat next.config.mjs
 
 # Build Next.js (standalone)
 RUN npm run build
-RUN chmod +x entrypoint.sh
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
@@ -33,9 +32,6 @@ RUN apk add --no-cache openssl
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
 
 # Copy standalone build
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
