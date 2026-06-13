@@ -270,11 +270,11 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         reportDate = bangkokFormatter.format(new Date())
       }
 
-      const { getPortfolioSummary, getDeliveryByDate, getRepairStatus: getRepair } = await import('@/lib/bot-queries')
-      const [portfolio, delivery, repair] = await Promise.all([
+      const { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary } = await import('@/lib/bot-queries')
+      const [portfolio, delivery, repairDaily] = await Promise.all([
         getPortfolioSummary(),
         getDeliveryByDate({ date: reportDate }),
-        getRepair({ date: reportDate }),
+        getRepairDailySummary(reportDate),
       ])
 
       if ('error' in portfolio) {
@@ -287,12 +287,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
       })
       const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
-      const repairSummary = repair?.summary || { total: 0, closed: 0, open: 0 }
+      const repairData = { newReports: repairDaily?.newReports || 0, completed: repairDaily?.completed || 0 }
 
       const portfolioBubble = {
         type: 'bubble', size: 'mega',
         header: { type: 'box', layout: 'vertical', contents: [
-          { type: 'text', text: '🧈 Butter สรุปข่าวเช้า', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+          { type: 'text', text: '🧈 Butter สรุปข่าว', weight: 'bold', size: 'lg', color: '#1a1a1a' },
           { type: 'text', text: todayFormatted, size: 'xs', color: '#888888' },
         ], backgroundColor: '#FFF9E6', paddingAll: 'lg' },
         body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
@@ -391,16 +391,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(repairData.newReports), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'แจ้งซ่อม', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.closed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'ปิดงาน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
-            { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.open), size: 'xl', weight: 'bold', color: '#C62828', align: 'center' },
-              { type: 'text', text: 'ค้างซ่อม', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(repairData.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'ซ่อมเสร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
         ], paddingAll: 'lg' },

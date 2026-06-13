@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
-import { getPortfolioSummary, getDeliveryByDate, getRepairStatus } from '@/lib/bot-queries'
+import { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary } from '@/lib/bot-queries'
 import { prisma } from '@/lib/prisma'
 import * as line from '@line/bot-sdk'
 
@@ -16,7 +16,7 @@ function fmt(n: number): string {
 }
 
 // ─── Build Flex Message (carousel: portfolio + daily activity) ─────
-function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair: any): any {
+function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any): any {
   const todayFormatted = new Date().toLocaleDateString('th-TH', {
     weekday: 'long',
     year: 'numeric',
@@ -26,7 +26,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
   })
 
   const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
-  const repairSummary = repair?.summary || { total: 0, closed: 0, open: 0 }
+  const repairData = { newReports: repairDaily?.newReports || 0, completed: repairDaily?.completed || 0 }
 
   // Bubble 1: Portfolio
   const portfolioBubble = {
@@ -36,7 +36,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
       type: 'box',
       layout: 'vertical',
       contents: [
-        { type: 'text', text: '🧈 Butter สรุปข่าวเช้า', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+        { type: 'text', text: '🧈 Butter สรุปข่าว', weight: 'bold', size: 'lg', color: '#1a1a1a' },
         { type: 'text', text: todayFormatted, size: 'xs', color: '#888888' },
       ],
       backgroundColor: '#FFF9E6',
@@ -178,16 +178,12 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(repairData.newReports), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'แจ้งซ่อม', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.closed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'ปิดงาน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
-            { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(repairSummary.open), size: 'xl', weight: 'bold', color: '#C62828', align: 'center' },
-              { type: 'text', text: 'ค้างซ่อม', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(repairData.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'ซ่อมเสร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
@@ -198,7 +194,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
 
   return {
     type: 'flex',
-    altText: `🧈 Butter สรุปข่าวเช้า ${todayFormatted}`,
+    altText: `🧈 Butter สรุปข่าว ${todayFormatted}`,
     contents: {
       type: 'carousel',
       contents: [portfolioBubble, activityBubble],
@@ -240,7 +236,7 @@ export async function GET(req: NextRequest) {
     const [portfolio, delivery, repair] = await Promise.all([
       getPortfolioSummary(),
       getDeliveryByDate({ date: yesterdayStr }),
-      getRepairStatus({ date: yesterdayStr }),
+      getRepairDailySummary(yesterdayStr),
     ])
 
     if ('error' in portfolio) {

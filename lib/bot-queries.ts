@@ -194,6 +194,42 @@ export async function getRepairStatus(params: { date?: string; model?: string })
   }
 }
 
+// ─── Function: getRepairDailySummary (for morning report) ──────────
+export async function getRepairDailySummary(dateStr: string) {
+  const pool = await getMSSQLPool()
+  if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
+
+  const { start, end } = getDateRange(dateStr)
+
+  // แจ้งซ่อม — นับจาก ReportDate
+  const reportReq = pool.request()
+  reportReq.input('startDate', sql.DateTime, start)
+  reportReq.input('endDate', sql.DateTime, end)
+  const reportResult = await reportReq.query(`
+    SELECT COUNT(DISTINCT m.VinNo) AS newReports
+    FROM dbo.EV_MaintenanceItem m
+    WHERE m.IsActive = 1
+      AND m.ReportDate >= @startDate AND m.ReportDate <= @endDate
+  `)
+
+  // ซ่อมเสร็จ — นับจาก MaintenanceFinishDate
+  const finishReq = pool.request()
+  finishReq.input('startDate', sql.DateTime, start)
+  finishReq.input('endDate', sql.DateTime, end)
+  const finishResult = await finishReq.query(`
+    SELECT COUNT(DISTINCT m.VinNo) AS completed
+    FROM dbo.EV_MaintenanceItem m
+    WHERE m.IsActive = 1
+      AND m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate
+  `)
+
+  return {
+    date: dateStr,
+    newReports: reportResult.recordset[0]?.newReports || 0,
+    completed: finishResult.recordset[0]?.completed || 0,
+  }
+}
+
 // ─── Function: getMonthlyStats ─────────────────────────────────────
 export async function getMonthlyStats(params: { year?: number; month?: number }) {
   const pool = await getMSSQLPool()
