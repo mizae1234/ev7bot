@@ -84,7 +84,7 @@ export function RepairTrendChart({ data }: RepairTrendChartProps) {
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายเดือน สถิติวินิจฉัยและปิดงานซ่อม</h2>
+          <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายเดือน แจ้งซ่อม / ปิดงาน</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">เปรียบเทียบการแจ้งซ่อมและซ่อมเสร็จในแต่ละเดือน</p>
         </div>
         <div className="text-xs text-zinc-400 dark:text-zinc-500 italic bg-zinc-100 dark:bg-zinc-800/50 px-2.5 py-1 rounded-lg border border-zinc-200/50 dark:border-zinc-800/30">

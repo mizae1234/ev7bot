@@ -1,8 +1,9 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { DeliveryRecord } from '@/types'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface DeliveryTableProps {
   records: DeliveryRecord[]
@@ -12,6 +13,8 @@ interface DeliveryTableProps {
 export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredRecords = records.filter((rec) => {
     const matchesSearch = 
@@ -25,6 +28,17 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
 
     return matchesSearch && matchesStatus
   })
+
+  // Reset page to 1 when filters or search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter])
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage)
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const getStatusBadge = (status: DeliveryRecord['status']) => {
     switch (status) {
@@ -139,8 +153,8 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
-            {filteredRecords.length > 0 ? (
-              filteredRecords.map((rec, i) => (
+            {paginatedRecords.length > 0 ? (
+              paginatedRecords.map((rec, i) => (
                 <tr key={rec.vehicle_id + '-' + i} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors duration-150">
                   <td className="py-3.5 pr-2 font-mono font-medium">{rec.vehicle_id}</td>
                   <td className="py-3.5 pr-2 font-mono text-zinc-500 dark:text-zinc-400">{rec.vin}</td>
@@ -160,6 +174,14 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredRecords.length}
+        itemsPerPage={itemsPerPage}
+      />
     </div>
   )
 }

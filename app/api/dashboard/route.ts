@@ -6,6 +6,37 @@ import type { DashboardData, DeliveryRecord, RepairRecord } from '@/types'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function maskDriverName(driverName?: string): string {
+  if (!driverName) return '-'
+  const trimmed = driverName.trim()
+  if (trimmed === 'รถใหม่ยังไม่มีเจ้าของ' || trimmed === 'รถทดแทน') return trimmed
+  
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    const firstName = parts[1]
+    const remaining = parts.slice(2)
+    if (remaining.length === 0) {
+      return `คุณ ${firstName}`
+    }
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `คุณ ${firstName} ${maskedRemaining}`
+  } else {
+    const firstName = parts[0]
+    const remaining = parts.slice(1)
+    if (remaining.length === 0) return firstName
+    const maskedRemaining = remaining.map(part => {
+      if (part === 'คืนรถ') return 'คืนรถ'
+      return '***'
+    }).join(' ')
+    return `${firstName} ${maskedRemaining}`
+  }
+}
+
 // Mock data generator matching user's screenshot exactly for June 2026
 function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum: number): DashboardData {
   const start = new Date(startDateStr)
@@ -42,6 +73,14 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
       const idStr = Math.floor(1000 + Math.random() * 9000)
       const vinStr = 'LNADHAB38R1E0' + Math.floor(10000 + Math.random() * 90000)
       
+      const mockReplacements = Math.random() > 0.4 ? [
+        {
+          vin: 'LNADHAB38R1E0' + Math.floor(10000 + Math.random() * 90000),
+          register_no: `ทอ-${Math.floor(1000 + Math.random() * 9000)}`,
+          start_date: `${dateStr}T10:30:00.000Z`,
+        }
+      ] : []
+
       repairs.push({
         order_id: orderId,
         vehicle_id: `ทอ-${idStr}`,
@@ -59,7 +98,19 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
         fault_party: Math.random() > 0.5 ? 'DRIVER' : 'MANUFACTURER',
         car_case: Math.random() > 0.5 ? 'DAMAGE_LIGHT' : 'DAMAGE_HEAVY',
         insurance: 'ICARE_INSURANCE',
-        project: null
+        project: null,
+        incident_date: `${dateStr}T08:00:00.000Z`,
+        follow_up: 'อาการเสียทั่วไป ได้รับการตรวจสอบและรอประเมินความเสียหายเพิ่มเติม',
+        driver_name: 'คุณ สมศักดิ์ ***',
+        root_cause: 'ชิ้นส่วนเสื่อมสภาพตามการใช้งาน',
+        fix_action: 'ทำการสับเปลี่ยนอะไหล่และทดสอบขับขี่',
+        last_follow_up_date: `${dateStr}T14:30:00.000Z`,
+        parent_maintenance_id: null,
+        create_date: `${dateStr}T09:00:00.000Z`,
+        update_date: status === 'closed' ? `${dateStr}T15:30:00.000Z` : `${dateStr}T10:30:00.000Z`,
+        create_user_id: 1,
+        update_user_id: 1,
+        replacements: mockReplacements
       })
     }
   }
@@ -300,207 +351,224 @@ export async function GET(req: NextRequest) {
     const startDateTime = new Date(`${startDate}T00:00:00.000Z`)
     const endDateTime = new Date(`${endDate}T23:59:59.999Z`)
 
-    // --- Get planned count from EV_DeliveryPlan ---
+    // Prepare all requests in parallel
     const planRequest = pool.request()
     planRequest.input('startDate', sql.DateTime, startDateTime)
     planRequest.input('endDate', sql.DateTime, endDateTime)
-    const planResult = await planRequest.query(`
-      SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
-      FROM dbo.EV_DeliveryPlan
-      WHERE PlanDate >= @startDate AND PlanDate <= @endDate
-    `)
-    const planTotal = planResult.recordset[0]?.planTotal || 0
 
-    // --- Delivery summary inside date range ---
     const deliverySummaryRequest = pool.request()
     deliverySummaryRequest.input('startDate', sql.DateTime, startDateTime)
     deliverySummaryRequest.input('endDate', sql.DateTime, endDateTime)
-    const deliverySummaryResult = await deliverySummaryRequest.query(`
-      SELECT
-        SUM(CASE WHEN ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed
-      FROM dbo.EV_RentItem
-      WHERE IsActive = 1
-        AND (
-          (ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate)
-          OR (ReleaseDate >= @startDate AND ReleaseDate <= @endDate)
-        )
-    `)
 
-    // --- Repair summary inside date range ---
     const repairSummaryRequest = pool.request()
     repairSummaryRequest.input('startDate', sql.DateTime, startDateTime)
     repairSummaryRequest.input('endDate', sql.DateTime, endDateTime)
-    const repairSummaryResult = await repairSummaryRequest.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
-        SUM(CASE WHEN CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END) AS [open]
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
-        AND (
-          (ReportDate >= @startDate AND ReportDate <= @endDate)
-          OR (MaintenanceStartDate >= @startDate AND MaintenanceStartDate <= @endDate)
-          OR (MaintenanceFinishDate >= @startDate AND MaintenanceFinishDate <= @endDate)
-        )
-    `)
 
-    // --- Monthly trend inside the selected year (Plan vs Actual) ---
     const planTrendRequest = pool.request()
     planTrendRequest.input('year', sql.Int, year)
-    const planTrendResult = await planTrendRequest.query(`
-      SELECT
-        MONTH(PlanDate) AS monthNum,
-        SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
-      FROM dbo.EV_DeliveryPlan
-      WHERE YEAR(PlanDate) = @year
-      GROUP BY MONTH(PlanDate)
-    `)
 
     const actualTrendRequest = pool.request()
     actualTrendRequest.input('year', sql.Int, year)
-    const actualTrendResult = await actualTrendRequest.query(`
-      SELECT
-        MONTH(ReleaseDate) AS monthNum,
-        COUNT(*) AS completed
-      FROM dbo.EV_RentItem
-      WHERE IsActive = 1
-        AND YEAR(ReleaseDate) = @year
-        AND ReleaseDate IS NOT NULL
-      GROUP BY MONTH(ReleaseDate)
-    `)
 
-    // --- Monthly repair trend inside the selected year (Reported vs Closed) ---
     const repairReportedTrendRequest = pool.request()
     repairReportedTrendRequest.input('year', sql.Int, year)
-    const repairReportedTrendResult = await repairReportedTrendRequest.query(`
-      SELECT
-        MONTH(ReportDate) AS monthNum,
-        COUNT(*) AS reported
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
-        AND YEAR(ReportDate) = @year
-      GROUP BY MONTH(ReportDate)
-    `)
 
     const repairClosedTrendRequest = pool.request()
     repairClosedTrendRequest.input('year', sql.Int, year)
-    const repairClosedTrendResult = await repairClosedTrendRequest.query(`
-      SELECT
-        MONTH(MaintenanceFinishDate) AS monthNum,
-        COUNT(*) AS closed
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
-        AND CarStatusCode = 'COMPLETE'
-        AND YEAR(MaintenanceFinishDate) = @year
-        AND MaintenanceFinishDate IS NOT NULL
-      GROUP BY MONTH(MaintenanceFinishDate)
-    `)
 
-    // --- Detailed delivery list inside date range ---
     const deliveryListRequest = pool.request()
     deliveryListRequest.input('startDate', sql.DateTime, startDateTime)
     deliveryListRequest.input('endDate', sql.DateTime, endDateTime)
-    const deliveryListResult = await deliveryListRequest.query(`
-      SELECT TOP 200
-        COALESCE(r.RegisterNo, i.RegisterNo, 'ID: ' + CAST(r.InventoryItemID AS VARCHAR)) AS vehicle_id,
-        r.VinNo AS vin,
-        i.Model AS model,
-        i.ProjectType AS project,
-        CASE WHEN r.ReleaseDate IS NOT NULL THEN 'complete' ELSE 'pending' END AS status,
-        r.ExpectedReleaseDate AS expected_release_date,
-        r.ReleaseDate AS release_date
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND (
-          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-        )
-      ORDER BY r.ReleaseDate DESC, r.ExpectedReleaseDate DESC
-    `)
 
-    // --- Detailed repair list inside date range ---
     const repairListRequest = pool.request()
     repairListRequest.input('startDate', sql.DateTime, startDateTime)
     repairListRequest.input('endDate', sql.DateTime, endDateTime)
-    const repairListResult = await repairListRequest.query(`
-      SELECT TOP 200
-        m.MaintenanceItemID AS order_id,
-        COALESCE(m.RegisterNo, i.RegisterNo, 'ID: ' + CAST(m.InventoryItemID AS VARCHAR)) AS vehicle_id,
-        m.IssueTitle AS description,
-        CASE 
-          WHEN m.CarStatusCode = 'COMPLETE' THEN 'closed'
-          WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 'in_progress'
-          ELSE 'open'
-        END AS status,
-        m.VinNo AS vin,
-        i.Model AS model,
-        m.ReportDate AS report_date,
-        m.MaintenanceStartDate AS start_date,
-        m.MaintenanceFinishDate AS finish_date,
-        m.CarStatusCode AS status_code,
-        m.ServiceLocationCode AS service_location,
-        m.ProblemTypeCode AS problem_type,
-        m.FaultPartyCode AS fault_party,
-        m.CarCaseCode AS car_case,
-        m.InsuranceCode AS insurance,
-        i.ProjectType AS project
-      FROM dbo.EV_MaintenanceItem m
-      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1
-        AND (
-          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
-          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
-          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
-        )
-      ORDER BY m.ReportDate DESC
-    `)
 
-    // --- Replacement list inside date range ---
     const replacementListRequest = pool.request()
     replacementListRequest.input('startDate', sql.DateTime, startDateTime)
     replacementListRequest.input('endDate', sql.DateTime, endDateTime)
-    const replacementListResult = await replacementListRequest.query(`
-      SELECT TOP 200
-        r.ReplacementItemID AS replacement_id,
-        r.MaintenanceItemID AS maintenance_id,
-        r.VinNo AS vin,
-        r.ReplacementStartDate AS start_date,
-        r.ReplacementReturnDate AS return_date,
-        r.Location AS location,
-        r.Remark AS remark
-      FROM dbo.EV_ReplacementItem r
-      WHERE (
-        (r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate)
-        OR (r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate)
-        OR r.ReplacementReturnDate IS NULL
-      )
-      ORDER BY r.ReplacementStartDate DESC
-    `)
 
-    // --- Return list inside date range ---
     const returnListRequest = pool.request()
     returnListRequest.input('startDate', sql.DateTime, startDateTime)
     returnListRequest.input('endDate', sql.DateTime, endDateTime)
-    const returnListResult = await returnListRequest.query(`
-      SELECT TOP 200
-        r.ReturnItemID AS return_id,
-        r.Model AS model,
-        r.VinNo AS vin,
-        r.RegisterNo AS register_no,
-        r.ReturnDate AS return_date,
-        r.ReceiveDate AS receive_date,
-        r.CustomerName AS customer_name,
-        r.Mileage AS mileage,
-        r.ParkLocation AS park_location,
-        r.RemarkForCustomer AS remark
-      FROM dbo.EV_ReturnItem r
-      WHERE (
-        (r.ReceiveDate >= @startDate AND r.ReceiveDate <= @endDate)
-        OR (r.ReturnDate >= @startDate AND r.ReturnDate <= @endDate)
-      )
-      ORDER BY r.ReceiveDate DESC
-    `)
+
+    // Execute all queries in parallel for high performance!
+    const [
+      planResult,
+      deliverySummaryResult,
+      repairSummaryResult,
+      planTrendResult,
+      actualTrendResult,
+      repairReportedTrendResult,
+      repairClosedTrendResult,
+      deliveryListResult,
+      repairListResult,
+      replacementListResult,
+      returnListResult
+    ] = await Promise.all([
+      planRequest.query(`
+        SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
+        FROM dbo.EV_DeliveryPlan
+        WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+      `),
+      deliverySummaryRequest.query(`
+        SELECT
+          SUM(CASE WHEN ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed
+        FROM dbo.EV_RentItem
+        WHERE IsActive = 1
+          AND (
+            (ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate)
+            OR (ReleaseDate >= @startDate AND ReleaseDate <= @endDate)
+          )
+      `),
+      repairSummaryRequest.query(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
+          SUM(CASE WHEN MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open]
+        FROM dbo.EV_MaintenanceItem
+        WHERE (IsActive = 1 OR MaintenanceFinishDate IS NOT NULL)
+          AND (
+            (ReportDate >= @startDate AND ReportDate <= @endDate)
+            OR (MaintenanceStartDate >= @startDate AND MaintenanceStartDate <= @endDate)
+            OR (MaintenanceFinishDate >= @startDate AND MaintenanceFinishDate <= @endDate)
+          )
+      `),
+      planTrendRequest.query(`
+        SELECT
+          MONTH(PlanDate) AS monthNum,
+          SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
+        FROM dbo.EV_DeliveryPlan
+        WHERE YEAR(PlanDate) = @year
+        GROUP BY MONTH(PlanDate)
+      `),
+      actualTrendRequest.query(`
+        SELECT
+          MONTH(ReleaseDate) AS monthNum,
+          COUNT(*) AS completed
+        FROM dbo.EV_RentItem
+        WHERE IsActive = 1
+          AND YEAR(ReleaseDate) = @year
+          AND ReleaseDate IS NOT NULL
+        GROUP BY MONTH(ReleaseDate)
+      `),
+      repairReportedTrendRequest.query(`
+        SELECT
+          MONTH(ReportDate) AS monthNum,
+          COUNT(*) AS reported
+        FROM dbo.EV_MaintenanceItem
+        WHERE (IsActive = 1 OR MaintenanceFinishDate IS NOT NULL)
+          AND YEAR(ReportDate) = @year
+        GROUP BY MONTH(ReportDate)
+      `),
+      repairClosedTrendRequest.query(`
+        SELECT
+          MONTH(MaintenanceFinishDate) AS monthNum,
+          COUNT(*) AS closed
+        FROM dbo.EV_MaintenanceItem
+        WHERE YEAR(MaintenanceFinishDate) = @year
+          AND MaintenanceFinishDate IS NOT NULL
+        GROUP BY MONTH(MaintenanceFinishDate)
+      `),
+      deliveryListRequest.query(`
+        SELECT TOP 2000
+          COALESCE(r.RegisterNo, i.RegisterNo, 'ID: ' + CAST(r.InventoryItemID AS VARCHAR)) AS vehicle_id,
+          r.VinNo AS vin,
+          i.Model AS model,
+          i.ProjectType AS project,
+          CASE WHEN r.ReleaseDate IS NOT NULL THEN 'complete' ELSE 'pending' END AS status,
+          r.ExpectedReleaseDate AS expected_release_date,
+          r.ReleaseDate AS release_date
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        WHERE r.IsActive = 1
+          AND (
+            (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+            OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+          )
+        ORDER BY r.ReleaseDate DESC, r.ExpectedReleaseDate DESC
+      `),
+      repairListRequest.query(`
+        SELECT TOP 2000
+          m.MaintenanceItemID AS order_id,
+          COALESCE(m.RegisterNo, i.RegisterNo, 'ID: ' + CAST(m.InventoryItemID AS VARCHAR)) AS vehicle_id,
+          m.IssueTitle AS description,
+          CASE 
+            WHEN m.MaintenanceFinishDate IS NOT NULL THEN 'closed'
+            WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 'in_progress'
+            ELSE 'open'
+          END AS status,
+          m.VinNo AS vin,
+          i.Model AS model,
+          m.ReportDate AS report_date,
+          m.MaintenanceStartDate AS start_date,
+          m.MaintenanceFinishDate AS finish_date,
+          m.CarStatusCode AS status_code,
+          m.ServiceLocationCode AS service_location,
+          m.ProblemTypeCode AS problem_type,
+          m.FaultPartyCode AS fault_party,
+          m.CarCaseCode AS car_case,
+          m.InsuranceCode AS insurance,
+          i.ProjectType AS project,
+          m.IncidentDate AS incident_date,
+          m.FollowUpDetail AS follow_up,
+          m.DriverName AS driver_name,
+          m.RootCauseFound AS root_cause,
+          m.FixAction AS fix_action,
+          m.LastFollowUpDate AS last_follow_up_date,
+          m.ParentMaintenanceItemID AS parent_maintenance_id,
+          m.CreateDate AS create_date,
+          m.UpdateDate AS update_date,
+          m.CreateUserID AS create_user_id,
+          m.UpdateUserID AS update_user_id
+        FROM dbo.EV_MaintenanceItem m
+        LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE (m.IsActive = 1 OR m.MaintenanceFinishDate IS NOT NULL)
+          AND (
+            (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+            OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+            OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
+          )
+        ORDER BY m.ReportDate DESC
+      `),
+      replacementListRequest.query(`
+        SELECT TOP 2000
+          r.ReplacementItemID AS replacement_id,
+          r.MaintenanceItemID AS maintenance_id,
+          r.VinNo AS vin,
+          r.ReplacementStartDate AS start_date,
+          r.ReplacementReturnDate AS return_date,
+          r.Location AS location,
+          r.Remark AS remark
+        FROM dbo.EV_ReplacementItem r
+        WHERE (
+          (r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate)
+          OR (r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate)
+          OR r.ReplacementReturnDate IS NULL
+        )
+        ORDER BY r.ReplacementStartDate DESC
+      `),
+      returnListRequest.query(`
+        SELECT TOP 2000
+          r.ReturnItemID AS return_id,
+          r.Model AS model,
+          r.VinNo AS vin,
+          r.RegisterNo AS register_no,
+          r.ReturnDate AS return_date,
+          r.ReceiveDate AS receive_date,
+          r.CustomerName AS customer_name,
+          r.Mileage AS mileage,
+          r.ParkLocation AS park_location,
+          r.RemarkForCustomer AS remark
+        FROM dbo.EV_ReturnItem r
+        WHERE (
+          (r.ReceiveDate >= @startDate AND r.ReceiveDate <= @endDate)
+          OR (r.ReturnDate >= @startDate AND r.ReturnDate <= @endDate)
+        )
+        ORDER BY r.ReceiveDate DESC
+      `)
+    ])
+    const planTotal = planResult.recordset[0]?.planTotal || 0
 
     const monthlyTrendMap: Record<number, { date: string; deliveries: number; completed: number; repairsReported: number; repairsClosed: number }> = {}
 
@@ -554,6 +622,32 @@ export async function GET(req: NextRequest) {
     const realCompleted = Number(deliverySummaryResult.recordset[0]?.completed || 0)
     const realPending = Math.max(0, Number(planTotal) - realCompleted)
 
+    // Get replacement cars for repairs
+    const maintIds = (repairListResult.recordset || []).map((m: any) => m.order_id)
+    let replacements: Record<number | string, { vin: string; register_no: string | null; start_date: string | null }[]> = {}
+
+    if (maintIds.length > 0) {
+      const replReq = pool.request()
+      const idList = maintIds.map((_: any, idx: number) => `@rid${idx}`).join(',')
+      maintIds.forEach((id: any, idx: number) => {
+        replReq.input(`rid${idx}`, sql.Int, id)
+      })
+      const replResult = await replReq.query(`
+        SELECT r.MaintenanceItemID, r.VinNo, i.RegisterNo, r.ReplacementStartDate
+        FROM dbo.EV_ReplacementItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.VinNo = i.VinNo
+        WHERE r.MaintenanceItemID IN (${idList}) AND r.IsActive = 1
+      `)
+      for (const r of replResult.recordset) {
+        if (!replacements[r.MaintenanceItemID]) replacements[r.MaintenanceItemID] = []
+        replacements[r.MaintenanceItemID].push({
+          vin: r.VinNo,
+          register_no: r.RegisterNo,
+          start_date: r.ReplacementStartDate,
+        })
+      }
+    }
+
     return NextResponse.json({
       delivery: {
         total: Number(planTotal),
@@ -567,7 +661,11 @@ export async function GET(req: NextRequest) {
       },
       trend,
       deliveryList: deliveryListResult.recordset || [],
-      repairList: repairListResult.recordset || [],
+      repairList: (repairListResult.recordset || []).map((row: any) => ({
+        ...row,
+        driver_name: maskDriverName(row.driver_name),
+        replacements: replacements[row.order_id] || [],
+      })),
       replacementList: replacementListResult.recordset || [],
       returnList: returnListResult.recordset || [],
       fetchedAt: new Date().toISOString(),

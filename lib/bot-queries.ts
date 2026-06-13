@@ -38,39 +38,42 @@ export async function getDeliveryToday() {
   req.input('startDate', sql.DateTime, start)
   req.input('endDate', sql.DateTime, end)
 
-  const result = await req.query(`
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-  `)
-
   // Also get breakdown by project
   const breakdownReq = pool.request()
   breakdownReq.input('startDate', sql.DateTime, start)
   breakdownReq.input('endDate', sql.DateTime, end)
-  const breakdown = await breakdownReq.query(`
-    SELECT
-      ISNULL(i.Project, 'ไม่ระบุ') AS project,
-      ISNULL(i.Model, 'ไม่ระบุ') AS model,
-      COUNT(*) AS count
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-    GROUP BY i.Project, i.Model
-    ORDER BY count DESC
-  `)
+
+  // Execute both queries concurrently for high performance
+  const [result, breakdown] = await Promise.all([
+    req.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+    `),
+    breakdownReq.query(`
+      SELECT
+        ISNULL(i.Project, 'ไม่ระบุ') AS project,
+        ISNULL(i.Model, 'ไม่ระบุ') AS model,
+        COUNT(*) AS count
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+      GROUP BY i.Project, i.Model
+      ORDER BY count DESC
+    `)
+  ])
 
   return {
     date: getTodayRange().dateStr,
@@ -89,38 +92,41 @@ export async function getDeliveryByDate(params: { date: string }) {
   req.input('startDate', sql.DateTime, start)
   req.input('endDate', sql.DateTime, end)
 
-  const result = await req.query(`
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-  `)
-
   const breakdownReq = pool.request()
   breakdownReq.input('startDate', sql.DateTime, start)
   breakdownReq.input('endDate', sql.DateTime, end)
-  const breakdown = await breakdownReq.query(`
-    SELECT
-      ISNULL(i.Project, 'ไม่ระบุ') AS project,
-      ISNULL(i.Model, 'ไม่ระบุ') AS model,
-      COUNT(*) AS count
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-    GROUP BY i.Project, i.Model
-    ORDER BY count DESC
-  `)
+
+  // Execute both queries concurrently for high performance
+  const [result, breakdown] = await Promise.all([
+    req.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+    `),
+    breakdownReq.query(`
+      SELECT
+        ISNULL(i.Project, 'ไม่ระบุ') AS project,
+        ISNULL(i.Model, 'ไม่ระบุ') AS model,
+        COUNT(*) AS count
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+      GROUP BY i.Project, i.Model
+      ORDER BY count DESC
+    `)
+  ])
 
   return {
     date: params.date,
@@ -146,24 +152,6 @@ export async function getRepairStatus(params: { date?: string; model?: string })
     modelFilter = 'AND i.Model LIKE @model'
   }
 
-  const result = await req.query(`
-    SELECT
-      COUNT(*) AS total,
-      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END), 0) AS closed,
-      ISNULL(SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END), 0) AS [open],
-      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS inMaintenance,
-      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS waiting,
-      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END), 0) AS stillWork
-    FROM dbo.EV_MaintenanceItem m
-    LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-    WHERE m.IsActive = 1 ${modelFilter}
-      AND (
-        (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
-        OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
-        OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
-      )
-  `)
-
   // Get breakdown by issue
   const issueReq = pool.request()
   issueReq.input('startDate', sql.DateTime, start)
@@ -171,22 +159,43 @@ export async function getRepairStatus(params: { date?: string; model?: string })
   if (params.model) {
     issueReq.input('model', sql.NVarChar, `%${params.model}%`)
   }
-  const issues = await issueReq.query(`
-    SELECT TOP 10
-      m.IssueTitle AS issue,
-      m.CarStatusCode AS status,
-      COUNT(*) AS count
-    FROM dbo.EV_MaintenanceItem m
-    LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-    WHERE m.IsActive = 1 ${modelFilter}
-      AND (
-        (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
-        OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
-        OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
-      )
-    GROUP BY m.IssueTitle, m.CarStatusCode
-    ORDER BY count DESC
-  `)
+
+  // Execute both queries concurrently for high performance
+  const [result, issues] = await Promise.all([
+    req.query(`
+      SELECT
+        COUNT(*) AS total,
+        ISNULL(SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS closed,
+        ISNULL(SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END), 0) AS [open],
+        ISNULL(SUM(CASE WHEN m.MaintenanceFinishDate IS NULL AND m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS inMaintenance,
+        ISNULL(SUM(CASE WHEN m.MaintenanceFinishDate IS NULL AND m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS waiting,
+        ISNULL(SUM(CASE WHEN m.MaintenanceFinishDate IS NULL AND m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END), 0) AS stillWork
+      FROM dbo.EV_MaintenanceItem m
+      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 ${modelFilter}
+        AND (
+          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
+        )
+    `),
+    issueReq.query(`
+      SELECT TOP 10
+        m.IssueTitle AS issue,
+        m.CarStatusCode AS status,
+        COUNT(*) AS count
+      FROM dbo.EV_MaintenanceItem m
+      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 ${modelFilter}
+        AND (
+          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
+        )
+      GROUP BY m.IssueTitle, m.CarStatusCode
+      ORDER BY count DESC
+    `)
+  ])
 
   return {
     date: params.date || getTodayRange().dateStr,
@@ -207,45 +216,49 @@ export async function getRepairDailySummary(dateStr: string) {
   const reportReq = pool.request()
   reportReq.input('startDate', sql.DateTime, start)
   reportReq.input('endDate', sql.DateTime, end)
-  const reportResult = await reportReq.query(`
-    SELECT COUNT(DISTINCT m.VinNo) AS newReports
-    FROM dbo.EV_MaintenanceItem m
-    WHERE m.IsActive = 1
-      AND m.ReportDate >= @startDate AND m.ReportDate <= @endDate
-  `)
 
   // ซ่อมเสร็จ — นับจาก MaintenanceFinishDate
   const finishReq = pool.request()
   finishReq.input('startDate', sql.DateTime, start)
   finishReq.input('endDate', sql.DateTime, end)
-  const finishResult = await finishReq.query(`
-    SELECT COUNT(DISTINCT m.VinNo) AS completed
-    FROM dbo.EV_MaintenanceItem m
-    WHERE m.IsActive = 1
-      AND m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate
-  `)
 
   // รถทดแทน — นับจาก ReplacementStartDate
   const replReq = pool.request()
   replReq.input('startDate', sql.DateTime, start)
   replReq.input('endDate', sql.DateTime, end)
-  const replResult = await replReq.query(`
-    SELECT COUNT(DISTINCT r.VinNo) AS replacements
-    FROM dbo.EV_ReplacementItem r
-    WHERE r.IsActive = 1
-      AND r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate
-  `)
 
   // รถคืน — นับจาก ReplacementReturnDate (คืนรถทดแทน)
   const returnReq = pool.request()
   returnReq.input('startDate', sql.DateTime, start)
   returnReq.input('endDate', sql.DateTime, end)
-  const returnResult = await returnReq.query(`
-    SELECT COUNT(DISTINCT r.VinNo) AS returns
-    FROM dbo.EV_ReplacementItem r
-    WHERE r.IsActive = 1
-      AND r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
-  `)
+
+  // Run all 4 queries concurrently for high performance
+  const [reportResult, finishResult, replResult, returnResult] = await Promise.all([
+    reportReq.query(`
+      SELECT COUNT(DISTINCT m.VinNo) AS newReports
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND m.ReportDate >= @startDate AND m.ReportDate <= @endDate
+    `),
+    finishReq.query(`
+      SELECT COUNT(DISTINCT m.VinNo) AS completed
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate
+    `),
+    replReq.query(`
+      SELECT COUNT(DISTINCT r.VinNo) AS replacements
+      FROM dbo.EV_ReplacementItem r
+      WHERE r.IsActive = 1
+        AND r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate
+    `),
+    returnReq.query(`
+      SELECT COUNT(DISTINCT r.VinNo) AS returns
+      FROM dbo.EV_ReplacementItem r
+      WHERE r.IsActive = 1
+        AND r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
+    `)
+  ])
 
   return {
     date: dateStr,
@@ -267,100 +280,111 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
   const deliveryReq = pool.request()
   deliveryReq.input('startDate', sql.DateTime, start)
   deliveryReq.input('endDate', sql.DateTime, end)
-  const deliveryRes = await deliveryReq.query(`
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-  `)
 
   // Repair stats
   const repairReq = pool.request()
   repairReq.input('startDate', sql.DateTime, start)
   repairReq.input('endDate', sql.DateTime, end)
-  const repairRes = await repairReq.query(`
-    SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
-      SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END) AS [open]
-    FROM dbo.EV_MaintenanceItem m
-    WHERE m.IsActive = 1
-      AND (
-        (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
-        OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
-        OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
-      )
-  `)
 
   // Project breakdown
   const projectReq = pool.request()
   projectReq.input('startDate', sql.DateTime, start)
   projectReq.input('endDate', sql.DateTime, end)
-  const projectRes = await projectReq.query(`
-    SELECT
-      ISNULL(i.Project, 'ไม่ระบุ') AS project,
-      COUNT(*) AS count
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND (
-        (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-        OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-      )
-    GROUP BY i.Project
-    ORDER BY count DESC
-  `)
 
   // Get planned count from EV_DeliveryPlan
   const planReq = pool.request()
   planReq.input('startDate', sql.DateTime, start)
   planReq.input('endDate', sql.DateTime, end)
-  const planRes = await planReq.query(`
-    SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
-    FROM dbo.EV_DeliveryPlan
-    WHERE PlanDate >= @startDate AND PlanDate <= @endDate
-  `)
-  const planTotal = planRes.recordset[0]?.planTotal || 0
 
   // Get planned breakdown by ProjectType from EV_DeliveryPlan
   const planBreakdownReq = pool.request()
   planBreakdownReq.input('startDate', sql.DateTime, start)
   planBreakdownReq.input('endDate', sql.DateTime, end)
-  const planBreakdownRes = await planBreakdownReq.query(`
-    SELECT 
-      ProjectType,
-      SUM(ISNULL(ES_Count, 0)) AS ES_Count,
-      SUM(ISNULL(Y490_Count, 0)) AS Y490_Count,
-      SUM(ISNULL(Y410_Count, 0)) AS Y410_Count
-    FROM dbo.EV_DeliveryPlan
-    WHERE PlanDate >= @startDate AND PlanDate <= @endDate
-    GROUP BY ProjectType
-  `)
 
   // Get actual breakdown by ProjectType and Model from EV_RentItem
   const actualBreakdownReq = pool.request()
   actualBreakdownReq.input('startDate', sql.DateTime, start)
   actualBreakdownReq.input('endDate', sql.DateTime, end)
-  const actualBreakdownRes = await actualBreakdownReq.query(`
-    SELECT 
-      ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-      ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-      COUNT(*) AS Count
-    FROM dbo.EV_RentItem r
-    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-    WHERE r.IsActive = 1
-      AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
-      AND r.ReleaseDate IS NOT NULL
-    GROUP BY i.ProjectType, i.Model
-  `)
 
+  // Run all 6 queries concurrently for high performance
+  const [
+    deliveryRes,
+    repairRes,
+    projectRes,
+    planRes,
+    planBreakdownRes,
+    actualBreakdownRes
+  ] = await Promise.all([
+    deliveryReq.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+    `),
+    repairReq.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
+        SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open]
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND (
+          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
+        )
+    `),
+    projectReq.query(`
+      SELECT
+        ISNULL(i.Project, 'ไม่ระบุ') AS project,
+        COUNT(*) AS count
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND (
+          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
+          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
+        )
+      GROUP BY i.Project
+      ORDER BY count DESC
+    `),
+    planReq.query(`
+      SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
+      FROM dbo.EV_DeliveryPlan
+      WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+    `),
+    planBreakdownReq.query(`
+      SELECT 
+        ProjectType,
+        SUM(ISNULL(ES_Count, 0)) AS ES_Count,
+        SUM(ISNULL(Y490_Count, 0)) AS Y490_Count,
+        SUM(ISNULL(Y410_Count, 0)) AS Y410_Count
+      FROM dbo.EV_DeliveryPlan
+      WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+      GROUP BY ProjectType
+    `),
+    actualBreakdownReq.query(`
+      SELECT 
+        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        COUNT(*) AS Count
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+        AND r.ReleaseDate IS NOT NULL
+      GROUP BY i.ProjectType, i.Model
+    `)
+  ])
+
+  const planTotal = planRes.recordset[0]?.planTotal || 0
   const deliveryData = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
   deliveryData.total = planTotal
   deliveryData.pending = Math.max(0, planTotal - (deliveryData.completed || 0))
@@ -525,28 +549,32 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
     // 1. Fetch Plan
     const planReq = pool.request()
     planReq.input('targetDate', sql.Date, params.date)
-    const planResult = await planReq.query(`
-      SELECT ProjectType, ES_Count, Y490_Count, Y410_Count
-      FROM dbo.EV_DeliveryPlan
-      WHERE PlanDate = @targetDate
-    `)
 
     // 2. Fetch Actuals
     const actualReq = pool.request()
     actualReq.input('startDate', sql.DateTime, start)
     actualReq.input('endDate', sql.DateTime, end)
-    const actualResult = await actualReq.query(`
-      SELECT 
-        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-        COUNT(*) AS Count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
-        AND r.ReleaseDate IS NOT NULL
-      GROUP BY i.ProjectType, i.Model
-    `)
+
+    // Run plan query and actual query concurrently for high performance
+    const [planResult, actualResult] = await Promise.all([
+      planReq.query(`
+        SELECT ProjectType, ES_Count, Y490_Count, Y410_Count
+        FROM dbo.EV_DeliveryPlan
+        WHERE PlanDate = @targetDate
+      `),
+      actualReq.query(`
+        SELECT 
+          ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+          ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+          COUNT(*) AS Count
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        WHERE r.IsActive = 1
+          AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+          AND r.ReleaseDate IS NOT NULL
+        GROUP BY i.ProjectType, i.Model
+      `)
+    ])
 
     return {
       plans: planResult.recordset,

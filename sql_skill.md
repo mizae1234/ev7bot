@@ -758,3 +758,38 @@ Sub-status สำหรับ GI (Good Inspect)
   * หากรถยังไม่มีเลขทะเบียน (`RegisterNo` เป็น NULL หรือค่าว่าง) ให้ใช้ `VinNo` ในการระบุและแสดงผลแทนทะเบียนรถเสมอ
   * การนับจำนวนการปล่อยเช่าสำเร็จ (**Completed Delivery**): จะนับเมื่อมีข้อมูล `r.ReleaseDate IS NOT NULL` เท่านั้น หากยังไม่มีข้อมูลวันส่งมอบจริงจะถูกนับเป็นรอดำเนินการ (**Pending**) ทั้งนี้แม้รถจะกลับมาเข้าซ่อมและมีสถานะเป็น `MAINTENANCE` ในภายหลัง ก็ยังถือว่าการส่งมอบสำเร็จแล้ว
 
+---
+
+## 13. แนวทางการออกแบบ Query สำหรับประสิทธิภาพที่ดี (Performance Optimization Guidelines)
+
+ในการเขียนโค้ดเชื่อมต่อฐานข้อมูล SQL Server ในอนาคต ให้ยึดหลักเกณฑ์ความเร็วประสิทธิภาพดังนี้:
+
+### 13.1 หลีกเลี่ยงการรอคิวคำสั่งแบบ Sequential Await
+หากมีคำสั่ง SQL หลายคำสั่งที่เป็นอิสระต่อกัน (ไม่ได้ขึ้นต่อผลลัพธ์ของกันและกัน) **ห้ามเขียน `await` ทีละคิวรี** เพราะจะทำให้เกิด Latency สะสม (เช่น 4 คิวรี คิวรีละ 100ms จะกลายเป็น 400ms)
+* **❌ แบบไม่ดี (ช้า):**
+  ```typescript
+  const result1 = await pool.request().query('SELECT ...')
+  const result2 = await pool.request().query('SELECT ...')
+  ```
+* **✅ แบบที่ดี (เร็วมาก):**
+  ```typescript
+  const req1 = pool.request()
+  const req2 = pool.request()
+  const [res1, res2] = await Promise.all([
+    req1.query('SELECT ...'),
+    req2.query('SELECT ...')
+  ])
+  ```
+
+### 13.2 การนำ Connection Pool กลับมาใช้ซ้ำ (Connection Pool Caching)
+ในไฟล์ `lib/mssql.ts` ได้จัดเก็บ Instance ของ Connection Pool ไว้ในระดับ Global (`let pool: sql.ConnectionPool | null = null`) และตรวจสอบทุกครั้งก่อนสร้างการเชื่อมต่อใหม่:
+```typescript
+if (pool && pool.connected) return pool
+pool = await sql.connect(config)
+```
+การทำเช่นนี้จะลด overhead ในการสร้าง TCP Handshake ใหม่กับ SQL Server ในทุก ๆ HTTP Request ได้อย่างมหาศาล
+
+### 13.3 จำกัดจำนวนแถวการแสดงผล (TOP N Limitation)
+สำหรับตารางการแสดงผลข้อมูลประวัติหรือลิสต์รายการ (เช่น รายการแจ้งซ่อม หรือรายการปล่อยรถ) ให้ใช้ `TOP 200` หรือ `TOP 500` เสมอ เพื่อป้องกันไม่ให้คำสั่งคิวรีดึงข้อมูลปริมาณมหาศาลกลับมาทั้งหมดในครั้งเดียว ซึ่งเป็นสาเหตุหลักที่ทำให้ API หน่วงและส่งผลกระทบต่อหน่วยความจำของแอปพลิเคชัน
+
+

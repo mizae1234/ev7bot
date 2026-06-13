@@ -105,39 +105,12 @@ export async function GET(req: NextRequest) {
 
     // Summary counts
     const summaryReq = pool.request()
-    const summaryResult = await summaryReq.query(`
-      SELECT
-        COUNT(DISTINCT m.InventoryItemID) AS total,
-        COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
-        0 AS complete,
-        COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN m.InventoryItemID END) AS waiting
-      FROM dbo.EV_MaintenanceItem m
-      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-    `)
 
     // Unique locations
     const locReq = pool.request()
-    const locResult = await locReq.query(`
-      SELECT DISTINCT m.ServiceLocationCode
-      FROM dbo.EV_MaintenanceItem m
-      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode IS NOT NULL AND m.ServiceLocationCode != ''
-      ORDER BY m.ServiceLocationCode
-    `)
 
     // Repairs by location summary
     const repairByLocReq = pool.request()
-    const repairByLocResult = await repairByLocReq.query(`
-      SELECT 
-        ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
-        COUNT(DISTINCT m.InventoryItemID) AS Count
-      FROM dbo.EV_MaintenanceItem m
-      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-      GROUP BY m.ServiceLocationCode
-      ORDER BY Count DESC
-    `)
 
     // Maintenance items (active only, optionally filtered)
     const itemReq = pool.request()
@@ -148,42 +121,77 @@ export async function GET(req: NextRequest) {
       itemReq.input('locationFilter', sql.NVarChar, locationFilter)
     }
 
-    const itemResult = await itemReq.query(`
-      SELECT TOP 500
-        m.MaintenanceItemID,
-        COALESCE(i.RegisterNo, '') AS RegisterNo,
-        m.VinNo,
-        i.Model,
-        i.ProjectType AS Project,
-        m.IssueTitle,
-        m.CarStatusCode,
-        m.ProblemTypeCode,
-        m.FaultPartyCode,
-        m.CarCaseCode,
-        m.ServiceLocationCode,
-        m.InsuranceCode,
-        m.ReportDate,
-        m.IncidentDate,
-        m.MaintenanceStartDate,
-        m.MaintenanceFinishDate,
-        m.MaintenanceReturnDate,
-        m.FollowUpDetail,
-        m.DriverName,
-        m.RootCauseFound,
-        m.FixAction,
-        m.LastFollowUpDate,
-        m.ParentMaintenanceItemID,
-        m.CreateDate,
-        m.UpdateDate,
-        m.CreateUserID,
-        m.UpdateUserID
-      FROM dbo.EV_MaintenanceItem m
-      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
-      ORDER BY 
-        CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
-        m.ReportDate DESC
-    `)
+    // Run first 4 queries concurrently for performance optimization
+    const [
+      summaryResult,
+      locResult,
+      repairByLocResult,
+      itemResult
+    ] = await Promise.all([
+      summaryReq.query(`
+        SELECT
+          COUNT(DISTINCT m.InventoryItemID) AS total,
+          COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
+          0 AS complete,
+          COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN m.InventoryItemID END) AS waiting
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+      `),
+      locReq.query(`
+        SELECT DISTINCT m.ServiceLocationCode
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode IS NOT NULL AND m.ServiceLocationCode != ''
+        ORDER BY m.ServiceLocationCode
+      `),
+      repairByLocReq.query(`
+        SELECT 
+          ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+          COUNT(DISTINCT m.InventoryItemID) AS Count
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+        GROUP BY m.ServiceLocationCode
+        ORDER BY Count DESC
+      `),
+      itemReq.query(`
+        SELECT TOP 500
+          m.MaintenanceItemID,
+          COALESCE(i.RegisterNo, '') AS RegisterNo,
+          m.VinNo,
+          i.Model,
+          i.ProjectType AS Project,
+          m.IssueTitle,
+          m.CarStatusCode,
+          m.ProblemTypeCode,
+          m.FaultPartyCode,
+          m.CarCaseCode,
+          m.ServiceLocationCode,
+          m.InsuranceCode,
+          m.ReportDate,
+          m.IncidentDate,
+          m.MaintenanceStartDate,
+          m.MaintenanceFinishDate,
+          m.MaintenanceReturnDate,
+          m.FollowUpDetail,
+          m.DriverName,
+          m.RootCauseFound,
+          m.FixAction,
+          m.LastFollowUpDate,
+          m.ParentMaintenanceItemID,
+          m.CreateDate,
+          m.UpdateDate,
+          m.CreateUserID,
+          m.UpdateUserID
+        FROM dbo.EV_MaintenanceItem m
+        LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
+        ORDER BY 
+          CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
+          m.ReportDate DESC
+      `)
+    ])
 
     // Get replacement cars for items
     const maintIds = itemResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)

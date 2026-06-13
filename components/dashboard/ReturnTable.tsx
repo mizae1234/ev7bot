@@ -1,7 +1,8 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { ReturnRecord } from '@/types'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface ReturnTableProps {
   records: ReturnRecord[]
@@ -10,6 +11,8 @@ interface ReturnTableProps {
 
 export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps) {
   const [search, setSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredRecords = records.filter((rec) => {
     return (
@@ -20,6 +23,17 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
       (rec.customer_name || '').toLowerCase().includes(search.toLowerCase())
     )
   })
+
+  // Reset page to 1 when filters or search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search])
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage)
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
@@ -83,8 +97,8 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
-            {filteredRecords.length > 0 ? (
-              filteredRecords.map((rec, i) => (
+            {paginatedRecords.length > 0 ? (
+              paginatedRecords.map((rec, i) => (
                 <tr key={rec.return_id + '-' + i} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors duration-150">
                   <td className="py-3.5 pr-2 font-mono font-medium">{rec.return_id}</td>
                   <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{rec.register_no || '-'}</td>
@@ -107,6 +121,14 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredRecords.length}
+        itemsPerPage={itemsPerPage}
+      />
     </div>
   )
 }

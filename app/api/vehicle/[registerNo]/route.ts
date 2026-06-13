@@ -105,38 +105,53 @@ export async function GET(
 
     const car = carResult.recordset[0]
 
-    // 2. ดึงประวัติสัญญาเช่าทั้งหมด
+    // Prepare requests
     const rentReq = pool.request()
     rentReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
-    const rentResult = await rentReq.query(`
-      SELECT
-        RentItemID, ContractNo, ContractType,
-        FirstName, LastName, PhoneNo,
-        ExpectedReleaseDate, ReleaseDate,
-        ContractCancellationDate, IsActive
-      FROM dbo.EV_RentItem
-      WHERE InventoryItemID = @inventoryItemId
-      ORDER BY ExpectedReleaseDate DESC, ReleaseDate DESC
-    `)
 
-    // 3. ดึงประวัติซ่อมทั้งหมด (ใช้ SP ที่ return description แทน code)
     const maintReq = pool.request()
     maintReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
-    const maintResult = await maintReq.query(`
-      SELECT
-        m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
-        m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
-        m.CarStatusCode, m.IssueTitle,
-        m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
-        m.ServiceLocationCode, m.InsuranceCode,
-        m.FollowUpDetail, m.IsActive,
-        m.DriverName, m.RootCauseFound, m.FixAction,
-        m.LastFollowUpDate, m.ParentMaintenanceItemID,
-        m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID
-      FROM dbo.EV_MaintenanceItem m
-      WHERE m.InventoryItemID = @inventoryItemId
-      ORDER BY m.ReportDate DESC
-    `)
+
+    const returnReq = pool.request()
+    returnReq.input('vinNo', sql.NVarChar, car.VinNo)
+
+    // Execute rent history, maintenance records, and return history concurrently
+    const [rentResult, maintResult, returnResult] = await Promise.all([
+      rentReq.query(`
+        SELECT
+          RentItemID, ContractNo, ContractType,
+          FirstName, LastName, PhoneNo,
+          ExpectedReleaseDate, ReleaseDate,
+          ContractCancellationDate, IsActive
+        FROM dbo.EV_RentItem
+        WHERE InventoryItemID = @inventoryItemId
+        ORDER BY ExpectedReleaseDate DESC, ReleaseDate DESC
+      `),
+      maintReq.query(`
+        SELECT
+          m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
+          m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
+          m.CarStatusCode, m.IssueTitle,
+          m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
+          m.ServiceLocationCode, m.InsuranceCode,
+          m.FollowUpDetail, m.IsActive,
+          m.DriverName, m.RootCauseFound, m.FixAction,
+          m.LastFollowUpDate, m.ParentMaintenanceItemID,
+          m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID
+        FROM dbo.EV_MaintenanceItem m
+        WHERE m.InventoryItemID = @inventoryItemId
+        ORDER BY m.ReportDate DESC
+      `),
+      returnReq.query(`
+        SELECT
+          r.ReturnItemID, r.VinNo, r.CustomerName, r.Model, rent.ContractNo,
+          r.ReceiveDate, r.ReturnDate, r.Mileage, r.ParkLocation
+        FROM dbo.EV_ReturnItem r
+        LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
+        WHERE r.VinNo = @vinNo
+        ORDER BY r.ReturnDate DESC
+      `)
+    ])
 
     // 4. ดึงรถทดแทน (ถ้ามี) สำหรับแต่ละงานซ่อม
     const maintIds = maintResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)
@@ -165,19 +180,6 @@ export async function GET(
         replacements[r.MaintenanceItemID].push(r)
       }
     }
-
-    // 5. ดึงประวัติรับคืน
-    const returnReq = pool.request()
-    returnReq.input('vinNo', sql.NVarChar, car.VinNo)
-    const returnResult = await returnReq.query(`
-      SELECT
-        r.ReturnItemID, r.VinNo, r.CustomerName, r.Model, rent.ContractNo,
-        r.ReceiveDate, r.ReturnDate, r.Mileage, r.ParkLocation
-      FROM dbo.EV_ReturnItem r
-      LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
-      WHERE r.VinNo = @vinNo
-      ORDER BY r.ReturnDate DESC
-    `)
 
     // ─── Apply Data Masking ────────────────────────────────────
     const maskedCar = stripSensitiveFields(car)

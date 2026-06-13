@@ -49,6 +49,18 @@ export interface RepairRecord {
   car_case: string | null
   insurance: string | null
   project: string | null
+  incident_date?: string | null
+  follow_up?: string | null
+  driver_name?: string | null
+  root_cause?: string | null
+  fix_action?: string | null
+  last_follow_up_date?: string | null
+  parent_maintenance_id?: number | string | null
+  create_date?: string | null
+  update_date?: string | null
+  create_user_id?: number | null
+  update_user_id?: number | null
+  replacements?: { vin: string; register_no: string | null; start_date: string | null }[]
 }
 
 export interface ReplacementRecord {

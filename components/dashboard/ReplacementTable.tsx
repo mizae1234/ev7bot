@@ -1,8 +1,9 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import type { ReplacementRecord } from '@/types'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface ReplacementTableProps {
   records: ReplacementRecord[]
@@ -11,6 +12,8 @@ interface ReplacementTableProps {
 
 export function ReplacementTable({ records = [], periodLabel = '' }: ReplacementTableProps) {
   const [search, setSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredRecords = records.filter((rec) => {
     return (
@@ -19,6 +22,17 @@ export function ReplacementTable({ records = [], periodLabel = '' }: Replacement
       (rec.vin || '').toLowerCase().includes(search.toLowerCase())
     )
   })
+
+  // Reset page to 1 when filters or search change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search])
+
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage)
+  const paginatedRecords = filteredRecords.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
@@ -80,8 +94,8 @@ export function ReplacementTable({ records = [], periodLabel = '' }: Replacement
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
-            {filteredRecords.length > 0 ? (
-              filteredRecords.map((rec, i) => (
+            {paginatedRecords.length > 0 ? (
+              paginatedRecords.map((rec, i) => (
                 <tr key={rec.replacement_id + '-' + i} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors duration-150">
                   <td className="py-3.5 pr-2 font-mono font-medium">{rec.replacement_id}</td>
                   <td className="py-3.5 pr-2 font-mono text-zinc-500 dark:text-zinc-400">{rec.maintenance_id}</td>
@@ -107,6 +121,14 @@ export function ReplacementTable({ records = [], periodLabel = '' }: Replacement
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredRecords.length}
+        itemsPerPage={itemsPerPage}
+      />
     </div>
   )
 }
