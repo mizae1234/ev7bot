@@ -72,6 +72,7 @@ interface ReturnInfo {
 interface VehicleData {
   car: CarInfo
   currentRent: RentInfo | null
+  rentHistory: RentInfo[]
   maintenance: MaintenanceInfo[]
   returns: ReturnInfo[]
 }
@@ -148,7 +149,7 @@ export default function VehicleDetailPage() {
   if (error) return <ErrorState message={error} registerNo={registerNo} />
   if (!data) return null
 
-  const { car, currentRent, maintenance, returns } = data
+  const { car, currentRent, rentHistory = [], maintenance, returns } = data
   const statusInfo = getStatusInfo(car.StatusCode)
   const activeMaint = maintenance.find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
 
@@ -207,6 +208,32 @@ export default function VehicleDetailPage() {
               <InfoItem label="ประเภทสัญญา" value={currentRent.ContractType || '-'} />
               <InfoItem label="วันนัดส่งมอบ" value={formatDate(currentRent.ExpectedReleaseDate)} />
               <InfoItem label="วันส่งมอบจริง" value={formatDate(currentRent.ReleaseDate)} />
+            </div>
+          </SectionCard>
+        )}
+
+        {/* ── Rent History ── */}
+        {rentHistory.length > 0 && (
+          <SectionCard title={`📋 ประวัติการปล่อยเช่า (${rentHistory.length} รายการ)`} color="zinc">
+            <div className="space-y-3">
+              {rentHistory.map((r, i) => (
+                <div key={i} className={`rounded-xl border p-3 ${r.IsActive ? 'border-blue-300 bg-blue-50/30' : 'border-zinc-200 bg-zinc-50/30'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-zinc-800">สัญญาเช่า {r.ContractNo}</span>
+                    {r.IsActive && <span className="text-xs font-bold text-blue-600">สัญญาปัจจุบัน</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-zinc-500">ลูกค้า: <span className="text-zinc-700">{r.FirstName} {r.LastName}</span></span>
+                    <span className="text-zinc-500">ประเภท: <span className="text-zinc-700">{r.ContractType || '-'}</span></span>
+                    <span className="text-zinc-500">เบอร์โทร: <span className="text-zinc-700">{r.PhoneNo || '-'}</span></span>
+                    <span className="text-zinc-500">วันนัดส่งมอบ: <span className="text-zinc-700">{formatDate(r.ExpectedReleaseDate)}</span></span>
+                    <span className="text-zinc-500">วันส่งมอบจริง: <span className="text-zinc-700">{formatDate(r.ReleaseDate)}</span></span>
+                    {r.ContractCancellationDate && (
+                      <span className="text-zinc-500 col-span-2 text-red-500">วันยกเลิกสัญญา: <span>{formatDate(r.ContractCancellationDate)}</span></span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </SectionCard>
         )}

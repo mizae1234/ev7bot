@@ -74,18 +74,18 @@ export async function GET(
 
     const car = carResult.recordset[0]
 
-    // 2. ดึงข้อมูลสัญญาเช่าปัจจุบัน
+    // 2. ดึงประวัติสัญญาเช่าทั้งหมด
     const rentReq = pool.request()
     rentReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
     const rentResult = await rentReq.query(`
-      SELECT TOP 1
+      SELECT
         RentItemID, ContractNo, ContractType,
         FirstName, LastName, PhoneNo,
         ExpectedReleaseDate, ReleaseDate,
         ContractCancellationDate, IsActive
       FROM dbo.EV_RentItem
-      WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
-      ORDER BY ReleaseDate DESC
+      WHERE InventoryItemID = @inventoryItemId
+      ORDER BY ExpectedReleaseDate DESC, ReleaseDate DESC
     `)
 
     // 3. ดึงประวัติซ่อมทั้งหมด (ใช้ SP ที่ return description แทน code)
@@ -147,14 +147,21 @@ export async function GET(
 
     // ─── Apply Data Masking ────────────────────────────────────
     const maskedCar = stripSensitiveFields(car)
-
-    const maskedRent = rentResult.recordset[0]
+ 
+    const activeRentRow = rentResult.recordset.find((r: any) => r.IsActive === true)
+    const maskedRent = activeRentRow
       ? {
-          ...stripSensitiveFields(rentResult.recordset[0]),
-          ...maskName(rentResult.recordset[0].FirstName, rentResult.recordset[0].LastName),
-          PhoneNo: maskPhone(rentResult.recordset[0].PhoneNo),
+          ...stripSensitiveFields(activeRentRow),
+          ...maskName(activeRentRow.FirstName, activeRentRow.LastName),
+          PhoneNo: maskPhone(activeRentRow.PhoneNo),
         }
       : null
+
+    const rentHistory = rentResult.recordset.map((r: any) => ({
+      ...stripSensitiveFields(r),
+      ...maskName(r.FirstName, r.LastName),
+      PhoneNo: maskPhone(r.PhoneNo),
+    }))
 
     // ─── Code → Description mapping ─────────────────────────────
     const carStatusMap: Record<string, string> = {
@@ -208,6 +215,7 @@ export async function GET(
     return NextResponse.json({
       car: maskedCar,
       currentRent: maskedRent,
+      rentHistory,
       maintenance,
       returns: maskedReturns,
     })
