@@ -7,8 +7,48 @@ import { env } from '@/lib/env'
 import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
 import { getMSSQLPool, sql } from '@/lib/mssql'
+import { AsyncLocalStorage } from 'async_hooks'
 
 export const dynamic = 'force-dynamic';
+
+const requestContext = new AsyncLocalStorage<{
+  userId?: string
+  sourceType: string
+  sourceId: string | null
+  userMessage: string
+}>()
+
+async function logReplyToDb(replyMessageText: string) {
+  const ctx = requestContext.getStore()
+  if (!ctx || !ctx.userMessage) return
+  
+  let userName: string | undefined
+  try {
+    if (!env.MOCK_MODE && ctx.userId) {
+      const profile = await lineClient.getProfile(ctx.userId)
+      userName = profile.displayName
+    }
+  } catch { /* ignore */ }
+  
+  await logChatToDb(ctx.sourceType, ctx.sourceId, userName, ctx.userMessage, replyMessageText)
+}
+
+const originalReplyMessage = lineClient.replyMessage.bind(lineClient)
+lineClient.replyMessage = async function(replyToken: string, messages: any, ...args: any[]) {
+  const res = await originalReplyMessage(replyToken, messages, ...args)
+  try {
+    let logText = ''
+    if (Array.isArray(messages)) {
+      logText = messages.map(m => m.text || m.altText || '[Flex Message]').join('\n')
+    } else if (messages && typeof messages === 'object') {
+      logText = messages.text || messages.altText || '[Flex Message]'
+    }
+    await logReplyToDb(logText)
+  } catch (err) {
+    console.error('[logReplyToDb Error in replyMessage]', err)
+  }
+  return res
+} as any
 
 const BOT_NAME = 'Butter'
 const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
@@ -86,7 +126,20 @@ export async function POST(req: NextRequest) {
 
     const { events }: { events: WebhookEvent[] } = JSON.parse(body)
 
-    await Promise.allSettled(events.map(event => handleEvent(event, appUrl)))
+    await Promise.allSettled(events.map(event => {
+      const isGroupOrRoom = event.source.type === 'group' || event.source.type === 'room'
+      const targetSourceId = isGroupOrRoom
+        ? ((event.source as any).groupId || (event.source as any).roomId || event.source.userId!)
+        : event.source.userId!
+      
+      const ctx = {
+        userId: event.source.userId,
+        sourceType: event.source.type,
+        sourceId: targetSourceId || null,
+        userMessage: event.type === 'message' && event.message.type === 'text' ? event.message.text : ''
+      }
+      return requestContext.run(ctx, () => handleEvent(event, appUrl))
+    }))
 
     return NextResponse.json({ ok: true })
   } catch (error) {
@@ -1143,16 +1196,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     const aiResponse = await askButter(text, history)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
 
-    // ─── Log chat to database ────────────────────────────────────
-    let userName: string | undefined
-    try {
-      if (!env.MOCK_MODE && userId) {
-        const profile = await lineClient.getProfile(userId)
-        userName = profile.displayName
-      }
-    } catch { /* ignore profile errors */ }
-    logChatToDb(chatSourceType, targetSourceId, userName, text, aiResponse)
-      .catch(err => console.error('[logChat Error]', err))
+
 
     // ─── Try to detect a vehicle identifier for Flex Message ───
     let vehicleIdentifier: string | null = null
@@ -1281,6 +1325,7 @@ function matchAny(text: string, keywords: string[]): boolean {
 async function replyText(replyToken: string, message: string) {
   if (env.MOCK_MODE) {
     console.log(`[Mock ${BOT_NAME}] Reply:`, message)
+    await logReplyToDb(message).catch(err => console.error('[Mock logReplyToDb error]', err))
     return
   }
   try {
