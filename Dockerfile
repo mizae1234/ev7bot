@@ -16,11 +16,9 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN cat next.config.mjs
 
 # Build Next.js (standalone)
 RUN npm run build
-RUN chmod +x entrypoint.sh
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
@@ -31,9 +29,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-RUN chmod +x entrypoint.sh
 
 # Copy standalone build
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
