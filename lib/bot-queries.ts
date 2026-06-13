@@ -318,10 +318,25 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     ORDER BY count DESC
   `)
 
+  // Get planned count from EV_DeliveryPlan
+  const planReq = pool.request()
+  planReq.input('startDate', sql.DateTime, start)
+  planReq.input('endDate', sql.DateTime, end)
+  const planRes = await planReq.query(`
+    SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
+    FROM dbo.EV_DeliveryPlan
+    WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+  `)
+  const planTotal = planRes.recordset[0]?.planTotal || 0
+
+  const deliveryData = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
+  deliveryData.total = planTotal
+  deliveryData.pending = Math.max(0, planTotal - (deliveryData.completed || 0))
+
   return {
     year,
     month,
-    delivery: deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 },
+    delivery: deliveryData,
     repair: repairRes.recordset[0] || { total: 0, closed: 0, open: 0 },
     projectBreakdown: projectRes.recordset,
   }
