@@ -139,18 +139,41 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
 
     // ─── Group mode: ต้องพิมพ์ "butter" นำหน้าก่อน ─────────────
     if (isGroup) {
-      // Check if message starts with bot trigger
-      const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
-      if (!trigger) {
-        // ไม่ได้เรียก Butter → ไม่ตอบ (เงียบ)
+      // Check if message is a quick menu keyword (allow bypass without prefix)
+      const bypassKeywords = [
+        'สรุปวันนี้',
+        'สรุปเมื่อวาน',
+        'สรุปส่งมอบประจำเดือน',
+        'ดูรถค้างซ่อมแต่ละพื้นที่',
+        'เมนู',
+        'dashboard',
+        'แดชบอร์ด',
+        'ลงทะเบียน',
+        'register'
+      ]
+      const isBypass = bypassKeywords.includes(rawLower)
+
+      let strippedText = rawText
+      let triggerFound = false
+
+      if (isBypass) {
+        strippedText = rawText
+        triggerFound = true
+      } else {
+        const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
+        if (trigger) {
+          strippedText = rawText.substring(trigger.length).trim()
+          triggerFound = true
+        }
+      }
+
+      if (!triggerFound) {
+        // ไม่ได้เรียก Butter และไม่ใช่คำสั่ง Bypass → ไม่ตอบ (เงียบ)
         return
       }
 
-      // Strip bot name prefix and process the rest
-      const strippedText = rawText.substring(trigger.length).trim()
-
-      // ถ้าพิมพ์แค่ "butter" เฉยๆ → ทักทาย
-      if (!strippedText) {
+      // ถ้าพิมพ์แค่ "butter" เฉยๆ (ไม่มีการ bypass และ strippedText ว่าง) → ทักทาย
+      if (!isBypass && !strippedText) {
         await replyText(
           event.replyToken,
           `ว่าไงคะ~ 🧈✨ ${BOT_NAME} พร้อมช่วยเหลือแล้วค่ะ!\n\nลองถาม เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter เมนู"\n💬 "butter ซ่อมค้างกี่คัน" 💛`
