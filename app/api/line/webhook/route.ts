@@ -246,6 +246,181 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     return
   }
 
+  // ─── Daily Report as Flex Message ─────────────────────────────
+  if (matchAny(lower, ['รายงานประจำวัน', 'สรุปรายงาน', 'สรุปประจำวัน', 'ข่าวเช้า', 'รายงานวัน'])) {
+    try {
+      // Try to extract date from message (DD/MM/YYYY or YYYY-MM-DD)
+      let reportDate: string | null = null
+      const dateMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
+      if (dateMatch) {
+        const [, d, m, y] = dateMatch
+        // If year > 2500 it's Buddhist Era
+        const year = parseInt(y) > 2500 ? parseInt(y) - 543 : parseInt(y)
+        reportDate = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+      }
+
+      // Default to today
+      if (!reportDate) {
+        const bangkokFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        reportDate = bangkokFormatter.format(new Date())
+      }
+
+      const { getPortfolioSummary, getDeliveryByDate, getRepairStatus: getRepair } = await import('@/lib/bot-queries')
+      const [portfolio, delivery, repair] = await Promise.all([
+        getPortfolioSummary(),
+        getDeliveryByDate({ date: reportDate }),
+        getRepair({ date: reportDate }),
+      ])
+
+      if ('error' in portfolio) {
+        await replyText(replyToken, `❌ ดึงข้อมูลไม่สำเร็จค่ะ: ${portfolio.error}`)
+        return
+      }
+
+      const fmt = (n: number) => n.toLocaleString('en-US')
+      const todayFormatted = new Date().toLocaleDateString('th-TH', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
+      })
+      const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
+      const repairSummary = repair?.summary || { total: 0, closed: 0, open: 0 }
+
+      const portfolioBubble = {
+        type: 'bubble', size: 'mega',
+        header: { type: 'box', layout: 'vertical', contents: [
+          { type: 'text', text: '🧈 Butter สรุปข่าวเช้า', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+          { type: 'text', text: todayFormatted, size: 'xs', color: '#888888' },
+        ], backgroundColor: '#FFF9E6', paddingAll: 'lg' },
+        body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: '🚗 รถทั้งหมด', size: 'sm', color: '#555555', flex: 5 },
+            { type: 'text', text: fmt(portfolio.total), size: 'sm', weight: 'bold', color: '#1a1a1a', align: 'end', flex: 3 },
+          ]},
+          { type: 'separator' },
+          { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '🟢 On Rent', size: 'sm', weight: 'bold', color: '#2E7D32', flex: 5 },
+              { type: 'text', text: fmt(portfolio.onRent.total), size: 'sm', weight: 'bold', color: '#2E7D32', align: 'end', flex: 3 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `On Road ${fmt(portfolio.onRent.onRoad)}`, size: 'xxs', color: '#aaaaaa', flex: 5 },
+              { type: 'text', text: `Maint. ${fmt(portfolio.onRent.underMaintenance)}`, size: 'xxs', color: '#E65100', align: 'end', flex: 3 },
+            ]},
+          ]},
+          { type: 'separator' },
+          { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '✅ Available', size: 'sm', weight: 'bold', color: '#1565C0', flex: 5 },
+              { type: 'text', text: fmt(portfolio.available.total), size: 'sm', weight: 'bold', color: '#1565C0', align: 'end', flex: 3 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `EV7 ${fmt(portfolio.available.ev7)}`, size: 'xxs', color: '#aaaaaa' },
+              { type: 'text', text: `LM ${fmt(portfolio.available.lineMan)}`, size: 'xxs', color: '#aaaaaa', align: 'center' },
+              { type: 'text', text: `Grab ${fmt(portfolio.available.grab)}`, size: 'xxs', color: '#aaaaaa', align: 'end' },
+            ]},
+          ]},
+          { type: 'separator' },
+          { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '🏭 Production', size: 'sm', weight: 'bold', color: '#6A1B9A', flex: 5 },
+              { type: 'text', text: fmt(portfolio.onProduction.total), size: 'sm', weight: 'bold', color: '#6A1B9A', align: 'end', flex: 3 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `Pending ${fmt(portfolio.onProduction.pending)}`, size: 'xxs', color: '#aaaaaa' },
+              { type: 'text', text: `Process ${fmt(portfolio.onProduction.inProcess)}`, size: 'xxs', color: '#aaaaaa', align: 'center' },
+              { type: 'text', text: `GR ${fmt(portfolio.onProduction.waitingGR)}`, size: 'xxs', color: '#aaaaaa', align: 'end' },
+            ]},
+          ]},
+          { type: 'separator' },
+          { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '🔄 Replacement', size: 'sm', weight: 'bold', color: '#E65100', flex: 5 },
+              { type: 'text', text: fmt(portfolio.replacement.total), size: 'sm', weight: 'bold', color: '#E65100', align: 'end', flex: 3 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `Available ${fmt(portfolio.replacement.available)}`, size: 'xxs', color: '#aaaaaa', flex: 5 },
+              { type: 'text', text: `Car ${fmt(portfolio.replacement.car)}`, size: 'xxs', color: '#aaaaaa', align: 'end', flex: 3 },
+            ]},
+          ]},
+          { type: 'separator' },
+          { type: 'box', layout: 'vertical', spacing: 'xs', contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '🛠️ Maintenance', size: 'sm', weight: 'bold', color: '#C62828', flex: 5 },
+              { type: 'text', text: fmt(portfolio.underMaintenance.total), size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 3 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `New ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#aaaaaa' },
+              { type: 'text', text: `Rent ${fmt(portfolio.underMaintenance.onRent)}`, size: 'xxs', color: '#aaaaaa', align: 'center' },
+              { type: 'text', text: `Use ${fmt(portfolio.underMaintenance.use)}`, size: 'xxs', color: '#aaaaaa', align: 'end' },
+            ]},
+          ]},
+        ], paddingAll: 'lg' },
+        footer: { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: `EV7: ${fmt(portfolio.company.ev7)}`, size: 'xxs', color: '#aaaaaa' },
+          { type: 'text', text: `GI: ${fmt(portfolio.company.gi)}`, size: 'xxs', color: '#aaaaaa', align: 'end' },
+        ], paddingAll: 'md' },
+      }
+
+      const activityBubble = {
+        type: 'bubble', size: 'mega',
+        header: { type: 'box', layout: 'vertical', contents: [
+          { type: 'text', text: `📅 กิจกรรมวันที่ ${reportDate}`, weight: 'bold', size: 'md', color: '#1a1a1a' },
+          { type: 'text', text: 'สรุปการส่งรถและงานซ่อม', size: 'xs', color: '#888888' },
+        ], backgroundColor: '#E8F5E9', paddingAll: 'lg' },
+        body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
+          { type: 'text', text: '🚛 ส่งมอบรถ', weight: 'bold', size: 'sm', color: '#1565C0' },
+          { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(deliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(deliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(deliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+          ]},
+          { type: 'separator' },
+          { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
+          { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(repairSummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(repairSummary.closed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'ปิดงาน', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(repairSummary.open), size: 'xl', weight: 'bold', color: '#C62828', align: 'center' },
+              { type: 'text', text: 'ค้างซ่อม', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+          ]},
+        ], paddingAll: 'lg' },
+      }
+
+      if (!env.MOCK_MODE) {
+        await lineClient.replyMessage(replyToken, {
+          type: 'flex',
+          altText: `🧈 Butter สรุปรายงาน ${reportDate}`,
+          contents: { type: 'carousel', contents: [portfolioBubble, activityBubble] },
+        })
+      }
+      return
+    } catch (err: any) {
+      console.error('[Daily Report Flex Error]', err)
+      await replyText(replyToken, `❌ สร้างรายงานไม่สำเร็จค่ะ: ${err.message}\n\nลองใหม่อีกครั้งนะคะ 🧈`)
+      return
+    }
+  }
+
   // ─── AI-Powered Response (Gemini) ──────────────────────────────
   // ทุกข้อความที่ไม่ตรงกับ keyword ข้างบน → ส่งให้ AI ตอบ
   try {
