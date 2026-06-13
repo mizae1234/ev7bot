@@ -61,7 +61,13 @@ export async function GET(req: NextRequest) {
     // Build WHERE clause dynamically
     let statusWhere = ''
     if (statusFilter && statusFilter !== 'all') {
-      statusWhere = ` AND m.CarStatusCode = @statusFilter`
+      if (statusFilter === 'IN_MAINTENANCE') {
+        statusWhere = ` AND i.Status = 'MAINTENANCE'`
+      } else if (statusFilter === 'WAITING_FOR_MAINTENANCE') {
+        statusWhere = ` AND (i.Status IS NULL OR i.Status != 'MAINTENANCE')`
+      } else {
+        statusWhere = ` AND m.CarStatusCode = @statusFilter`
+      }
     }
     let locationWhere = ''
     if (locationFilter && locationFilter !== 'all') {
@@ -76,12 +82,13 @@ export async function GET(req: NextRequest) {
     const summaryReq = pool.request()
     const summaryResult = await summaryReq.query(`
       SELECT
-        COUNT(DISTINCT InventoryItemID) AS total,
-        COUNT(DISTINCT CASE WHEN CarStatusCode = 'IN_MAINTENANCE' THEN InventoryItemID END) AS in_maintenance,
+        COUNT(DISTINCT m.InventoryItemID) AS total,
+        COUNT(DISTINCT CASE WHEN i.Status = 'MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
         0 AS complete,
-        COUNT(DISTINCT CASE WHEN CarStatusCode IN ('WAITING_FOR_MAINTENANCE','STILL_WORK') THEN InventoryItemID END) AS waiting
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1
+        COUNT(DISTINCT CASE WHEN i.Status IS NULL OR i.Status != 'MAINTENANCE' THEN m.InventoryItemID END) AS waiting
+      FROM dbo.EV_MaintenanceItem m
+      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1
     `)
 
     // Unique locations
@@ -108,7 +115,7 @@ export async function GET(req: NextRequest) {
 
     // Maintenance items (active only, optionally filtered)
     const itemReq = pool.request()
-    if (statusFilter && statusFilter !== 'all') {
+    if (statusFilter && statusFilter !== 'all' && statusFilter !== 'IN_MAINTENANCE' && statusFilter !== 'WAITING_FOR_MAINTENANCE') {
       itemReq.input('statusFilter', sql.NVarChar, statusFilter)
     }
     if (locationFilter && locationFilter !== 'all' && locationFilter !== 'ไม่ระบุ') {
