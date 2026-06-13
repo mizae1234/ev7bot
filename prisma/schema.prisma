@@ -65,3 +65,13 @@ model ChatLog {
 
   @@map("chat_logs")
 }
+
+model ActivityNotification {
+  id         Int      @id @default(autoincrement())
+  recordType String   @map("record_type") @db.VarChar(30)  // 'MAINTENANCE' | 'DELIVERY'
+  recordId   Int      @map("record_id")
+  sentAt     DateTime @default(now()) @map("sent_at") @db.Timestamptz
+
+  @@unique([recordType, recordId])
+  @@map("activity_notifications")
+}
