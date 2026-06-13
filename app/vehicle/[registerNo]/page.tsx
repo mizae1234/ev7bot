@@ -30,6 +30,7 @@ interface RentInfo {
   ExpectedReleaseDate: string
   ReleaseDate: string
   ContractCancellationDate: string | null
+  IsActive?: boolean
 }
 
 interface ReplacementInfo {

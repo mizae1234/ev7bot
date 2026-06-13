@@ -230,12 +230,12 @@ function delay(ms: number) {
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
-export async function askButter(userMessage: string): Promise<string> {
+export async function askButter(userMessage: string, history: any[] = []): Promise<string> {
   let lastError: unknown = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await _askButterOnce(userMessage)
+      return await _askButterOnce(userMessage, history)
     } catch (error) {
       lastError = error
       const message = error instanceof Error ? error.message : String(error)
@@ -269,14 +269,14 @@ export async function askButter(userMessage: string): Promise<string> {
 
 // ─── Single attempt ────────────────────────────────────────────────
 
-async function _askButterOnce(userMessage: string): Promise<string> {
+async function _askButterOnce(userMessage: string, history: any[] = []): Promise<string> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations }],
   })
 
-  const chat = model.startChat()
+  const chat = model.startChat({ history })
   let response = await chat.sendMessage(userMessage)
 
   // Handle function calling loop (max 8 iterations to prevent infinite loops)

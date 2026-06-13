@@ -294,8 +294,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         returns: repairDaily?.returns || 0,
       }
 
-      const portfolioBubble = {
-        type: 'bubble', size: 'mega',
+      const portfolioBubble: any = {
+        type: 'bubble' as const, size: 'mega' as const,
         header: { type: 'box', layout: 'vertical', contents: [
           { type: 'text', text: '🧈 Butter สรุปข่าว', weight: 'bold', size: 'lg', color: '#1a1a1a' },
           { type: 'text', text: todayFormatted, size: 'xs', color: '#888888' },
@@ -370,8 +370,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         ], paddingAll: 'md' },
       }
 
-      const activityBubble = {
-        type: 'bubble', size: 'mega',
+      const activityBubble: any = {
+        type: 'bubble' as const, size: 'mega' as const,
         header: { type: 'box', layout: 'vertical', contents: [
           { type: 'text', text: `📅 กิจกรรมวันที่ ${reportDate}`, weight: 'bold', size: 'md', color: '#1a1a1a' },
           { type: 'text', text: 'สรุปการส่งรถและงานซ่อม', size: 'xs', color: '#888888' },
@@ -440,7 +440,29 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   // ทุกข้อความที่ไม่ตรงกับ keyword ข้างบน → ส่งให้ AI ตอบ
   try {
     console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
-    const aiResponse = await askButter(text)
+
+    // Load recent chat history for context (up to 5 messages)
+    const targetSourceId = chatSourceId || userId
+    let history: any[] = []
+
+    if (targetSourceId) {
+      try {
+        const logs = await prisma.chatLog.findMany({
+          where: { sourceId: targetSourceId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        })
+        const chronologicalLogs = [...logs].reverse()
+        history = chronologicalLogs.flatMap(log => [
+          { role: 'user', parts: [{ text: log.userMessage }] },
+          { role: 'model', parts: [{ text: log.botReply }] }
+        ])
+      } catch (err) {
+        console.error('[handleChat] Error loading conversation history:', err)
+      }
+    }
+
+    const aiResponse = await askButter(text, history)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
 
     // ─── Log chat to database ────────────────────────────────────
