@@ -10,6 +10,7 @@ import { ReplacementTable } from '@/components/dashboard/ReplacementTable'
 import { ReturnTable } from '@/components/dashboard/ReturnTable'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { LoginProfile } from '@/components/ui/LoginProfile'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 import type { DashboardData } from '@/types'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -24,7 +25,7 @@ const thaiMonthsShort = [
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
 ]
 
-export default function DashboardPage() {
+function DashboardContent() {
   // Navigation calendar state (June 2026 matches user data)
   const [selectedYear, setSelectedYear] = useState<number>(2026)
   const [selectedMonth, setSelectedMonth] = useState<number>(5) // 0-indexed, 5 = June
@@ -418,7 +419,7 @@ export default function DashboardPage() {
           ) : data ? (
             <>
               <StatCard
-                title={filterMode === 'month' ? "คิวส่งมอบเดือนนี้" : "คิวส่งมอบช่วงที่เลือก"}
+                title={filterMode === 'month' ? "แผนเดือนนี้" : "แผนช่วงที่เลือก"}
                 value={data.delivery.total}
                 icon={carIcon}
                 subValue={[
@@ -585,5 +586,13 @@ export default function DashboardPage() {
 
       </div>
     </main>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <DashboardContent />
+    </AuthGuard>
   )
 }

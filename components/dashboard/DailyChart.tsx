@@ -83,8 +83,8 @@ export function DailyChart({ data }: DailyChartProps) {
   return (
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">แนวโน้มการส่งมอบรถ 7 วันย้อนหลัง</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">เปรียบเทียบเป้าหมายการปล่อยรถและรถที่ส่งมอบเสร็จสิ้นแล้วในแต่ละวัน</p>
+        <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายเดือน แผนเทียบ actual การปล่อยรถ</h2>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">เปรียบเทียบแผนการปล่อยรถ (แผนทั้งหมด) และรถที่ส่งมอบเสร็จสิ้นจริง (Actual) ในแต่ละวัน</p>
       </div>
 
       <div className="h-80 w-full">
@@ -124,13 +124,13 @@ export function DailyChart({ data }: DailyChartProps) {
               wrapperStyle={{ fontSize: 12, paddingBottom: 15, color: '#888888' }}
             />
             <Bar
-              name="ปล่อยรถทั้งหมด"
+              name="แผนทั้งหมด"
               dataKey="deliveries"
               fill="url(#colorDeliveries)"
               radius={[4, 4, 0, 0]}
             />
             <Bar
-              name="เสร็จสิ้นแล้ว"
+              name="Actual ปล่อยรถ"
               dataKey="completed"
               fill="url(#colorCompleted)"
               radius={[4, 4, 0, 0]}

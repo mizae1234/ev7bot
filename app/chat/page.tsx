@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 interface ChatMessage {
   id: string
@@ -16,7 +17,7 @@ const QUICK_ACTIONS = [
   { label: '🔍 ค้นหารถ', message: 'ค้นหารถรุ่น Y Plus 490' },
 ]
 
-export default function ChatPage() {
+function ChatContent() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -553,5 +554,13 @@ export default function ChatPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <AuthGuard>
+      <ChatContent />
+    </AuthGuard>
   )
 }

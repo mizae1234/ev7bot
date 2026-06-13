@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
 import { LoginProfile } from '@/components/ui/LoginProfile'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -494,16 +495,18 @@ function MaintenanceContent() {
 
 export default function MaintenancePage() {
   return (
-    <Suspense fallback={
-      <main className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/30 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
-          <div className="flex justify-center py-20">
-            <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+    <AuthGuard>
+      <Suspense fallback={
+        <main className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/30 pb-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+            <div className="flex justify-center py-20">
+              <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+            </div>
           </div>
-        </div>
-      </main>
-    }>
-      <MaintenanceContent />
-    </Suspense>
+        </main>
+      }>
+        <MaintenanceContent />
+      </Suspense>
+    </AuthGuard>
   )
 }

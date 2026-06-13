@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import useSWR, { mutate } from 'swr'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -15,7 +16,7 @@ interface LineGroup {
   updatedAt: string
 }
 
-export default function SettingsPage() {
+function SettingsContent() {
   const { data: groups, error, isLoading } = useSWR<LineGroup[]>('/api/groups', fetcher)
   const [togglingId, setTogglingId] = useState<number | null>(null)
 
@@ -192,5 +193,13 @@ export default function SettingsPage() {
         </section>
       </main>
     </div>
+  )
+}
+
+export default function SettingsPage() {
+  return (
+    <AuthGuard>
+      <SettingsContent />
+    </AuthGuard>
   )
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { LoginProfile } from '@/components/ui/LoginProfile'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ function getRepairStatusInfo(code: string): { label: string; color: string } {
 
 // ─── Page Component ────────────────────────────────────────────────
 
-export default function VehicleDetailPage() {
+function VehicleDetailContent() {
   const params = useParams()
   const registerNo = decodeURIComponent(params.registerNo as string)
 
@@ -379,6 +380,14 @@ export default function VehicleDetailPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function VehicleDetailPage() {
+  return (
+    <AuthGuard>
+      <VehicleDetailContent />
+    </AuthGuard>
   )
 }
 
