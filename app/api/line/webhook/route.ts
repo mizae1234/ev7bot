@@ -287,7 +287,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
       })
       const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
-      const repairData = { newReports: repairDaily?.newReports || 0, completed: repairDaily?.completed || 0 }
+      const repairData = {
+        newReports: repairDaily?.newReports || 0,
+        completed: repairDaily?.completed || 0,
+        replacements: repairDaily?.replacements || 0,
+        returns: repairDaily?.returns || 0,
+      }
 
       const portfolioBubble = {
         type: 'bubble', size: 'mega',
