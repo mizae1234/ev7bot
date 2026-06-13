@@ -34,6 +34,7 @@ interface MaintenanceData {
   items: MaintenanceItem[]
   summary: { total: number; in_maintenance: number; complete: number; waiting: number }
   locations: string[]
+  locationSummary: { Location: string; Count: number }[]
   fetchedAt: string
 }
 
@@ -153,7 +154,7 @@ function MaintenanceContent() {
 
         {/* Summary Cards */}
         {data?.summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <button onClick={() => setStatusFilter('all')}
               className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'all' ? 'border-indigo-500/40 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">ทั้งหมด</p>
@@ -169,11 +170,40 @@ function MaintenanceContent() {
               <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">⏳ รอเข้าซ่อม</p>
               <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">{data.summary.waiting}</p>
             </button>
-            <button onClick={() => setStatusFilter('COMPLETE')}
-              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'COMPLETE' ? 'border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">✅ ซ่อมเสร็จ</p>
-              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{data.summary.complete}</p>
-            </button>
+          </div>
+        )}
+
+        {/* Repairs by Location */}
+        {data?.locationSummary && data.locationSummary.length > 0 && (
+          <div className="bg-white/70 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 p-5 shadow-sm backdrop-blur-md">
+            <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-4">
+              📍 รถค้างซ่อมแยกตามอู่/พื้นที่
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {data.locationSummary.map((item: any, idx: number) => {
+                const displayLoc = item.Location === 'ไม่ระบุ' ? 'ไม่ระบุพื้นที่/อู่' : item.Location.replace(/_/g, ' ')
+                const isSelected = locationFilter === item.Location
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setLocationFilter(isSelected ? 'all' : item.Location)}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all text-[11px] text-left ${
+                      isSelected
+                        ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold'
+                        : 'border-zinc-200 hover:border-zinc-300 bg-white/50 dark:border-zinc-800 dark:hover:border-zinc-700 dark:bg-zinc-950/20 text-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    <span className="truncate pr-2" title={displayLoc}>
+                      {displayLoc}
+                    </span>
+                    <span className="font-extrabold text-rose-600 dark:text-rose-400 shrink-0">
+                      {item.Count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -228,10 +258,10 @@ function MaintenanceContent() {
                 <thead>
                   <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-semibold bg-zinc-50/50 dark:bg-zinc-900/50">
                     <th className="py-3 px-4"></th>
+                    <th className="py-3 pr-2">📍 สถานที่ซ่อม</th>
                     <th className="py-3 pr-2">ทะเบียน / VIN</th>
                     <th className="py-3 pr-2">รุ่น</th>
                     <th className="py-3 pr-2">อาการ</th>
-                    <th className="py-3 pr-2">📍 สถานที่ซ่อม</th>
                     <th className="py-3 pr-2">ประเภท</th>
                     <th className="py-3 pr-2">เคส</th>
                     <th className="py-3 pr-2">วันที่แจ้ง</th>
@@ -249,13 +279,13 @@ function MaintenanceContent() {
                           <td className="py-3.5 px-4 text-zinc-400">
                             <span className={`inline-block transition-transform duration-200 ${expandedId === item.id ? 'rotate-90' : ''}`}>▶</span>
                           </td>
+                          <td className="py-3.5 pr-2 text-emerald-700 dark:text-emerald-400 font-medium">{item.service_location}</td>
                           <td className="py-3.5 pr-2">
                             <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{item.register_no || '-'}</div>
                             <div className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">{item.vin}</div>
                           </td>
                           <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{item.model || '-'}</td>
                           <td className="py-3.5 pr-2 max-w-[200px] truncate" title={item.issue_title}>{item.issue_title || '-'}</td>
-                          <td className="py-3.5 pr-2 text-emerald-700 dark:text-emerald-400 font-medium">{item.service_location}</td>
                           <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{item.problem_type}</td>
                           <td className="py-3.5 pr-2">
                             {item.car_case !== '-' && (

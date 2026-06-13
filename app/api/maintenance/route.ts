@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
-        SUM(CASE WHEN CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS complete,
+        0 AS complete,
         SUM(CASE WHEN CarStatusCode IN ('WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 1 ELSE 0 END) AS waiting
       FROM dbo.EV_MaintenanceItem
       WHERE IsActive = 1
@@ -91,6 +91,19 @@ export async function GET(req: NextRequest) {
       FROM dbo.EV_MaintenanceItem
       WHERE IsActive = 1 AND ServiceLocationCode IS NOT NULL AND ServiceLocationCode != ''
       ORDER BY ServiceLocationCode
+    `)
+
+    // Repairs by location summary
+    const repairByLocReq = pool.request()
+    const repairByLocResult = await repairByLocReq.query(`
+      SELECT 
+        ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+        COUNT(*) AS Count
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')
+      GROUP BY m.ServiceLocationCode
+      ORDER BY Count DESC
     `)
 
     // Maintenance items (active only, optionally filtered)
@@ -185,6 +198,7 @@ export async function GET(req: NextRequest) {
       items,
       summary: summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 },
       locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
+      locationSummary: repairByLocResult.recordset || [],
       fetchedAt: new Date().toISOString(),
     })
   } catch (error) {
