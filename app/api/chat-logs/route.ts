@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const search = searchParams.get('search') || ''
     const sourceType = searchParams.get('sourceType') || 'all'
+    const filterUser = searchParams.get('user') || ''
 
     const skip = (page - 1) * limit
 
@@ -25,13 +26,58 @@ export async function GET(req: NextRequest) {
       where.sourceType = sourceType
     }
 
-    if (search) {
-      where.OR = [
-        { userName: { contains: search, mode: 'insensitive' } },
-        { userMessage: { contains: search, mode: 'insensitive' } },
-        { botReply: { contains: search, mode: 'insensitive' } }
-      ]
+    const conditions: any[] = []
+
+    if (filterUser) {
+      conditions.push({
+        OR: [
+          { userName: filterUser },
+          { sourceId: filterUser }
+        ]
+      })
     }
+
+    if (search) {
+      conditions.push({
+        OR: [
+          { userName: { contains: search, mode: 'insensitive' } },
+          { userMessage: { contains: search, mode: 'insensitive' } },
+          { botReply: { contains: search, mode: 'insensitive' } }
+        ]
+      })
+    }
+
+    if (conditions.length > 0) {
+      where.AND = conditions
+    }
+
+    // Fetch unique users for the dropdown filter (last 2000 chats)
+    const allUsersRaw = await prisma.chatLog.findMany({
+      select: {
+        userName: true,
+        sourceId: true,
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 2000
+    })
+
+    const uniqueUsersMap = new Map()
+    for (const log of allUsersRaw) {
+      const key = log.sourceId || log.userName
+      if (key && !uniqueUsersMap.has(key)) {
+        uniqueUsersMap.set(key, {
+          userName: log.userName,
+          sourceId: log.sourceId
+        })
+      }
+    }
+    const usersList = Array.from(uniqueUsersMap.values()).sort((a, b) => {
+      const nameA = a.userName || a.sourceId || ''
+      const nameB = b.userName || b.sourceId || ''
+      return nameA.localeCompare(nameB, 'th')
+    })
 
     const [logs, total] = await Promise.all([
       prisma.chatLog.findMany({
@@ -48,7 +94,8 @@ export async function GET(req: NextRequest) {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
+      users: usersList
     })
   } catch (error) {
     console.error('[Chat Logs API Error]', error)

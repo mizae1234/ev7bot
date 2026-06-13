@@ -23,6 +23,8 @@ export default function LogChatsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
   const [sourceType, setSourceType] = useState('all')
+  const [users, setUsers] = useState<{ userName: string | null; sourceId: string | null }[]>([])
+  const [selectedUser, setSelectedUser] = useState('all')
   const [loading, setLoading] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
 
@@ -40,7 +42,7 @@ export default function LogChatsPage() {
     if (isAuthenticated && passcode) {
       fetchLogs()
     }
-  }, [isAuthenticated, page, sourceType])
+  }, [isAuthenticated, page, sourceType, selectedUser])
 
   // Debounced search trigger
   useEffect(() => {
@@ -59,7 +61,7 @@ export default function LogChatsPage() {
       fetchLogs()
     }, refreshInterval * 1000)
     return () => clearInterval(interval)
-  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType])
+  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser])
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -70,6 +72,7 @@ export default function LogChatsPage() {
         limit: '20',
         search,
         sourceType,
+        user: selectedUser !== 'all' ? selectedUser : '',
       })
       const res = await fetch(`/api/chat-logs?${params.toString()}`)
       if (!res.ok) {
@@ -86,6 +89,9 @@ export default function LogChatsPage() {
       setLogs(data.logs || [])
       setTotal(data.total || 0)
       setTotalPages(data.totalPages || 1)
+      if (data.users) {
+        setUsers(data.users)
+      }
       setError('')
     } catch (err) {
       setError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้')
@@ -206,8 +212,8 @@ export default function LogChatsPage() {
         </div>
 
         {/* Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
-          <div className="sm:col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
+          <div>
             <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาคำสำคัญ</label>
             <input
               type="text"
@@ -216,6 +222,31 @@ export default function LogChatsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
             />
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">เลือกผู้ใช้</label>
+            <select
+              value={selectedUser}
+              onChange={(e) => {
+                setPage(1)
+                setSelectedUser(e.target.value)
+              }}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+            >
+              <option value="all">ทั้งหมด</option>
+              {users.map((u, idx) => {
+                const value = u.sourceId || u.userName || ''
+                const label = u.userName 
+                  ? `${u.userName}${u.sourceId ? ` (${u.sourceId.substring(0, 8)})` : ''}`
+                  : `ID: ${u.sourceId ? u.sourceId.substring(0, 15) : 'ไม่ระบุ'}`
+                return (
+                  <option key={idx} value={value}>
+                    {label}
+                  </option>
+                )
+              })}
+            </select>
           </div>
 
           <div>
@@ -234,7 +265,7 @@ export default function LogChatsPage() {
             </select>
           </div>
 
-          <div className="sm:col-span-3 md:col-span-1">
+          <div>
             <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">รีเฟรชอัตโนมัติ</label>
             <select
               value={refreshInterval || 'none'}
