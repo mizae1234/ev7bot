@@ -69,7 +69,39 @@ export function LoginProfile() {
     }
   }, [])
 
-  if (!profile) return null
+  if (!profile) {
+    const isLocalhost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1'
+    )
+
+    if (isLocalhost) {
+      return (
+        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-amber-500/10 dark:bg-amber-500/5 border border-amber-500/20 shadow-sm backdrop-blur-sm">
+          <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-600 dark:bg-amber-500/30 dark:text-amber-400 flex items-center justify-center text-xs font-bold">
+            🧈
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[11px] font-bold text-zinc-850 dark:text-zinc-200 leading-tight">
+              คุณ เนย (Dev Mode)
+            </span>
+            <span className="text-[9px] text-amber-600 dark:text-amber-500 font-bold leading-none mt-0.5">
+              Local Test
+            </span>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <a
+        href={`/liff?path=${typeof window !== 'undefined' ? encodeURIComponent(window.location.pathname) : '/dashboard'}`}
+        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl shadow-sm transition-all duration-200"
+      >
+        🟢 เข้าสู่ระบบ LINE
+      </a>
+    )
+  }
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/85 dark:bg-zinc-900/95 border border-zinc-200/50 dark:border-zinc-800 shadow-sm backdrop-blur-sm">
