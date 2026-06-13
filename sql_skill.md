@@ -715,3 +715,42 @@ Sub-status สำหรับ GI (Good Inspect)
 | รอ GR | 11 คัน |
 | บริษัท EV7 | 3,481 คัน |
 | บริษัท GI | 779 คัน |
+
+---
+
+## 11. ตารางข้อมูลหลัก (Base Tables)
+
+นอกจาก Stored Procedures แล้ว ระบบยังมีการเรียกข้อมูลตรงจากตารางหลักในฐานข้อมูล `ICI_EVSERVICES` ดังนี้:
+
+### 11.1 ตาราง: `dbo.EV_InventoryItem` (สต็อกรถยนต์)
+เก็บข้อมูลรายละเอียดรถและสถานะหลัก
+* **คอลัมน์สำคัญ**: `InventoryItemID` (PK), `VinNo` (เลขตัวถัง), `RegisterNo` (เลขทะเบียน), `MotorNo`, `Model`, `Project` (โครงการ เช่น LineMan, Grab), `ProjectType` (เช่น Taxi, Rental), `Company` (EV7 หรือ GI), `Status` (AVAILABLE, ON_RENT, MAINTENANCE, WAITING_FOR_GR, PRODUCTION, REPLACEMENT), `StatusType`, `Exterior_Color`, `Interior_Color`, `IsActive` (bit)
+
+### 11.2 ตาราง: `dbo.EV_RentItem` (สัญญาเช่าและการปล่อยรถ)
+เก็บข้อมูลการจองและปล่อยรถ
+* **คอลัมน์สำคัญ**: `RentItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ContractNo` (เลขที่สัญญา), `ContractType`, `FirstName` (ชื่อผู้เช่า), `LastName` (นามสกุลผู้เช่า), `PhoneNo`, `ExpectedReleaseDate` (วันนัดส่งมอบ), `ReleaseDate` (วันส่งมอบจริง), `ContractCancellationDate` (วันยกเลิกสัญญา), `IsActive` (bit)
+
+### 11.3 ตาราง: `dbo.EV_MaintenanceItem` (ใบแจ้งซ่อมและสถานะซ่อม)
+เก็บประวัติการเคลมและแจ้งซ่อม
+* **คอลัมน์สำคัญ**: `MaintenanceItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ReportDate` (วันแจ้งซ่อม), `IncidentDate` (วันเกิดเหตุ), `MaintenanceStartDate` (วันเข้าซ่อมจริง), `MaintenanceFinishDate` (วันซ่อมเสร็จ), `MaintenanceReturnDate` (วันรับรถคืน), `CarStatusCode` (COMPLETE, IN_MAINTENANCE, WAITING_FOR_MAINTENANCE, STILL_WORK), `IssueTitle` (อาการที่แจ้ง), `ProblemTypeCode` (ประเภทปัญหา เช่น PRODUCT, ACCIDENT), `FaultPartyCode` (ฝ่ายผิด เช่น DRIVER, COUNTERPART), `CarCaseCode` (เคสซ่อมเบา/หนัก), `ServiceLocationCode` (อู่ที่เข้าซ่อม), `InsuranceCode`, `FollowUpDetail`, `IsActive` (bit)
+
+### 11.4 ตาราง: `dbo.EV_ReplacementItem` (ประวัติการใช้รถทดแทน)
+เก็บประวัติการปล่อยรถทดแทนระหว่างซ่อม
+* **คอลัมน์สำคัญ**: `ReplacementItemID` (PK), `MaintenanceItemID` (FK -> `EV_MaintenanceItem`), `VinNo` (เลขตัวถังของรถคันที่นำไปทดแทน), `ReplacementStartDate` (วันที่เริ่มทดแทน), `ReplacementReturnDate` (วันที่คืนรถทดแทน), `Location` (สถานที่รับ/คืน), `Remark`, `IsActive` (bit)
+
+### 11.5 ตาราง: `dbo.EV_ReturnItem` (การคืนรถเช่า)
+เก็บประวัติการรับรถกลับเข้าระบบ
+* **คอลัมน์สำคัญ**: `ReturnItemID` (PK), `VinNo`, `CustomerName`, `Model`, `ContractNo`, `ReceiveDate`, `ReturnDate`, `Mileage` (เลขไมล์ตอนรับคืน), `ParkLocation` (สถานที่จอดเก็บรถ)
+
+---
+
+## 12. ความสัมพันธ์และเงื่อนไขการ Query
+* **การเชื่อมตาราง**:
+  * `EV_RentItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
+  * `EV_MaintenanceItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
+  * `EV_ReplacementItem.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
+* **เงื่อนไขคิวรี (สำคัญ)**:
+  * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ
+  * หากรถยังไม่มีเลขทะเบียน (`RegisterNo` เป็น NULL หรือค่าว่าง) ให้ใช้ `VinNo` ในการระบุและแสดงผลแทนทะเบียนรถเสมอ
+  * การนับจำนวนการปล่อยเช่าสำเร็จ (**Completed Delivery**): จะนับเมื่อ `r.ReleaseDate IS NOT NULL` และ `i.Status = 'ON_RENT'` เท่านั้น หากยังไม่มีครบทั้งสองเงื่อนไขจะถูกนับเป็นรอดำเนินการ (**Pending**)
+
