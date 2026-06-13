@@ -147,11 +147,11 @@ export async function getRepairStatus(params: { date?: string; model?: string })
   const result = await req.query(`
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
-      SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END) AS [open],
-      SUM(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS inMaintenance,
-      SUM(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting,
-      SUM(CASE WHEN m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END) AS stillWork
+      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END), 0) AS closed,
+      ISNULL(SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK') THEN 1 ELSE 0 END), 0) AS [open],
+      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS inMaintenance,
+      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END), 0) AS waiting,
+      ISNULL(SUM(CASE WHEN m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END), 0) AS stillWork
     FROM dbo.EV_MaintenanceItem m
     LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
     WHERE m.IsActive = 1 ${modelFilter}
