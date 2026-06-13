@@ -61,13 +61,7 @@ export async function GET(req: NextRequest) {
     // Build WHERE clause dynamically
     let statusWhere = ''
     if (statusFilter && statusFilter !== 'all') {
-      if (statusFilter === 'IN_MAINTENANCE') {
-        statusWhere = ` AND i.Status = 'MAINTENANCE'`
-      } else if (statusFilter === 'WAITING_FOR_MAINTENANCE') {
-        statusWhere = ` AND (i.Status IS NULL OR i.Status != 'MAINTENANCE')`
-      } else {
-        statusWhere = ` AND m.CarStatusCode = @statusFilter`
-      }
+      statusWhere = ` AND m.CarStatusCode = @statusFilter`
     }
     let locationWhere = ''
     if (locationFilter && locationFilter !== 'all') {
@@ -83,21 +77,22 @@ export async function GET(req: NextRequest) {
     const summaryResult = await summaryReq.query(`
       SELECT
         COUNT(DISTINCT m.InventoryItemID) AS total,
-        COUNT(DISTINCT CASE WHEN i.Status = 'MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
+        COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
         0 AS complete,
-        COUNT(DISTINCT CASE WHEN i.Status IS NULL OR i.Status != 'MAINTENANCE' THEN m.InventoryItemID END) AS waiting
+        COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN m.InventoryItemID END) AS waiting
       FROM dbo.EV_MaintenanceItem m
-      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1
+      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
     `)
 
     // Unique locations
     const locReq = pool.request()
     const locResult = await locReq.query(`
-      SELECT DISTINCT ServiceLocationCode
-      FROM dbo.EV_MaintenanceItem
-      WHERE IsActive = 1 AND ServiceLocationCode IS NOT NULL AND ServiceLocationCode != ''
-      ORDER BY ServiceLocationCode
+      SELECT DISTINCT m.ServiceLocationCode
+      FROM dbo.EV_MaintenanceItem m
+      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode IS NOT NULL AND m.ServiceLocationCode != ''
+      ORDER BY m.ServiceLocationCode
     `)
 
     // Repairs by location summary
@@ -107,15 +102,15 @@ export async function GET(req: NextRequest) {
         ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
         COUNT(DISTINCT m.InventoryItemID) AS Count
       FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1
-        AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')
+      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
       GROUP BY m.ServiceLocationCode
       ORDER BY Count DESC
     `)
 
     // Maintenance items (active only, optionally filtered)
     const itemReq = pool.request()
-    if (statusFilter && statusFilter !== 'all' && statusFilter !== 'IN_MAINTENANCE' && statusFilter !== 'WAITING_FOR_MAINTENANCE') {
+    if (statusFilter && statusFilter !== 'all') {
       itemReq.input('statusFilter', sql.NVarChar, statusFilter)
     }
     if (locationFilter && locationFilter !== 'all' && locationFilter !== 'ไม่ระบุ') {
@@ -144,7 +139,7 @@ export async function GET(req: NextRequest) {
         m.FollowUpDetail
       FROM dbo.EV_MaintenanceItem m
       LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1${statusWhere}${locationWhere}
+      WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
       ORDER BY 
         CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
         m.ReportDate DESC

@@ -522,8 +522,8 @@ export async function getRepairByLocation() {
         ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
         COUNT(DISTINCT m.InventoryItemID) AS Count
       FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1
-        AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')
+      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
       GROUP BY m.ServiceLocationCode
       ORDER BY Count DESC
     `)
