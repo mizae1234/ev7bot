@@ -113,8 +113,11 @@ export function LoginProfile() {
           className="w-6 h-6 rounded-full border border-emerald-500/30 object-cover"
         />
       ) : (
-        <div className="w-6 h-6 rounded-full bg-emerald-550/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold">
-          {profile.displayName.slice(0, 2).toUpperCase()}
+        <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold">
+          {(() => {
+            const clean = profile.displayName.trim().replace(/^คุณ\s+/, '')
+            return clean.slice(0, 2).toUpperCase()
+          })()}
         </div>
       )}
       <div className="flex flex-col text-left">
