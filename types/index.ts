@@ -30,6 +30,10 @@ export interface DeliveryRecord {
   project: string | null
   expected_release_date: string | null
   release_date: string | null
+  create_date: string | null
+  update_date: string | null
+  create_user_name: string | null
+  update_user_name: string | null
 }
 
 export interface RepairRecord {
@@ -61,6 +65,8 @@ export interface RepairRecord {
   update_date?: string | null
   create_user_id?: number | null
   update_user_id?: number | null
+  create_user_name?: string | null
+  update_user_name?: string | null
   replacements?: { vin: string; register_no: string | null; start_date: string | null }[]
 }
 
@@ -72,6 +78,10 @@ export interface ReplacementRecord {
   return_date: string | null
   location: string | null
   remark: string | null
+  create_date: string | null
+  update_date: string | null
+  create_user_name: string | null
+  update_user_name: string | null
 }
 
 export interface ReturnRecord {
@@ -85,6 +95,10 @@ export interface ReturnRecord {
   mileage: number
   park_location: string | null
   remark: string | null
+  create_date: string | null
+  update_date: string | null
+  create_user_name: string | null
+  update_user_name: string | null
 }
 
 export interface DashboardData {
@@ -98,3 +112,5 @@ export interface DashboardData {
   fetchedAt: string
   mockMode: boolean
 }
+
+

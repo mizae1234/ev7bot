@@ -183,9 +183,15 @@ export async function GET(req: NextRequest) {
           m.CreateDate,
           m.UpdateDate,
           m.CreateUserID,
-          m.UpdateUserID
+          m.UpdateUserID,
+          cu.FirstName AS CreateUserFirstName,
+          cu.LastName AS CreateUserLastName,
+          uu.FirstName AS UpdateUserFirstName,
+          uu.LastName AS UpdateUserLastName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
         ORDER BY 
           CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
@@ -251,6 +257,8 @@ export async function GET(req: NextRequest) {
       update_date: m.UpdateDate || null,
       create_user_id: m.CreateUserID || null,
       update_user_id: m.UpdateUserID || null,
+      create_user_name: m.CreateUserFirstName ? `${m.CreateUserFirstName} ${m.CreateUserLastName || ''}`.trim() : null,
+      update_user_name: m.UpdateUserFirstName ? `${m.UpdateUserFirstName} ${m.UpdateUserLastName || ''}`.trim() : null,
     }))
 
     return NextResponse.json({

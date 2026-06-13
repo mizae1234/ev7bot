@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { lineClient, lineConfig } from '@/lib/line'
 import { prisma } from '@/lib/prisma'
+import { logChatToDb } from '@/lib/chat-log'
 import { env } from '@/lib/env'
 import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
@@ -1924,27 +1925,5 @@ async function deactivateGroupInDb(groupId: string) {
     console.log(`[DB] Deactivated group ${groupId}`)
   } catch (err) {
     console.error(`[DB Error] Failed to deactivate group ${groupId}:`, err)
-  }
-}
-
-export async function logChatToDb(
-  sourceType: string,
-  sourceId: string | null,
-  userName: string | undefined,
-  userMessage: string,
-  botReply: string
-) {
-  try {
-    await prisma.chatLog.create({
-      data: {
-        sourceType,
-        sourceId: sourceId || null,
-        userName: userName || null,
-        userMessage: userMessage.substring(0, 2000),
-        botReply: botReply.substring(0, 5000),
-      },
-    })
-  } catch (err) {
-    console.error('[DB Error] Failed to log chat:', err)
   }
 }

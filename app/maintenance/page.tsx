@@ -39,6 +39,8 @@ interface MaintenanceItem {
   update_date: string | null
   create_user_id: number | null
   update_user_id: number | null
+  create_user_name: string | null
+  update_user_name: string | null
 }
 
 interface MaintenanceData {
@@ -118,7 +120,7 @@ function MaintenanceContent() {
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
       periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel}`,
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
         item.vin,
@@ -138,6 +140,8 @@ function MaintenanceContent() {
         item.status_text,
         item.replacements.map(r => r.register_no || r.vin).join(', ') || '-',
         item.follow_up || '-',
+        item.create_user_name || '-',
+        item.update_user_name || '-',
       ]),
       fileName: 'รายการงานซ่อม',
     })

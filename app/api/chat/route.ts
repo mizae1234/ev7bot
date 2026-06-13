@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { askButter } from '@/lib/gemini'
-import { logChatToDb } from '@/app/api/line/webhook/route'
+import { logChatToDb } from '@/lib/chat-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Log web chat to database
     logChatToDb('web', null, undefined, trimmed, reply)
-      .catch(err => console.error('[Chat API logChat Error]', err))
+      .catch((err: any) => console.error('[Chat API logChat Error]', err))
 
     return NextResponse.json({ reply })
   } catch (error) {

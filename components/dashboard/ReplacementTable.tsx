@@ -47,7 +47,7 @@ export function ReplacementTable({ records = [], periodLabel = '' }: Replacement
     exportToExcel({
       reportName: 'รายการรถทดแทน',
       periodLabel: periodLabel || '-',
-      headers: ['ID รถทดแทน', 'เลขใบสั่งซ่อม', 'เลขตัวถัง (VIN)', 'วันที่เริ่มใช้', 'วันที่ส่งคืน', 'สถานที่ปล่อยรถ', 'หมายเหตุ'],
+      headers: ['ID รถทดแทน', 'เลขใบสั่งซ่อม', 'เลขตัวถัง (VIN)', 'วันที่เริ่มใช้', 'วันที่ส่งคืน', 'สถานที่ปล่อยรถ', 'หมายเหตุ', 'วันที่สร้าง', 'ผู้สร้าง', 'วันที่แก้ไข', 'ผู้แก้ไข'],
       rows: filteredRecords.map(rec => [
         rec.replacement_id,
         rec.maintenance_id,
@@ -56,6 +56,10 @@ export function ReplacementTable({ records = [], periodLabel = '' }: Replacement
         rec.return_date ? formatDateForExcel(rec.return_date) : 'ยังไม่คืน',
         rec.location || '-',
         rec.remark || '-',
+        formatDateForExcel(rec.create_date),
+        rec.create_user_name || '-',
+        formatDateForExcel(rec.update_date),
+        rec.update_user_name || '-',
       ]),
       fileName: 'รายการรถทดแทน',
     })

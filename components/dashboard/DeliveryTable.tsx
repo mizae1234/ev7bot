@@ -95,7 +95,7 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
     exportToExcel({
       reportName: 'รายการปล่อยรถ',
       periodLabel: periodLabel || '-',
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'วันที่คาดว่าจะปล่อย', 'วันที่ปล่อยจริง', 'สถานะ'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'วันที่คาดว่าจะปล่อย', 'วันที่ปล่อยจริง', 'สถานะ', 'วันที่สร้าง', 'ผู้สร้าง', 'วันที่แก้ไข', 'ผู้แก้ไข'],
       rows: filteredRecords.map(rec => [
         rec.vehicle_id,
         rec.vin,
@@ -104,6 +104,10 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
         formatDateForExcel(rec.expected_release_date),
         formatDateForExcel(rec.release_date || rec.delivered_at),
         getStatusText(rec.status),
+        formatDateForExcel(rec.create_date),
+        rec.create_user_name || '-',
+        formatDateForExcel(rec.update_date),
+        rec.update_user_name || '-',
       ]),
       fileName: 'รายการปล่อยรถ',
     })

@@ -61,7 +61,11 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
         delivered_at: releasedAt,
         project: project,
         expected_release_date: `${dateStr}T09:00:00.000Z`,
-        release_date: releasedAt
+        release_date: releasedAt,
+        create_date: `${dateStr}T09:00:00.000Z`,
+        update_date: releasedAt || `${dateStr}T09:00:00.000Z`,
+        create_user_name: 'System Admin',
+        update_user_name: 'System Admin',
       })
     }
   }
@@ -110,6 +114,8 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
         update_date: status === 'closed' ? `${dateStr}T15:30:00.000Z` : `${dateStr}T10:30:00.000Z`,
         create_user_id: 1,
         update_user_id: 1,
+        create_user_name: 'System Admin',
+        update_user_name: 'System Admin',
         replacements: mockReplacements
       })
     }
@@ -478,9 +484,17 @@ export async function GET(req: NextRequest) {
           i.ProjectType AS project,
           CASE WHEN r.ReleaseDate IS NOT NULL THEN 'complete' ELSE 'pending' END AS status,
           r.ExpectedReleaseDate AS expected_release_date,
-          r.ReleaseDate AS release_date
+          r.ReleaseDate AS release_date,
+          r.CreateDate AS create_date,
+          r.UpdateDate AS update_date,
+          cu.FirstName AS CreateUserFirstName,
+          cu.LastName AS CreateUserLastName,
+          uu.FirstName AS UpdateUserFirstName,
+          uu.LastName AS UpdateUserLastName
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
         WHERE r.IsActive = 1
           AND (
             (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
@@ -520,9 +534,15 @@ export async function GET(req: NextRequest) {
           m.CreateDate AS create_date,
           m.UpdateDate AS update_date,
           m.CreateUserID AS create_user_id,
-          m.UpdateUserID AS update_user_id
+          m.UpdateUserID AS update_user_id,
+          cu.FirstName AS CreateUserFirstName,
+          cu.LastName AS CreateUserLastName,
+          uu.FirstName AS UpdateUserFirstName,
+          uu.LastName AS UpdateUserLastName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         WHERE (m.IsActive = 1 OR m.MaintenanceFinishDate IS NOT NULL)
           AND (
             (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
@@ -539,8 +559,16 @@ export async function GET(req: NextRequest) {
           r.ReplacementStartDate AS start_date,
           r.ReplacementReturnDate AS return_date,
           r.Location AS location,
-          r.Remark AS remark
+          r.Remark AS remark,
+          r.CreateDate AS create_date,
+          r.UpdateDate AS update_date,
+          cu.FirstName AS CreateUserFirstName,
+          cu.LastName AS CreateUserLastName,
+          uu.FirstName AS UpdateUserFirstName,
+          uu.LastName AS UpdateUserLastName
         FROM dbo.EV_ReplacementItem r
+        LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
         WHERE (
           (r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate)
           OR (r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate)
@@ -559,8 +587,16 @@ export async function GET(req: NextRequest) {
           r.CustomerName AS customer_name,
           r.Mileage AS mileage,
           r.ParkLocation AS park_location,
-          r.RemarkForCustomer AS remark
+          r.RemarkForCustomer AS remark,
+          r.CreateDate AS create_date,
+          r.UpdateDate AS update_date,
+          cu.FirstName AS CreateUserFirstName,
+          cu.LastName AS CreateUserLastName,
+          uu.FirstName AS UpdateUserFirstName,
+          uu.LastName AS UpdateUserLastName
         FROM dbo.EV_ReturnItem r
+        LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
         WHERE (
           (r.ReceiveDate >= @startDate AND r.ReceiveDate <= @endDate)
           OR (r.ReturnDate >= @startDate AND r.ReturnDate <= @endDate)
@@ -660,14 +696,28 @@ export async function GET(req: NextRequest) {
         open: Number(repairSummaryResult.recordset[0]?.open || 0),
       },
       trend,
-      deliveryList: deliveryListResult.recordset || [],
+      deliveryList: (deliveryListResult.recordset || []).map((row: any) => ({
+        ...row,
+        create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
+        update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
+      })),
       repairList: (repairListResult.recordset || []).map((row: any) => ({
         ...row,
         driver_name: maskDriverName(row.driver_name),
         replacements: replacements[row.order_id] || [],
+        create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
+        update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
       })),
-      replacementList: replacementListResult.recordset || [],
-      returnList: returnListResult.recordset || [],
+      replacementList: (replacementListResult.recordset || []).map((row: any) => ({
+        ...row,
+        create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
+        update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
+      })),
+      returnList: (returnListResult.recordset || []).map((row: any) => ({
+        ...row,
+        create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
+        update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
+      })),
       fetchedAt: new Date().toISOString(),
       mockMode: false,
     })

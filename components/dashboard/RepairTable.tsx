@@ -147,7 +147,7 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
     exportToExcel({
       reportName: 'รายการงานซ่อม',
       periodLabel: periodLabel || '-',
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'วันที่แจ้ง', 'วันที่เสร็จ', 'สถานะ'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'วันที่แจ้ง', 'วันที่เสร็จ', 'สถานะ', 'ผู้สร้าง', 'ผู้แก้ไข'],
       rows: filteredRecords.map(rec => [
         rec.vehicle_id,
         rec.vin || '-',
@@ -159,6 +159,8 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
         formatDateForExcel(rec.report_date),
         formatDateForExcel(rec.finish_date),
         getStatusText(rec.status),
+        rec.create_user_name || '-',
+        rec.update_user_name || '-',
       ]),
       fileName: 'รายการงานซ่อม',
     })

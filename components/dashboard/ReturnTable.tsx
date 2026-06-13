@@ -48,7 +48,7 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
     exportToExcel({
       reportName: 'รายการรับคืนรถ',
       periodLabel: periodLabel || '-',
-      headers: ['ID รับคืน', 'ทะเบียน', 'รุ่น', 'เลขตัวถัง (VIN)', 'เลขไมล์ (กม.)', 'จุดจอดรถ', 'วันที่รับคืน', 'หมายเหตุ'],
+      headers: ['ID รับคืน', 'ทะเบียน', 'รุ่น', 'เลขตัวถัง (VIN)', 'เลขไมล์ (กม.)', 'จุดจอดรถ', 'วันที่รับคืน', 'หมายเหตุ', 'วันที่สร้าง', 'ผู้สร้าง', 'วันที่แก้ไข', 'ผู้แก้ไข'],
       rows: filteredRecords.map(rec => [
         rec.return_id,
         rec.register_no || '-',
@@ -58,6 +58,10 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
         rec.park_location || '-',
         formatDateForExcel(rec.receive_date || rec.return_date),
         rec.remark || '-',
+        formatDateForExcel(rec.create_date),
+        rec.create_user_name || '-',
+        formatDateForExcel(rec.update_date),
+        rec.update_user_name || '-',
       ]),
       fileName: 'รายการรับคืนรถ',
     })
