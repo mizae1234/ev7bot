@@ -61,6 +61,16 @@ function buildMaintenanceFlex(item: any): any {
           ]},
         ],
       },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '16px',
+        contents: [{
+          type: 'button', style: 'primary', color: '#C62828',
+          action: {
+            type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
+            uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
+          },
+        }],
+      },
     },
   }
 }
@@ -105,6 +115,16 @@ function buildDeliveryFlex(item: any): any {
             { type: 'text', text: formatDateTh(item.ReleaseDate), color: '#111827', size: 'sm', flex: 5 },
           ]},
         ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '16px',
+        contents: [{
+          type: 'button', style: 'primary', color: '#1565C0',
+          action: {
+            type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
+            uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
+          },
+        }],
       },
     },
   }
