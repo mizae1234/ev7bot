@@ -171,6 +171,7 @@ export async function GET(req: NextRequest) {
 
     const maintResult = await pool.request()
       .input('since', sql.DateTime, since)
+      .input('until', sql.DateTime, now)
       .query(`
         SELECT 
           m.MaintenanceItemID,
@@ -186,12 +187,14 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1
           AND m.ReportDate >= @since
+          AND m.ReportDate <= @until
         ORDER BY m.ReportDate DESC
       `)
 
     // ── Poll new Deliveries (actually released today) ─────────────
     const deliveryResult = await pool.request()
       .input('since', sql.DateTime, since)
+      .input('until', sql.DateTime, now)
       .query(`
         SELECT
           r.RentItemID,
@@ -208,6 +211,7 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
+          AND r.ReleaseDate <= @until
           AND r.ReleaseDate IS NOT NULL
           AND i.Status = 'ON_RENT'
         ORDER BY r.ReleaseDate DESC
