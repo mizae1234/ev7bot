@@ -442,7 +442,9 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     console.log(`[${BOT_NAME} AI] Processing: "${text}"`)
 
     // Load recent chat history for context (up to 5 messages)
-    const targetSourceId = chatSourceId || userId
+    // สำหรับกลุ่ม/ห้องใช้ Group ID/Room ID, สำหรับส่วนตัวใช้ User ID
+    const isGroupOrRoom = chatSourceType === 'group' || chatSourceType === 'room'
+    const targetSourceId = isGroupOrRoom ? (chatSourceId || userId) : userId
     let history: any[] = []
 
     if (targetSourceId) {
@@ -473,7 +475,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         userName = profile.displayName
       }
     } catch { /* ignore profile errors */ }
-    logChatToDb(chatSourceType, chatSourceId || userId, userName, text, aiResponse)
+    logChatToDb(chatSourceType, targetSourceId, userName, text, aiResponse)
       .catch(err => console.error('[logChat Error]', err))
 
     // ─── Try to detect a vehicle identifier for Flex Message ───
