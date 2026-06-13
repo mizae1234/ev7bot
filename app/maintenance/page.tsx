@@ -3,6 +3,7 @@ import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
+import { LoginProfile } from '@/components/ui/LoginProfile'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -158,6 +159,9 @@ function MaintenanceContent() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               รายละเอียดงานซ่อมทั้งหมด สถานที่ซ่อม สถานะ และรถทดแทน
             </p>
+          </div>
+          <div className="flex items-center justify-end">
+            <LoginProfile />
           </div>
         </div>
 

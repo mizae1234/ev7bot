@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import { LoginProfile } from '@/components/ui/LoginProfile'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -167,15 +168,18 @@ export default function VehicleDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-emerald-50/30">
       {/* Header */}
       <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/80 border-b border-zinc-200/60 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-          <a href="/dashboard" className="flex items-center gap-1 text-zinc-500 hover:text-zinc-800 transition-colors text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-            </svg>
-            Dashboard
-          </a>
-          <span className="text-zinc-300">|</span>
-          <h1 className="text-sm font-bold text-zinc-800">🚗 ข้อมูลรถ {car.RegisterNo || car.VinNo}</h1>
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <a href="/dashboard" className="flex items-center gap-1 text-zinc-500 hover:text-zinc-800 transition-colors text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              </svg>
+              Dashboard
+            </a>
+            <span className="text-zinc-300">|</span>
+            <h1 className="text-sm font-bold text-zinc-800">🚗 ข้อมูลรถ {car.RegisterNo || car.VinNo}</h1>
+          </div>
+          <LoginProfile />
         </div>
       </header>
 

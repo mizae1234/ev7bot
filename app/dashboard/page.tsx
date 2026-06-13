@@ -9,6 +9,7 @@ import { RepairTable } from '@/components/dashboard/RepairTable'
 import { ReplacementTable } from '@/components/dashboard/ReplacementTable'
 import { ReturnTable } from '@/components/dashboard/ReturnTable'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
+import { LoginProfile } from '@/components/ui/LoginProfile'
 import type { DashboardData } from '@/types'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -209,6 +210,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <LoginProfile />
             {isLoading ? (
               <LoadingSkeleton className="h-6 w-36" />
             ) : data ? (

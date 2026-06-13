@@ -55,6 +55,18 @@ function LiffContent() {
         console.log('[LIFF] Fetching profile...')
         const profile = await liff.getProfile()
 
+        // Cache profile in localStorage for other dashboard pages
+        try {
+          localStorage.setItem('liff_profile', JSON.stringify({
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl,
+            statusMessage: profile.statusMessage,
+          }))
+        } catch (e) {
+          console.error('[LIFF] Failed to save profile to localStorage:', e)
+        }
+
         // Register in PostgreSQL
         console.log('[LIFF] Registering profile in DB...')
         const res = await fetch('/api/liff/register', {
