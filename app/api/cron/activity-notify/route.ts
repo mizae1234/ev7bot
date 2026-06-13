@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
         ORDER BY m.ReportDate DESC
       `)
 
-    // ── Poll new Deliveries (last 24h) ───────────────────────────
+    // ── Poll new Deliveries (actually released today) ─────────────
     const deliveryResult = await pool.request()
       .input('since', sql.DateTime, since)
       .query(`
@@ -202,12 +202,14 @@ export async function GET(req: NextRequest) {
           r.ReleaseDate,
           i.RegisterNo,
           i.Model,
-          i.ProjectType
+          i.ProjectType,
+          i.Status AS CarStatus
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
           AND r.ReleaseDate IS NOT NULL
+          AND i.Status = 'ON_RENT'
         ORDER BY r.ReleaseDate DESC
       `)
 
