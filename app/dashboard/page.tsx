@@ -204,11 +204,7 @@ function DashboardContent() {
               <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-indigo-650 dark:from-zinc-100 dark:to-indigo-400 tracking-tight">
                 EV7 Tracking Operations
               </h1>
-              <div className="flex gap-1.5 items-center">
-                <span className="text-[10px] tracking-wider px-2 py-0.5 rounded-md font-extrabold border border-indigo-500/25 bg-indigo-500/5 text-indigo-500 dark:text-indigo-400">AION</span>
-                <span className="text-[10px] tracking-wider px-2 py-0.5 rounded-md font-extrabold border border-emerald-500/25 bg-emerald-500/5 text-emerald-500 dark:text-emerald-400">HYPTEC</span>
-                <span className="text-[10px] tracking-wider px-2 py-0.5 rounded-md font-extrabold border border-zinc-500/25 bg-zinc-500/5 text-zinc-650 dark:text-zinc-300">GAC</span>
-              </div>
+
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               ระบบแสดงผลปฏิทินส่งมอบรถ สถิติการแจ้งซ่อม และรายการทดแทน/รับคืนแบบเรียลไทม์
