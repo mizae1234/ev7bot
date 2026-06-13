@@ -15,7 +15,6 @@ function formatDateTh(d: Date | string | null): string {
   try {
     return new Date(d).toLocaleDateString('th-TH', {
       day: 'numeric', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
       timeZone: 'Asia/Bangkok',
     })
   } catch { return String(d) }
