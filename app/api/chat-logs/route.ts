@@ -51,28 +51,56 @@ export async function GET(req: NextRequest) {
       where.AND = conditions
     }
 
-    // Fetch unique users for the dropdown filter (last 2000 chats)
-    const allUsersRaw = await prisma.chatLog.findMany({
-      select: {
-        userName: true,
-        sourceId: true,
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 2000
-    })
+    // Fetch registered Line users and unique chat log users for the dropdown filter
+    const [registeredUsers, allUsersRaw] = await Promise.all([
+      prisma.lineRegistration.findMany({
+        select: {
+          displayName: true,
+          lineUserId: true,
+        }
+      }),
+      prisma.chatLog.findMany({
+        select: {
+          userName: true,
+          sourceId: true,
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 2000
+      })
+    ])
 
     const uniqueUsersMap = new Map()
-    for (const log of allUsersRaw) {
-      const key = log.sourceId || log.userName
-      if (key && !uniqueUsersMap.has(key)) {
-        uniqueUsersMap.set(key, {
-          userName: log.userName,
-          sourceId: log.sourceId
+
+    // 1. Add all registered users
+    for (const reg of registeredUsers) {
+      if (reg.lineUserId) {
+        uniqueUsersMap.set(reg.lineUserId, {
+          userName: reg.displayName,
+          sourceId: reg.lineUserId
         })
       }
     }
+
+    // 2. Add users from chat logs (includes groups and non-registered users)
+    for (const log of allUsersRaw) {
+      const key = log.sourceId || log.userName
+      if (key) {
+        if (!uniqueUsersMap.has(key)) {
+          uniqueUsersMap.set(key, {
+            userName: log.userName,
+            sourceId: log.sourceId
+          })
+        } else {
+          const existing = uniqueUsersMap.get(key)
+          if (!existing.userName && log.userName) {
+            existing.userName = log.userName
+          }
+        }
+      }
+    }
+
     const usersList = Array.from(uniqueUsersMap.values()).sort((a, b) => {
       const nameA = a.userName || a.sourceId || ''
       const nameB = b.userName || b.sourceId || ''
