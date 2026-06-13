@@ -65,7 +65,11 @@ export async function GET(req: NextRequest) {
     }
     let locationWhere = ''
     if (locationFilter && locationFilter !== 'all') {
-      locationWhere = ` AND m.ServiceLocationCode = @locationFilter`
+      if (locationFilter === 'ไม่ระบุ') {
+        locationWhere = ` AND (m.ServiceLocationCode IS NULL OR m.ServiceLocationCode = '')`
+      } else {
+        locationWhere = ` AND m.ServiceLocationCode = @locationFilter`
+      }
     }
 
     // Summary counts
@@ -94,7 +98,7 @@ export async function GET(req: NextRequest) {
     if (statusFilter && statusFilter !== 'all') {
       itemReq.input('statusFilter', sql.NVarChar, statusFilter)
     }
-    if (locationFilter && locationFilter !== 'all') {
+    if (locationFilter && locationFilter !== 'all' && locationFilter !== 'ไม่ระบุ') {
       itemReq.input('locationFilter', sql.NVarChar, locationFilter)
     }
 

@@ -16,13 +16,18 @@ function LiffContent() {
 
     const initLiff = async () => {
       try {
-        const liffModule = await import('@line/liff')
-        const liff = liffModule.default
-        const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID
+        const configRes = await fetch('/api/config')
+        if (!configRes.ok) {
+          throw new Error('Failed to fetch LIFF configuration from server')
+        }
+        const { liffId } = await configRes.json()
 
         if (!liffId) {
-          throw new Error('NEXT_PUBLIC_LINE_LIFF_ID is not configured in .env')
+          throw new Error('NEXT_PUBLIC_LINE_LIFF_ID is not configured on the server')
         }
+
+        const liffModule = await import('@line/liff')
+        const liff = liffModule.default
 
         console.log('[LIFF] Initializing with ID:', liffId)
         await liff.init({ liffId })

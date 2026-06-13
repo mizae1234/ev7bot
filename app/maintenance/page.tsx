@@ -1,5 +1,6 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
 
@@ -47,10 +48,18 @@ const formatDateTh = (dateStr: string | null) => {
 
 const formatLocation = (code: string) => code.replace(/_/g, ' ')
 
-export default function MaintenancePage() {
+function MaintenanceContent() {
+  const searchParams = useSearchParams()
   const [statusFilter, setStatusFilter] = useState('all')
   const [locationFilter, setLocationFilter] = useState('all')
   const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const loc = searchParams.get('location')
+    if (loc) {
+      setLocationFilter(loc)
+    }
+  }, [searchParams])
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   const params = new URLSearchParams()
@@ -187,6 +196,7 @@ export default function MaintenancePage() {
               {data.locations.map(loc => (
                 <option key={loc} value={loc}>{formatLocation(loc)}</option>
               ))}
+              <option value="ไม่ระบุ">📍 ไม่ระบุพื้นที่/อู่</option>
             </select>
           )}
           <ExportButton onClick={handleExport} />
@@ -348,5 +358,21 @@ export default function MaintenancePage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function MaintenancePage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/30 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
+          <div className="flex justify-center py-20">
+            <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+          </div>
+        </div>
+      </main>
+    }>
+      <MaintenanceContent />
+    </Suspense>
   )
 }

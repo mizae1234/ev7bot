@@ -735,14 +735,40 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         return loc.replace(/_/g, ' ')
       }
 
-      const locationRows = list.slice(0, 10).map((item: any) => ({
-        type: 'box',
-        layout: 'horizontal',
-        contents: [
-          { type: 'text', text: `• ${formatLocationName(item.Location)}`, size: 'sm', color: '#555555', flex: 5, wrap: true },
-          { type: 'text', text: `${item.Count} คัน`, size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 2 }
-        ]
-      }))
+      const locationRows = list.slice(0, 10).map((item: any) => {
+        const pathUrl = `/maintenance?location=${item.Location}`
+        const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(pathUrl)}`
+
+        return {
+          type: 'box',
+          layout: 'horizontal',
+          action: {
+            type: 'uri',
+            label: `ดูค้างซ่อม ${formatLocationName(item.Location)}`,
+            uri: liffUrl
+          },
+          contents: [
+            {
+              type: 'text',
+              text: `• ${formatLocationName(item.Location)}`,
+              size: 'sm',
+              color: '#1565C0',
+              decoration: 'underline',
+              flex: 5,
+              wrap: true
+            },
+            {
+              type: 'text',
+              text: `${item.Count} คัน`,
+              size: 'sm',
+              weight: 'bold',
+              color: '#C62828',
+              align: 'end',
+              flex: 2
+            }
+          ]
+        }
+      })
 
       const flexMessage = {
         type: 'flex' as const,
@@ -774,6 +800,23 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               ] : [])
             ],
             paddingAll: 'lg'
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: 'lg',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '🔧 ดูรายการซ่อมทั้งหมด',
+                  uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/maintenance')}`
+                }
+              }
+            ]
           }
         },
         quickReply: quickReplyItems
