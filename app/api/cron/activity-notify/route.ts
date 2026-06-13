@@ -151,6 +151,85 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No active groups', alerts: 0 })
     }
 
+    // ─── Test Mode (if testVin or testMaintVin is provided) ──────────
+    const testVin = req.nextUrl.searchParams.get('testVin')
+    const testMaintVin = req.nextUrl.searchParams.get('testMaintVin')
+
+    if (testVin) {
+      const deliveryResult = await pool.request()
+        .input('vin', sql.NVarChar, testVin)
+        .query(`
+          SELECT TOP 1
+            r.RentItemID,
+            r.VinNo,
+            r.ContractNo,
+            r.FirstName,
+            r.LastName,
+            r.ReleaseDate,
+            i.RegisterNo,
+            i.Model,
+            i.ProjectType,
+            i.Status AS CarStatus
+          FROM dbo.EV_RentItem r
+          LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+          WHERE r.IsActive = 1
+            AND (r.VinNo = @vin OR i.RegisterNo = @vin)
+          ORDER BY r.RentItemID DESC
+        `)
+      
+      const item = deliveryResult.recordset[0]
+      if (!item) {
+        return NextResponse.json({ error: `No rent record found for VIN/RegisterNo: ${testVin}` }, { status: 404 })
+      }
+      
+      const flexMsg = buildDeliveryFlex(item)
+      let sentCount = 0
+      for (const group of activeGroups) {
+        if (!env.MOCK_MODE) {
+          await lineClient.pushMessage({ to: group.groupId, messages: [flexMsg] })
+        }
+        sentCount++
+      }
+      return NextResponse.json({ success: true, message: `Test delivery alert sent for ${item.RegisterNo || item.VinNo}`, item, sentCount })
+    }
+
+    if (testMaintVin) {
+      const maintResult = await pool.request()
+        .input('vin', sql.NVarChar, testMaintVin)
+        .query(`
+          SELECT TOP 1
+            m.MaintenanceItemID,
+            m.VinNo,
+            m.IssueTitle,
+            m.CarStatusCode,
+            m.ServiceLocationCode,
+            m.ReportDate,
+            i.RegisterNo,
+            i.Model,
+            i.ProjectType
+          FROM dbo.EV_MaintenanceItem m
+          LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          WHERE m.IsActive = 1
+            AND (m.VinNo = @vin OR i.RegisterNo = @vin)
+          ORDER BY m.MaintenanceItemID DESC
+        `)
+      
+      const item = maintResult.recordset[0]
+      if (!item) {
+        return NextResponse.json({ error: `No maintenance record found for VIN/RegisterNo: ${testMaintVin}` }, { status: 404 })
+      }
+      
+      const flexMsg = buildMaintenanceFlex(item)
+      let sentCount = 0
+      for (const group of activeGroups) {
+        if (!env.MOCK_MODE) {
+          await lineClient.pushMessage({ to: group.groupId, messages: [flexMsg] })
+        }
+        sentCount++
+      }
+      return NextResponse.json({ success: true, message: `Test maintenance alert sent for ${item.RegisterNo || item.VinNo}`, item, sentCount })
+    }
+
     // Get already-sent IDs to skip
     const sentMaint = await prisma.activityNotification.findMany({
       where: { recordType: 'MAINTENANCE' },
