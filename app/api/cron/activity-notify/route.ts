@@ -143,12 +143,14 @@ export async function GET(req: NextRequest) {
     const sentMaintIds = new Set(sentMaint.map(s => s.recordId))
     const sentDeliveryIds = new Set(sentDelivery.map(s => s.recordId))
 
-    // ── Poll new Maintenance (last 24h) ──────────────────────────
+    // ── Poll new records since 10:00 AM today (Bangkok time) ─────
     const now = new Date()
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    // Build today 10:00 AM in Bangkok (UTC+7 → 03:00 UTC)
+    const bangkokDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+    const since = new Date(`${bangkokDate}T03:00:00.000Z`) // 10:00 Bangkok = 03:00 UTC
 
     const maintResult = await pool.request()
-      .input('since', sql.DateTime, yesterday)
+      .input('since', sql.DateTime, since)
       .query(`
         SELECT 
           m.MaintenanceItemID,
@@ -169,7 +171,7 @@ export async function GET(req: NextRequest) {
 
     // ── Poll new Deliveries (last 24h) ───────────────────────────
     const deliveryResult = await pool.request()
-      .input('since', sql.DateTime, yesterday)
+      .input('since', sql.DateTime, since)
       .query(`
         SELECT
           r.RentItemID,
