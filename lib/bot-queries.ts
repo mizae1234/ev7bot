@@ -350,10 +350,12 @@ export async function getPortfolioSummary() {
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
     const result = await pool.request()
-      .input('DateBegin', sql.Date, today)
-      .input('DateEnd', sql.Date, today)
+      .input('DateBegin', sql.Date, firstDay)
+      .input('DateEnd', sql.Date, lastDay)
       .execute('GetEV_HeadlineDashboard')
 
     const row = result.recordset[0]
