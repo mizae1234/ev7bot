@@ -228,7 +228,7 @@ export async function getRepairDailySummary(dateStr: string) {
   replReq.input('startDate', sql.DateTime, start)
   replReq.input('endDate', sql.DateTime, end)
   const replResult = await replReq.query(`
-    SELECT COUNT(DISTINCT r.VinNoReplacement) AS replacements
+    SELECT COUNT(DISTINCT r.VinNo) AS replacements
     FROM dbo.EV_ReplacementItem r
     WHERE r.IsActive = 1
       AND r.ReplacementStartDate >= @startDate AND r.ReplacementStartDate <= @endDate
@@ -239,7 +239,7 @@ export async function getRepairDailySummary(dateStr: string) {
   returnReq.input('startDate', sql.DateTime, start)
   returnReq.input('endDate', sql.DateTime, end)
   const returnResult = await returnReq.query(`
-    SELECT COUNT(DISTINCT r.VinNoReplacement) AS returns
+    SELECT COUNT(DISTINCT r.VinNo) AS returns
     FROM dbo.EV_ReplacementItem r
     WHERE r.IsActive = 1
       AND r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
