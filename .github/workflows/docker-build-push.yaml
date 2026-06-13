@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - ci/fix-build-failed
 
 permissions:
   contents: read
