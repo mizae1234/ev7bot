@@ -108,7 +108,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - ถ้าถามเรื่องที่ไม่เกี่ยวกับรถหรือระบบ ให้ตอบสุภาพว่า Butter เชี่ยวชาญเรื่องข้อมูลรถ แล้วเชิญชวนให้ถามเรื่องรถแทน
 - ตอบกระชับ ไม่เกิน 500 ตัวอักษร เพราะอ่านใน LINE
 - เมื่อถูกขอ "สรุปรายงานประจำวัน" หรือ "รายงานประจำวัน" ให้ตอบเป็น 2 ส่วน:
-  ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port (ไม่รวมรถที่เปิดใช้งาน Active) แสดง: On Rent (ทั้งหมด, On Road, Under Maintenance), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
+  ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port แสดง: Total (รถทั้งหมด), On Rent (ทั้งหมด, On Road, Under Maintenance), Available (ทั้งหมด, EV7, Line Man, Grab), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
   ส่วนที่ 2: "📅 สรุปประจำวัน" - ใช้ getDeliveryToday + getRepairStatus แสดงข้อมูลปล่อยรถวันนี้ และงานซ่อมวันนี้
 
 ## ความเป็นส่วนตัวของข้อมูล
@@ -210,7 +210,7 @@ const functionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: 'getPortfolioSummary',
-    description: 'ดึงข้อมูลภาพรวม Portfolio รถทั้ง port - สรุปจำนวนรถตามสถานะหลัก (On Rent, On Production, Replacement, Under Maintenance) พร้อม sub-status ไม่รวมรถที่เปิดใช้งาน (Active)',
+    description: 'ดึงข้อมูลภาพรวม Portfolio รถทั้ง port จาก SP GetEV_HeadlineDashboard - สรุปจำนวนรถตามสถานะหลัก พร้อม sub-status ครบถ้วน: Total, On Rent (On Road, Under Maintenance), Available (EV7, Line Man, Grab), On Production (Pending, In Process, Waiting GR), Replacement (Available, Car), Under Maintenance (New, On Rent, Use), Company (EV7, GI)',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {},

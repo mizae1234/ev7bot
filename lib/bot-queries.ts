@@ -344,76 +344,62 @@ export async function runCustomQuery(params: { sqlQuery: string }) {
 }
 
 // ─── Function: getPortfolioSummary (ภาพรวม Portfolio ทั้ง port) ─────
+// ใช้ SP GetEV_HeadlineDashboard เพื่อให้ตัวเลขตรงกับ Dashboard ต้นทาง 100%
 export async function getPortfolioSummary() {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
-  // 1. Overall status breakdown (excluding Active)
-  const statusReq = pool.request()
-  const statusResult = await statusReq.query(`
-    SELECT Status, StatusType, COUNT(*) AS Total
-    FROM dbo.EV_InventoryItem
-    WHERE IsActive = 1
-    GROUP BY Status, StatusType
-    ORDER BY Status, StatusType
-  `)
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const result = await pool.request()
+      .input('DateBegin', sql.Date, today)
+      .input('DateEnd', sql.Date, today)
+      .execute('GetEV_HeadlineDashboard')
 
-  // Build summary from status breakdown
-  let onRentTotal = 0, onRoadCount = 0, underMaintenanceOnRent = 0
-  let productionTotal = 0, pendingCount = 0, inProcessCount = 0, waitingGRCount = 0
-  let replacementTotal = 0, replacementAvailable = 0, replacementCar = 0
-  let maintenanceTotal = 0, newMaintenance = 0, onRentMaintenance = 0, useMaintenance = 0
-  let availableTotal = 0
+    const row = result.recordset[0]
+    if (!row) return { error: 'SP GetEV_HeadlineDashboard ไม่ส่งข้อมูลกลับมา' }
 
-  for (const row of statusResult.recordset) {
-    const st = row.Status as string
-    const stType = (row.StatusType as string) || ''
-    const count = row.Total as number
-
-    switch (st) {
-      case 'ON_RENT':
-        onRentTotal += count
-        if (stType.includes('MAINTENANCE')) {
-          underMaintenanceOnRent += count
-        } else {
-          onRoadCount += count
-        }
-        break
-      case 'PRODUCTION':
-        productionTotal += count
-        if (stType.includes('PENDING')) pendingCount += count
-        else if (stType.includes('PROCESS') || stType.includes('IN_PROCESS')) inProcessCount += count
-        else pendingCount += count // fallback
-        break
-      case 'WAITING_FOR_GR':
-        productionTotal += count
-        waitingGRCount += count
-        break
-      case 'REPLACEMENT':
-        replacementTotal += count
-        if (stType.includes('AVAILABLE')) replacementAvailable += count
-        else replacementCar += count
-        break
-      case 'MAINTENANCE':
-        maintenanceTotal += count
-        if (stType.includes('ON_RENT')) onRentMaintenance += count
-        else if (stType.includes('USE')) useMaintenance += count
-        else newMaintenance += count
-        break
-      case 'AVAILABLE':
-        availableTotal += count
-        break
-      // Active excluded
+    return {
+      total: Number(row.TotalVehicle || 0),
+      onRent: {
+        total: Number(row.OnRentVehicle || 0),
+        onRoad: Number(row.OnRoadVehicle || 0),
+        underMaintenance: Number(row.OnRentMaintenanceVehicle || 0),
+      },
+      onProduction: {
+        total: Number(row.OnProductionVehicle || 0),
+        pending: Number(row.OnProductionPendingVehicle || 0),
+        inProcess: Number(row.OnProductionInProcessVehicle || 0),
+        waitingGR: Number(row.OnProductionWaitingForGRVehicle || 0),
+      },
+      replacement: {
+        total: Number(row.ReplacementVehicle || 0),
+        available: Number(row.ReplacementAvailableVehicle || 0),
+        car: Number(row.ReplacementCarVehicle || 0),
+      },
+      underMaintenance: {
+        total: Number(row.MaintenanceVehicle || 0),
+        new: Number(row.NewMaintenanceVehicle || 0),
+        onRent: Number(row.OnRentMaintenanceVehicle || 0),
+        use: Number(row.UseMaintenanceVehicle || 0),
+      },
+      available: {
+        total: Number(row.AvailableVehicle || 0),
+        ev7: Number(row.AvailableEV7Vehicle || 0),
+        lineMan: Number(row.AvailableLineManVehicle || 0),
+        grab: Number(row.AvailableGrabVehicle || 0),
+      },
+      company: {
+        ev7: Number(row.CompanyEV7 || 0),
+        gi: Number(row.CompanyGI || 0),
+      },
+      active: Number(row.ActiveVehicle || 0),
+      released: Number(row.ReleasedVehicle || 0),
     }
-  }
-
-  return {
-    onRent: { total: onRentTotal, onRoad: onRoadCount, underMaintenance: underMaintenanceOnRent },
-    onProduction: { total: productionTotal, pending: pendingCount, inProcess: inProcessCount, waitingGR: waitingGRCount },
-    replacement: { total: replacementTotal, available: replacementAvailable, car: replacementCar },
-    underMaintenance: { total: maintenanceTotal, new: newMaintenance, onRent: onRentMaintenance, use: useMaintenance },
-    available: { total: availableTotal },
-    rawBreakdown: statusResult.recordset,
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[getPortfolioSummary] SP Error:', message)
+    return { error: `ดึงข้อมูล Portfolio ไม่สำเร็จ: ${message}` }
   }
 }
 
