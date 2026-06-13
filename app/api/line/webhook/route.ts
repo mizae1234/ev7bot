@@ -45,6 +45,14 @@ const quickReplyItems = {
         label: '🔧 ค้างซ่อมรายพื้นที่',
         text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
       }
+    },
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: '📖 เมนู',
+        text: 'เมนู'
+      }
     }
   ] as any[]
 }
@@ -277,11 +285,165 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
   // Menu / Help
   if (matchAny(lower, ['เมนู', 'menu', 'help', 'ช่วย', 'คำสั่ง', 'ทำอะไรได้บ้าง'])) {
-    await replyText(
-      replyToken,
-      `🧈 เมนู ${BOT_NAME}\n━━━━━━━━━━━━━━━\n🤖 ถามอะไรก็ได้! เช่น:\n   💬 "วันนี้ปล่อยรถกี่คัน"\n   💬 "ซ่อมค้างกี่คัน"\n   💬 "ค้นหา VIN LNADH..."\n━━━━━━━━━━━━━━━\n📊 "สถานะ" — สรุปส่งมอบ & ซ่อมวันนี้\n📅 "สรุปเดือน" — สรุปรายเดือน\n📋 "ลงทะเบียน" — ลงทะเบียนเข้าระบบ\n🔗 "dashboard" — ลิงก์ Dashboard\n━━━━━━━━━━━━━━━\n${BOT_NAME} ใช้ AI ตอบคำถามได้อัจฉริยะ~ 💛`
-    )
-    return
+    try {
+      const flexMessage = {
+        type: 'flex' as const,
+        altText: '📖 เมนูคำสั่ง Butter Bot',
+        contents: {
+          type: 'bubble' as const,
+          size: 'mega' as const,
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '📖 เมนูคำสั่ง',
+                weight: 'bold',
+                size: 'xl',
+                color: '#ffffff'
+              },
+              {
+                type: 'text',
+                text: 'คู่มือแนะนำการใช้บริการและคำสั่งทางลัด',
+                size: 'xs',
+                color: '#FFE0B2',
+                margin: 'xs'
+              }
+            ],
+            backgroundColor: '#FF6D00',
+            paddingAll: 'lg'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '💡 วิธีพิมพ์สั่งการ',
+                weight: 'bold',
+                size: 'sm',
+                color: '#FF6D00'
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'xs',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: '• แชทส่วนตัว:', size: 'xs', weight: 'bold', color: '#555555', flex: 3 },
+                      { type: 'text', text: 'พิมพ์ถามได้ตรงๆ ไม่ต้องใช้คำนำหน้า', size: 'xs', color: '#666666', wrap: true, flex: 7 }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    margin: 'xs',
+                    contents: [
+                      { type: 'text', text: '• แชทกลุ่ม/ห้อง:', size: 'xs', weight: 'bold', color: '#555555', flex: 3 },
+                      { type: 'text', text: 'กดผ่าน Quick Menu หรือพิมพ์ลัดได้ทันที (หากคุยกับ AI ให้พิมพ์นำหน้าด้วย "butter" หรือ "เนย" เสมอ)', size: 'xs', color: '#666666', wrap: true, flex: 7 }
+                    ]
+                  }
+                ]
+              },
+              { type: 'separator', margin: 'md' },
+              {
+                type: 'text',
+                text: '⚡ รายการคำสั่งทางลัด (กดหรือพิมพ์ส่งได้เลย)',
+                weight: 'bold',
+                size: 'sm',
+                color: '#FF6D00',
+                margin: 'sm'
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    action: {
+                      type: 'message',
+                      label: 'สรุปวันนี้',
+                      text: 'สรุปวันนี้'
+                    },
+                    contents: [
+                      { type: 'text', text: 'สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                      { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมวันนี้', size: 'xs', color: '#666666', flex: 6 }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    action: {
+                      type: 'message',
+                      label: 'สรุปเมื่อวาน',
+                      text: 'สรุปเมื่อวาน'
+                    },
+                    contents: [
+                      { type: 'text', text: 'สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                      { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมเมื่อวาน', size: 'xs', color: '#666666', flex: 6 }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    action: {
+                      type: 'message',
+                      label: 'สรุปส่งมอบประจำเดือน',
+                      text: 'สรุปส่งมอบประจำเดือน'
+                    },
+                    contents: [
+                      { type: 'text', text: 'สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                      { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบในเดือนนี้', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    action: {
+                      type: 'message',
+                      label: 'ค้างซ่อมรายพื้นที่',
+                      text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
+                    },
+                    contents: [
+                      { type: 'text', text: 'ค้างซ่อมรายพื้นที่', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                      { type: 'text', text: 'จัดอันดับรถค้างซ่อมแยกรายพื้นที่/อู่', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'horizontal',
+                    contents: [
+                      { type: 'text', text: 'ค้นหา [ทะเบียน/VIN]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                      { type: 'text', text: 'ดูข้อมูลรถ ผู้เช่า สัญญา และประวัติซ่อม (เช่น ทอ-6844)', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+                    ]
+                  }
+                ]
+              }
+            ],
+            paddingAll: 'lg'
+          }
+        },
+        quickReply: quickReplyItems
+      }
+
+      if (!env.MOCK_MODE) {
+        await lineClient.replyMessage(replyToken, flexMessage as any)
+      } else {
+        console.log('[Mock Menu Response]', JSON.stringify(flexMessage, null, 2))
+      }
+      return
+    } catch (err: any) {
+      console.error('[Menu Flex Error]', err)
+      await replyText(replyToken, `❌ สร้างเมนูไม่สำเร็จค่ะ: ${err.message}`)
+      return
+    }
   }
 
   // Dashboard link (exact match only)
