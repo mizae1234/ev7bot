@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface ChatLog {
   id: number
@@ -323,29 +324,13 @@ export default function LogChatsPage() {
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-xs text-zinc-500">
-                แสดงทั้งหมด {total} รายการ (หน้า {page}/{totalPages})
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 rounded-xl border border-zinc-900 text-xs text-zinc-350 disabled:opacity-40 disabled:hover:bg-transparent hover:bg-zinc-900 transition-all font-semibold"
-                >
-                  ย้อนกลับ
-                </button>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 rounded-xl border border-zinc-900 text-xs text-zinc-350 disabled:opacity-40 disabled:hover:bg-transparent hover:bg-zinc-900 transition-all font-semibold"
-                >
-                  ถัดไป
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalItems={total}
+            itemsPerPage={20}
+          />
         </div>
       </div>
     </div>
