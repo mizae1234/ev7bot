@@ -1054,9 +1054,11 @@ function parseMonthYear(text: string) {
     { names: ['ธันวาคม', 'ธันวา', 'ธ.ค.'], val: 12 }
   ]
 
+  let foundMonthByName = false
   for (const m of thMonths) {
     if (m.names.some(name => lowerText.includes(name))) {
       month = m.val
+      foundMonthByName = true
       break
     }
   }
@@ -1068,6 +1070,7 @@ function parseMonthYear(text: string) {
     let y = parseInt(slashMatch[2])
     if (y < 100) y += 2000
     year = y
+    return { month, year }
   }
 
   const yearRegex = /(20\d{2})|(25\d{2})/
@@ -1079,10 +1082,21 @@ function parseMonthYear(text: string) {
     year = y
   }
 
-  const monthWordRegex = /เดือน\s*(\d{1,2})/
-  const monthWordMatch = lowerText.match(monthWordRegex)
-  if (monthWordMatch && !lowerText.includes('/')) {
-    month = parseInt(monthWordMatch[1])
+  if (!foundMonthByName) {
+    let cleanText = lowerText
+    if (yearMatch) {
+      cleanText = lowerText.replace(yearMatch[0], '')
+    }
+    const numbers = cleanText.match(/\d{1,2}/g)
+    if (numbers) {
+      for (const numStr of numbers) {
+        const num = parseInt(numStr)
+        if (num >= 1 && num <= 12) {
+          month = num
+          break
+        }
+      }
+    }
   }
 
   return { month, year }
