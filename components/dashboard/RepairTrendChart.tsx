@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import type { TrendDataPoint } from '@/types'
 
-interface DailyChartProps {
+interface RepairTrendChartProps {
   data: TrendDataPoint[]
 }
 
@@ -35,12 +35,12 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
       <div className="rounded-xl border border-zinc-200 bg-white/95 p-3 shadow-md backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95">
         <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mb-1.5">{label}</p>
         {payload.map((p) => {
-          const color = p.dataKey === 'deliveries' ? '#6366f1' : '#10b981'
+          const color = p.dataKey === 'repairsReported' ? '#f97316' : '#10b981'
           return (
             <div key={p.name} className="flex items-center gap-2 text-xs py-0.5">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
               <span className="text-zinc-500 dark:text-zinc-400">{p.name}:</span>
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100 ml-auto">{p.value} คัน</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100 ml-auto">{p.value} รายการ</span>
             </div>
           )
         })}
@@ -50,7 +50,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   return null
 }
 
-export function DailyChart({ data }: DailyChartProps) {
+export function RepairTrendChart({ data }: RepairTrendChartProps) {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -63,15 +63,11 @@ export function DailyChart({ data }: DailyChartProps) {
     )
   }
 
-  // Format dates for friendly display (e.g., "11 Jun" or just "Jun" for monthly view)
-  const isMonthly = data.length === 12 || (data.length > 0 && data.every(d => d.date && d.date.endsWith('-01')))
-  
+  // Format dates for friendly display (monthly view, e.g., "มิ.ย.")
   const formattedData = data.map((item) => {
     try {
       const date = new Date(item.date)
-      const options: Intl.DateTimeFormatOptions = isMonthly
-        ? { month: 'short' }
-        : { day: 'numeric', month: 'short' }
+      const options: Intl.DateTimeFormatOptions = { month: 'short' }
       return {
         ...item,
         formattedDate: date.toLocaleDateString('th-TH', options),
@@ -86,9 +82,14 @@ export function DailyChart({ data }: DailyChartProps) {
 
   return (
     <div className="rounded-2xl border border-zinc-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60">
-      <div className="mb-6">
-        <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายเดือน แผนเทียบ actual การปล่อยรถ</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">เปรียบเทียบแผนการปล่อยรถ (แผนทั้งหมด) และรถที่ส่งมอบเสร็จสิ้นจริง (Actual) ในแต่ละวัน</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-zinc-800 dark:text-zinc-100">รายเดือน สถิติวินิจฉัยและปิดงานซ่อม</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">เปรียบเทียบการแจ้งซ่อมและซ่อมเสร็จในแต่ละเดือน</p>
+        </div>
+        <div className="text-xs text-zinc-400 dark:text-zinc-500 italic bg-zinc-100 dark:bg-zinc-800/50 px-2.5 py-1 rounded-lg border border-zinc-200/50 dark:border-zinc-800/30">
+          * นับตามจำนวนรายการสั่งซ่อมที่บันทึกเข้ามาในระบบ
+        </div>
       </div>
 
       <div className="h-80 w-full">
@@ -98,11 +99,11 @@ export function DailyChart({ data }: DailyChartProps) {
             margin={{ top: 10, right: 5, left: -25, bottom: 0 }}
           >
             <defs>
-              <linearGradient id="colorDeliveries" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0.15}/>
+              <linearGradient id="colorReported" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f97316" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#f97316" stopOpacity={0.15}/>
               </linearGradient>
-              <linearGradient id="colorCompleted" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="colorClosed" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
                 <stop offset="95%" stopColor="#10b981" stopOpacity={0.15}/>
               </linearGradient>
@@ -128,15 +129,15 @@ export function DailyChart({ data }: DailyChartProps) {
               wrapperStyle={{ fontSize: 12, paddingBottom: 15, color: '#888888' }}
             />
             <Bar
-              name="แผนทั้งหมด"
-              dataKey="deliveries"
-              fill="url(#colorDeliveries)"
+              name="แจ้งซ่อม"
+              dataKey="repairsReported"
+              fill="url(#colorReported)"
               radius={[4, 4, 0, 0]}
             />
             <Bar
-              name="Actual ปล่อยรถ"
-              dataKey="completed"
-              fill="url(#colorCompleted)"
+              name="ซ่อมเสร็จ"
+              dataKey="repairsClosed"
+              fill="url(#colorClosed)"
               radius={[4, 4, 0, 0]}
             />
           </BarChart>

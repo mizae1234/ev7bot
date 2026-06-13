@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // Mock data generator matching user's screenshot exactly for June 2026
-function getMockDashboardData(startDateStr: string, endDateStr: string): DashboardData {
+function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum: number): DashboardData {
   const start = new Date(startDateStr)
   const end = new Date(endDateStr)
   
@@ -166,55 +166,87 @@ function getMockDashboardData(startDateStr: string, endDateStr: string): Dashboa
   const repairClosed = filteredRepairs.filter(r => r.status === 'closed').length
   const repairOpen = filteredRepairs.filter(r => r.status === 'open' || r.status === 'in_progress').length
 
-  // Create trend dynamically from deliveries & plans
-  const trendDays: Record<string, { deliveries: number; completed: number }> = {}
+  // Create 12-month trend dynamically for the selected year
+  const monthlyTrendMap: Record<number, { date: string; deliveries: number; completed: number; repairsReported: number; repairsClosed: number }> = {}
   
-  // Populate mock plans for each day in the date range
-  const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  for (let day = 0; day <= durationDays; day++) {
-    const d = new Date(start.getTime() + day * 24 * 60 * 60 * 1000)
-    if (d > end) break
-    const dateStr = d.toISOString().split('T')[0]
-    
-    // Skip Sundays for plans
-    if (d.getDay() === 0) continue
-    
-    let plan = 30
-    if (d.getDay() === 3) plan = 60 // Wed
-    if (d.getDay() === 5) plan = 45 // Fri
-    if (d.getDay() === 6) plan = 12 // Sat
-    
-    trendDays[dateStr] = {
-      deliveries: plan,
-      completed: 0
+  for (let m = 1; m <= 12; m++) {
+    const paddedMonth = String(m).padStart(2, '0')
+    monthlyTrendMap[m] = {
+      date: `${yearNum}-${paddedMonth}-01`,
+      deliveries: 0,
+      completed: 0,
+      repairsReported: 0,
+      repairsClosed: 0
     }
   }
 
-  // Add completed counts from filteredDeliveries
-  filteredDeliveries.forEach(d => {
-    const dateStr = (d.release_date || d.expected_release_date || '').split('T')[0]
-    if (!trendDays[dateStr]) {
-      trendDays[dateStr] = { deliveries: 0, completed: 0 }
+  // Populate mock plan values for the months
+  if (yearNum === 2026) {
+    monthlyTrendMap[1].deliveries = 400
+    monthlyTrendMap[2].deliveries = 450
+    monthlyTrendMap[3].deliveries = 500
+    monthlyTrendMap[4].deliveries = 300
+    monthlyTrendMap[5].deliveries = 600
+    monthlyTrendMap[6].deliveries = 900 // June plan is 900
+    monthlyTrendMap[7].deliveries = 800
+    monthlyTrendMap[8].deliveries = 850
+    monthlyTrendMap[9].deliveries = 900
+    monthlyTrendMap[10].deliveries = 950
+    monthlyTrendMap[11].deliveries = 1000
+    monthlyTrendMap[12].deliveries = 1050
+
+    // Mock repair trends for 2026
+    monthlyTrendMap[1].repairsReported = 35; monthlyTrendMap[1].repairsClosed = 32
+    monthlyTrendMap[2].repairsReported = 40; monthlyTrendMap[2].repairsClosed = 38
+    monthlyTrendMap[3].repairsReported = 45; monthlyTrendMap[3].repairsClosed = 42
+    monthlyTrendMap[4].repairsReported = 30; monthlyTrendMap[4].repairsClosed = 28
+    monthlyTrendMap[5].repairsReported = 55; monthlyTrendMap[5].repairsClosed = 52
+    monthlyTrendMap[6].repairsReported = 41; monthlyTrendMap[6].repairsClosed = 25 // June: 41 reported, 25 closed
+    monthlyTrendMap[7].repairsReported = 38; monthlyTrendMap[7].repairsClosed = 0
+    monthlyTrendMap[8].repairsReported = 42; monthlyTrendMap[8].repairsClosed = 0
+    monthlyTrendMap[9].repairsReported = 45; monthlyTrendMap[9].repairsClosed = 0
+    monthlyTrendMap[10].repairsReported = 48; monthlyTrendMap[10].repairsClosed = 0
+    monthlyTrendMap[11].repairsReported = 50; monthlyTrendMap[11].repairsClosed = 0
+    monthlyTrendMap[12].repairsReported = 52; monthlyTrendMap[12].repairsClosed = 0
+  } else {
+    for (let m = 1; m <= 12; m++) {
+      monthlyTrendMap[m].deliveries = 300 + m * 50
+      monthlyTrendMap[m].repairsReported = 20 + m * 2
+      monthlyTrendMap[m].repairsClosed = 18 + m * 2
     }
-    if (d.status === 'complete') {
-      trendDays[dateStr].completed++
+  }
+
+  // Populate completed values based on mock deliveries in range
+  filteredDeliveries.forEach(d => {
+    const deliveryDate = new Date(d.release_date || d.expected_release_date || '')
+    if (deliveryDate.getFullYear() === yearNum) {
+      const mNum = deliveryDate.getMonth() + 1
+      if (d.status === 'complete' && monthlyTrendMap[mNum]) {
+        monthlyTrendMap[mNum].completed++
+      }
     }
   })
 
-  const trend = Object.entries(trendDays)
-    .map(([date, counts]) => ({
-      date,
-      deliveries: counts.deliveries,
-      completed: counts.completed,
+  // If June 2026 is in range, manually set completed to 222 (matching user request)
+  if (yearNum === 2026 && monthlyTrendMap[6]) {
+    monthlyTrendMap[6].completed = 222
+  }
+
+  const trend = Object.entries(monthlyTrendMap)
+    .map(([mNum, data]) => ({
+      date: data.date,
+      deliveries: data.deliveries,
+      completed: data.completed,
+      repairsReported: data.repairsReported,
+      repairsClosed: data.repairsClosed,
     }))
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-7)
 
   // Calculate mock plan total across the range
   // For June 2026, we know the real database plan total is 900, let's hardcode 900 for exact mock matching.
   const mockPlanTotal = isWithinJune2026 
     ? 900 
-    : Object.values(trendDays).reduce((sum, item) => sum + item.deliveries, 0)
+    : Object.values(monthlyTrendMap).reduce((sum, item) => sum + item.deliveries, 0)
 
   const mockPending = Math.max(0, mockPlanTotal - deliveryCompleted)
 
@@ -243,6 +275,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const startDateStr = searchParams.get('startDate')
   const endDateStr = searchParams.get('endDate')
+  const yearStr = searchParams.get('year')
 
   // Default date parameters: first and last days of the current month
   const now = new Date()
@@ -251,16 +284,17 @@ export async function GET(req: NextRequest) {
 
   const startDate = startDateStr || defaultStartStr
   const endDate = endDateStr || defaultEndStr
+  const year = yearStr ? Number(yearStr) : new Date(startDate).getFullYear()
 
   if (env.MOCK_MODE) {
-    return NextResponse.json(getMockDashboardData(startDate, endDate))
+    return NextResponse.json(getMockDashboardData(startDate, endDate, year))
   }
 
   try {
     const pool = await getMSSQLPool()
     if (!pool) {
       console.warn('[Dashboard API] SQL Server pool is not initialized, using mock data.')
-      return NextResponse.json(getMockDashboardData(startDate, endDate))
+      return NextResponse.json(getMockDashboardData(startDate, endDate, year))
     }
 
     const startDateTime = new Date(`${startDate}T00:00:00.000Z`)
@@ -310,31 +344,56 @@ export async function GET(req: NextRequest) {
         )
     `)
 
-    // --- 7-day trend inside range (Plan vs Actual) ---
+    // --- Monthly trend inside the selected year (Plan vs Actual) ---
     const planTrendRequest = pool.request()
-    planTrendRequest.input('startDate', sql.DateTime, startDateTime)
-    planTrendRequest.input('endDate', sql.DateTime, endDateTime)
+    planTrendRequest.input('year', sql.Int, year)
     const planTrendResult = await planTrendRequest.query(`
       SELECT
-        CAST(PlanDate AS DATE) AS date,
+        MONTH(PlanDate) AS monthNum,
         SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
       FROM dbo.EV_DeliveryPlan
-      WHERE PlanDate >= @startDate AND PlanDate <= @endDate
-      GROUP BY CAST(PlanDate AS DATE)
+      WHERE YEAR(PlanDate) = @year
+      GROUP BY MONTH(PlanDate)
     `)
 
     const actualTrendRequest = pool.request()
-    actualTrendRequest.input('startDate', sql.DateTime, startDateTime)
-    actualTrendRequest.input('endDate', sql.DateTime, endDateTime)
+    actualTrendRequest.input('year', sql.Int, year)
     const actualTrendResult = await actualTrendRequest.query(`
       SELECT
-        CAST(ReleaseDate AS DATE) AS date,
+        MONTH(ReleaseDate) AS monthNum,
         COUNT(*) AS completed
       FROM dbo.EV_RentItem
       WHERE IsActive = 1
-        AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+        AND YEAR(ReleaseDate) = @year
         AND ReleaseDate IS NOT NULL
-      GROUP BY CAST(ReleaseDate AS DATE)
+      GROUP BY MONTH(ReleaseDate)
+    `)
+
+    // --- Monthly repair trend inside the selected year (Reported vs Closed) ---
+    const repairReportedTrendRequest = pool.request()
+    repairReportedTrendRequest.input('year', sql.Int, year)
+    const repairReportedTrendResult = await repairReportedTrendRequest.query(`
+      SELECT
+        MONTH(ReportDate) AS monthNum,
+        COUNT(*) AS reported
+      FROM dbo.EV_MaintenanceItem
+      WHERE IsActive = 1
+        AND YEAR(ReportDate) = @year
+      GROUP BY MONTH(ReportDate)
+    `)
+
+    const repairClosedTrendRequest = pool.request()
+    repairClosedTrendRequest.input('year', sql.Int, year)
+    const repairClosedTrendResult = await repairClosedTrendRequest.query(`
+      SELECT
+        MONTH(MaintenanceFinishDate) AS monthNum,
+        COUNT(*) AS closed
+      FROM dbo.EV_MaintenanceItem
+      WHERE IsActive = 1
+        AND CarStatusCode = 'COMPLETE'
+        AND YEAR(MaintenanceFinishDate) = @year
+        AND MaintenanceFinishDate IS NOT NULL
+      GROUP BY MONTH(MaintenanceFinishDate)
     `)
 
     // --- Detailed delivery list inside date range ---
@@ -443,37 +502,53 @@ export async function GET(req: NextRequest) {
       ORDER BY r.ReceiveDate DESC
     `)
 
-    const trendMap: Record<string, { date: string; deliveries: number; completed: number }> = {}
+    const monthlyTrendMap: Record<number, { date: string; deliveries: number; completed: number; repairsReported: number; repairsClosed: number }> = {}
 
-    // Initialize with plan days
+    // Initialize 12 months
+    for (let m = 1; m <= 12; m++) {
+      const paddedMonth = String(m).padStart(2, '0')
+      monthlyTrendMap[m] = {
+        date: `${year}-${paddedMonth}-01`,
+        deliveries: 0,
+        completed: 0,
+        repairsReported: 0,
+        repairsClosed: 0
+      }
+    }
+
+    // Merge plans
     for (const row of planTrendResult.recordset || []) {
-      const dateStr = row.date instanceof Date 
-        ? row.date.toISOString().split('T')[0] 
-        : String(row.date).split('T')[0]
-      trendMap[dateStr] = {
-        date: dateStr,
-        deliveries: Number(row.planTotal || 0),
-        completed: 0
+      const mNum = Number(row.monthNum)
+      if (monthlyTrendMap[mNum]) {
+        monthlyTrendMap[mNum].deliveries = Number(row.planTotal || 0)
       }
     }
 
-    // Merge completed days
+    // Merge completed actuals
     for (const row of actualTrendResult.recordset || []) {
-      const dateStr = row.date instanceof Date 
-        ? row.date.toISOString().split('T')[0] 
-        : String(row.date).split('T')[0]
-      if (trendMap[dateStr]) {
-        trendMap[dateStr].completed = Number(row.completed || 0)
-      } else {
-        trendMap[dateStr] = {
-          date: dateStr,
-          deliveries: 0,
-          completed: Number(row.completed || 0)
-        }
+      const mNum = Number(row.monthNum)
+      if (monthlyTrendMap[mNum]) {
+        monthlyTrendMap[mNum].completed = Number(row.completed || 0)
       }
     }
 
-    const trend = Object.values(trendMap)
+    // Merge reported repairs
+    for (const row of repairReportedTrendResult.recordset || []) {
+      const mNum = Number(row.monthNum)
+      if (monthlyTrendMap[mNum]) {
+        monthlyTrendMap[mNum].repairsReported = Number(row.reported || 0)
+      }
+    }
+
+    // Merge closed repairs
+    for (const row of repairClosedTrendResult.recordset || []) {
+      const mNum = Number(row.monthNum)
+      if (monthlyTrendMap[mNum]) {
+        monthlyTrendMap[mNum].repairsClosed = Number(row.closed || 0)
+      }
+    }
+
+    const trend = Object.values(monthlyTrendMap)
       .sort((a, b) => a.date.localeCompare(b.date))
 
     const realCompleted = Number(deliverySummaryResult.recordset[0]?.completed || 0)
@@ -502,7 +577,7 @@ export async function GET(req: NextRequest) {
     console.error('[Dashboard API Error]', error)
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[Dashboard API] Error occurred, returning fallback mock data.')
-      return NextResponse.json(getMockDashboardData(startDate, endDate))
+      return NextResponse.json(getMockDashboardData(startDate, endDate, year))
     }
     return NextResponse.json(
       { error: 'Failed to fetch dashboard data' },

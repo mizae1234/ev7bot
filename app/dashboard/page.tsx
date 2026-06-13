@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import useSWR from 'swr'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { DailyChart } from '@/components/dashboard/DailyChart'
+import { RepairTrendChart } from '@/components/dashboard/RepairTrendChart'
 import { DeliveryCalendar } from '@/components/dashboard/DeliveryCalendar'
 import { DeliveryTable } from '@/components/dashboard/DeliveryTable'
 import { RepairTable } from '@/components/dashboard/RepairTable'
@@ -21,7 +22,7 @@ const thaiMonths = [
 ]
 
 const thaiMonthsShort = [
-  'ม.ค.', 'ก.พ.', 'มี.ย.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
 ]
 
@@ -32,7 +33,7 @@ function DashboardContent() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   
   // Custom date range state
-  const [filterMode, setFilterMode] = useState<'month' | 'range'>('month')
+  const [filterMode, setFilterMode] = useState<'month' | 'range' | 'year'>('month')
   const [customStartDate, setCustomStartDate] = useState<string>('')
   const [customEndDate, setCustomEndDate] = useState<string>('')
 
@@ -45,14 +46,18 @@ function DashboardContent() {
   // Calculate start/end dates
   const startDateStr = filterMode === 'month'
     ? new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
-    : (customStartDate || new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0])
+    : filterMode === 'year'
+      ? `${selectedYear}-01-01`
+      : (customStartDate || new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0])
   const endDateStr = filterMode === 'month'
     ? new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
-    : (customEndDate || new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0])
+    : filterMode === 'year'
+      ? `${selectedYear}-12-31`
+      : (customEndDate || new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0])
 
   // Query database dynamically using SWR
   const { data, error, isLoading, mutate, isValidating } = useSWR<DashboardData>(
-    `/api/dashboard?startDate=${startDateStr}&endDate=${endDateStr}`,
+    `/api/dashboard?startDate=${startDateStr}&endDate=${endDateStr}&year=${selectedYear}`,
     fetcher,
     { refreshInterval: 60_000 }   // Auto-refresh every 60s
   )
@@ -256,7 +261,7 @@ function DashboardContent() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white/60 dark:bg-zinc-900/40 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm backdrop-blur-md">
           {/* Mode Selector & Main Date Controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            {/* Range vs Month Toggle */}
+            {/* Range vs Month vs Year Toggle */}
             <div className="bg-zinc-100 dark:bg-zinc-850 p-1 rounded-xl flex gap-1 shadow-inner border border-zinc-200/50 dark:border-zinc-800/50">
               <button
                 onClick={() => {
@@ -270,6 +275,19 @@ function DashboardContent() {
                 }`}
               >
                 รายเดือน
+              </button>
+              <button
+                onClick={() => {
+                  setFilterMode('year')
+                  setSelectedDate(null)
+                }}
+                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-150 ${
+                  filterMode === 'year'
+                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-indigo-600 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-300'
+                }`}
+              >
+                รายปี
               </button>
               <button
                 onClick={() => {
@@ -294,7 +312,7 @@ function DashboardContent() {
               </button>
             </div>
 
-            {filterMode === 'month' ? (
+            {filterMode === 'month' && (
               /* Month/Year toggle controls */
               <div className="flex items-center gap-2">
                 <button
@@ -326,7 +344,36 @@ function DashboardContent() {
                   วันนี้
                 </button>
               </div>
-            ) : (
+            )}
+            
+            {filterMode === 'year' && (
+              /* Year-only toggle controls */
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedYear(y => y - 1)}
+                  className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100 min-w-[120px] text-center">
+                  ปี {selectedYear + 543}
+                </span>
+                
+                <button
+                  onClick={() => setSelectedYear(y => y + 1)}
+                  className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5 text-zinc-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {filterMode === 'range' && (
               /* Custom Date Range Pickers */
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -379,8 +426,8 @@ function DashboardContent() {
               </div>
             )}
 
-            {/* Quick dropdown selectors (Only in Month Mode) */}
-            {filterMode === 'month' && (
+            {/* Quick dropdown selectors (Month and Year Mode) */}
+            {(filterMode === 'month' || filterMode === 'year') && (
               <div className="flex gap-2">
                 <select
                   value={selectedYear}
@@ -393,18 +440,20 @@ function DashboardContent() {
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
                 </select>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => {
-                    setSelectedMonth(Number(e.target.value))
-                    setSelectedDate(null)
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
-                >
-                  {thaiMonthsShort.map((m, i) => (
-                    <option key={i} value={i}>{m}</option>
-                  ))}
-                </select>
+                {filterMode === 'month' && (
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => {
+                      setSelectedMonth(Number(e.target.value))
+                      setSelectedDate(null)
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-xl border border-zinc-200 bg-white/50 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+                  >
+                    {thaiMonthsShort.map((m, i) => (
+                      <option key={i} value={i}>{m}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
           </div>
@@ -419,7 +468,7 @@ function DashboardContent() {
           ) : data ? (
             <>
               <StatCard
-                title={filterMode === 'month' ? "แผนเดือนนี้" : "แผนช่วงที่เลือก"}
+                title={filterMode === 'month' ? "แผนเดือนนี้" : filterMode === 'year' ? "แผนปีนี้" : "แผนช่วงที่เลือก"}
                 value={data.delivery.total}
                 icon={carIcon}
                 subValue={[
@@ -428,7 +477,7 @@ function DashboardContent() {
                 ]}
               />
               <StatCard
-                title={filterMode === 'month' ? "งานซ่อมแจ้งเดือนนี้" : "งานซ่อมแจ้งช่วงที่เลือก"}
+                title={filterMode === 'month' ? "งานซ่อมแจ้งเดือนนี้" : filterMode === 'year' ? "งานซ่อมแจ้งปีนี้" : "งานซ่อมแจ้งช่วงที่เลือก"}
                 value={data.repair.total}
                 icon={repairIcon}
                 subValue={[
@@ -476,9 +525,12 @@ function DashboardContent() {
           ) : null
         )}
 
-        {/* 7-day trend chart */}
+        {/* Trend Charts Section */}
         {!isLoading && data && data.trend && data.trend.length > 0 && (
-          <DailyChart data={data.trend} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DailyChart data={data.trend} />
+            <RepairTrendChart data={data.trend} />
+          </div>
         )}
 
         {/* Live Tables Details Section */}

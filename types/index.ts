@@ -16,6 +16,8 @@ export interface TrendDataPoint {
   date: string        // 'YYYY-MM-DD'
   deliveries: number
   completed: number
+  repairsReported: number
+  repairsClosed: number
 }
 
 export interface DeliveryRecord {
