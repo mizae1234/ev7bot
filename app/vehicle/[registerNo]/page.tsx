@@ -291,7 +291,9 @@ export default function VehicleDetailPage() {
                 return (
                   <div key={i} className={`rounded-xl border p-3 ${m.IsActive && m.CarStatusCode !== 'COMPLETE' ? 'border-amber-300 bg-amber-50/30' : 'border-zinc-200 bg-zinc-50/30'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-zinc-800">{m.IssueTitle || 'ไม่ระบุอาการ'}</span>
+                      <span className="text-sm font-semibold text-zinc-800">
+                        ID: <span className="font-mono font-bold text-zinc-550 text-xs">{m.MaintenanceItemID}</span> | {m.IssueTitle || 'ไม่ระบุอาการ'}
+                      </span>
                       <span className={`text-xs font-bold ${repairStatus.color}`}>{repairStatus.label}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -301,9 +303,16 @@ export default function VehicleDetailPage() {
                       <span className="text-zinc-500">ฝ่ายผิด: <span className="text-zinc-700">{m.FaultParty || '-'}</span></span>
                       <span className="text-zinc-500">สถานที่: <span className="text-zinc-700">{m.ServiceLocation || '-'}</span></span>
                       <span className="text-zinc-500">กรณีรถ: <span className="text-zinc-700">{m.CarCase || '-'}</span></span>
+                      <span className="text-zinc-500">ประกัน: <span className="text-zinc-700">{m.Insurance || '-'}</span></span>
                       <span className="text-zinc-500">เริ่มซ่อม: <span className="text-zinc-700">{formatDate(m.MaintenanceStartDate)}</span></span>
                       <span className="text-zinc-500">ซ่อมเสร็จ: <span className="text-zinc-700">{formatDate(m.MaintenanceFinishDate)}</span></span>
+                      <span className="text-zinc-500">วันรับรถคืน: <span className="text-zinc-700">{formatDate(m.MaintenanceReturnDate)}</span></span>
                     </div>
+                    {m.FollowUpDetail && (
+                      <div className="mt-2 text-xs bg-zinc-100 dark:bg-zinc-800 p-2 rounded-lg text-zinc-600 dark:text-zinc-300">
+                        <strong>หมายเหตุ:</strong> {m.FollowUpDetail}
+                      </div>
+                    )}
                     {m.replacements.length > 0 && (
                       <div className="mt-2 text-xs text-purple-600">
                         🔄 รถทดแทน: {m.replacements.map(r => r.VinNo).join(', ')}

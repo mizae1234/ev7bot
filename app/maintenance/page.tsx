@@ -312,50 +312,96 @@ function MaintenanceContent() {
                         {/* Expanded Detail Row */}
                         {expandedId === item.id && (
                           <tr className="bg-zinc-50/80 dark:bg-zinc-800/40">
-                            <td colSpan={9} className="px-6 py-4">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                                <div>
-                                  <span className="text-zinc-400 font-bold">โครงการ:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{item.project || '-'}</span>
+                            <td colSpan={9} className="px-6 py-5">
+                              <div className="space-y-4">
+                                {/* Title / ID info */}
+                                <div className="flex items-center gap-3 text-xs font-bold text-zinc-500 dark:text-zinc-450 pb-2 border-b border-zinc-250/60 dark:border-zinc-700/60">
+                                  <span>🆔 ใบสั่งซ่อม ID: <span className="text-zinc-800 dark:text-zinc-200 font-mono">{item.id}</span></span>
+                                  <span>•</span>
+                                  <span>🚗 ทะเบียน/VIN: <span className="text-zinc-800 dark:text-zinc-200 font-mono">{item.register_no || '-'} / {item.vin}</span></span>
                                 </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">ผู้รับผิดชอบ:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{item.fault_party}</span>
-                                </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">ประกัน:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{item.insurance}</span>
-                                </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">วันเกิดเหตุ:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{formatDateTh(item.incident_date)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">วันเริ่มซ่อม:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{formatDateTh(item.start_date)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">วันซ่อมเสร็จ:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{formatDateTh(item.finish_date)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-zinc-400 font-bold">วันรับคืน:</span>
-                                  <span className="ml-2 text-zinc-800 dark:text-zinc-200">{formatDateTh(item.return_date)}</span>
-                                </div>
-                                {item.follow_up && (
-                                  <div className="sm:col-span-2 lg:col-span-4">
-                                    <span className="text-zinc-400 font-bold">หมายเหตุ:</span>
-                                    <span className="ml-2 text-zinc-800 dark:text-zinc-200">{item.follow_up}</span>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3.5 text-xs">
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🏢 โครงการ:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.project || '-'}</span>
                                   </div>
-                                )}
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🚗 รุ่นรถ:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.model || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🔧 อาการที่แจ้ง:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200 font-medium">{item.issue_title || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">⚠️ ประเภทปัญหา:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.problem_type || '-'}</span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">💼 เคสการซ่อม:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.car_case || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🛡️ ประกันภัย:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.insurance || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">👤 ฝ่ายที่ผิด (ผู้รับผิดชอบ):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{item.fault_party || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📍 สถานที่ซ่อม (อู่):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">
+                                      {item.service_location || '-'} {item.service_location_code ? `(${item.service_location_code})` : ''}
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">⚙️ สถานะการซ่อม:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200 font-semibold">
+                                      {item.status_text || '-'} {item.status_code ? `(${item.status_code})` : ''}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันแจ้งซ่อม (Report):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.report_date)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันเกิดเหตุ (Incident):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.incident_date)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันเริ่มเข้าซ่อม (Start):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.start_date)}</span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันซ่อมเสร็จ (Finish):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.finish_date)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📅 วันรับรถคืน (Return):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.return_date)}</span>
+                                  </div>
+                                </div>
+
+                                {/* Follow up notes */}
+                                <div className="pt-2">
+                                  <span className="text-zinc-450 font-bold block mb-1">📝 บันทึกติดตาม/หมายเหตุ (Follow Up):</span>
+                                  <p className="text-zinc-800 dark:text-zinc-200 bg-zinc-100/60 dark:bg-zinc-800/40 rounded-xl p-3 border border-zinc-200/40 dark:border-zinc-700/40">
+                                    {item.follow_up || '-'}
+                                  </p>
+                                </div>
 
                                 {/* Replacement cars */}
                                 {item.replacements.length > 0 && (
-                                  <div className="sm:col-span-2 lg:col-span-4 mt-2 pt-3 border-t border-zinc-200 dark:border-zinc-700">
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">🚙 รถทดแทน:</span>
-                                    <div className="mt-2 space-y-1">
+                                  <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold block mb-2">🚙 รถทดแทน:</span>
+                                    <div className="space-y-1">
                                       {item.replacements.map((r, i) => (
-                                        <div key={i} className="flex items-center gap-3 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-lg px-3 py-1.5">
+                                        <div key={i} className="flex items-center gap-3 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-lg px-3 py-1.5 w-fit">
                                           <span className="font-mono text-emerald-700 dark:text-emerald-300 font-bold">{r.register_no || r.vin}</span>
                                           {r.register_no && <span className="text-zinc-400 text-[10px] font-mono">{r.vin}</span>}
                                           <span className="text-zinc-500">{formatDateTh(r.start_date)}</span>
@@ -364,16 +410,16 @@ function MaintenanceContent() {
                                     </div>
                                   </div>
                                 )}
-                              </div>
 
-                              {/* Link to vehicle detail */}
-                              <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-700">
-                                <a
-                                  href={`/vehicle/${encodeURIComponent(item.register_no || item.vin)}`}
-                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
-                                >
-                                  🔗 ดูข้อมูลรถคันนี้
-                                </a>
+                                {/* Link to vehicle detail */}
+                                <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                                  <a
+                                    href={`/vehicle/${encodeURIComponent(item.register_no || item.vin)}`}
+                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
+                                  >
+                                    🔗 ดูข้อมูลรถคันนี้
+                                  </a>
+                                </div>
                               </div>
                             </td>
                           </tr>
