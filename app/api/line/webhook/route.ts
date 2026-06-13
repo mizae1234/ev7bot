@@ -12,6 +12,43 @@ export const dynamic = 'force-dynamic';
 const BOT_NAME = 'Butter'
 const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
 
+const quickReplyItems = {
+  items: [
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: '📊 สรุปวันนี้',
+        text: 'สรุปวันนี้'
+      }
+    },
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: '📊 สรุปเมื่อวาน',
+        text: 'สรุปเมื่อวาน'
+      }
+    },
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: '📅 สรุปส่งมอบประจำเดือน',
+        text: 'สรุปส่งมอบประจำเดือน'
+      }
+    },
+    {
+      type: 'action',
+      action: {
+        type: 'message',
+        label: '🔧 ค้างซ่อมรายพื้นที่',
+        text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
+      }
+    }
+  ] as any[]
+}
+
 // Verify Line signature
 function verifySignature(body: string, signature: string): boolean {
   if (env.MOCK_MODE && (signature === 'mock-signature' || signature === '')) {
@@ -247,16 +284,39 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   }
 
   // ─── Daily Report as Flex Message ─────────────────────────────
-  if (matchAny(lower, ['รายงานประจำวัน', 'สรุปรายงาน', 'สรุปประจำวัน', 'ข่าวเช้า', 'รายงานวัน'])) {
+  if (matchAny(lower, ['รายงานประจำวัน', 'สรุปรายงาน', 'สรุปประจำวัน', 'ข่าวเช้า', 'รายงานวัน', 'สรุปวันนี้', 'สรุปเมื่อวาน'])) {
     try {
-      // Try to extract date from message (DD/MM/YYYY or YYYY-MM-DD)
       let reportDate: string | null = null
-      const dateMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
-      if (dateMatch) {
-        const [, d, m, y] = dateMatch
-        // If year > 2500 it's Buddhist Era
-        const year = parseInt(y) > 2500 ? parseInt(y) - 543 : parseInt(y)
-        reportDate = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+
+      // Check relative date keywords first
+      if (lower.includes('เมื่อวาน')) {
+        const bangkokFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        reportDate = bangkokFormatter.format(yesterday)
+      } else if (lower.includes('วันนี้')) {
+        const bangkokFormatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Bangkok',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+        reportDate = bangkokFormatter.format(new Date())
+      }
+
+      // Try to extract date from message (DD/MM/YYYY or YYYY-MM-DD)
+      if (!reportDate) {
+        const dateMatch = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
+        if (dateMatch) {
+          const [, d, m, y] = dateMatch
+          // If year > 2500 it's Buddhist Era
+          const year = parseInt(y) > 2500 ? parseInt(y) - 543 : parseInt(y)
+          reportDate = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+        }
       }
 
       // Default to today
@@ -538,12 +598,196 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           type: 'flex',
           altText: `🧈 Butter สรุปรายงาน ${reportDate}`,
           contents: { type: 'carousel', contents: [activityBubble, portfolioBubble] },
+          quickReply: quickReplyItems
         })
       }
       return
     } catch (err: any) {
       console.error('[Daily Report Flex Error]', err)
       await replyText(replyToken, `❌ สร้างรายงานไม่สำเร็จค่ะ: ${err.message}\n\nลองใหม่อีกครั้งนะคะ 🧈`)
+      return
+    }
+  }
+
+  // ─── Monthly Delivery Summary as Flex Message ──────────────────
+  if (matchAny(lower, ['สรุปส่งมอบประจำเดือน', 'สรุปเดือนนี้', 'สรุปประจำเดือน'])) {
+    try {
+      const { getMonthlyStats } = await import('@/lib/bot-queries')
+      const now = new Date()
+      const bangkokYear = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric' }).format(now)
+      const bangkokMonth = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', month: 'numeric' }).format(now)
+      
+      const stats = await getMonthlyStats({ year: parseInt(bangkokYear), month: parseInt(bangkokMonth) })
+      if ('error' in stats) {
+        await replyText(replyToken, `❌ ดึงข้อมูลประจำเดือนไม่สำเร็จค่ะ: ${stats.error}`)
+        return
+      }
+
+      const delivery = stats.delivery || { total: 0, completed: 0, pending: 0 }
+      const projectBreakdown = stats.projectBreakdown || []
+
+      const breakdownRows = projectBreakdown.map((item: any) => ({
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          { type: 'text', text: `• ${item.project || 'ไม่ระบุ'}`, size: 'sm', color: '#555555', flex: 5 },
+          { type: 'text', text: `${item.count} คัน`, size: 'sm', weight: 'bold', color: '#1a1a1a', align: 'end', flex: 3 }
+        ]
+      }))
+
+      const flexMessage = {
+        type: 'flex' as const,
+        altText: `📅 สรุปส่งมอบประจำเดือน ${bangkokMonth}/${bangkokYear}`,
+        contents: {
+          type: 'bubble' as const,
+          size: 'mega' as const,
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+              { type: 'text', text: `ข้อมูล ณ เดือนที่ ${bangkokMonth}/${bangkokYear}`, size: 'xs', color: '#888888' }
+            ],
+            backgroundColor: '#FFF3E0',
+            paddingAll: 'lg'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              { type: 'text', text: '🚛 สถิติส่งมอบรวม', weight: 'bold', size: 'sm', color: '#E65100' },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(delivery.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+                      { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(delivery.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+                      { type: 'text', text: 'ส่งจริงแล้ว', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(delivery.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+                      { type: 'text', text: 'รอส่งมอบ', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  }
+                ]
+              },
+              ...(breakdownRows.length > 0 ? [
+                { type: 'separator', margin: 'lg' },
+                { type: 'text', text: '📋 แยกตามโครงการ', weight: 'bold', size: 'xs', color: '#555555', margin: 'md' },
+                ...breakdownRows
+              ] : [])
+            ],
+            paddingAll: 'lg'
+          }
+        },
+        quickReply: quickReplyItems
+      }
+
+      if (!env.MOCK_MODE) {
+        await lineClient.replyMessage(replyToken, flexMessage as any)
+      } else {
+        console.log('[Mock Monthly Report]', JSON.stringify(flexMessage, null, 2))
+      }
+      return
+    } catch (err: any) {
+      console.error('[Monthly Report Flex Error]', err)
+      await replyText(replyToken, `❌ สร้างสรุปรายเดือนไม่สำเร็จค่ะ: ${err.message}`)
+      return
+    }
+  }
+
+  // ─── Pending Repairs by Location as Flex Message ────────────────
+  if (matchAny(lower, ['ดูรถค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมรายพื้นที่', 'ค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมพื้นที่'])) {
+    try {
+      const { getRepairByLocation } = await import('@/lib/bot-queries')
+      const repairs = await getRepairByLocation()
+
+      if ('error' in repairs) {
+        await replyText(replyToken, `❌ ดึงข้อมูลค้างซ่อมไม่สำเร็จค่ะ: ${repairs.error}`)
+        return
+      }
+
+      const list = (repairs as any).data || []
+      const totalCount = (repairs as any).totalCount || 0
+
+      const formatLocationName = (loc: string) => {
+        if (!loc || loc === 'ไม่ระบุ') return 'ไม่ระบุพื้นที่/อู่'
+        return loc.replace(/_/g, ' ')
+      }
+
+      const locationRows = list.slice(0, 10).map((item: any) => ({
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          { type: 'text', text: `• ${formatLocationName(item.Location)}`, size: 'sm', color: '#555555', flex: 5, wrap: true },
+          { type: 'text', text: `${item.Count} คัน`, size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 2 }
+        ]
+      }))
+
+      const flexMessage = {
+        type: 'flex' as const,
+        altText: `🔧 สรุปรถค้างซ่อมแยกตามพื้นที่`,
+        contents: {
+          type: 'bubble' as const,
+          size: 'mega' as const,
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              { type: 'text', text: '🔧 รถค้างซ่อมแยกตามพื้นที่', weight: 'bold', size: 'lg', color: '#ffffff' },
+              { type: 'text', text: `รวมทั้งหมด: ${totalCount} คัน`, size: 'sm', color: '#ffcdd2', margin: 'xs' }
+            ],
+            backgroundColor: '#C62828',
+            paddingAll: 'lg'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              { type: 'text', text: '📍 รายชื่อพื้นที่ที่มีรถค้างซ่อมสูงสุด (Top 10)', weight: 'bold', size: 'sm', color: '#1a1a1a' },
+              { type: 'separator' },
+              ...locationRows,
+              ...(list.length > 10 ? [
+                { type: 'separator', margin: 'lg' },
+                { type: 'text', text: `...และพื้นที่อื่นๆ อีก ${list.length - 10} แห่ง`, size: 'xs', color: '#888888', align: 'center', margin: 'md' }
+              ] : [])
+            ],
+            paddingAll: 'lg'
+          }
+        },
+        quickReply: quickReplyItems
+      }
+
+      if (!env.MOCK_MODE) {
+        await lineClient.replyMessage(replyToken, flexMessage as any)
+      } else {
+        console.log('[Mock Repair by Location Report]', JSON.stringify(flexMessage, null, 2))
+      }
+      return
+    } catch (err: any) {
+      console.error('[Repair Location Flex Error]', err)
+      await replyText(replyToken, `❌ สร้างสรุปค้างซ่อมไม่สำเร็จค่ะ: ${err.message}`)
       return
     }
   }
@@ -648,7 +892,11 @@ async function replyText(replyToken: string, message: string) {
     return
   }
   try {
-    await lineClient.replyMessage(replyToken, { type: 'text', text: message })
+    await lineClient.replyMessage(replyToken, {
+      type: 'text',
+      text: message,
+      quickReply: quickReplyItems
+    })
   } catch (err) {
     console.error(`[${BOT_NAME} replyText Error]`, err)
   }
@@ -1079,7 +1327,8 @@ async function trySendVehicleFlexMessage(
         {
           type: 'flex',
           altText: `ข้อมูลรถ ${car.RegisterNo || car.VinNo}`,
-          contents: flexContents
+          contents: flexContents,
+          quickReply: quickReplyItems
         }
       ])
       return true
@@ -1224,7 +1473,7 @@ async function handleRegister(userId: string, replyToken: string) {
     }
 
     if (!env.MOCK_MODE) {
-      await lineClient.replyMessage(replyToken, responseContent)
+      await lineClient.replyMessage(replyToken, { ...responseContent, quickReply: quickReplyItems })
     } else {
       console.log(`[Mock ${BOT_NAME}] Replied to user ${userId} with registration success Flex message.`)
     }

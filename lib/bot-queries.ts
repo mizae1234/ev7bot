@@ -511,6 +511,37 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
   }
 }
 
+// ─── Function: getRepairByLocation ─────────────────────────────────
+export async function getRepairByLocation() {
+  const pool = await getMSSQLPool()
+  if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
+
+  try {
+    const result = await pool.request().query(`
+      SELECT 
+        ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+        COUNT(*) AS Count
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')
+      GROUP BY m.ServiceLocationCode
+      ORDER BY Count DESC
+    `)
+
+    const data = result.recordset
+    const totalCount = data.reduce((sum: number, item: any) => sum + (item.Count || 0), 0)
+
+    return {
+      data,
+      totalCount,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[getRepairByLocation] Error:', message)
+    return { error: `ดึงข้อมูลรถค้างซ่อมรายพื้นที่ไม่สำเร็จ: ${message}` }
+  }
+}
+
 // ─── Function registry (for AI dispatch) ───────────────────────────
 export const botFunctions: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
   getDeliveryToday: () => getDeliveryToday(),
@@ -521,5 +552,6 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
   runCustomQuery: (p) => runCustomQuery(p as { sqlQuery: string }),
   getPortfolioSummary: () => getPortfolioSummary(),
   getDeliveryPlanAndActual: (p) => getDeliveryPlanAndActual(p as { date: string }),
+  getRepairByLocation: () => getRepairByLocation(),
 }
 
