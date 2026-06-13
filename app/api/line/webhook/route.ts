@@ -575,7 +575,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
@@ -583,7 +583,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
           ...(comparisonBox ? [comparisonBox] : []),
@@ -708,7 +708,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(delivery.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-                      { type: 'text', text: 'รอส่งมอบ', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   }

@@ -275,7 +275,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'ทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
@@ -283,7 +283,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(deliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
