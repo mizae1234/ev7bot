@@ -4,6 +4,7 @@ export interface DeliverySummary {
   total: number
   completed: number
   pending: number
+  pendingActual?: number
 }
 
 export interface RepairSummary {

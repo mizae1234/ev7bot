@@ -809,7 +809,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         return
       }
 
-      const delivery = stats.delivery || { total: 0, completed: 0, pending: 0 }
+      const delivery = stats.delivery || { total: 0, completed: 0, pending: 0, pendingActual: 0 }
 
       const planRows: any[] = []
       if (stats.plans && stats.actuals) {
@@ -951,7 +951,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     type: 'box',
                     layout: 'vertical',
                     contents: [
-                      { type: 'text', text: String(delivery.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+                      { type: 'text', text: String(delivery.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
+                      { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(delivery.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
                       { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1

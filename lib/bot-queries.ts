@@ -386,8 +386,10 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
 
   const planTotal = planRes.recordset[0]?.planTotal || 0
   const deliveryData = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
+  const pendingActual = deliveryData.pending || 0
   deliveryData.total = planTotal
   deliveryData.pending = Math.max(0, planTotal - (deliveryData.completed || 0))
+  deliveryData.pendingActual = pendingActual
 
   return {
     year,
