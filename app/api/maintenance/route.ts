@@ -76,10 +76,10 @@ export async function GET(req: NextRequest) {
     const summaryReq = pool.request()
     const summaryResult = await summaryReq.query(`
       SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
+        COUNT(DISTINCT InventoryItemID) AS total,
+        COUNT(DISTINCT CASE WHEN CarStatusCode = 'IN_MAINTENANCE' THEN InventoryItemID END) AS in_maintenance,
         0 AS complete,
-        SUM(CASE WHEN CarStatusCode IN ('WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 1 ELSE 0 END) AS waiting
+        COUNT(DISTINCT CASE WHEN CarStatusCode IN ('WAITING_FOR_MAINTENANCE','STILL_WORK') THEN InventoryItemID END) AS waiting
       FROM dbo.EV_MaintenanceItem
       WHERE IsActive = 1
     `)
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
     const repairByLocResult = await repairByLocReq.query(`
       SELECT 
         ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
-        COUNT(*) AS Count
+        COUNT(DISTINCT m.InventoryItemID) AS Count
       FROM dbo.EV_MaintenanceItem m
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')

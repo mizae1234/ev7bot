@@ -158,17 +158,23 @@ function MaintenanceContent() {
             <button onClick={() => setStatusFilter('all')}
               className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'all' ? 'border-indigo-500/40 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">ทั้งหมด</p>
-              <p className="text-2xl font-extrabold text-zinc-900 dark:text-white mt-1">{data.summary.total}</p>
+              <p className="text-2xl font-extrabold text-zinc-900 dark:text-white mt-1">
+                {data.summary.total} <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400 ml-0.5">คัน</span>
+              </p>
             </button>
             <button onClick={() => setStatusFilter('IN_MAINTENANCE')}
               className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'IN_MAINTENANCE' ? 'border-amber-500/40 bg-amber-500/5 ring-1 ring-amber-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
               <p className="text-xs text-amber-600 dark:text-amber-400 font-bold">🔧 กำลังซ่อม</p>
-              <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{data.summary.in_maintenance}</p>
+              <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">
+                {data.summary.in_maintenance} <span className="text-xs font-normal text-amber-500 dark:text-amber-450 ml-0.5">คัน</span>
+              </p>
             </button>
             <button onClick={() => setStatusFilter('WAITING_FOR_MAINTENANCE')}
               className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'WAITING_FOR_MAINTENANCE' ? 'border-rose-500/40 bg-rose-500/5 ring-1 ring-rose-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
               <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">⏳ รอเข้าซ่อม</p>
-              <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">{data.summary.waiting}</p>
+              <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
+                {data.summary.waiting} <span className="text-xs font-normal text-rose-500 dark:text-rose-450 ml-0.5">คัน</span>
+              </p>
             </button>
           </div>
         )}
@@ -198,7 +204,7 @@ function MaintenanceContent() {
                       {displayLoc}
                     </span>
                     <span className="font-extrabold text-rose-600 dark:text-rose-400 shrink-0">
-                      {item.Count}
+                      {item.Count} <span className="text-[9px] font-normal text-zinc-400">คัน</span>
                     </span>
                   </button>
                 )

@@ -520,7 +520,7 @@ export async function getRepairByLocation() {
     const result = await pool.request().query(`
       SELECT 
         ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
-        COUNT(*) AS Count
+        COUNT(DISTINCT m.InventoryItemID) AS Count
       FROM dbo.EV_MaintenanceItem m
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'STILL_WORK')
