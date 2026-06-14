@@ -7,19 +7,18 @@ import { env } from '@/lib/env'
 import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
 import { getMSSQLPool, sql } from '@/lib/mssql'
-import { AsyncLocalStorage } from 'async_hooks'
 
 export const dynamic = 'force-dynamic';
 
-const requestContext = new AsyncLocalStorage<{
+const pendingLogs = new Map<string, {
   userId?: string
   sourceType: string
   sourceId: string | null
   userMessage: string
 }>()
 
-async function logReplyToDb(replyMessageText: string) {
-  const ctx = requestContext.getStore()
+async function logReplyToDb(replyToken: string, replyMessageText: string) {
+  const ctx = pendingLogs.get(replyToken)
   if (!ctx || !ctx.userMessage) return
   
   let userName: string | undefined
@@ -43,7 +42,8 @@ lineClient.replyMessage = async function(replyToken: string, messages: any, ...a
     } else if (messages && typeof messages === 'object') {
       logText = messages.text || messages.altText || '[Flex Message]'
     }
-    await logReplyToDb(logText)
+    await logReplyToDb(replyToken, logText)
+    pendingLogs.delete(replyToken) // Clean up after logging
   } catch (err) {
     console.error('[logReplyToDb Error in replyMessage]', err)
   }
@@ -132,13 +132,15 @@ export async function POST(req: NextRequest) {
         ? ((event.source as any).groupId || (event.source as any).roomId || event.source.userId!)
         : event.source.userId!
       
-      const ctx = {
-        userId: event.source.userId,
-        sourceType: event.source.type,
-        sourceId: targetSourceId || null,
-        userMessage: event.type === 'message' && event.message.type === 'text' ? event.message.text : ''
+      if ('replyToken' in event && event.replyToken) {
+        pendingLogs.set(event.replyToken, {
+          userId: event.source.userId,
+          sourceType: event.source.type,
+          sourceId: targetSourceId || null,
+          userMessage: event.type === 'message' && event.message.type === 'text' ? event.message.text : ''
+        })
       }
-      return requestContext.run(ctx, () => handleEvent(event, appUrl))
+      return handleEvent(event, appUrl)
     }))
 
     return NextResponse.json({ ok: true })
@@ -1325,7 +1327,7 @@ function matchAny(text: string, keywords: string[]): boolean {
 async function replyText(replyToken: string, message: string) {
   if (env.MOCK_MODE) {
     console.log(`[Mock ${BOT_NAME}] Reply:`, message)
-    await logReplyToDb(message).catch(err => console.error('[Mock logReplyToDb error]', err))
+    await logReplyToDb(replyToken, message).catch(err => console.error('[Mock logReplyToDb error]', err))
     return
   }
   try {
