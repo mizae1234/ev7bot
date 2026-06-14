@@ -1874,7 +1874,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
     // Strategy 2: Extract from /vehicle/xxx link in AI response (broad regex)
     if (!vehicleIdentifier) {
-      const linkMatch = aiResponse.match(/\/vehicle\/([^\s"')\]]+)/i)
+      const linkMatch = aiResponse.match(/\/vehicle\/([^\"')\]\r\n\t]+)/i)
       if (linkMatch) {
         vehicleIdentifier = decodeURIComponent(linkMatch[1]).trim()
         console.log(`[${BOT_NAME}] Detected vehicle from AI link: ${vehicleIdentifier}`)
@@ -2026,14 +2026,34 @@ async function trySendVehicleFlexMessage(
     const pool = await getMSSQLPool()
     if (!pool) return false
 
-    // Query inventory item
-    const carResult = await pool.request()
-      .input('identifier', sql.NVarChar, `%${registerNo}%`)
-      .query(`
-        SELECT TOP 1 InventoryItemID, VinNo, RegisterNo, Model, Status AS StatusCode, StatusType, Project, ProjectType
-        FROM dbo.EV_InventoryItem
-        WHERE (RegisterNo LIKE @identifier OR VinNo LIKE @identifier) AND IsActive = 1
-      `)
+    // Normalize identifier to remove spaces and dashes
+    const normalized = registerNo.replace(/[\s\-]/g, '')
+
+    let query = `
+      SELECT TOP 1 InventoryItemID, VinNo, RegisterNo, Model, Status AS StatusCode, StatusType, Project, ProjectType
+      FROM dbo.EV_InventoryItem
+      WHERE IsActive = 1 AND (
+        RegisterNo = @exact
+        OR VinNo = @exact
+        OR REPLACE(REPLACE(RegisterNo, ' ', ''), '-', '') = @normalized
+        OR REPLACE(REPLACE(VinNo, ' ', ''), '-', '') = @normalized
+    `
+
+    const request = pool.request()
+      .input('exact', sql.NVarChar, registerNo)
+      .input('normalized', sql.NVarChar, normalized)
+
+    if (registerNo.length >= 4) {
+      query += `
+        OR RegisterNo LIKE @like
+        OR VinNo LIKE @like
+      `
+      request.input('like', sql.NVarChar, `%${registerNo}%`)
+    }
+
+    query += `)`
+
+    const carResult = await request.query(query)
 
     if (carResult.recordset.length === 0) return false
     const car = carResult.recordset[0]
