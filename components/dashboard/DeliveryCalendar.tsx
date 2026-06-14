@@ -40,6 +40,30 @@ export function DeliveryCalendar({
     setIsMounted(true)
   }, [])
 
+  // Get selected date details for the bottom card
+  const selectedDateDeliveries = selectedDate
+    ? deliveries.filter(d => {
+        const dateVal = d.release_date || d.expected_release_date
+        return dateVal && dateVal.startsWith(selectedDate)
+      })
+    : []
+
+  const selectedDateDeliveryByProject: Record<string, typeof deliveries> = {}
+  selectedDateDeliveries.forEach(d => {
+    const projName = d.project || 'อื่นๆ'
+    if (!selectedDateDeliveryByProject[projName]) {
+      selectedDateDeliveryByProject[projName] = []
+    }
+    selectedDateDeliveryByProject[projName].push(d)
+  })
+
+  const selectedDateRepairsReported = selectedDate
+    ? repairs.filter(r => r.report_date && r.report_date.startsWith(selectedDate))
+    : []
+  const selectedDateRepairsFinished = selectedDate
+    ? repairs.filter(r => r.finish_date && r.finish_date.startsWith(selectedDate))
+    : []
+
   if (!isMounted) {
     return <div className="h-96 w-full rounded-2xl bg-white dark:bg-zinc-900 animate-pulse border border-zinc-200 dark:border-zinc-800" />
   }
@@ -212,31 +236,19 @@ export function DeliveryCalendar({
               </div>
 
               {/* Mobile simple indicators view (hidden on desktop) */}
-              <div className="flex md:hidden flex-wrap gap-0.5 mt-0.5 justify-center items-center">
+              <div className="flex md:hidden flex-col gap-0.5 mt-1 items-center justify-center w-full">
                 {viewMode === 'deliveries' ? (
-                  Object.keys(deliveryByProject).map((proj) => {
-                    const p = proj.toUpperCase()
-                    let dotColor = 'bg-zinc-400'
-                    if (p.includes('EV7') || p.includes('TAXI')) dotColor = 'bg-cyan-500'
-                    else if (p.includes('LINE') || p.includes('MAN')) dotColor = 'bg-orange-500'
-                    else if (p.includes('GRAB')) dotColor = 'bg-emerald-500'
-                    return (
-                      <span
-                        key={proj}
-                        className={`h-1.5 w-1.5 rounded-full ${dotColor}`}
-                        title={`${proj}: ${deliveryByProject[proj].length}`}
-                      />
-                    )
-                  })
+                  dayDeliveries.length > 0 && (
+                    <span className="text-[9px] px-1 py-0.5 bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 rounded-md font-bold scale-90">
+                      🚚 {dayDeliveries.length}
+                    </span>
+                  )
                 ) : (
-                  <>
-                    {dayRepairsReported.length > 0 && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" title={`แจ้งซ่อม: ${dayRepairsReported.length}`} />
-                    )}
-                    {dayRepairsFinished.length > 0 && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title={`ซ่อมเสร็จ: ${dayRepairsFinished.length}`} />
-                    )}
-                  </>
+                  (dayRepairsReported.length > 0 || dayRepairsFinished.length > 0) && (
+                    <span className="text-[9px] px-1 py-0.5 bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 rounded-md font-bold scale-90">
+                      🛠️ {dayRepairsReported.length + dayRepairsFinished.length}
+                    </span>
+                  )
                 )}
               </div>
 
@@ -334,6 +346,104 @@ export function DeliveryCalendar({
           )
         })}
       </div>
+
+      {/* Mobile & Desktop Inline Date Detail Card (Saves mobile UX from scrolling down) */}
+      {selectedDate && (
+        <div className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 text-xs animate-in fade-in slide-in-from-bottom-2 duration-250">
+          <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-2.5 mb-3">
+            <h4 className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+              <span>📅 สรุปข้อมูลวันที่ {new Date(selectedDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </h4>
+            <button
+              onClick={() => onDateClick(selectedDate)} // Click again to clear
+              className="text-rose-500 hover:text-rose-600 font-semibold transition-colors text-xs"
+            >
+              แสดงทั้งเดือน ✕
+            </button>
+          </div>
+
+          {viewMode === 'deliveries' ? (
+            // --- DELIVERIES BREAKDOWN ---
+            selectedDateDeliveries.length === 0 ? (
+              <p className="text-zinc-500 dark:text-zinc-400 py-2">ไม่มีแผนงานส่งมอบในวันนี้</p>
+            ) : (
+              <div className="space-y-3">
+                <p className="font-semibold text-zinc-700 dark:text-zinc-300">
+                  🚛 แผนส่งมอบทั้งหมด <span className="text-indigo-600 dark:text-indigo-400 font-bold">{selectedDateDeliveries.length}</span> คัน
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Object.entries(selectedDateDeliveryByProject).map(([proj, list]) => {
+                    const modelCounts: Record<string, number> = {}
+                    list.forEach(item => {
+                      const m = cleanModelName(item.model)
+                      modelCounts[m] = (modelCounts[m] || 0) + 1
+                    })
+                    return (
+                      <div key={proj} className="p-3 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-800/80 shadow-sm">
+                        <div className="flex justify-between items-center font-bold text-zinc-800 dark:text-zinc-200 mb-1.5 border-b border-zinc-100 dark:border-zinc-800 pb-1">
+                          <span>{proj}</span>
+                          <span className="text-indigo-600 dark:text-indigo-400">{list.length} คัน</span>
+                        </div>
+                        <ul className="space-y-1 text-zinc-500 dark:text-zinc-400">
+                          {Object.entries(modelCounts).map(([model, count]) => (
+                            <li key={model} className="flex justify-between items-center">
+                              <span>• {model}</span>
+                              <span className="font-medium">{count}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          ) : (
+            // --- REPAIRS BREAKDOWN ---
+            selectedDateRepairsReported.length === 0 && selectedDateRepairsFinished.length === 0 ? (
+              <p className="text-zinc-500 dark:text-zinc-400 py-2">ไม่มีความเคลื่อนไหวด้านงานซ่อมในวันนี้</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Reported Repairs */}
+                {selectedDateRepairsReported.length > 0 && (
+                  <div className="p-3 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-800/80 shadow-sm">
+                    <p className="font-bold text-amber-600 dark:text-amber-400 mb-2 pb-1 border-b border-zinc-100 dark:border-zinc-800 flex justify-between">
+                      <span>🔧 แจ้งซ่อมใหม่</span>
+                      <span>{selectedDateRepairsReported.length} คัน</span>
+                    </p>
+                    <ul className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                      {selectedDateRepairsReported.map((r, i) => (
+                        <li key={i} className="text-zinc-650 dark:text-zinc-450 text-[11px] leading-tight flex gap-1.5 items-start">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 shrink-0">• {r.vehicle_id}</span>
+                          <span className="text-zinc-500 dark:text-zinc-455 truncate" title={r.description}>{r.description || '-'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Finished Repairs */}
+                {selectedDateRepairsFinished.length > 0 && (
+                  <div className="p-3 bg-white dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-800/80 shadow-sm">
+                    <p className="font-bold text-emerald-600 dark:text-emerald-450 mb-2 pb-1 border-b border-zinc-100 dark:border-zinc-800 flex justify-between">
+                      <span>✅ ซ่อมเสร็จสิ้น</span>
+                      <span>{selectedDateRepairsFinished.length} คัน</span>
+                    </p>
+                    <ul className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1">
+                      {selectedDateRepairsFinished.map((r, i) => (
+                        <li key={i} className="text-zinc-650 dark:text-zinc-455 text-[11px] leading-tight flex gap-1.5 items-start">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 shrink-0">• {r.vehicle_id}</span>
+                          <span className="text-zinc-500 dark:text-zinc-400 truncate" title={r.description}>{r.description || '-'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
     </div>
   )
 }
