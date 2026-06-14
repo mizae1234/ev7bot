@@ -504,8 +504,8 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
-        WHERE r.ReceiveDate >= @since OR r.ReturnDate >= @since
-        ORDER BY r.ReceiveDate DESC, r.ReturnDate DESC
+        WHERE COALESCE(r.ReturnDate, r.ReceiveDate) >= @since
+        ORDER BY COALESCE(r.ReturnDate, r.ReceiveDate) DESC
       `)
 
     const [maintResult, deliveryResult, returnResult] = await Promise.all([
