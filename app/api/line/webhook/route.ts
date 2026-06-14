@@ -523,18 +523,71 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     }
   }
 
+  // ─── 🔗 List Issue / List Bug Link Request (Super Admin only) ───────
+  const linkReqMatch = lower.match(/(ขอ)?(ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์)?\s*(list\s*issue|list\s*bug|รายการ\s*bug|รายการ\s*issue)/i)
+  if (linkReqMatch) {
+    let isSuperAdmin = false
+    try {
+      const registration = await prisma.lineRegistration.findUnique({
+        where: { lineUserId: userId }
+      })
+      if (registration?.role === 'SUPER_ADMIN') {
+        isSuperAdmin = true
+      }
+    } catch (err) {
+      console.error('[link request authorization check error]', err)
+    }
+
+    if (!isSuperAdmin) {
+      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+      if (adminIds.includes(userId)) {
+        isSuperAdmin = true
+      }
+    }
+
+    if (!isSuperAdmin) {
+      await replyText(
+        replyToken,
+        `ท่านไม่มีสิทธิ์เข้าถึงข้อมูลดังกล่าว`
+      )
+      return
+    }
+
+    await replyText(
+      replyToken,
+      `🔗 ลิงก์สำหรับเข้าดูรายการแจ้งปัญหา (Issues List) ค่ะ:\n${appUrl}/issues 💛`
+    )
+    return
+  }
+
   // ─── 🔧 Fixed Command (Admin only) ──────────────────────────────────
   if (lower.startsWith('fixed')) {
     const fixedMatch = text.trim().match(/^fixed\s*#?(\d+)/i)
     if (fixedMatch) {
       const issueId = parseInt(fixedMatch[1], 10)
       
-      // Check admin authorization
-      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
-      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
-      const isAdmin = adminIds.includes(userId)
+      // Check admin authorization in DB and env
+      let isAdmin = false
+      try {
+        const registration = await prisma.lineRegistration.findUnique({
+          where: { lineUserId: userId }
+        })
+        if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+          isAdmin = true
+        }
+      } catch (err) {
+        console.error('[fixed authorization check error]', err)
+      }
+      if (!isAdmin) {
+        const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+        const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+        if (adminIds.includes(userId)) {
+          isAdmin = true
+        }
+      }
       
-      if (adminIds.length > 0 && !isAdmin) {
+      if (!isAdmin) {
         await replyText(
           replyToken,
           `❌ ขออภัยค่ะ เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถอัปเดตสถานะเป็นเสร็จสิ้นได้ค่ะ 🧈`
@@ -621,12 +674,27 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       }
 
       // Check authorization (only reporter or admin can cancel)
-      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
-      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
-      const isAdmin = adminIds.includes(userId)
       const isReporter = issue.lineUserId === userId
+      let isAdmin = false
+      try {
+        const registration = await prisma.lineRegistration.findUnique({
+          where: { lineUserId: userId }
+        })
+        if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+          isAdmin = true
+        }
+      } catch (err) {
+        console.error('[cancel authorization check error]', err)
+      }
+      if (!isAdmin) {
+        const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+        const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+        if (adminIds.includes(userId)) {
+          isAdmin = true
+        }
+      }
 
-      if (adminIds.length > 0 && !isAdmin && !isReporter) {
+      if (!isAdmin && !isReporter) {
         await replyText(
           replyToken,
           `❌ ขออภัยค่ะ เฉพาะผู้แจ้งปัญหาหรือผู้ดูแลระบบเท่านั้นที่สามารถยกเลิกรายการนี้ได้ค่ะ 🧈`

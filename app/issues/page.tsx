@@ -245,6 +245,12 @@ export default function IssuesPage() {
               ออกจากระบบ 🚪
             </button>
             <a 
+              href="/users"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+            >
+              👥 จัดการสิทธิ์
+            </a>
+            <a 
               href="/logchats"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
             >

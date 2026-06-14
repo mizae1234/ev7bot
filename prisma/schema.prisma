@@ -35,6 +35,7 @@ model LineRegistration {
   statusMessage String?   @map("status_message") @db.VarChar(255)
   system        String    @default("EV7") @map("system") @db.VarChar(50)
   isActive      Boolean   @default(true) @map("is_active")
+  role          String    @default("USER") @map("role") @db.VarChar(20)
   registeredAt  DateTime  @default(now()) @map("registered_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
