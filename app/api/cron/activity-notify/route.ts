@@ -429,8 +429,8 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
         WHERE m.IsActive = 1
-          AND m.ReportDate >= @since
-        ORDER BY m.ReportDate DESC
+          AND m.CreateDate >= @since
+        ORDER BY m.CreateDate DESC
       `)
 
     const deliveryQueryPromise = pool.request()
@@ -457,8 +457,9 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
         WHERE r.IsActive = 1
-          AND r.CreateDate >= @since
-        ORDER BY r.CreateDate DESC
+          AND r.ReleaseDate >= @since
+          AND r.ReleaseDate IS NOT NULL
+        ORDER BY r.ReleaseDate DESC
       `)
 
     const returnQueryPromise = pool.request()
@@ -487,8 +488,9 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
-        WHERE r.ReturnDate >= @since AND r.ReturnDate < DATEADD(month, 1, @since)
-        ORDER BY r.ReturnDate DESC
+        WHERE r.IsActive = 1
+          AND r.CreateDate >= @since
+        ORDER BY r.CreateDate DESC
       `)
 
     const [maintResult, deliveryResult, returnResult] = await Promise.all([
