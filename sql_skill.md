@@ -746,6 +746,20 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บข้อมูลแผนการส่งมอบรถประจำวัน แยกตามประเภทโครงการและรุ่นรถยนต์
 * **คอลัมน์สำคัญ**: `PlanID` (PK, bigint), `PlanDate` (date, วันที่ในแผนการส่งมอบ), `ProjectType` (varchar(20), ประเภทโครงการ เช่น EV7, Grab, Line Man), `ES_Count` (int, จำนวนแผนส่งมอบของรุ่น MG ES), `Y490_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 490), `Y410_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 410)
 
+### 11.7 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
+ใช้จัดเก็บสถานะบอต การบันทึกปัญหา การลงทะเบียน และ Log การสนทนา
+* **ตาราง: `line_registrations` (การลงทะเบียนบัญชี LINE)**
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `line_user_id` (Unique, varchar(50)), `display_name` (varchar(255)), `picture_url` (text), `status_message` (varchar(255)), `system` (varchar(50), default 'EV7'), `is_active` (boolean, default true), `role` (varchar(20), default 'USER' - สิทธิ์การเข้าใช้งาน: 'USER' | 'ADMIN' | 'SUPER_ADMIN'), `registered_at` (timestamptz), `updated_at` (timestamptz)
+* **ตาราง: `system_issues` (ประวัติการแจ้งบัคและปัญหา)**
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `line_user_id` (varchar(50)), `display_name` (varchar(255)), `description` (text), `status` (varchar(20), default 'OPEN' - 'OPEN' | 'RESOLVED' | 'CANCELLED'), `source_type` (varchar(20)), `source_id` (varchar(50)), `created_at` (timestamptz), `resolved_at` (timestamptz)
+* **ตาราง: `chat_logs` (บันทึกการคุยของบอต)**
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `source_type` (varchar(20)), `source_id` (varchar(50)), `user_name` (varchar(255)), `user_message` (text), `bot_reply` (text), `created_at` (timestamptz)
+* **ตาราง: `line_groups` (ข้อมูลกลุ่มที่ลงทะเบียนบอต)**
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `group_id` (Unique, varchar(50)), `group_name` (varchar(255)), `group_type` (varchar(20), default 'group'), `is_active` (boolean, default true), `enable_report` (boolean, default false), `created_at` (timestamptz), `updated_at` (timestamptz)
+* **ตาราง: `activity_notifications` (ข้อมูลการแจ้งเตือนงานซ่อม/ส่งมอบ)**
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `record_type` (varchar(30) - 'MAINTENANCE' | 'DELIVERY'), `record_id` (int), `sent_at` (timestamptz)
+
+
 ---
 
 ## 12. ความสัมพันธ์และเงื่อนไขการ Query
