@@ -48,8 +48,8 @@ export async function getDeliveryToday() {
     req.query(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
@@ -101,8 +101,8 @@ export async function getDeliveryByDate(params: { date: string }) {
     req.query(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
@@ -318,8 +318,8 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     deliveryReq.query(`
       SELECT
         COUNT(*) AS total,
-        SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed,
-        SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END) AS pending
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
+        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
