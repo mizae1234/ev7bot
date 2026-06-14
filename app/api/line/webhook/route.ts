@@ -524,8 +524,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   }
 
   // ─── 🔗 List Issue / List Bug Link Request (Super Admin only) ───────
-  const linkReqMatch = lower.match(/(ขอ)?(ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์)?\s*(list\s*issue|list\s*bug|รายการ\s*bug|รายการ\s*issue)/i)
-  if (linkReqMatch) {
+  const isLinkRequest = (
+    /((ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์|list|รายการ).*(issue|bug|บัค|ปัญหา))/i.test(lower) ||
+    /((issue|bug|บัค|ปัญหา).*(ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์|list|รายการ))/i.test(lower)
+  ) && !/^(แจ้งปัญหา|แจ้งบัค|แจ้ง bug|แจ้ง issue|แจ้งบั๊ก)/i.test(lower)
+
+  if (isLinkRequest) {
     let isSuperAdmin = false
     try {
       const registration = await prisma.lineRegistration.findUnique({
