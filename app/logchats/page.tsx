@@ -203,6 +203,12 @@ export default function LogChatsPage() {
               ออกจากระบบ 🚪
             </button>
             <a 
+              href="/issues"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-850 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
+            >
+              🐞 ระบบแจ้งบัค
+            </a>
+            <a 
               href="/dashboard"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-100 border border-zinc-800 transition-all"
             >

@@ -323,6 +323,185 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
 // ─── Butter Chat Handler ───────────────────────────────────────────
 
 async function handleChat(text: string, lower: string, userId: string, replyToken: string, appUrl: string, chatSourceType: string = 'user', chatSourceId: string | null = null) {
+  // ─── 🆔 LINE User ID Command ──────────────────────────────────────
+  if (lower === 'my id' || lower === 'line id' || lower === 'my line id') {
+    await replyText(
+      replyToken,
+      `🆔 LINE User ID ของคุณคือ:\n\`${userId}\` 💛`
+    )
+    return
+  }
+
+  // ─── 🔧 Fixed Command (Admin only) ──────────────────────────────────
+  if (lower.startsWith('fixed')) {
+    const fixedMatch = text.trim().match(/^fixed\s*#?(\d+)/i)
+    if (fixedMatch) {
+      const issueId = parseInt(fixedMatch[1], 10)
+      
+      // Check admin authorization
+      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+      const isAdmin = adminIds.includes(userId)
+      
+      if (adminIds.length > 0 && !isAdmin) {
+        await replyText(
+          replyToken,
+          `❌ ขออภัยค่ะ เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถอัปเดตสถานะเป็นเสร็จสิ้นได้ค่ะ 🧈`
+        )
+        return
+      }
+
+      try {
+        const issue = await prisma.systemIssue.findUnique({
+          where: { id: issueId }
+        })
+
+        if (!issue) {
+          await replyText(
+            replyToken,
+            `❌ ไม่พบเลขที่แจ้งปัญหา #${issueId} ในระบบค่ะ 🧈`
+          )
+          return
+        }
+
+        if (issue.status === 'RESOLVED') {
+          await replyText(
+            replyToken,
+            `ℹ️ ปัญหา #${issueId} นี้ได้รับการแก้ไขเป็นเสร็จสิ้นอยู่แล้วค่ะ 🧈`
+          )
+          return
+        }
+
+        // Update issue status to RESOLVED
+        await prisma.systemIssue.update({
+          where: { id: issueId },
+          data: {
+            status: 'RESOLVED',
+            resolvedAt: new Date()
+          }
+        })
+
+        // Notify the reporter if reporter has lineUserId
+        if (issue.lineUserId) {
+          await replyOrPush(
+            issue.lineUserId,
+            `🔔 ปัญหาเลขที่แจ้ง #${issueId} ที่คุณได้รายงานไว้:\n"${issue.description}"\n\nได้รับการแก้ไขเรียบร้อยแล้วค่ะ! ✨ ขอบคุณที่แจ้งปัญหาเข้ามานะคะ 💛`
+          )
+        }
+
+        await replyText(
+          replyToken,
+          `✅ อัปเดตสถานะปัญหา #${issueId} เป็น "แก้ไขแล้ว" เรียบร้อย และแจ้งเตือนผู้รายงานทาง LINE แล้วค่ะ 💛`
+        )
+      } catch (err: any) {
+        console.error('[Fixed Command Error]', err)
+        await replyText(
+          replyToken,
+          `❌ เกิดข้อผิดพลาดในการอัปเดตปัญหา #${issueId}: ${err.message || err}`
+        )
+      }
+      return
+    }
+  }
+
+  // ─── 🚫 Cancel Command (User / Admin) ────────────────────────────────
+  const cancelMatch = text.trim().match(/^(bug\s+cancel|cancel)\s*#?(\d+)/i)
+  if (cancelMatch) {
+    const issueId = parseInt(cancelMatch[2], 10)
+    try {
+      const issue = await prisma.systemIssue.findUnique({
+        where: { id: issueId }
+      })
+
+      if (!issue) {
+        await replyText(
+          replyToken,
+          `❌ ไม่พบเลขที่แจ้งปัญหา #${issueId} ในระบบค่ะ 🧈`
+        )
+        return
+      }
+
+      if (issue.status === 'CANCELLED') {
+        await replyText(
+          replyToken,
+          `ℹ️ ปัญหา #${issueId} นี้ถูกยกเลิกไปแล้วค่ะ 🧈`
+        )
+        return
+      }
+
+      // Check authorization (only reporter or admin can cancel)
+      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+      const isAdmin = adminIds.includes(userId)
+      const isReporter = issue.lineUserId === userId
+
+      if (adminIds.length > 0 && !isAdmin && !isReporter) {
+        await replyText(
+          replyToken,
+          `❌ ขออภัยค่ะ เฉพาะผู้แจ้งปัญหาหรือผู้ดูแลระบบเท่านั้นที่สามารถยกเลิกรายการนี้ได้ค่ะ 🧈`
+        )
+        return
+      }
+
+      // Update status to CANCELLED
+      await prisma.systemIssue.update({
+        where: { id: issueId },
+        data: { status: 'CANCELLED' }
+      })
+
+      await replyText(
+        replyToken,
+        `🚫 ยกเลิกปัญหาเลขที่แจ้ง #${issueId} เรียบร้อยแล้วค่ะ 💛`
+      )
+    } catch (err: any) {
+      console.error('[Cancel Command Error]', err)
+      await replyText(
+        replyToken,
+        `❌ เกิดข้อผิดพลาดในการยกเลิกปัญหา #${issueId}: ${err.message || err}`
+      )
+    }
+    return
+  }
+
+  // ─── 🐞 Bug / Issue Report Command ──────────────────────────────────
+  const bugMatch = text.trim().match(/^(บัค|bug|แจ้งบัค|แจ้งปัญหา|issue)\s*[:\-=\s]*\s*(.+)$/i)
+  if (bugMatch) {
+    const description = bugMatch[2].trim()
+    try {
+      let profileName = 'ผู้ใช้ LINE'
+      try {
+        if (!env.MOCK_MODE && userId) {
+          const profile = await lineClient.getProfile(userId)
+          profileName = profile.displayName
+        }
+      } catch { /* ignore profile fetch errors */ }
+
+      // Save issue in the database
+      const issue = await prisma.systemIssue.create({
+        data: {
+          lineUserId: userId || null,
+          displayName: profileName,
+          description: description,
+          sourceType: chatSourceType || null,
+          sourceId: chatSourceId || null,
+          status: 'OPEN'
+        }
+      })
+
+      await replyText(
+        replyToken,
+        `✅ บันทึกปัญหาเรียบร้อยค่ะ!\n\n📋 ปัญหา: "${description}"\n🆔 เลขที่แจ้ง: #${issue.id}\n\nขอบคุณสำหรับข้อมูลนะคะ บัตเตอร์จะส่งเรื่องให้ทีมพัฒนาช่วยตรวจสอบค่ะ 💛`
+      )
+    } catch (err: any) {
+      console.error('[Report Issue Error]', err)
+      await replyText(
+        replyToken,
+        `❌ เกิดข้อผิดพลาดในการบันทึกปัญหา: ${err.message || err}`
+      )
+    }
+    return
+  }
+
   // Greeting patterns
   if (matchAny(lower, ['สวัสดี', 'หวัดดี', 'ดีครับ', 'ดีค่ะ', 'ดีจ้า', 'hi', 'hello', 'hey'])) {
     let name = ''

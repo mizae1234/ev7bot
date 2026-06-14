@@ -75,3 +75,17 @@ model ActivityNotification {
   @@unique([recordType, recordId])
   @@map("activity_notifications")
 }
+
+model SystemIssue {
+  id          Int       @id @default(autoincrement())
+  lineUserId  String?   @map("line_user_id") @db.VarChar(50)
+  displayName String?   @map("display_name") @db.VarChar(255)
+  description String    @map("description") @db.Text
+  status      String    @default("OPEN") @map("status") @db.VarChar(20) // 'OPEN' | 'RESOLVED' | 'CANCELLED'
+  sourceType  String?   @map("source_type") @db.VarChar(20)  // 'user' | 'group' | 'room'
+  sourceId    String?   @map("source_id") @db.VarChar(50)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt  DateTime? @map("resolved_at") @db.Timestamptz
+
+  @@map("system_issues")
+}
