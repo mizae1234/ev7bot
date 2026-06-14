@@ -740,7 +740,7 @@ Sub-status สำหรับ GI (Good Inspect)
 
 ### 11.5 ตาราง: `dbo.EV_ReturnItem` (การคืนรถเช่า)
 เก็บประวัติการรับรถกลับเข้าระบบ
-* **คอลัมน์สำคัญ**: `ReturnItemID` (PK), `VinNo`, `CustomerName`, `Model`, `ContractNo`, `ReceiveDate`, `ReturnDate`, `Mileage` (เลขไมล์ตอนรับคืน), `ParkLocation` (สถานที่จอดเก็บรถ)
+* **คอลัมน์สำคัญ**: `ReturnItemID` (PK), `VinNo`, `CustomerName`, `Model`, `ContractNo`, `ReceiveDate`, `ReturnDate`, `Mileage` (เลขไมล์ตอนรับคืน), `ParkLocation` (สถานที่จอดเก็บรถ), `CreateUserID` (ID ผู้บันทึกข้อมูล)
 
 ### 11.6 ตาราง: `dbo.EV_DeliveryPlan` (แผนการส่งมอบรถยนต์)
 เก็บข้อมูลแผนการส่งมอบรถประจำวัน แยกตามประเภทโครงการและรุ่นรถยนต์
@@ -777,6 +777,7 @@ Sub-status สำหรับ GI (Good Inspect)
   * `EV_ReplacementItem.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
   * `EV_InventoryItem.Status` ➔ `EV_MsStatus.StatusCode` (เพื่อดึงคำแปลภาษาไทยของสถานะรถคันนั้นจากคอลัมน์ `DescriptionStatus`)
   * `EV_InventoryItem.StatusType` ➔ `EV_MsSubStatus.StatusCode` (ดึงชื่อคำอธิบายภาษาไทยของสถานะย่อย เช่น เพื่อระบุว่ารถเป็นรถใหม่หรือรถเก่าจากคอลัมน์ `DescriptionStatus` โดยควรกรองด้วยเงื่อนไข `sub.Type LIKE 'STATUS_TYPE_%'`)
+  * `EV_ReturnItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้บันทึกข้อมูลย้อนกลับ โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
 
 * **เงื่อนไขคิวรี (สำคัญ)**:
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ

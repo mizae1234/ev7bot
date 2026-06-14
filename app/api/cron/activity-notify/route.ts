@@ -189,53 +189,41 @@ function buildReturnFlex(item: any): any {
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#2E7D32', paddingAll: '16px',
+        type: 'box', layout: 'vertical', backgroundColor: '#2E7D32', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
-          { type: 'text', text: '↩️ บันทึกคืนรถ', color: '#ffffff', weight: 'bold', size: 'lg' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#c8e6c9', size: 'sm', margin: 'xs' },
+          { type: 'text', text: '↩️ บันทึกคืนรถ', color: '#ffffff', weight: 'bold', size: 'md' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#c8e6c9', size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
-        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'md',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '10px', paddingBottom: '10px', spacing: 'sm',
         contents: [
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'รุ่น', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.Model || '-', color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'โครงการ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: projectDisplay, color: '#111827', size: 'sm', flex: 5 },
+            { type: 'text', text: 'ลูกค้า/สัญญา', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.CustomerName || '-'} (${item.ContractNo || '-'})`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'ลูกค้า', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.CustomerName || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+            { type: 'text', text: 'วันคืน/เลขไมล์', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(item.ReturnDate)} / ${mileageDisplay}`, color: '#111827', size: 'xs', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'เลขสัญญา', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.ContractNo || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+            { type: 'text', text: 'สถานที่/ผู้บันทึก', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.ParkLocation || '-'} (${item.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'วันคืนรถ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: formatDateTh(item.ReturnDate), color: '#111827', size: 'sm', flex: 5 },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'เลขไมล์คืน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: mileageDisplay, color: '#111827', size: 'sm', flex: 5 },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานที่จอด', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.ParkLocation || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
       footer: {
-        type: 'box', layout: 'vertical', paddingAll: '16px',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#2E7D32',
+          type: 'button', style: 'primary', color: '#2E7D32', height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
@@ -377,12 +365,14 @@ export async function GET(req: NextRequest) {
             i.Status AS CarInventoryStatusCode,
             s.DescriptionStatus AS CarStatusName,
             sub.DescriptionStatus AS CarSubStatusName,
-            i.StatusType AS CarSubStatusCode
+            i.StatusType AS CarSubStatusCode,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
           FROM dbo.EV_ReturnItem r
           LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
           LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+          LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
           WHERE r.VinNo = @vin OR i.RegisterNo = @vin
           ORDER BY r.ReturnItemID DESC
         `)
@@ -498,12 +488,14 @@ export async function GET(req: NextRequest) {
           i.Status AS CarInventoryStatusCode,
           s.DescriptionStatus AS CarStatusName,
           sub.DescriptionStatus AS CarSubStatusName,
-          i.StatusType AS CarSubStatusCode
+          i.StatusType AS CarSubStatusCode,
+          ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
         FROM dbo.EV_ReturnItem r
         LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+        LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
         WHERE r.ReturnDate >= @since AND r.ReturnDate < DATEADD(month, 1, @since)
         ORDER BY r.ReturnDate DESC
       `)
