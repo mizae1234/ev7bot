@@ -20,6 +20,18 @@ function formatDateTh(d: Date | string | null): string {
   } catch { return String(d) }
 }
 
+function getCarStatusDisplay(status: string): string {
+  const map: Record<string, string> = {
+    PRODUCTION: '🏭 ผลิต (PRODUCTION)',
+    AVAILABLE: '✅ พร้อมส่ง (AVAILABLE)',
+    ON_RENT: '🚗 ปล่อยรถแล้ว (ON_RENT)',
+    MAINTENANCE: '🔧 ซ่อม (MAINTENANCE)',
+    REPLACEMENT: '🔄 รถทดแทน (REPLACEMENT)',
+    WAITING_FOR_GR: '📦 รอ GR (WAITING_FOR_GR)',
+  }
+  return map[status] || status || '-'
+}
+
 // ─── Build Flex: New Maintenance Alert ──────────────────────────────
 function buildMaintenanceFlex(item: any): any {
   const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
@@ -66,6 +78,10 @@ function buildMaintenanceFlex(item: any): any {
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'การใช้งาน', color: '#6b7280', size: 'sm', flex: 3 },
             { type: 'text', text: usageStatus, color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันที่แจ้ง', color: '#6b7280', size: 'sm', flex: 3 },
@@ -125,6 +141,10 @@ function buildDeliveryFlex(item: any): any {
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'เลขสัญญา', color: '#6b7280', size: 'sm', flex: 3 },
             { type: 'text', text: item.ContractNo || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันส่งมอบ', color: '#6b7280', size: 'sm', flex: 3 },
@@ -192,6 +212,10 @@ function buildReturnFlex(item: any): any {
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานที่จอด', color: '#6b7280', size: 'sm', flex: 3 },
             { type: 'text', text: item.ParkLocation || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
@@ -286,7 +310,8 @@ export async function GET(req: NextRequest) {
             m.ReportDate,
             i.RegisterNo,
             i.Model,
-            i.ProjectType
+            i.ProjectType,
+            i.Status AS CarStatus
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           WHERE m.IsActive = 1
@@ -325,7 +350,8 @@ export async function GET(req: NextRequest) {
             r.Mileage,
             r.ParkLocation,
             i.RegisterNo,
-            rent.ProjectType
+            rent.ProjectType,
+            i.Status AS CarStatus
           FROM dbo.EV_ReturnItem r
           LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
           LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
@@ -385,7 +411,8 @@ export async function GET(req: NextRequest) {
           m.ReportDate,
           i.RegisterNo,
           i.Model,
-          i.ProjectType
+          i.ProjectType,
+          i.Status AS CarStatus
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1
@@ -429,7 +456,8 @@ export async function GET(req: NextRequest) {
           r.Mileage,
           r.ParkLocation,
           i.RegisterNo,
-          rent.ProjectType
+          rent.ProjectType,
+          i.Status AS CarStatus
         FROM dbo.EV_ReturnItem r
         LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
