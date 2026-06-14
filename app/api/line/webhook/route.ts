@@ -463,8 +463,17 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     return
   }
 
+  // ─── 🐞 Help check for empty bug reports ────────────────────────────
+  if (['bug', 'บัค', 'แจ้งบัค', 'แจ้งปัญหา', 'issue'].includes(lower)) {
+    await replyText(
+      replyToken,
+      `💡 กรุณาระบุรายละเอียดปัญหาที่ต้องการแจ้งด้วยค่ะ\nเช่น: \`butter bug ข้อมูลทะเบียนรถไม่ถูกต้อง\` 💛`
+    )
+    return
+  }
+
   // ─── 🐞 Bug / Issue Report Command ──────────────────────────────────
-  const bugMatch = text.trim().match(/^(บัค|bug|แจ้งบัค|แจ้งปัญหา|issue)\s*[:\-=\s]*\s*(.+)$/i)
+  const bugMatch = text.trim().match(/^(บัค|bug|แจ้งบัค|แจ้งปัญหา|issue)\s*[:\-=\s]*\s*([\s\S]+)$/i)
   if (bugMatch) {
     const description = bugMatch[2].trim()
     try {
