@@ -457,9 +457,8 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
         WHERE r.IsActive = 1
-          AND r.ReleaseDate >= @since
-          AND r.ReleaseDate IS NOT NULL
-        ORDER BY r.ReleaseDate DESC
+          AND r.CreateDate >= @since
+        ORDER BY r.CreateDate DESC
       `)
 
     const returnQueryPromise = pool.request()
