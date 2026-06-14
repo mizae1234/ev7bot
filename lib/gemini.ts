@@ -78,6 +78,8 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ### ถามจำนวนรถซ่อมค้าง
 - SELECT COUNT(*) FROM EV_MaintenanceItem WHERE CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE') AND IsActive = 1
+- หากถามเรื่องอู่ซ่อมเฉพาะพื้นที่/เจาะจงสถานที่ (เช่น "ซ่อม ศาลายา", "รถซ่อมที่อู่บางนา") ให้ค้นหาจาก ServiceLocationCode:
+  SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode LIKE '%ศาลายา%'
 
 ### ถามรถส่งมอบวันนี้
 - ใช้ function getDeliveryToday ก่อน ถ้าต้องการ detail ใช้:

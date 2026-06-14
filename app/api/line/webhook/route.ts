@@ -380,14 +380,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 spacing: 'md',
                 contents: [
                   {
-                    type: 'text',
-                    text: '💡 ดูสรุปข้อมูลภาพรวมการปล่อยรถหรือแผนการส่งมอบรถของโครงการต่างๆ ได้ทันที',
-                    size: 'xs',
-                    color: '#666666',
-                    wrap: true
-                  },
-                  { type: 'separator', margin: 'md' },
-                  {
                     type: 'box',
                     layout: 'vertical',
                     spacing: 'md',
@@ -487,14 +479,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 spacing: 'md',
                 contents: [
                   {
-                    type: 'text',
-                    text: '💡 ตรวจสอบข้อมูลการส่งเข้าอู่ซ่อมรถ สถานะความคืบหน้า และประวัติการสลับรถทดแทน',
-                    size: 'xs',
-                    color: '#666666',
-                    wrap: true
-                  },
-                  { type: 'separator', margin: 'md' },
-                  {
                     type: 'box',
                     layout: 'vertical',
                     spacing: 'md',
@@ -524,6 +508,19 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                           { type: 'text', text: '🛠️ ค้างซ่อมทั้งหมด', size: 'xs', weight: 'bold', color: '#059669', flex: 5 },
                           { type: 'text', text: 'ดูข้อมูลซ่อมปัจจุบัน', size: 'xs', color: '#888888', align: 'end', flex: 5 }
                         ]
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'ซ่อม ศาลายา',
+                          text: 'ซ่อม ศาลายา'
+                        },
+                        contents: [
+                          { type: 'text', text: '📍 ซ่อม ศาลายา', size: 'xs', weight: 'bold', color: '#059669', flex: 5 },
+                          { type: 'text', text: 'ดูข้อมูลรถที่อู่ศาลายา', size: 'xs', color: '#888888', align: 'end', flex: 5 }
+                        ]
                       }
                     ]
                   }
@@ -549,7 +546,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 ]
               }
             },
-            // Bubble 3: Search & Logs
+            // Bubble 3: Search Vehicle Info
             {
               type: 'bubble' as const,
               size: 'mega' as const,
@@ -559,14 +556,14 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 contents: [
                   {
                     type: 'text',
-                    text: '🔍 ค้นหาข้อมูล & แชทล็อก',
+                    text: '🔍 ค้นหาข้อมูลรถ',
                     weight: 'bold',
                     size: 'lg',
                     color: '#ffffff'
                   },
                   {
                     type: 'text',
-                    text: 'ค้นหาสัญญารถ และดูประวัติแชทล็อกของพนักงาน',
+                    text: 'พิมพ์สอบถามบอทเพื่อค้นหาข้อมูลรถและประวัติซ่อม',
                     size: 'xs',
                     color: '#DBEAFE',
                     margin: 'xs'
@@ -581,36 +578,20 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 spacing: 'md',
                 contents: [
                   {
-                    type: 'text',
-                    text: '💡 ค้นหาประวัติรถด้วยป้ายทะเบียน/VIN หรือเปิดระบบบันทึกประวัติการแชท (Chat Logs)',
-                    size: 'xs',
-                    color: '#666666',
-                    wrap: true
-                  },
-                  { type: 'separator', margin: 'md' },
-                  {
                     type: 'box',
                     layout: 'vertical',
                     spacing: 'xs',
                     contents: [
                       {
-                        type: 'text',
-                        text: '👉 ตัวอย่างการค้นหาข้อมูลรถ:',
-                        size: 'xs',
-                        weight: 'bold',
-                        color: '#1E40AF'
-                      },
-                      {
                         type: 'box',
                         layout: 'horizontal',
-                        margin: 'sm',
                         action: {
                           type: 'message',
                           label: 'ทอ-6844',
                           text: 'ทอ-6844'
                         },
                         contents: [
-                          { type: 'text', text: 'พิมพ์ทะเบียนรถ เช่น', size: 'xs', color: '#666666', flex: 6 },
+                          { type: 'text', text: '🔍 ค้นหาทะเบียน เช่น', size: 'xs', color: '#666666', flex: 6 },
                           { type: 'text', text: '"ทอ-6844"', size: 'xs', weight: 'bold', color: '#1E40AF', align: 'end', flex: 4 }
                         ]
                       }
@@ -631,8 +612,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     height: 'sm',
                     action: {
                       type: 'uri',
-                      label: '💬 เปิดดูประวัติแชทล็อก',
-                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/logchats')}`
+                      label: '🖥️ เปิด Dashboard',
+                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/dashboard')}`
                     }
                   }
                 ]
@@ -1199,6 +1180,178 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       console.error('[Monthly Report Flex Error]', err)
       await replyText(replyToken, `❌ สร้างสรุปรายเดือนไม่สำเร็จค่ะ: ${err.message}`)
       return
+    }
+  }
+
+  // ─── Pending Repairs at Specific Location ────────────────────────
+  // Example: "ซ่อม ศาลายา", "ซ่อม บางนา"
+  const repairLocMatch = text.match(/^ซ่อม\s*(.+)$/i)
+  if (repairLocMatch && !matchAny(lower, ['ดูรถค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมรายพื้นที่', 'ค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมพื้นที่', 'ค้างซ่อมทั้งหมด', 'ซ่อมทั้งหมด', 'ซ่อมเสร็จ', 'ซ่อมเสร็จแล้ว', 'ซ่อมวันนี้', 'ซ่อมเมื่อวาน', 'ซ่อมรถ'])) {
+    const searchLoc = repairLocMatch[1].trim()
+    if (searchLoc.length > 0) {
+      try {
+        const pool = await getMSSQLPool()
+        if (pool) {
+          const result = await pool.request()
+            .input('loc', sql.NVarChar, `%${searchLoc}%`)
+            .query(`
+              SELECT 
+                m.MaintenanceItemID AS id, 
+                i.RegisterNo AS register_no, 
+                i.VinNo AS vin, 
+                i.Model AS model, 
+                m.IssueTitle AS issue_title, 
+                m.CarStatusCode AS status_code, 
+                m.ServiceLocationCode AS service_location,
+                m.ReportDate AS report_date
+              FROM dbo.EV_MaintenanceItem m
+              JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+              WHERE m.IsActive = 1 
+                AND i.IsActive = 1 
+                AND i.Status = 'MAINTENANCE'
+                AND m.ServiceLocationCode LIKE @loc
+              ORDER BY m.ReportDate DESC
+            `)
+
+          const list = result.recordset || []
+          let displayLocation = searchLoc
+          if (list.length > 0) {
+            displayLocation = list[0].service_location || searchLoc
+          }
+
+          const flexMessage = {
+            type: 'flex' as const,
+            altText: `🔧 ข้อมูลรถค้างซ่อมที่ ${displayLocation}`,
+            contents: {
+              type: 'bubble' as const,
+              size: 'mega' as const,
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `📍 อู่ซ่อม: ${displayLocation}`,
+                    weight: 'bold',
+                    size: 'lg',
+                    color: '#ffffff'
+                  },
+                  {
+                    type: 'text',
+                    text: `สถานะรถค้างซ่อมทั้งหมดในอู่นี้`,
+                    size: 'xs',
+                    color: '#D1FAE5',
+                    margin: 'xs'
+                  }
+                ],
+                backgroundColor: '#059669',
+                paddingAll: 'lg'
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `พบรถค้างซ่อมทั้งหมด ${list.length} คัน:`,
+                    size: 'sm',
+                    weight: 'bold',
+                    color: '#111827'
+                  },
+                  { type: 'separator' },
+                  ...(list.length > 0 ? list.slice(0, 5).map((car: any) => ({
+                    type: 'box',
+                    layout: 'vertical',
+                    margin: 'md',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        contents: [
+                          {
+                            type: 'text',
+                            text: `🚗 ${car.register_no || car.vin}`,
+                            weight: 'bold',
+                            size: 'sm',
+                            color: '#111827',
+                            flex: 6
+                          },
+                          {
+                            type: 'text',
+                            text: car.model || '-',
+                            size: 'xs',
+                            color: '#4b5563',
+                            align: 'end',
+                            flex: 4
+                          }
+                        ]
+                      },
+                      {
+                        type: 'text',
+                        text: `อาการ: ${car.issue_title || 'ไม่ระบุอาการ'}`,
+                        size: 'xs',
+                        color: '#6b7280',
+                        margin: 'xs'
+                      }
+                    ]
+                  })) : [
+                    {
+                      type: 'text',
+                      text: 'ไม่มีรถค้างซ่อมที่อู่นี้ในขณะนี้ 🟢',
+                      size: 'sm',
+                      color: '#4b5563',
+                      margin: 'md',
+                      align: 'center'
+                    }
+                  ]),
+                  ...(list.length > 5 ? [
+                    { type: 'separator', margin: 'md' },
+                    {
+                      type: 'text',
+                      text: `...และคันอื่นๆ อีก ${list.length - 5} คัน`,
+                      size: 'xs',
+                      color: '#6b7280',
+                      align: 'center'
+                    }
+                  ] : [])
+                ],
+                paddingAll: 'lg'
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: 'lg',
+                contents: [
+                  {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#059669',
+                    height: 'sm',
+                    action: {
+                      type: 'uri',
+                      label: 'ดูรายละเอียดเพิ่มเติม',
+                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/maintenance?location=${displayLocation}`)}`
+                    }
+                  }
+                ]
+              }
+            },
+            quickReply: quickReplyItems
+          }
+
+          if (!env.MOCK_MODE) {
+            await lineClient.replyMessage(replyToken, flexMessage as any)
+          } else {
+            console.log('[Mock Repair by Location Name Report]', JSON.stringify(flexMessage, null, 2))
+          }
+          return
+        }
+      } catch (err: any) {
+        console.error('[Repair Location Name Flex Error]', err)
+        await replyText(replyToken, `❌ ดึงข้อมูลรถค้างซ่อมที่ ${searchLoc} ไม่สำเร็จค่ะ: ${err.message}`)
+        return
+      }
     }
   }
 
