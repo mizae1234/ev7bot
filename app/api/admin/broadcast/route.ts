@@ -86,21 +86,6 @@ export async function POST(req: NextRequest) {
             }
           ],
           paddingAll: 'lg' as const,
-        },
-        footer: {
-          type: 'box' as const,
-          layout: 'vertical' as const,
-          contents: [
-            {
-              type: 'text' as const,
-              text: `ส่งโดย: ${senderName}`,
-              size: 'xs' as const,
-              color: '#9CA3AF',
-              align: 'end' as const
-            }
-          ],
-          paddingAll: 'md' as const,
-          backgroundColor: '#F9FAFB'
         }
       }
     }
@@ -119,7 +104,7 @@ export async function POST(req: NextRequest) {
         sourceId: targetId,
         userName: targetName,
         userMessage: `[ประกาศจาก Butter] ${message}`,
-        botReply: `ประกาศจาก Butter (Flex Message) (ส่งโดย: ${senderName})`
+        botReply: `ประกาศจาก Butter (Flex Message)`
       }
     })
 
