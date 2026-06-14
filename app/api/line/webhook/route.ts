@@ -2287,7 +2287,7 @@ async function trySendVehicleFlexMessage(
           margin: 'sm',
           contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: currentStatus, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+            { type: 'text', text: currentStatus, color: '#dc2626', size: 'xs', weight: 'bold', flex: 5, wrap: true }
           ]
         }
       ]
@@ -2510,7 +2510,7 @@ async function trySendVehicleFlexMessage(
               margin: 'sm',
               contents: [
                 { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-                { type: 'text', text: currentStatus, color: '#2563eb', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+                { type: 'text', text: currentStatus, color: car.StatusType === 'ON_RENT_MAINTENANCE' ? '#dc2626' : '#2563eb', size: 'xs', weight: 'bold', flex: 5, wrap: true }
               ]
             }
           ]

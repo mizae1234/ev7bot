@@ -98,7 +98,7 @@ function buildMaintenanceFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: (item.CarInventoryStatusCode === 'MAINTENANCE' || item.CarSubStatusCode === 'ON_RENT_MAINTENANCE') ? '#dc2626' : '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
@@ -149,7 +149,7 @@ function buildDeliveryFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: (item.CarInventoryStatusCode === 'MAINTENANCE' || item.CarSubStatusCode === 'ON_RENT_MAINTENANCE') ? '#dc2626' : '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
@@ -208,7 +208,7 @@ function buildReturnFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: (item.CarInventoryStatusCode === 'MAINTENANCE' || item.CarSubStatusCode === 'ON_RENT_MAINTENANCE') ? '#dc2626' : '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
