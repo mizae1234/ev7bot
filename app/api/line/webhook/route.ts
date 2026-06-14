@@ -346,145 +346,299 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         type: 'flex' as const,
         altText: '📖 เมนูคำสั่ง Butter Bot',
         contents: {
-          type: 'bubble' as const,
-          size: 'mega' as const,
-          header: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              {
-                type: 'text',
-                text: '📖 เมนูคำสั่ง',
-                weight: 'bold',
-                size: 'xl',
-                color: '#ffffff'
-              },
-              {
-                type: 'text',
-                text: 'คู่มือแนะนำการใช้บริการและคำสั่งทางลัด',
-                size: 'xs',
-                color: '#FFE0B2',
-                margin: 'xs'
-              }
-            ],
-            backgroundColor: '#FF6D00',
-            paddingAll: 'lg'
-          },
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'md',
-            contents: [
-              {
-                type: 'text',
-                text: '💡 วิธีพิมพ์สั่งการ',
-                weight: 'bold',
-                size: 'sm',
-                color: '#FF6D00'
-              },
-              {
+          type: 'carousel' as const,
+          contents: [
+            // Bubble 1: Overview & Dashboard
+            {
+              type: 'bubble' as const,
+              size: 'mega' as const,
+              header: {
                 type: 'box',
                 layout: 'vertical',
-                spacing: 'xs',
                 contents: [
                   {
-                    type: 'box',
-                    layout: 'horizontal',
-                    contents: [
-                      { type: 'text', text: '• แชทส่วนตัว:', size: 'xs', weight: 'bold', color: '#555555', flex: 3 },
-                      { type: 'text', text: 'พิมพ์ถามได้ตรงๆ ไม่ต้องใช้คำนำหน้า', size: 'xs', color: '#666666', wrap: true, flex: 7 }
-                    ]
+                    type: 'text',
+                    text: '📊 รายงาน & แดชบอร์ด',
+                    weight: 'bold',
+                    size: 'lg',
+                    color: '#ffffff'
                   },
                   {
-                    type: 'box',
-                    layout: 'horizontal',
-                    margin: 'xs',
-                    contents: [
-                      { type: 'text', text: '• แชทกลุ่ม/ห้อง:', size: 'xs', weight: 'bold', color: '#555555', flex: 3 },
-                      { type: 'text', text: 'กดผ่าน Quick Menu หรือพิมพ์ลัดได้ทันที (หากคุยกับ AI ให้พิมพ์นำหน้าด้วย "butter" หรือ "เนย" เสมอ)', size: 'xs', color: '#666666', wrap: true, flex: 7 }
-                    ]
+                    type: 'text',
+                    text: 'ภาพรวมความเคลื่อนไหวและแผนงานส่งรถ',
+                    size: 'xs',
+                    color: '#FFE0B2',
+                    margin: 'xs'
                   }
-                ]
+                ],
+                backgroundColor: '#FF6D00',
+                paddingAll: 'lg'
               },
-              { type: 'separator', margin: 'md' },
-              {
-                type: 'text',
-                text: '⚡ รายการคำสั่งทางลัด (กดหรือพิมพ์ส่งได้เลย)',
-                weight: 'bold',
-                size: 'sm',
-                color: '#FF6D00',
-                margin: 'sm'
-              },
-              {
+              body: {
                 type: 'box',
                 layout: 'vertical',
                 spacing: 'md',
                 contents: [
                   {
-                    type: 'box',
-                    layout: 'horizontal',
-                    action: {
-                      type: 'message',
-                      label: 'สรุปวันนี้',
-                      text: 'สรุปวันนี้'
-                    },
-                    contents: [
-                      { type: 'text', text: 'สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                      { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมวันนี้', size: 'xs', color: '#666666', flex: 6 }
-                    ]
+                    type: 'text',
+                    text: '💡 ดูสรุปข้อมูลภาพรวมการปล่อยรถหรือแผนการส่งมอบรถของโครงการต่างๆ ได้ทันที',
+                    size: 'xs',
+                    color: '#666666',
+                    wrap: true
                   },
+                  { type: 'separator', margin: 'md' },
                   {
                     type: 'box',
-                    layout: 'horizontal',
-                    action: {
-                      type: 'message',
-                      label: 'สรุปเมื่อวาน',
-                      text: 'สรุปเมื่อวาน'
-                    },
+                    layout: 'vertical',
+                    spacing: 'md',
                     contents: [
-                      { type: 'text', text: 'สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                      { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมเมื่อวาน', size: 'xs', color: '#666666', flex: 6 }
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'สรุปวันนี้',
+                          text: 'สรุปวันนี้'
+                        },
+                        contents: [
+                          { type: 'text', text: '📊 สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                          { type: 'text', text: 'ดูสรุปส่งมอบและงานซ่อมวันนี้', size: 'xs', color: '#888888', align: 'end', flex: 6 }
+                        ]
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'สรุปเมื่อวาน',
+                          text: 'สรุปเมื่อวาน'
+                        },
+                        contents: [
+                          { type: 'text', text: '📊 สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                          { type: 'text', text: 'ดูรายงานย้อนหลังของเมื่อวาน', size: 'xs', color: '#888888', align: 'end', flex: 6 }
+                        ]
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'สรุปส่งมอบประจำเดือน',
+                          text: 'สรุปส่งมอบประจำเดือน'
+                        },
+                        contents: [
+                          { type: 'text', text: '📅 รายงานประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 5 },
+                          { type: 'text', text: 'ดูเทียบเป้าส่งมอบรถ', size: 'xs', color: '#888888', align: 'end', flex: 5 }
+                        ]
+                      }
                     ]
-                  },
+                  }
+                ],
+                paddingAll: 'lg'
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: 'lg',
+                contents: [
                   {
-                    type: 'box',
-                    layout: 'horizontal',
+                    type: 'button',
+                    style: 'primary',
+                    color: '#FF6D00',
+                    height: 'sm',
                     action: {
-                      type: 'message',
-                      label: 'สรุปส่งมอบประจำเดือน',
-                      text: 'สรุปส่งมอบประจำเดือน'
-                    },
-                    contents: [
-                      { type: 'text', text: 'สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                      { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบในเดือนนี้', size: 'xs', color: '#666666', wrap: true, flex: 6 }
-                    ]
-                  },
-                  {
-                    type: 'box',
-                    layout: 'horizontal',
-                    action: {
-                      type: 'message',
-                      label: 'ค้างซ่อมรายพื้นที่',
-                      text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
-                    },
-                    contents: [
-                      { type: 'text', text: 'ค้างซ่อมรายพื้นที่', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                      { type: 'text', text: 'จัดอันดับรถค้างซ่อมแยกรายพื้นที่/อู่', size: 'xs', color: '#666666', wrap: true, flex: 6 }
-                    ]
-                  },
-                  {
-                    type: 'box',
-                    layout: 'horizontal',
-                    contents: [
-                      { type: 'text', text: 'ค้นหา [ทะเบียน/VIN]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                      { type: 'text', text: 'ดูข้อมูลรถ ผู้เช่า สัญญา และประวัติซ่อม (เช่น ทอ-6844)', size: 'xs', color: '#666666', wrap: true, flex: 6 }
-                    ]
+                      type: 'uri',
+                      label: '🖥️ เปิด Dashboard',
+                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/dashboard')}`
+                    }
                   }
                 ]
               }
-            ],
-            paddingAll: 'lg'
-          }
+            },
+            // Bubble 2: Maintenance & Replacements (งานซ่อม & รถทดแทน)
+            {
+              type: 'bubble' as const,
+              size: 'mega' as const,
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '🔧 งานซ่อม & รถทดแทน',
+                    weight: 'bold',
+                    size: 'lg',
+                    color: '#ffffff'
+                  },
+                  {
+                    type: 'text',
+                    text: 'ติดตามความคืบหน้างานซ่อมและประวัติรถทดแทน',
+                    size: 'xs',
+                    color: '#D1FAE5',
+                    margin: 'xs'
+                  }
+                ],
+                backgroundColor: '#059669',
+                paddingAll: 'lg'
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '💡 ตรวจสอบข้อมูลการส่งเข้าอู่ซ่อมรถ สถานะความคืบหน้า และประวัติการสลับรถทดแทน',
+                    size: 'xs',
+                    color: '#666666',
+                    wrap: true
+                  },
+                  { type: 'separator', margin: 'md' },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'md',
+                    contents: [
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'ค้างซ่อมรายพื้นที่',
+                          text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
+                        },
+                        contents: [
+                          { type: 'text', text: '📍 ค้างซ่อมรายพื้นที่', size: 'xs', weight: 'bold', color: '#059669', flex: 5 },
+                          { type: 'text', text: 'รถค้างแยกตามอู่/พื้นที่', size: 'xs', color: '#888888', align: 'end', flex: 5 }
+                        ]
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        action: {
+                          type: 'message',
+                          label: 'ค้างซ่อมทั้งหมด',
+                          text: 'ค้างซ่อมทั้งหมด'
+                        },
+                        contents: [
+                          { type: 'text', text: '🛠️ ค้างซ่อมทั้งหมด', size: 'xs', weight: 'bold', color: '#059669', flex: 5 },
+                          { type: 'text', text: 'ดูข้อมูลซ่อมปัจจุบัน', size: 'xs', color: '#888888', align: 'end', flex: 5 }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                paddingAll: 'lg'
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: 'lg',
+                contents: [
+                  {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#059669',
+                    height: 'sm',
+                    action: {
+                      type: 'uri',
+                      label: '🔧 ดูรายการซ่อม & รถทดแทน',
+                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/maintenance')}`
+                    }
+                  }
+                ]
+              }
+            },
+            // Bubble 3: Search & Logs
+            {
+              type: 'bubble' as const,
+              size: 'mega' as const,
+              header: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '🔍 ค้นหาข้อมูล & แชทล็อก',
+                    weight: 'bold',
+                    size: 'lg',
+                    color: '#ffffff'
+                  },
+                  {
+                    type: 'text',
+                    text: 'ค้นหาสัญญารถ และดูประวัติแชทล็อกของพนักงาน',
+                    size: 'xs',
+                    color: '#DBEAFE',
+                    margin: 'xs'
+                  }
+                ],
+                backgroundColor: '#1E40AF',
+                paddingAll: 'lg'
+              },
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '💡 ค้นหาประวัติรถด้วยป้ายทะเบียน/VIN หรือเปิดระบบบันทึกประวัติการแชท (Chat Logs)',
+                    size: 'xs',
+                    color: '#666666',
+                    wrap: true
+                  },
+                  { type: 'separator', margin: 'md' },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'xs',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '👉 ตัวอย่างการค้นหาข้อมูลรถ:',
+                        size: 'xs',
+                        weight: 'bold',
+                        color: '#1E40AF'
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        margin: 'sm',
+                        action: {
+                          type: 'message',
+                          label: 'ทอ-6844',
+                          text: 'ทอ-6844'
+                        },
+                        contents: [
+                          { type: 'text', text: 'พิมพ์ทะเบียนรถ เช่น', size: 'xs', color: '#666666', flex: 6 },
+                          { type: 'text', text: '"ทอ-6844"', size: 'xs', weight: 'bold', color: '#1E40AF', align: 'end', flex: 4 }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                paddingAll: 'lg'
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: 'lg',
+                contents: [
+                  {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#1E40AF',
+                    height: 'sm',
+                    action: {
+                      type: 'uri',
+                      label: '💬 เปิดดูประวัติแชทล็อก',
+                      uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/logchats')}`
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         },
         quickReply: quickReplyItems
       }
