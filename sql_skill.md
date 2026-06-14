@@ -728,11 +728,11 @@ Sub-status สำหรับ GI (Good Inspect)
 
 ### 11.2 ตาราง: `dbo.EV_RentItem` (สัญญาเช่าและการปล่อยรถ)
 เก็บข้อมูลการจองและปล่อยรถ
-* **คอลัมน์สำคัญ**: `RentItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ContractNo` (เลขที่สัญญา), `ContractType`, `FirstName` (ชื่อผู้เช่า), `LastName` (นามสกุลผู้เช่า), `PhoneNo`, `ExpectedReleaseDate` (วันนัดส่งมอบ), `ReleaseDate` (วันส่งมอบจริง), `ContractCancellationDate` (วันยกเลิกสัญญา), `IsActive` (bit)
+* **คอลัมน์สำคัญ**: `RentItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ContractNo` (เลขที่สัญญา), `ContractType`, `FirstName` (ชื่อผู้เช่า), `LastName` (นามสกุลผู้เช่า), `PhoneNo`, `ExpectedReleaseDate` (วันนัดส่งมอบ), `ReleaseDate` (วันส่งมอบจริง), `ContractCancellationDate` (วันยกเลิกสัญญา), `IsActive` (bit), `CreateUserID` (ID ผู้บันทึกข้อมูล)
 
 ### 11.3 ตาราง: `dbo.EV_MaintenanceItem` (ใบแจ้งซ่อมและสถานะซ่อม)
 เก็บประวัติการเคลมและแจ้งซ่อม
-* **คอลัมน์สำคัญ**: `MaintenanceItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ReportDate` (วันแจ้งซ่อม), `IncidentDate` (วันเกิดเหตุ), `MaintenanceStartDate` (วันเข้าซ่อมจริง), `MaintenanceFinishDate` (วันซ่อมเสร็จ), `MaintenanceReturnDate` (วันรับรถคืน), `CarStatusCode` (COMPLETE, IN_MAINTENANCE, WAITING_FOR_MAINTENANCE, STILL_WORK), `IssueTitle` (อาการที่แจ้ง), `ProblemTypeCode` (ประเภทปัญหา เช่น PRODUCT, ACCIDENT), `FaultPartyCode` (ฝ่ายผิด เช่น DRIVER, COUNTERPART), `CarCaseCode` (เคสซ่อมเบา/หนัก), `ServiceLocationCode` (อู่ที่เข้าซ่อม), `InsuranceCode`, `FollowUpDetail`, `IsActive` (bit)
+* **คอลัมน์สำคัญ**: `MaintenanceItemID` (PK), `InventoryItemID` (FK -> `EV_InventoryItem`), `ReportDate` (วันแจ้งซ่อม), `IncidentDate` (วันเกิดเหตุ), `MaintenanceStartDate` (วันเข้าซ่อมจริง), `MaintenanceFinishDate` (วันซ่อมเสร็จ), `MaintenanceReturnDate` (วันรับรถคืน), `CarStatusCode` (COMPLETE, IN_MAINTENANCE, WAITING_FOR_MAINTENANCE, STILL_WORK), `IssueTitle` (อาการที่แจ้ง), `ProblemTypeCode` (ประเภทปัญหา เช่น PRODUCT, ACCIDENT), `FaultPartyCode` (ฝ่ายผิด เช่น DRIVER, COUNTERPART), `CarCaseCode` (เคสซ่อมเบา/หนัก), `ServiceLocationCode` (อู่ที่เข้าซ่อม), `InsuranceCode`, `FollowUpDetail`, `IsActive` (bit), `CreateUserID` (ID ผู้แจ้งซ่อม/ผู้บันทึก)
 
 ### 11.4 ตาราง: `dbo.EV_ReplacementItem` (ประวัติการใช้รถทดแทน)
 เก็บประวัติการปล่อยรถทดแทนระหว่างซ่อม
@@ -778,6 +778,8 @@ Sub-status สำหรับ GI (Good Inspect)
   * `EV_InventoryItem.Status` ➔ `EV_MsStatus.StatusCode` (เพื่อดึงคำแปลภาษาไทยของสถานะรถคันนั้นจากคอลัมน์ `DescriptionStatus`)
   * `EV_InventoryItem.StatusType` ➔ `EV_MsSubStatus.StatusCode` (ดึงชื่อคำอธิบายภาษาไทยของสถานะย่อย เช่น เพื่อระบุว่ารถเป็นรถใหม่หรือรถเก่าจากคอลัมน์ `DescriptionStatus` โดยควรกรองด้วยเงื่อนไข `sub.Type LIKE 'STATUS_TYPE_%'`)
   * `EV_ReturnItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้บันทึกข้อมูลย้อนกลับ โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
+  * `EV_RentItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้ปล่อยรถ/ทำสัญญาส่งมอบ โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
+  * `EV_MaintenanceItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้แจ้งซ่อม/ผู้บันทึกรายการแจ้งซ่อม โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
 
 * **เงื่อนไขคิวรี (สำคัญ)**:
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ
