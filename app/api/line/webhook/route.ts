@@ -391,7 +391,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
         await replyText(
           replyToken,
-          `✅ อัปเดตสถานะปัญหา #${issueId} เป็น "แก้ไขแล้ว" เรียบร้อย และแจ้งเตือนผู้รายงานทาง LINE แล้วค่ะ 💛`
+          `✅ อัปเดตสถานะปัญหา #${issueId} "${issue.description}" เป็น "แก้ไขแล้ว" เรียบร้อย และแจ้งเตือนผู้รายงานทาง LINE แล้วค่ะ 💛`
         )
       } catch (err: any) {
         console.error('[Fixed Command Error]', err)
