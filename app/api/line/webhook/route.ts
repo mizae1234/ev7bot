@@ -503,7 +503,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 paddingAll: 'lg'
               }
             },
-            // Bubble 2: Overview & Dashboard
+            // Bubble 2: 🚚 การปล่อยรถ & ส่งมอบ (Deliveries)
             {
               type: 'bubble' as const,
               size: 'mega' as const,
@@ -513,20 +513,20 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 contents: [
                   {
                     type: 'text',
-                    text: '📊 รายงาน & แดชบอร์ด',
+                    text: '🚚 การปล่อยรถ & ส่งมอบ',
                     weight: 'bold',
                     size: 'lg',
                     color: '#ffffff'
                   },
                   {
                     type: 'text',
-                    text: 'ภาพรวมความเคลื่อนไหวและแผนงานส่งรถ',
+                    text: 'ดูสถิติการส่งมอบ แผนงาน และประวัติปล่อยรถเช่า',
                     size: 'xs',
-                    color: '#FFE0B2',
+                    color: '#DBEAFE',
                     margin: 'xs'
                   }
                 ],
-                backgroundColor: '#FF6D00',
+                backgroundColor: '#2563EB',
                 paddingAll: 'lg'
               },
               body: {
@@ -544,38 +544,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                         layout: 'horizontal',
                         action: {
                           type: 'message',
-                          label: 'สรุปวันนี้',
-                          text: 'สรุปวันนี้'
-                        },
-                        contents: [
-                          { type: 'text', text: '📊 สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                          { type: 'text', text: 'ดูสรุปส่งมอบและงานซ่อมวันนี้', size: 'xs', color: '#888888', align: 'end', flex: 6 }
-                        ]
-                      },
-                      {
-                        type: 'box',
-                        layout: 'horizontal',
-                        action: {
-                          type: 'message',
-                          label: 'สรุปเมื่อวาน',
-                          text: 'สรุปเมื่อวาน'
-                        },
-                        contents: [
-                          { type: 'text', text: '📊 สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                          { type: 'text', text: 'ดูรายงานย้อนหลังของเมื่อวาน', size: 'xs', color: '#888888', align: 'end', flex: 6 }
-                        ]
-                      },
-                      {
-                        type: 'box',
-                        layout: 'horizontal',
-                        action: {
-                          type: 'message',
                           label: 'สรุปส่งมอบประจำเดือน',
                           text: 'สรุปส่งมอบประจำเดือน'
                         },
                         contents: [
-                          { type: 'text', text: '📅 รายงานประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 5 },
-                          { type: 'text', text: 'ดูเทียบเป้าส่งมอบรถ', size: 'xs', color: '#888888', align: 'end', flex: 5 }
+                          { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#2563EB', flex: 6 },
+                          { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบรถ', size: 'xs', color: '#888888', align: 'end', flex: 4 }
                         ]
                       }
                     ]
@@ -591,11 +565,11 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   {
                     type: 'button',
                     style: 'primary',
-                    color: '#FF6D00',
+                    color: '#2563EB',
                     height: 'sm',
                     action: {
                       type: 'uri',
-                      label: '🖥️ เปิด Dashboard',
+                      label: '📅 ดูปฏิทินส่งมอบ',
                       uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent('/dashboard')}`
                     }
                   }
