@@ -21,6 +21,8 @@ interface CarInfo {
   Exterior_Color: string
   Interior_Color: string
   IsActive: boolean
+  StatusName?: string | null
+  SubStatusName?: string | null
 }
 
 interface RentInfo {
@@ -105,7 +107,7 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function getStatusInfo(code: string): { label: string; color: string; bg: string; icon: string } {
+function getStatusInfo(code: string, customLabel?: string | null): { label: string; color: string; bg: string; icon: string } {
   const map: Record<string, { label: string; color: string; bg: string; icon: string }> = {
     PRODUCTION: { label: 'ผลิต', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-300', icon: '🏭' },
     AVAILABLE: { label: 'พร้อมส่ง', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-300', icon: '✅' },
@@ -114,7 +116,11 @@ function getStatusInfo(code: string): { label: string; color: string; bg: string
     REPLACEMENT: { label: 'รถทดแทน', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-300', icon: '🔄' },
     WAITING_FOR_GR: { label: 'รอ GR', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-300', icon: '📦' },
   }
-  return map[code] || { label: code, color: 'text-zinc-700', bg: 'bg-zinc-100 border-zinc-300', icon: '📋' }
+  const base = map[code] || { label: code, color: 'text-zinc-700', bg: 'bg-zinc-100 border-zinc-300', icon: '📋' }
+  if (customLabel) {
+    return { ...base, label: customLabel }
+  }
+  return base
 }
 
 function getRepairStatusInfo(code: string): { label: string; color: string } {
@@ -162,7 +168,7 @@ function VehicleDetailContent() {
   if (!data) return null
 
   const { car, currentRent, rentHistory = [], maintenance, returns } = data
-  const statusInfo = getStatusInfo(car.StatusCode)
+  const statusInfo = getStatusInfo(car.StatusCode, car.StatusName)
   const activeMaint = maintenance.find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
 
   return (

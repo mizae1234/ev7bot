@@ -92,11 +92,15 @@ export async function GET(
     carReq.input('identifier', sql.NVarChar, `%${identifier}%`)
     const carResult = await carReq.query(`
       SELECT TOP 1
-        InventoryItemID, VinNo, MotorNo, RegisterNo, Model,
-        Project, ProjectType, Company, Status AS StatusCode, StatusType,
-        Exterior_Color, Interior_Color, IsActive
-      FROM dbo.EV_InventoryItem
-      WHERE (RegisterNo LIKE @identifier OR VinNo LIKE @identifier) AND IsActive = 1
+        i.InventoryItemID, i.VinNo, i.MotorNo, i.RegisterNo, i.Model,
+        i.Project, i.ProjectType, i.Company, i.Status AS StatusCode, i.StatusType,
+        i.Exterior_Color, i.Interior_Color, i.IsActive,
+        s.DescriptionStatus AS StatusName,
+        sub.DescriptionStatus AS SubStatusName
+      FROM dbo.EV_InventoryItem i
+      LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      WHERE (i.RegisterNo LIKE @identifier OR i.VinNo LIKE @identifier) AND i.IsActive = 1
     `)
 
     if (carResult.recordset.length === 0) {
