@@ -408,7 +408,7 @@ function getGuideBubble() {
                 text: 'สรุปวันนี้'
               },
               contents: [
-                { type: 'text', text: 'สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '1. สรุปวันนี้', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมวันนี้', size: 'xs', color: '#666666', flex: 6 }
               ]
             },
@@ -421,7 +421,7 @@ function getGuideBubble() {
                 text: 'สรุปเมื่อวาน'
               },
               contents: [
-                { type: 'text', text: 'สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '2. สรุปเมื่อวาน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'ดูสรุปการส่งมอบและงานซ่อมเมื่อวาน', size: 'xs', color: '#666666', flex: 6 }
               ]
             },
@@ -434,7 +434,7 @@ function getGuideBubble() {
                 text: 'สรุปส่งมอบประจำเดือน'
               },
               contents: [
-                { type: 'text', text: 'สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '3. สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบในเดือนนี้', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             },
@@ -447,7 +447,7 @@ function getGuideBubble() {
                 text: 'ดูรถค้างซ่อมแต่ละพื้นที่'
               },
               contents: [
-                { type: 'text', text: 'ค้างซ่อมรายพื้นที่', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '4. ค้างซ่อมรายพื้นที่', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'จัดอันดับรถค้างซ่อมแยกรายพื้นที่/อู่', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             },
@@ -460,7 +460,7 @@ function getGuideBubble() {
                 text: 'ซ่อม ศาลายา'
               },
               contents: [
-                { type: 'text', text: 'ซ่อม [ชื่ออู่]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '5. ซ่อม [ชื่ออู่]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'ดูรถค้างซ่อมของอู่นั้น (เช่น ซ่อม ศาลายา)', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             },
@@ -468,7 +468,7 @@ function getGuideBubble() {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'ค้นหา [ทะเบียน/VIN]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '6. ค้นหา [ทะเบียน/VIN]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'ดูข้อมูลรถ ผู้เช่า สัญญา และประวัติซ่อม', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             },
@@ -476,7 +476,7 @@ function getGuideBubble() {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                { type: 'text', text: 'แจ้งบัค [รายละเอียด]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: '7. แจ้งบัค [รายละเอียด]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'พิมพ์ "butter บัค [ข้อมูล]" หรือ "butter bug [ข้อมูล]"', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             }
