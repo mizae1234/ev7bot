@@ -26,6 +26,16 @@ const thaiMonthsShort = [
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
 ]
 
+function formatThaiDate(dateStr: string, options: Intl.DateTimeFormatOptions): string {
+  const parts = dateStr.split('-')
+  if (parts.length !== 3) return dateStr
+  const year = parseInt(parts[0], 10)
+  const month = parseInt(parts[1], 10) - 1
+  const day = parseInt(parts[2], 10)
+  const localDate = new Date(year, month, day)
+  return localDate.toLocaleDateString('th-TH', options)
+}
+
 function DashboardContent() {
   // Navigation calendar state (June 2026 matches user data)
   const [selectedYear, setSelectedYear] = useState<number>(2026)
@@ -45,15 +55,15 @@ function DashboardContent() {
 
   // Calculate start/end dates
   const startDateStr = filterMode === 'month'
-    ? new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
+    ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`
     : filterMode === 'year'
       ? `${selectedYear}-01-01`
-      : (customStartDate || new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0])
+      : (customStartDate || `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`)
   const endDateStr = filterMode === 'month'
-    ? new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+    ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(new Date(selectedYear, selectedMonth + 1, 0).getDate()).padStart(2, '0')}`
     : filterMode === 'year'
       ? `${selectedYear}-12-31`
-      : (customEndDate || new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0])
+      : (customEndDate || `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(new Date(selectedYear, selectedMonth + 1, 0).getDate()).padStart(2, '0')}`)
 
   // Query database dynamically using SWR
   const { data, error, isLoading, mutate, isValidating } = useSWR<DashboardData>(
@@ -90,7 +100,7 @@ function DashboardContent() {
     const today = new Date()
     setSelectedMonth(today.getMonth())
     setSelectedYear(today.getFullYear())
-    setSelectedDate(today.toISOString().split('T')[0])
+    setSelectedDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`)
   }
 
   // Filter lists based on selectedDate if set, otherwise show all of month
@@ -290,11 +300,11 @@ function DashboardContent() {
                   setFilterMode('range')
                   setSelectedDate(null)
                   if (!customStartDate) {
-                    const firstDay = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
+                    const firstDay = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`
                     setCustomStartDate(firstDay)
                   }
                   if (!customEndDate) {
-                    const lastDay = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+                    const lastDay = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(new Date(selectedYear, selectedMonth + 1, 0).getDate()).padStart(2, '0')}`
                     setCustomEndDate(lastDay)
                   }
                 }}
@@ -580,7 +590,7 @@ function DashboardContent() {
             {selectedDate && (
               <div className="flex items-center gap-2">
                 <span className="text-xs bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 px-3 py-1.5 rounded-xl font-bold border border-indigo-500/20">
-                  กำลังแสดงผลข้อมูลเฉพาะวันที่: {new Date(selectedDate).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  กำลังแสดงผลข้อมูลเฉพาะวันที่: {formatThaiDate(selectedDate, { day: '2-digit', month: 'long', year: 'numeric' })}
                 </span>
                 <button
                   onClick={() => setSelectedDate(null)}

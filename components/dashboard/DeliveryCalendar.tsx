@@ -25,6 +25,16 @@ function cleanModelName(model: string | null): string {
   return model.replace(/Premium|Classic|Sport/gi, '').trim()
 }
 
+function formatThaiDate(dateStr: string, options: Intl.DateTimeFormatOptions): string {
+  const parts = dateStr.split('-')
+  if (parts.length !== 3) return dateStr
+  const year = parseInt(parts[0], 10)
+  const month = parseInt(parts[1], 10) - 1
+  const day = parseInt(parts[2], 10)
+  const localDate = new Date(year, month, day)
+  return localDate.toLocaleDateString('th-TH', options)
+}
+
 export function DeliveryCalendar({
   deliveries = [],
   repairs = [],
@@ -132,7 +142,7 @@ export function DeliveryCalendar({
             )
           }
 
-          const cellDateStr = cell.toISOString().split('T')[0]
+          const cellDateStr = `${cell.getFullYear()}-${String(cell.getMonth() + 1).padStart(2, '0')}-${String(cell.getDate()).padStart(2, '0')}`
           const dayNum = String(cell.getDate()).padStart(2, '0')
           const isSelected = selectedDate === cellDateStr
           const dayOfWeek = cell.getDay()
@@ -259,7 +269,7 @@ export function DeliveryCalendar({
                   {/* Tooltip Header */}
                   <div className="border-b border-zinc-800 pb-1.5 mb-2 flex justify-between items-center gap-2">
                     <span className="text-xs font-bold tracking-wide">
-                      {new Date(cellDateStr).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      {formatThaiDate(cellDateStr, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </span>
                     <span className="text-[10px] text-zinc-400 font-medium">
                       รวม {dayDeliveries.length} คัน
@@ -306,7 +316,7 @@ export function DeliveryCalendar({
                   
                   <div className="border-b border-zinc-800 pb-1.5 mb-2">
                     <span className="text-xs font-bold tracking-wide">
-                      {new Date(cellDateStr).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      {formatThaiDate(cellDateStr, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </span>
                   </div>
 
@@ -352,7 +362,7 @@ export function DeliveryCalendar({
         <div className="mt-4 p-4 bg-zinc-50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 text-xs animate-in fade-in slide-in-from-bottom-2 duration-250">
           <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-800 pb-2.5 mb-3">
             <h4 className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-              <span>📅 สรุปข้อมูลวันที่ {new Date(selectedDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span>📅 สรุปข้อมูลวันที่ {formatThaiDate(selectedDate, { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </h4>
             <button
               onClick={() => onDateClick(selectedDate)} // Click again to clear
