@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Pagination } from '@/components/ui/Pagination'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 interface RegisteredUser {
   id: number
@@ -16,7 +17,7 @@ interface RegisteredUser {
   updatedAt: string
 }
 
-export default function UserManagementPage() {
+function UserManagementContent() {
   const [passcode, setPasscode] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [error, setError] = useState('')
@@ -32,6 +33,54 @@ export default function UserManagementPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null) // lineUserId
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
+  // Auth / Role States
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleLoading, setRoleLoading] = useState(true)
+  const [liffUserId, setLiffUserId] = useState<string | null>(null)
+
+  // Broadcast States
+  const [recipientsLoading, setRecipientsLoading] = useState(false)
+  const [activeUsers, setActiveUsers] = useState<{ lineUserId: string; displayName: string | null; pictureUrl: string | null }[]>([])
+  const [activeGroups, setActiveGroups] = useState<{ groupId: string; groupName: string | null }[]>([])
+  const [broadcastTargetType, setBroadcastTargetType] = useState<'user' | 'group'>('user')
+  const [broadcastTargetId, setBroadcastTargetId] = useState('')
+  const [broadcastMessage, setBroadcastMessage] = useState('')
+  const [broadcastSending, setBroadcastSending] = useState(false)
+  const [broadcastSuccess, setBroadcastSuccess] = useState(false)
+
+  // 1. Authenticate role via user's LINE ID in AuthGuard cache
+  useEffect(() => {
+    const cachedProfile = localStorage.getItem('liff_profile')
+    if (cachedProfile) {
+      try {
+        const profile = JSON.parse(cachedProfile)
+        if (profile.userId) {
+          setLiffUserId(profile.userId)
+          fetchRole(profile.userId)
+          return
+        }
+      } catch (e) {
+        console.error('Failed to parse liff_profile', e)
+      }
+    }
+    setRoleLoading(false)
+  }, [])
+
+  const fetchRole = async (uid: string) => {
+    try {
+      const res = await fetch(`/api/auth/role?userId=${uid}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUserRole(data.role)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user role', err)
+    } finally {
+      setRoleLoading(false)
+    }
+  }
+
+  // 2. Passcode cache initialization
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = sessionStorage.getItem('logchats_passcode')
@@ -42,15 +91,22 @@ export default function UserManagementPage() {
     }
   }, [])
 
+  // 3. Fetch users and recipients when authenticated
   useEffect(() => {
-    if (isAuthenticated && passcode) {
+    if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
       fetchUsers()
     }
-  }, [isAuthenticated, page, roleFilter, statusFilter])
+  }, [isAuthenticated, page, roleFilter, statusFilter, liffUserId, userRole])
+
+  useEffect(() => {
+    if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
+      fetchRecipients()
+    }
+  }, [isAuthenticated, passcode, liffUserId, userRole])
 
   // Debounced search trigger
   useEffect(() => {
-    if (!isAuthenticated || !passcode) return
+    if (!isAuthenticated || !passcode || !liffUserId || userRole !== 'SUPER_ADMIN') return
     const timer = setTimeout(() => {
       setPage(1)
       fetchUsers()
@@ -63,6 +119,7 @@ export default function UserManagementPage() {
     try {
       const params = new URLSearchParams({
         passcode,
+        userId: liffUserId || '',
         page: String(page),
         limit: '20',
         search,
@@ -75,6 +132,8 @@ export default function UserManagementPage() {
           setIsAuthenticated(false)
           sessionStorage.removeItem('logchats_passcode')
           setError('รหัสผ่านไม่ถูกต้อง')
+        } else if (res.status === 403) {
+          setError('คุณไม่มีสิทธิ์เข้าถึง (ต้องการสิทธิ์ Super Admin)')
         } else {
           setError('เกิดข้อผิดพลาดในการดึงข้อมูล')
         }
@@ -95,6 +154,28 @@ export default function UserManagementPage() {
     }
   }
 
+  const fetchRecipients = async () => {
+    setRecipientsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        passcode,
+        userId: liffUserId || '',
+      })
+      const res = await fetch(`/api/admin/recipients?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setActiveUsers(data.users || [])
+          setActiveGroups(data.groups || [])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipients', err)
+    } finally {
+      setRecipientsLoading(false)
+    }
+  }
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (passcode === 'ev7admin') {
@@ -108,13 +189,13 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleRoleChange = async (lineUserId: string, newRole: string) => {
-    setActionLoading(lineUserId)
+  const handleRoleChange = async (targetLineUserId: string, newRole: string) => {
+    setActionLoading(targetLineUserId)
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineUserId, role: newRole, passcode })
+        body: JSON.stringify({ lineUserId: targetLineUserId, role: newRole, passcode, userId: liffUserId })
       })
       if (!res.ok) {
         const data = await res.json()
@@ -129,13 +210,13 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleStatusToggle = async (lineUserId: string, currentActive: boolean) => {
-    setActionLoading(lineUserId)
+  const handleStatusToggle = async (targetLineUserId: string, currentActive: boolean) => {
+    setActionLoading(targetLineUserId)
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineUserId, isActive: !currentActive, passcode })
+        body: JSON.stringify({ lineUserId: targetLineUserId, isActive: !currentActive, passcode, userId: liffUserId })
       })
       if (!res.ok) {
         const data = await res.json()
@@ -147,6 +228,38 @@ export default function UserManagementPage() {
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!broadcastTargetId || !broadcastMessage.trim() || !liffUserId) return
+    setBroadcastSending(true)
+    setBroadcastSuccess(false)
+    try {
+      const res = await fetch('/api/admin/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passcode,
+          userId: liffUserId,
+          targetId: broadcastTargetId,
+          targetType: broadcastTargetType,
+          message: broadcastMessage,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`ไม่สามารถส่งประกาศได้: ${data.error || 'เกิดข้อผิดพลาด'}`)
+      } else {
+        setBroadcastSuccess(true)
+        setBroadcastMessage('')
+        setTimeout(() => setBroadcastSuccess(false), 4000)
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setBroadcastSending(false)
     }
   }
 
@@ -193,6 +306,32 @@ export default function UserManagementPage() {
           </span>
         )
     }
+  }
+
+  // 4. Access Control check during role loading
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-zinc-500 font-medium animate-pulse">กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 5. Restrict access strictly to SUPER_ADMIN
+  if (userRole !== 'SUPER_ADMIN') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
+        <span className="text-5xl mb-4">🔑</span>
+        <h1 className="text-xl font-bold text-zinc-100 mb-2">เข้าถึงเฉพาะ Super Admin</h1>
+        <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานระบบจัดการสิทธิ์ผู้ใช้และการส่งประกาศ</p>
+        <a href="/dashboard" className="mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md">
+          กลับหน้าหลักแดชบอร์ด
+        </a>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
@@ -307,6 +446,131 @@ export default function UserManagementPage() {
             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">👤 User ทั่วไป</span>
             <span className="text-2xl font-extrabold text-zinc-400 mt-2">{summary.totalUser}</span>
           </div>
+        </div>
+
+        {/* Broadcast Message Section */}
+        <div className="bg-zinc-900/40 border border-zinc-900 rounded-3xl p-6 backdrop-blur-md shadow-lg space-y-4">
+          <div className="flex items-center gap-3 border-b border-zinc-850 pb-3">
+            <span className="text-xl">📢</span>
+            <div>
+              <h2 className="text-sm font-bold text-zinc-200">ประกาศข่าวสาร (Broadcast Flex Message)</h2>
+              <p className="text-[10px] text-zinc-500">ส่งข้อความประกาศแบบ Flex Message หาผู้ใช้หรือกลุ่มไลน์ ภายใต้หัวข้อ "ประกาศจาก Butter"</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSendBroadcast} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Target Type Selector */}
+              <div>
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ประเภทปลายทาง</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBroadcastTargetType('user')
+                      setBroadcastTargetId('')
+                    }}
+                    className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+                      broadcastTargetType === 'user'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:bg-zinc-900'
+                    }`}
+                  >
+                    👤 ผู้ใช้ (User)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBroadcastTargetType('group')
+                      setBroadcastTargetId('')
+                    }}
+                    className={`py-2 text-xs font-bold rounded-xl border transition-all ${
+                      broadcastTargetType === 'group'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:bg-zinc-900'
+                    }`}
+                  >
+                    👥 กลุ่ม (Group)
+                  </button>
+                </div>
+              </div>
+
+              {/* Target Recipient Dropdown */}
+              <div className="md:col-span-2">
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">
+                  {broadcastTargetType === 'user' ? 'เลือกผู้ใช้เป้าหมาย (Active Users)' : 'เลือกกลุ่มเป้าหมาย (Active Groups)'}
+                </label>
+                {recipientsLoading ? (
+                  <div className="h-9 flex items-center px-3 text-xs text-zinc-500 bg-zinc-950/70 border border-zinc-850 rounded-xl">
+                    กำลังโหลดรายชื่อผู้รับ...
+                  </div>
+                ) : (
+                  <select
+                    value={broadcastTargetId}
+                    onChange={(e) => setBroadcastTargetId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all cursor-pointer"
+                  >
+                    <option value="">-- กรุณาเลือกปลายทาง --</option>
+                    {broadcastTargetType === 'user' ? (
+                      activeUsers.map((u) => (
+                        <option key={u.lineUserId} value={u.lineUserId}>
+                          {u.displayName || 'ผู้ใช้ไม่มีชื่อ'} ({u.lineUserId})
+                        </option>
+                      ))
+                    ) : (
+                      activeGroups.map((g) => (
+                        <option key={g.groupId} value={g.groupId}>
+                          {g.groupName || 'กลุ่มไม่มีชื่อ'} ({g.groupId})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* Message Content */}
+            <div>
+              <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ข้อความประกาศ</label>
+              <textarea
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                required
+                placeholder="พิมพ์ข้อความที่ต้องการประกาศที่นี่..."
+                rows={3}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 placeholder-zinc-650 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all resize-y"
+              />
+            </div>
+
+            {/* Form Footer */}
+            <div className="flex items-center justify-between pt-1">
+              {broadcastSuccess ? (
+                <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                  ✅ ส่งข้อความประกาศสำเร็จและบันทึก Log เรียบร้อยแล้ว!
+                </span>
+              ) : (
+                <span className="text-[10px] text-zinc-500">
+                  * ข้อความจะถูกส่งเป็น Flex Message สีเหลือง/เขียวแอมเบอร์ ในนามบอท Butter
+                </span>
+              )}
+
+              <button
+                type="submit"
+                disabled={broadcastSending || !broadcastTargetId || !broadcastMessage.trim()}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {broadcastSending ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  <>🚀 ส่งข้อความประกาศ</>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* Filter Controls */}
@@ -475,5 +739,13 @@ export default function UserManagementPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function UserManagementPage() {
+  return (
+    <AuthGuard>
+      <UserManagementContent />
+    </AuthGuard>
   )
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Pagination } from '@/components/ui/Pagination'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 interface SystemIssue {
   id: number
@@ -15,7 +16,7 @@ interface SystemIssue {
   resolvedAt: string | null
 }
 
-export default function IssuesPage() {
+function IssuesContent() {
   const [passcode, setPasscode] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [error, setError] = useState('')
@@ -29,6 +30,44 @@ export default function IssuesPage() {
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
 
+  // Auth / Role States
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleLoading, setRoleLoading] = useState(true)
+  const [liffUserId, setLiffUserId] = useState<string | null>(null)
+
+  // 1. Authenticate role via user's LINE ID in AuthGuard cache
+  useEffect(() => {
+    const cachedProfile = localStorage.getItem('liff_profile')
+    if (cachedProfile) {
+      try {
+        const profile = JSON.parse(cachedProfile)
+        if (profile.userId) {
+          setLiffUserId(profile.userId)
+          fetchRole(profile.userId)
+          return
+        }
+      } catch (e) {
+        console.error('Failed to parse liff_profile', e)
+      }
+    }
+    setRoleLoading(false)
+  }, [])
+
+  const fetchRole = async (uid: string) => {
+    try {
+      const res = await fetch(`/api/auth/role?userId=${uid}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUserRole(data.role)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user role', err)
+    } finally {
+      setRoleLoading(false)
+    }
+  }
+
+  // 2. Passcode cache initialization
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = sessionStorage.getItem('logchats_passcode')
@@ -39,15 +78,16 @@ export default function IssuesPage() {
     }
   }, [])
 
+  // 3. Fetch issues when authenticated and role is valid
   useEffect(() => {
-    if (isAuthenticated && passcode) {
+    if (isAuthenticated && passcode && liffUserId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
       fetchIssues()
     }
-  }, [isAuthenticated, page, statusFilter])
+  }, [isAuthenticated, page, statusFilter, liffUserId, userRole])
 
   // Debounced search trigger
   useEffect(() => {
-    if (!isAuthenticated || !passcode) return
+    if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
     const timer = setTimeout(() => {
       setPage(1)
       fetchIssues()
@@ -60,6 +100,7 @@ export default function IssuesPage() {
     try {
       const params = new URLSearchParams({
         passcode,
+        userId: liffUserId || '',
         page: String(page),
         limit: '20',
         search,
@@ -71,6 +112,8 @@ export default function IssuesPage() {
           setIsAuthenticated(false)
           sessionStorage.removeItem('logchats_passcode')
           setError('รหัสผ่านไม่ถูกต้อง')
+        } else if (res.status === 403) {
+          setError('คุณไม่มีสิทธิ์เข้าถึง (ต้องการสิทธิ์ Admin หรือ Super Admin)')
         } else {
           setError('เกิดข้อผิดพลาดในการดึงข้อมูล')
         }
@@ -111,7 +154,7 @@ export default function IssuesPage() {
       const res = await fetch('/api/system-issues', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action, passcode })
+        body: JSON.stringify({ id, action, passcode, userId: liffUserId })
       })
       if (!res.ok) {
         const data = await res.json()
@@ -156,19 +199,39 @@ export default function IssuesPage() {
             ✅ แก้ไขแล้ว
           </span>
         )
-      case 'CANCELLED':
+      default:
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400 border border-zinc-750">
+          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400 border border-zinc-700/60">
             🚫 ยกเลิกแล้ว
           </span>
         )
-      default:
-        return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-300">
-            {status}
-          </span>
-        )
     }
+  }
+
+  // 4. Access Control check during role loading
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-zinc-500 font-medium animate-pulse">กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 5. Restrict access strictly to ADMIN or SUPER_ADMIN
+  if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
+        <span className="text-5xl mb-4">🛡️</span>
+        <h1 className="text-xl font-bold text-zinc-100 mb-2">เข้าถึงเฉพาะผู้ดูแลระบบ (Admin)</h1>
+        <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานระบบจัดการปัญหาและแจ้งบัค</p>
+        <a href="/dashboard" className="mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md">
+          กลับหน้าหลักแดชบอร์ด
+        </a>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
@@ -180,7 +243,7 @@ export default function IssuesPage() {
         >
           <div className="text-center mb-6">
             <span className="inline-block text-4xl mb-3">🐞</span>
-            <h1 className="text-xl font-bold text-zinc-100">ระบบจัดการบัค / ปัญหา</h1>
+            <h1 className="text-xl font-bold text-zinc-100">ระบบประวัติการแจ้งปัญหา</h1>
             <p className="text-xs text-zinc-500 mt-1">กรุณากรอกรหัสผ่านเพื่อเข้าใช้งาน</p>
           </div>
 
@@ -244,18 +307,22 @@ export default function IssuesPage() {
             >
               ออกจากระบบ 🚪
             </button>
-            <a 
-              href="/users"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              👥 จัดการสิทธิ์
-            </a>
-            <a 
-              href="/logchats"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              💬 ประวัติคุย LINE
-            </a>
+            {userRole === 'SUPER_ADMIN' && (
+              <>
+                <a 
+                  href="/users"
+                  className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+                >
+                  👥 จัดการสิทธิ์
+                </a>
+                <a 
+                  href="/logchats"
+                  className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+                >
+                  💬 ประวัติคุย LINE
+                </a>
+              </>
+            )}
             <a 
               href="/dashboard"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold transition-all shadow-md"
@@ -412,5 +479,13 @@ export default function IssuesPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function IssuesPage() {
+  return (
+    <AuthGuard>
+      <IssuesContent />
+    </AuthGuard>
   )
 }

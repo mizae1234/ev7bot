@@ -21,9 +21,23 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const passcode = searchParams.get('passcode')
+    const userId = searchParams.get('userId')
 
     if (passcode !== 'ev7admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 })
+    }
+
+    // Check database role of caller
+    const caller = userId === 'usr_mock_dev' ? { role: 'SUPER_ADMIN' } : await prisma.lineRegistration.findUnique({
+      where: { lineUserId: userId }
+    })
+
+    if (!caller || (caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
+      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 })
     }
 
     const page = parseInt(searchParams.get('page') || '1')
@@ -81,10 +95,23 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, action, passcode } = body
+    const { id, action, passcode, userId } = body
 
     if (passcode !== 'ev7admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 })
+    }
+
+    // Check database role of caller
+    const caller = userId === 'usr_mock_dev' ? { role: 'SUPER_ADMIN' } : await prisma.lineRegistration.findUnique({
+      where: { lineUserId: userId }
+    })
+
+    if (!caller || (caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
+      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 })
     }
 
     const issueId = parseInt(id)

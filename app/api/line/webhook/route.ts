@@ -538,27 +538,27 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   ) && !/^(แจ้งปัญหา|แจ้งบัค|แจ้ง bug|แจ้ง issue|แจ้งบั๊ก)/i.test(lower)
 
   if (isLinkRequest) {
-    let isSuperAdmin = false
+    let isAuthorized = false
     try {
       const registration = await prisma.lineRegistration.findUnique({
         where: { lineUserId: userId }
       })
-      if (registration?.role === 'SUPER_ADMIN') {
-        isSuperAdmin = true
+      if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+        isAuthorized = true
       }
     } catch (err) {
       console.error('[link request authorization check error]', err)
     }
 
-    if (!isSuperAdmin) {
+    if (!isAuthorized) {
       const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
       const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
       if (adminIds.includes(userId)) {
-        isSuperAdmin = true
+        isAuthorized = true
       }
     }
 
-    if (!isSuperAdmin) {
+    if (!isAuthorized) {
       await replyText(
         replyToken,
         `ท่านไม่มีสิทธิ์เข้าถึงข้อมูลดังกล่าว`

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Pagination } from '@/components/ui/Pagination'
+import { AuthGuard } from '@/components/ui/AuthGuard'
 
 interface ChatLog {
   id: number
@@ -13,7 +14,7 @@ interface ChatLog {
   createdAt: string
 }
 
-export default function LogChatsPage() {
+function LogChatsContent() {
   const [passcode, setPasscode] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [error, setError] = useState('')
@@ -28,6 +29,44 @@ export default function LogChatsPage() {
   const [loading, setLoading] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
 
+  // Auth / Role States
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleLoading, setRoleLoading] = useState(true)
+  const [liffUserId, setLiffUserId] = useState<string | null>(null)
+
+  // 1. Authenticate role via user's LINE ID in AuthGuard cache
+  useEffect(() => {
+    const cachedProfile = localStorage.getItem('liff_profile')
+    if (cachedProfile) {
+      try {
+        const profile = JSON.parse(cachedProfile)
+        if (profile.userId) {
+          setLiffUserId(profile.userId)
+          fetchRole(profile.userId)
+          return
+        }
+      } catch (e) {
+        console.error('Failed to parse liff_profile', e)
+      }
+    }
+    setRoleLoading(false)
+  }, [])
+
+  const fetchRole = async (uid: string) => {
+    try {
+      const res = await fetch(`/api/auth/role?userId=${uid}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUserRole(data.role)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user role', err)
+    } finally {
+      setRoleLoading(false)
+    }
+  }
+
+  // 2. Passcode cache initialization
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = sessionStorage.getItem('logchats_passcode')
@@ -38,15 +77,16 @@ export default function LogChatsPage() {
     }
   }, [])
 
+  // 3. Fetch logs when authenticated
   useEffect(() => {
-    if (isAuthenticated && passcode) {
+    if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
       fetchLogs()
     }
-  }, [isAuthenticated, page, sourceType, selectedUser])
+  }, [isAuthenticated, page, sourceType, selectedUser, liffUserId, userRole])
 
   // Debounced search trigger
   useEffect(() => {
-    if (!isAuthenticated || !passcode) return
+    if (!isAuthenticated || !passcode || !liffUserId || userRole !== 'SUPER_ADMIN') return
     const timer = setTimeout(() => {
       setPage(1)
       fetchLogs()
@@ -56,18 +96,19 @@ export default function LogChatsPage() {
 
   // Polling logic
   useEffect(() => {
-    if (!isAuthenticated || !passcode || !refreshInterval) return
+    if (!isAuthenticated || !passcode || !refreshInterval || !liffUserId || userRole !== 'SUPER_ADMIN') return
     const interval = setInterval(() => {
       fetchLogs()
     }, refreshInterval * 1000)
     return () => clearInterval(interval)
-  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser])
+  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser, liffUserId, userRole])
 
   const fetchLogs = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
         passcode,
+        userId: liffUserId || '',
         page: String(page),
         limit: '20',
         search,
@@ -80,6 +121,8 @@ export default function LogChatsPage() {
           setIsAuthenticated(false)
           sessionStorage.removeItem('logchats_passcode')
           setError('รหัสผ่านไม่ถูกต้อง')
+        } else if (res.status === 403) {
+          setError('คุณไม่มีสิทธิ์เข้าถึง (ต้องการสิทธิ์ Super Admin)')
         } else {
           setError('เกิดข้อผิดพลาดในการดึงข้อมูล')
         }
@@ -127,6 +170,32 @@ export default function LogChatsPage() {
     } catch {
       return dateStr
     }
+  }
+
+  // 4. Access Control check during role loading
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-zinc-500 font-medium animate-pulse">กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 5. Restrict access strictly to SUPER_ADMIN
+  if (userRole !== 'SUPER_ADMIN') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
+        <span className="text-5xl mb-4">🔑</span>
+        <h1 className="text-xl font-bold text-zinc-100 mb-2">เข้าถึงเฉพาะ Super Admin</h1>
+        <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานระบบประวัติการแชท</p>
+        <a href="/dashboard" className="mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md">
+          กลับหน้าหลักแดชบอร์ด
+        </a>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
@@ -325,7 +394,9 @@ export default function LogChatsPage() {
                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider ${
                         log.sourceType === 'line' 
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                          : log.sourceType.endsWith('broadcast')
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                       }`}>
                         {log.sourceType.toUpperCase()}
                       </span>
@@ -367,15 +438,27 @@ export default function LogChatsPage() {
           )}
 
           {/* Pagination */}
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            totalItems={total}
-            itemsPerPage={20}
-          />
+          {totalPages > 1 && (
+            <div className="pt-4">
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={total}
+                itemsPerPage={20}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LogChatsPage() {
+  return (
+    <AuthGuard>
+      <LogChatsContent />
+    </AuthGuard>
   )
 }
