@@ -746,7 +746,11 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บข้อมูลแผนการส่งมอบรถประจำวัน แยกตามประเภทโครงการและรุ่นรถยนต์
 * **คอลัมน์สำคัญ**: `PlanID` (PK, bigint), `PlanDate` (date, วันที่ในแผนการส่งมอบ), `ProjectType` (varchar(20), ประเภทโครงการ เช่น EV7, Grab, Line Man), `ES_Count` (int, จำนวนแผนส่งมอบของรุ่น MG ES), `Y490_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 490), `Y410_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 410)
 
-### 11.7 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
+### 11.7 ตาราง: `dbo.EV_MsStatus` (มาสเตอร์สถานะรถยนต์)
+เก็บข้อมูลคำแปลและรายละเอียดของสถานะหลักรถยนต์
+* **คอลัมน์สำคัญ**: `StatusCode` (PK, รหัสสถานะหลัก เช่น PRODUCTION, AVAILABLE, ON_RENT, MAINTENANCE, REPLACEMENT, WAITING_FOR_GR), `StatusName` (ชื่อภาษาอังกฤษ เช่น In Process Production, Available, On Rent), `DescriptionStatus` (ชื่อคำอธิบายภาษาไทย เช่น อยู่ระหว่างการผลิต, รถใหม่พร้อมส่ง, อยู่ระหว่างเช่า, อยู่ระหว่างซ่อม)
+
+### 11.8 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
 ใช้จัดเก็บสถานะบอต การบันทึกปัญหา การลงทะเบียน และ Log การสนทนา
 * **ตาราง: `line_registrations` (การลงทะเบียนบัญชี LINE)**
   * คอลัมน์สำคัญ: `id` (PK, Serial), `line_user_id` (Unique, varchar(50)), `display_name` (varchar(255)), `picture_url` (text), `status_message` (varchar(255)), `system` (varchar(50), default 'EV7'), `is_active` (boolean, default true), `role` (varchar(20), default 'USER' - สิทธิ์การเข้าใช้งาน: 'USER' | 'ADMIN' | 'SUPER_ADMIN'), `registered_at` (timestamptz), `updated_at` (timestamptz)
@@ -757,7 +761,7 @@ Sub-status สำหรับ GI (Good Inspect)
 * **ตาราง: `line_groups` (ข้อมูลกลุ่มที่ลงทะเบียนบอต)**
   * คอลัมน์สำคัญ: `id` (PK, Serial), `group_id` (Unique, varchar(50)), `group_name` (varchar(255)), `group_type` (varchar(20), default 'group'), `is_active` (boolean, default true), `enable_report` (boolean, default false), `created_at` (timestamptz), `updated_at` (timestamptz)
 * **ตาราง: `activity_notifications` (ข้อมูลการแจ้งเตือนงานซ่อม/ส่งมอบ)**
-  * คอลัมน์สำคัญ: `id` (PK, Serial), `record_type` (varchar(30) - 'MAINTENANCE' | 'DELIVERY'), `record_id` (int), `sent_at` (timestamptz)
+  * คอลัมน์สำคัญ: `id` (PK, Serial), `record_type` (varchar(30) - 'MAINTENANCE' | 'DELIVERY' | 'RETURN'), `record_id` (int), `sent_at` (timestamptz)
 
 
 ---
@@ -767,10 +771,13 @@ Sub-status สำหรับ GI (Good Inspect)
   * `EV_RentItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
   * `EV_MaintenanceItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
   * `EV_ReplacementItem.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
+  * `EV_InventoryItem.Status` ➔ `EV_MsStatus.StatusCode` (เพื่อดึงคำแปลภาษาไทยของสถานะรถคันนั้นจากคอลัมน์ `DescriptionStatus`)
 * **เงื่อนไขคิวรี (สำคัญ)**:
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ
   * หากรถยังไม่มีเลขทะเบียน (`RegisterNo` เป็น NULL หรือค่าว่าง) ให้ใช้ `VinNo` ในการระบุและแสดงผลแทนทะเบียนรถเสมอ
   * การนับจำนวนการปล่อยเช่าสำเร็จ (**Completed Delivery**): จะนับเมื่อมีข้อมูล `r.ReleaseDate IS NOT NULL` เท่านั้น หากยังไม่มีข้อมูลวันส่งมอบจริงจะถูกนับเป็นรอดำเนินการ (**Pending**) ทั้งนี้แม้รถจะกลับมาเข้าซ่อมและมีสถานะเป็น `MAINTENANCE` ในภายหลัง ก็ยังถือว่าการส่งมอบสำเร็จแล้ว
+  * **หลีกเลี่ยงชื่อคอลัมน์ทับซ้อน (Column Naming Conflicts/Shadowing)**:
+    เนื่องจากตารางใบแจ้งซ่อม `EV_MaintenanceItem` มีคอลัมน์ชื่อ `CarStatusCode` (เช่น STILL_WORK, IN_MAINTENANCE) หากมีการเชื่อมกับตาราง `EV_InventoryItem` เพื่อดึงสถานะตัวรถ (เช่น MAINTENANCE, ON_RENT) ให้ตั้งชื่อนามแฝง (Alias) ของสถานะตัวรถเป็นอย่างอื่น เช่น `i.Status AS CarInventoryStatusCode` แทนการใช้ `CarStatusCode` เพื่อไม่ให้เขียนทับค่าสถานะการซ่อมใน Object ผลลัพธ์
 
 ---
 

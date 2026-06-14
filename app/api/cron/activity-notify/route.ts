@@ -20,16 +20,21 @@ function formatDateTh(d: Date | string | null): string {
   } catch { return String(d) }
 }
 
-function getCarStatusDisplay(status: string): string {
-  const map: Record<string, string> = {
-    PRODUCTION: '🏭 ผลิต (PRODUCTION)',
-    AVAILABLE: '✅ พร้อมส่ง (AVAILABLE)',
-    ON_RENT: '🚗 ปล่อยรถแล้ว (ON_RENT)',
-    MAINTENANCE: '🔧 ซ่อม (MAINTENANCE)',
-    REPLACEMENT: '🔄 รถทดแทน (REPLACEMENT)',
-    WAITING_FOR_GR: '📦 รอ GR (WAITING_FOR_GR)',
+function getCarStatusDisplay(statusName: string, statusCode: string): string {
+  const emojiMap: Record<string, string> = {
+    PRODUCTION: '🏭',
+    AVAILABLE: '✅',
+    ON_RENT: '🚗',
+    MAINTENANCE: '🔧',
+    REPLACEMENT: '🔄',
+    WAITING_FOR_GR: '📦',
   }
-  return map[status] || status || '-'
+  const emoji = emojiMap[statusCode || ''] || '📋'
+  const name = statusName || statusCode || '-'
+  if (statusCode && statusName) {
+    return `${emoji} ${name} (${statusCode})`
+  }
+  return `${emoji} ${name}`
 }
 
 // ─── Build Flex: New Maintenance Alert ──────────────────────────────
@@ -81,7 +86,7 @@ function buildMaintenanceFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันที่แจ้ง', color: '#6b7280', size: 'sm', flex: 3 },
@@ -144,7 +149,7 @@ function buildDeliveryFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันส่งมอบ', color: '#6b7280', size: 'sm', flex: 3 },
@@ -215,7 +220,7 @@ function buildReturnFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatus), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
@@ -273,9 +278,11 @@ export async function GET(req: NextRequest) {
             i.RegisterNo,
             i.Model,
             i.ProjectType,
-            i.Status AS CarStatus
+            i.Status AS CarInventoryStatusCode,
+            s.DescriptionStatus AS CarStatusName
           FROM dbo.EV_RentItem r
           LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+          LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           WHERE r.IsActive = 1
             AND (r.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY r.RentItemID DESC
@@ -311,9 +318,11 @@ export async function GET(req: NextRequest) {
             i.RegisterNo,
             i.Model,
             i.ProjectType,
-            i.Status AS CarStatus
+            i.Status AS CarInventoryStatusCode,
+            s.DescriptionStatus AS CarStatusName
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           WHERE m.IsActive = 1
             AND (m.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY m.MaintenanceItemID DESC
@@ -350,11 +359,13 @@ export async function GET(req: NextRequest) {
             r.Mileage,
             r.ParkLocation,
             i.RegisterNo,
-            rent.ProjectType,
-            i.Status AS CarStatus
+            i.ProjectType,
+            i.Status AS CarInventoryStatusCode,
+            s.DescriptionStatus AS CarStatusName
           FROM dbo.EV_ReturnItem r
           LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
           LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
+          LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           WHERE r.VinNo = @vin OR i.RegisterNo = @vin
           ORDER BY r.ReturnItemID DESC
         `)
@@ -412,9 +423,11 @@ export async function GET(req: NextRequest) {
           i.RegisterNo,
           i.Model,
           i.ProjectType,
-          i.Status AS CarStatus
+          i.Status AS CarInventoryStatusCode,
+          s.DescriptionStatus AS CarStatusName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         WHERE m.IsActive = 1
           AND m.ReportDate >= @since
         ORDER BY m.ReportDate DESC
@@ -433,9 +446,11 @@ export async function GET(req: NextRequest) {
           i.RegisterNo,
           i.Model,
           i.ProjectType,
-          i.Status AS CarStatus
+          i.Status AS CarInventoryStatusCode,
+          s.DescriptionStatus AS CarStatusName
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
           AND r.ReleaseDate IS NOT NULL
@@ -456,11 +471,13 @@ export async function GET(req: NextRequest) {
           r.Mileage,
           r.ParkLocation,
           i.RegisterNo,
-          rent.ProjectType,
-          i.Status AS CarStatus
+          i.ProjectType,
+          i.Status AS CarInventoryStatusCode,
+          s.DescriptionStatus AS CarStatusName
         FROM dbo.EV_ReturnItem r
         LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
+        LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         WHERE r.ReceiveDate >= @since OR r.ReturnDate >= @since
         ORDER BY r.ReceiveDate DESC, r.ReturnDate DESC
       `)
