@@ -2212,6 +2212,20 @@ async function trySendVehicleFlexMessage(
         replacement = replResult.recordset[0] || null
       }
 
+      // Query follow-up logs if exist
+      let followUps: any[] = []
+      if (maint.MaintenanceItemID) {
+        const followUpResult = await pool.request()
+          .input('maintId', sql.Int, maint.MaintenanceItemID)
+          .query(`
+            SELECT f.FollowUpDate, f.FollowUpDetail, f.CreateDate, f.CreateUserID
+            FROM dbo.EV_MaintenanceFollowUp f
+            WHERE f.MaintenanceItemID = @maintId AND f.IsActive = 1
+            ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
+          `)
+        followUps = followUpResult.recordset || []
+      }
+
       const usageStatus =
         maint.CarStatusCode === 'STILL_WORK'
           ? '🟢 ยังใช้งานได้ (ยังวิ่งอยู่)'
@@ -2331,7 +2345,7 @@ async function trySendVehicleFlexMessage(
         }
       }
 
-      flexContents = {
+      const mainBubble = {
         type: 'bubble',
         header: {
           type: 'box',
@@ -2401,6 +2415,152 @@ async function trySendVehicleFlexMessage(
             }
           ]
         }
+      }
+
+      if (followUps.length > 0) {
+        const timelineRows: any[] = []
+        const maxTimelineItems = 4
+        const itemsToShow = followUps.slice(0, maxTimelineItems)
+
+        itemsToShow.forEach((f, idx) => {
+          const isLast = idx === itemsToShow.length - 1 && followUps.length <= maxTimelineItems
+          timelineRows.push({
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                width: '16px',
+                alignItems: 'center',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    width: '8px',
+                    height: '8px',
+                    cornerRadius: '4px',
+                    backgroundColor: '#dc2626'
+                  },
+                  ...(!isLast ? [{
+                    type: 'box',
+                    layout: 'vertical',
+                    width: '2px',
+                    flex: 1,
+                    backgroundColor: '#cbd5e1',
+                    margin: 'xs'
+                  }] : [])
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 1,
+                contents: [
+                  {
+                    type: 'text',
+                    text: `${formatDateTh(f.FollowUpDate || f.CreateDate)} - โดย User ${f.CreateUserID || '-'}`,
+                    size: 'xxs',
+                    color: '#6b7280',
+                    weight: 'bold'
+                  },
+                  {
+                    type: 'text',
+                    text: f.FollowUpDetail || '-',
+                    size: 'xs',
+                    color: '#111827',
+                    weight: 'bold',
+                    wrap: true,
+                    margin: 'xs'
+                  }
+                ]
+              }
+            ]
+          })
+        })
+
+        if (followUps.length > maxTimelineItems) {
+          timelineRows.push({
+            type: 'text',
+            text: `... และประวัติการติดตามอีก ${followUps.length - maxTimelineItems} รายการ`,
+            size: 'xxs',
+            color: '#9ca3af',
+            align: 'center',
+            margin: 'sm'
+          })
+        }
+
+        const timelineBubble = {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#059669',
+            paddingStart: '16px',
+            paddingEnd: '16px',
+            paddingTop: '12px',
+            paddingBottom: '12px',
+            contents: [
+              {
+                type: 'text',
+                text: '📋 ประวัติการติดตาม (Timeline)',
+                color: '#ffffff',
+                weight: 'bold',
+                size: 'md'
+              },
+              {
+                type: 'text',
+                text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
+                color: '#d1fae5',
+                size: 'xs',
+                margin: 'xs',
+                weight: 'bold'
+              }
+            ]
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            paddingStart: '16px',
+            paddingEnd: '16px',
+            paddingTop: '10px',
+            paddingBottom: '10px',
+            spacing: 'md',
+            contents: timelineRows
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            paddingStart: '16px',
+            paddingEnd: '16px',
+            paddingTop: '8px',
+            paddingBottom: '12px',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#059669',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: 'ดูรายละเอียดทั้งหมด',
+                  uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
+                }
+              }
+            ]
+          }
+        }
+
+        flexContents = {
+          type: 'carousel',
+          contents: [
+            mainBubble,
+            timelineBubble
+          ]
+        }
+      } else {
+        flexContents = mainBubble
       }
     } else if (statusCode === 'ON_RENT') {
       const rentResult = await pool.request()
