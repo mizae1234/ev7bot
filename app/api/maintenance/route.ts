@@ -105,12 +105,18 @@ export async function GET(req: NextRequest) {
 
     // Summary counts
     const summaryReq = pool.request()
+    if (locationFilter && locationFilter !== 'all' && locationFilter !== 'ไม่ระบุ') {
+      summaryReq.input('locationFilter', sql.NVarChar, locationFilter)
+    }
 
     // Unique locations
     const locReq = pool.request()
 
     // Repairs by location summary
     const repairByLocReq = pool.request()
+    if (statusFilter && statusFilter !== 'all') {
+      repairByLocReq.input('statusFilter', sql.NVarChar, statusFilter)
+    }
 
     // Maintenance items (active only, optionally filtered)
     const itemReq = pool.request()
@@ -136,7 +142,7 @@ export async function GET(req: NextRequest) {
           COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN m.InventoryItemID END) AS waiting
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'${locationWhere}
       `),
       locReq.query(`
         SELECT DISTINCT m.ServiceLocationCode
@@ -151,7 +157,7 @@ export async function GET(req: NextRequest) {
           COUNT(DISTINCT m.InventoryItemID) AS Count
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}
         GROUP BY m.ServiceLocationCode
         ORDER BY Count DESC
       `),
