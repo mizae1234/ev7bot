@@ -2107,13 +2107,17 @@ async function trySendVehicleFlexMessage(
     const normalized = registerNo.replace(/[\s\-]/g, '')
 
     let query = `
-      SELECT TOP 1 InventoryItemID, VinNo, RegisterNo, Model, Status AS StatusCode, StatusType, Project, ProjectType
-      FROM dbo.EV_InventoryItem
-      WHERE IsActive = 1 AND (
-        RegisterNo = @exact
-        OR VinNo = @exact
-        OR REPLACE(REPLACE(RegisterNo, ' ', ''), '-', '') = @normalized
-        OR REPLACE(REPLACE(VinNo, ' ', ''), '-', '') = @normalized
+      SELECT TOP 1
+        i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model,
+        i.Status AS StatusCode, i.StatusType, i.Project, i.ProjectType,
+        s.DescriptionStatus AS StatusName
+      FROM dbo.EV_InventoryItem i
+      LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      WHERE i.IsActive = 1 AND (
+        i.RegisterNo = @exact
+        OR i.VinNo = @exact
+        OR REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') = @normalized
+        OR REPLACE(REPLACE(i.VinNo, ' ', ''), '-', '') = @normalized
     `
 
     const request = pool.request()
@@ -2122,8 +2126,8 @@ async function trySendVehicleFlexMessage(
 
     if (registerNo.length >= 4) {
       query += `
-        OR RegisterNo LIKE @like
-        OR VinNo LIKE @like
+        OR i.RegisterNo LIKE @like
+        OR i.VinNo LIKE @like
       `
       request.input('like', sql.NVarChar, `%${registerNo}%`)
     }
@@ -2415,7 +2419,7 @@ async function trySendVehicleFlexMessage(
                 },
                 {
                   type: 'text',
-                  text: 'ปล่อยรถแล้ว (ON_RENT)',
+                  text: `${car.StatusName || 'ปล่อยรถแล้ว'} (${car.StatusCode})`,
                   color: '#2563eb',
                   size: 'sm',
                   weight: 'bold',
