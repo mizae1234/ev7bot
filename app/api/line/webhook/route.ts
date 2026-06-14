@@ -684,6 +684,14 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                           { type: 'text', text: 'ค้นหา [ทะเบียน/VIN]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                           { type: 'text', text: 'ดูข้อมูลรถ ผู้เช่า สัญญา และประวัติซ่อม', size: 'xs', color: '#666666', wrap: true, flex: 6 }
                         ]
+                      },
+                      {
+                        type: 'box',
+                        layout: 'horizontal',
+                        contents: [
+                          { type: 'text', text: 'แจ้งบัค [รายละเอียด]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                          { type: 'text', text: 'พิมพ์ "butter บัค [ข้อมูล]" หรือ "butter bug [ข้อมูล]"', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+                        ]
                       }
                     ]
                   }
