@@ -750,7 +750,11 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บข้อมูลคำแปลและรายละเอียดของสถานะหลักรถยนต์
 * **คอลัมน์สำคัญ**: `StatusCode` (PK, รหัสสถานะหลัก เช่น PRODUCTION, AVAILABLE, ON_RENT, MAINTENANCE, REPLACEMENT, WAITING_FOR_GR), `StatusName` (ชื่อภาษาอังกฤษ เช่น In Process Production, Available, On Rent), `DescriptionStatus` (ชื่อคำอธิบายภาษาไทย เช่น อยู่ระหว่างการผลิต, รถใหม่พร้อมส่ง, อยู่ระหว่างเช่า, อยู่ระหว่างซ่อม)
 
-### 11.8 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
+### 11.8 ตาราง: `dbo.EV_MsSubStatus` (มาสเตอร์สถานะย่อยรถยนต์)
+เก็บข้อมูลคำแปลและรายละเอียดของสถานะย่อยของรถยนต์ เพื่อใช้ตรวจสอบความแตกต่าง เช่น รถใหม่ (AVAILABLE) หรือ รถใช้แล้ว/รถเก่า (AVAILABLE_USE)
+* **คอลัมน์สำคัญ**: `SubStatusID` (PK, varchar), `StatusCode` (รหัสสถานะย่อย เช่น AVAILABLE, AVAILABLE_USE, RESERVE, NEW_MAINTENANCE, USE_MAINTENANCE), `StatusName` (ชื่ออังกฤษ เช่น Available New, Available Use, Reserve), `DescriptionStatus` (ชื่อคำอธิบายภาษาไทย เช่น รถใหม่ยังไม่ทำสัญญา, รถใช้เเล้วยังไม่ทำสัญญา, รถที่ถูกจอง), `Type` (ประเภท เช่น STATUS_TYPE_AVAILABLE, STATUS_TYPE_MAINTENANCE), `IsActive` (bit)
+
+### 11.9 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
 ใช้จัดเก็บสถานะบอต การบันทึกปัญหา การลงทะเบียน และ Log การสนทนา
 * **ตาราง: `line_registrations` (การลงทะเบียนบัญชี LINE)**
   * คอลัมน์สำคัญ: `id` (PK, Serial), `line_user_id` (Unique, varchar(50)), `display_name` (varchar(255)), `picture_url` (text), `status_message` (varchar(255)), `system` (varchar(50), default 'EV7'), `is_active` (boolean, default true), `role` (varchar(20), default 'USER' - สิทธิ์การเข้าใช้งาน: 'USER' | 'ADMIN' | 'SUPER_ADMIN'), `registered_at` (timestamptz), `updated_at` (timestamptz)
@@ -772,6 +776,8 @@ Sub-status สำหรับ GI (Good Inspect)
   * `EV_MaintenanceItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
   * `EV_ReplacementItem.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
   * `EV_InventoryItem.Status` ➔ `EV_MsStatus.StatusCode` (เพื่อดึงคำแปลภาษาไทยของสถานะรถคันนั้นจากคอลัมน์ `DescriptionStatus`)
+  * `EV_InventoryItem.StatusType` ➔ `EV_MsSubStatus.StatusCode` (ดึงชื่อคำอธิบายภาษาไทยของสถานะย่อย เช่น เพื่อระบุว่ารถเป็นรถใหม่หรือรถเก่าจากคอลัมน์ `DescriptionStatus` โดยควรกรองด้วยเงื่อนไข `sub.Type LIKE 'STATUS_TYPE_%'`)
+
 * **เงื่อนไขคิวรี (สำคัญ)**:
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ
   * หากรถยังไม่มีเลขทะเบียน (`RegisterNo` เป็น NULL หรือค่าว่าง) ให้ใช้ `VinNo` ในการระบุและแสดงผลแทนทะเบียนรถเสมอ

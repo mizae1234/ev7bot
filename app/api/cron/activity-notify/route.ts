@@ -20,7 +20,12 @@ function formatDateTh(d: Date | string | null): string {
   } catch { return String(d) }
 }
 
-function getCarStatusDisplay(statusName: string, statusCode: string): string {
+function getCarStatusDisplay(
+  statusName: string,
+  statusCode: string,
+  subStatusName?: string,
+  subStatusCode?: string
+): string {
   const emojiMap: Record<string, string> = {
     PRODUCTION: '🏭',
     AVAILABLE: '✅',
@@ -30,8 +35,11 @@ function getCarStatusDisplay(statusName: string, statusCode: string): string {
     WAITING_FOR_GR: '📦',
   }
   const emoji = emojiMap[statusCode || ''] || '📋'
-  const name = statusName || statusCode || '-'
-  if (statusCode && statusName) {
+  const name = subStatusName || statusName || statusCode || '-'
+  if (statusCode && subStatusCode && statusCode !== subStatusCode) {
+    return `${emoji} ${name} (${statusCode} / ${subStatusCode})`
+  }
+  if (statusCode) {
     return `${emoji} ${name} (${statusCode})`
   }
   return `${emoji} ${name}`
@@ -86,7 +94,7 @@ function buildMaintenanceFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันที่แจ้ง', color: '#6b7280', size: 'sm', flex: 3 },
@@ -149,7 +157,7 @@ function buildDeliveryFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันส่งมอบ', color: '#6b7280', size: 'sm', flex: 3 },
@@ -220,7 +228,7 @@ function buildReturnFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
@@ -279,10 +287,13 @@ export async function GET(req: NextRequest) {
             i.Model,
             i.ProjectType,
             i.Status AS CarInventoryStatusCode,
-            s.DescriptionStatus AS CarStatusName
+            s.DescriptionStatus AS CarStatusName,
+            sub.DescriptionStatus AS CarSubStatusName,
+            i.StatusType AS CarSubStatusCode
           FROM dbo.EV_RentItem r
           LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+          LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
           WHERE r.IsActive = 1
             AND (r.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY r.RentItemID DESC
@@ -319,10 +330,13 @@ export async function GET(req: NextRequest) {
             i.Model,
             i.ProjectType,
             i.Status AS CarInventoryStatusCode,
-            s.DescriptionStatus AS CarStatusName
+            s.DescriptionStatus AS CarStatusName,
+            sub.DescriptionStatus AS CarSubStatusName,
+            i.StatusType AS CarSubStatusCode
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+          LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
           WHERE m.IsActive = 1
             AND (m.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY m.MaintenanceItemID DESC
@@ -361,11 +375,14 @@ export async function GET(req: NextRequest) {
             i.RegisterNo,
             i.ProjectType,
             i.Status AS CarInventoryStatusCode,
-            s.DescriptionStatus AS CarStatusName
+            s.DescriptionStatus AS CarStatusName,
+            sub.DescriptionStatus AS CarSubStatusName,
+            i.StatusType AS CarSubStatusCode
           FROM dbo.EV_ReturnItem r
           LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
           LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+          LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
           WHERE r.VinNo = @vin OR i.RegisterNo = @vin
           ORDER BY r.ReturnItemID DESC
         `)
@@ -424,10 +441,13 @@ export async function GET(req: NextRequest) {
           i.Model,
           i.ProjectType,
           i.Status AS CarInventoryStatusCode,
-          s.DescriptionStatus AS CarStatusName
+          s.DescriptionStatus AS CarStatusName,
+          sub.DescriptionStatus AS CarSubStatusName,
+          i.StatusType AS CarSubStatusCode
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         WHERE m.IsActive = 1
           AND m.ReportDate >= @since
         ORDER BY m.ReportDate DESC
@@ -447,10 +467,13 @@ export async function GET(req: NextRequest) {
           i.Model,
           i.ProjectType,
           i.Status AS CarInventoryStatusCode,
-          s.DescriptionStatus AS CarStatusName
+          s.DescriptionStatus AS CarStatusName,
+          sub.DescriptionStatus AS CarSubStatusName,
+          i.StatusType AS CarSubStatusCode
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
           AND r.ReleaseDate IS NOT NULL
@@ -473,11 +496,14 @@ export async function GET(req: NextRequest) {
           i.RegisterNo,
           i.ProjectType,
           i.Status AS CarInventoryStatusCode,
-          s.DescriptionStatus AS CarStatusName
+          s.DescriptionStatus AS CarStatusName,
+          sub.DescriptionStatus AS CarSubStatusName,
+          i.StatusType AS CarSubStatusCode
         FROM dbo.EV_ReturnItem r
         LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
         WHERE r.ReceiveDate >= @since OR r.ReturnDate >= @since
         ORDER BY r.ReceiveDate DESC, r.ReturnDate DESC
       `)
