@@ -479,6 +479,14 @@ function getGuideBubble() {
                 { type: 'text', text: '7. แจ้งบัค [รายละเอียด]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
                 { type: 'text', text: 'พิมพ์ "butter บัค [ข้อมูล]" หรือ "butter bug [ข้อมูล]"', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: '8. ติดตามบัค [หมายเลข]', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
+                { type: 'text', text: 'พิมพ์ "butter ติดตามbug [หมายเลข]"', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+              ]
             }
           ]
         }
@@ -721,6 +729,75 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       await replyText(
         replyToken,
         `❌ เกิดข้อผิดพลาดในการยกเลิกปัญหา #${issueId}: ${err.message || err}`
+      )
+    }
+    return
+  }
+
+  // ─── 🔍 Track Bug Command ───────────────────────────────────────────
+  const followBugMatch = text.trim().match(/^(ติดตาม\s*bug|ติดตาม\s*บัค|ติดตาม\s*ปัญหา)\s*#?(\d+)/i)
+  if (followBugMatch) {
+    const issueId = parseInt(followBugMatch[2], 10)
+    try {
+      const issue = await prisma.systemIssue.findUnique({
+        where: { id: issueId }
+      })
+
+      if (!issue) {
+        await replyText(
+          replyToken,
+          `❌ ไม่พบเลขที่แจ้งปัญหา #${issueId} ในระบบค่ะ 🧈`
+        )
+        return
+      }
+
+      // Convert status to user friendly Thai
+      let thaiStatus = issue.status
+      if (issue.status === 'OPEN') {
+        thaiStatus = '⏳ รอดำเนินการ'
+      } else if (issue.status === 'RESOLVED') {
+        thaiStatus = '✅ แก้ไขแล้ว'
+      } else if (issue.status === 'CANCELLED') {
+        thaiStatus = '🚫 ยกเลิกแล้ว'
+      }
+
+      const formattedCreatedAt = issue.createdAt.toLocaleString('th-TH', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+
+      const formattedResolvedAt = issue.resolvedAt ? issue.resolvedAt.toLocaleString('th-TH', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) : null
+
+      let replyMsg = `📋 รายละเอียดการแจ้งปัญหา #${issue.id}\n`
+      replyMsg += `────────────────\n`
+      replyMsg += `👤 ผู้แจ้ง: ${issue.displayName || 'ไม่ระบุชื่อ'}\n`
+      replyMsg += `📅 วันที่แจ้ง: ${formattedCreatedAt}\n`
+      replyMsg += `📌 สถานะ: ${thaiStatus}\n`
+      if (formattedResolvedAt) {
+        replyMsg += `✅ แก้ไขเสร็จสิ้นเมื่อ: ${formattedResolvedAt}\n`
+      }
+      replyMsg += `────────────────\n`
+      replyMsg += `💬 ปัญหาที่แจ้ง:\n"${issue.description}"\n`
+      replyMsg += `────────────────\n`
+      replyMsg += `🧈 ขอบคุณที่ร่วมพัฒนาและแจ้งปัญหานะคะ 💛`
+
+      await replyText(replyToken, replyMsg)
+    } catch (err: any) {
+      console.error('[Follow Bug Command Error]', err)
+      await replyText(
+        replyToken,
+        `❌ เกิดข้อผิดพลาดในการดึงข้อมูลปัญหา #${issueId}: ${err.message || err}`
       )
     }
     return
