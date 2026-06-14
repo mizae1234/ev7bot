@@ -126,10 +126,10 @@ function buildDeliveryFlex(item: any): any {
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#1565C0', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
+        type: 'box', layout: 'vertical', backgroundColor: '#2E7D32', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
           { type: 'text', text: '🚗 ปล่อยรถใหม่', color: '#ffffff', weight: 'bold', size: 'md' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#bbdefb', size: 'xs', margin: 'xs', weight: 'bold' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#c8e6c9', size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
@@ -156,7 +156,7 @@ function buildDeliveryFlex(item: any): any {
       footer: {
         type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#1565C0', height: 'sm',
+          type: 'button', style: 'primary', color: '#2E7D32', height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
@@ -177,10 +177,10 @@ function buildReturnFlex(item: any): any {
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#2E7D32', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
+        type: 'box', layout: 'vertical', backgroundColor: '#1565C0', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
           { type: 'text', text: '↩️ บันทึกคืนรถ', color: '#ffffff', weight: 'bold', size: 'md' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#c8e6c9', size: 'xs', margin: 'xs', weight: 'bold' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#bbdefb', size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
@@ -215,7 +215,7 @@ function buildReturnFlex(item: any): any {
       footer: {
         type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#2E7D32', height: 'sm',
+          type: 'button', style: 'primary', color: '#1565C0', height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
