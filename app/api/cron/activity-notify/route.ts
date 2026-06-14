@@ -67,49 +67,41 @@ function buildMaintenanceFlex(item: any): any {
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#C62828', paddingAll: '16px',
+        type: 'box', layout: 'vertical', backgroundColor: '#C62828', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
-          { type: 'text', text: '🔧 แจ้งซ่อมใหม่', color: '#ffffff', weight: 'bold', size: 'lg' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#ffcdd2', size: 'sm', margin: 'xs' },
+          { type: 'text', text: '🔧 แจ้งซ่อมใหม่', color: '#ffffff', weight: 'bold', size: 'md' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#ffcdd2', size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
-        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'md',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '10px', paddingBottom: '10px', spacing: 'sm',
         contents: [
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'รุ่น', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.Model || '-', color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'โครงการ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: projectDisplay, color: '#111827', size: 'sm', flex: 5 },
+            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: item.IssueTitle || '-', color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.IssueTitle || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+            { type: 'text', text: 'การใช้งาน/อู่', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${usageStatus} / ${item.ServiceLocationCode || '-'}`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'การใช้งาน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: usageStatus, color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: 'วันที่แจ้ง/ผู้แจ้ง', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(item.ReportDate)} (${item.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'วันที่แจ้ง', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: formatDateTh(item.ReportDate), color: '#111827', size: 'sm', flex: 5 },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานที่ซ่อม', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.ServiceLocationCode || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
       footer: {
-        type: 'box', layout: 'vertical', paddingAll: '16px',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#C62828',
+          type: 'button', style: 'primary', color: '#C62828', height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
@@ -130,45 +122,37 @@ function buildDeliveryFlex(item: any): any {
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#1565C0', paddingAll: '16px',
+        type: 'box', layout: 'vertical', backgroundColor: '#1565C0', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
-          { type: 'text', text: '🚗 ปล่อยรถใหม่', color: '#ffffff', weight: 'bold', size: 'lg' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#bbdefb', size: 'sm', margin: 'xs' },
+          { type: 'text', text: '🚗 ปล่อยรถใหม่', color: '#ffffff', weight: 'bold', size: 'md' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#bbdefb', size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
-        type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'md',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '10px', paddingBottom: '10px', spacing: 'sm',
         contents: [
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'รุ่น', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.Model || '-', color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'โครงการ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: projectDisplay, color: '#111827', size: 'sm', flex: 5 },
+            { type: 'text', text: 'ลูกค้า/สัญญา', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${customerName} (${item.ContractNo || '-'})`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'ลูกค้า', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: customerName, color: '#111827', size: 'sm', flex: 5, wrap: true },
+            { type: 'text', text: 'วันส่งมอบ/ผู้ส่ง', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(item.ReleaseDate)} (${item.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'เลขสัญญา', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: item.ContractNo || '-', color: '#111827', size: 'sm', flex: 5, wrap: true },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true },
-          ]},
-          { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'วันส่งมอบ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: formatDateTh(item.ReleaseDate), color: '#111827', size: 'sm', flex: 5 },
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
         ],
       },
       footer: {
-        type: 'box', layout: 'vertical', paddingAll: '16px',
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#1565C0',
+          type: 'button', style: 'primary', color: '#1565C0', height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
@@ -277,11 +261,13 @@ export async function GET(req: NextRequest) {
             i.Status AS CarInventoryStatusCode,
             s.DescriptionStatus AS CarStatusName,
             sub.DescriptionStatus AS CarSubStatusName,
-            i.StatusType AS CarSubStatusCode
+            i.StatusType AS CarSubStatusCode,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
           FROM dbo.EV_RentItem r
           LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+          LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
           WHERE r.IsActive = 1
             AND (r.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY r.RentItemID DESC
@@ -320,11 +306,13 @@ export async function GET(req: NextRequest) {
             i.Status AS CarInventoryStatusCode,
             s.DescriptionStatus AS CarStatusName,
             sub.DescriptionStatus AS CarSubStatusName,
-            i.StatusType AS CarSubStatusCode
+            i.StatusType AS CarSubStatusCode,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+          LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
           WHERE m.IsActive = 1
             AND (m.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY m.MaintenanceItemID DESC
@@ -433,11 +421,13 @@ export async function GET(req: NextRequest) {
           i.Status AS CarInventoryStatusCode,
           s.DescriptionStatus AS CarStatusName,
           sub.DescriptionStatus AS CarSubStatusName,
-          i.StatusType AS CarSubStatusCode
+          i.StatusType AS CarSubStatusCode,
+          ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+        LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
         WHERE m.IsActive = 1
           AND m.ReportDate >= @since
         ORDER BY m.ReportDate DESC
@@ -459,11 +449,13 @@ export async function GET(req: NextRequest) {
           i.Status AS CarInventoryStatusCode,
           s.DescriptionStatus AS CarStatusName,
           sub.DescriptionStatus AS CarSubStatusName,
-          i.StatusType AS CarSubStatusCode
+          i.StatusType AS CarSubStatusCode,
+          ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+        LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @since
           AND r.ReleaseDate IS NOT NULL
