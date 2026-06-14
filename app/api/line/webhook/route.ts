@@ -2093,6 +2093,31 @@ function formatDateTh(dateStr: string | Date | null | undefined): string {
   }
 }
 
+function getCarStatusDisplay(
+  statusName: string,
+  statusCode: string,
+  subStatusName?: string,
+  subStatusCode?: string
+): string {
+  const emojiMap: Record<string, string> = {
+    PRODUCTION: '🏭',
+    AVAILABLE: '✅',
+    ON_RENT: '🚗',
+    MAINTENANCE: '🔧',
+    REPLACEMENT: '🔄',
+    WAITING_FOR_GR: '📦',
+  }
+  const emoji = emojiMap[statusCode || ''] || '📋'
+  const name = subStatusName || statusName || statusCode || '-'
+  if (statusCode && subStatusCode && statusCode !== subStatusCode) {
+    return `${emoji} ${name} (${statusCode} / ${subStatusCode})`
+  }
+  if (statusCode) {
+    return `${emoji} ${name} (${statusCode})`
+  }
+  return `${emoji} ${name}`
+}
+
 async function trySendVehicleFlexMessage(
   replyToken: string,
   registerNo: string,
@@ -2110,9 +2135,11 @@ async function trySendVehicleFlexMessage(
       SELECT TOP 1
         i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model,
         i.Status AS StatusCode, i.StatusType, i.Project, i.ProjectType,
-        s.DescriptionStatus AS StatusName
+        s.DescriptionStatus AS StatusName,
+        sub.DescriptionStatus AS SubStatusName
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       WHERE i.IsActive = 1 AND (
         i.RegisterNo = @exact
         OR i.VinNo = @exact
@@ -2154,10 +2181,19 @@ async function trySendVehicleFlexMessage(
       const maintResult = await pool.request()
         .input('inventoryItemId', sql.Int, car.InventoryItemID)
         .query(`
-           SELECT TOP 1 MaintenanceItemID, IssueTitle, ProblemTypeCode, ServiceLocationCode, MaintenanceStartDate, MaintenanceFinishDate, CarStatusCode, ReportDate
-           FROM dbo.EV_MaintenanceItem
-           WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
-           ORDER BY ReportDate DESC
+           SELECT TOP 1 
+             m.MaintenanceItemID, 
+             m.IssueTitle, 
+             m.CarStatusCode, 
+             m.ServiceLocationCode, 
+             m.ReportDate, 
+             m.CreateDate, 
+             m.IncidentDate,
+             ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+           FROM dbo.EV_MaintenanceItem m
+           LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
+           WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
+           ORDER BY m.ReportDate DESC
         `)
       const maint = maintResult.recordset[0] || {}
 
@@ -2176,14 +2212,19 @@ async function trySendVehicleFlexMessage(
         replacement = replResult.recordset[0] || null
       }
 
-      // Map CarStatusCode to Thai
-      const statusMap: Record<string, string> = {
-        'IN_MAINTENANCE': '🔧 อยู่ระหว่างการซ่อม',
-        'WAITING_FOR_MAINTENANCE': '⏳ รอเข้าซ่อม',
-        'STILL_WORK': '🚗 ยังวิ่งอยู่',
-        'COMPLETE': '✅ ซ่อมเสร็จแล้ว',
-      }
-      const carStatusText = statusMap[maint.CarStatusCode] || maint.CarStatusCode || '-'
+      const usageStatus =
+        maint.CarStatusCode === 'STILL_WORK'
+          ? '🟢 ยังใช้งานได้ (ยังวิ่งอยู่)'
+          : maint.CarStatusCode === 'IN_MAINTENANCE'
+          ? '🔴 งดใช้งาน (อยู่ระหว่างซ่อม)'
+          : maint.CarStatusCode === 'WAITING_FOR_MAINTENANCE'
+          ? '🟡 งดใช้งาน (รอเข้าซ่อม)'
+          : maint.CarStatusCode === 'COMPLETE'
+          ? '🟢 ซ่อมเสร็จสิ้น (ใช้งานได้)'
+          : maint.CarStatusCode || '-'
+
+      const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
+      const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
 
       // Build body rows
       const bodyContents: any[] = [
@@ -2191,55 +2232,64 @@ async function trySendVehicleFlexMessage(
           type: 'box',
           layout: 'horizontal',
           contents: [
-            { type: 'text', text: 'VIN', color: '#6b7280', size: 'sm', flex: 3 },
+            { type: 'text', text: 'VIN', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: car.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
           ]
         },
         {
           type: 'box',
           layout: 'horizontal',
-          margin: 'md',
+          margin: 'sm',
           contents: [
-            { type: 'text', text: 'รุ่น', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: car.Model || '-', color: '#111827', size: 'sm', weight: 'bold', flex: 5, wrap: true }
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${car.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true }
           ]
         },
         {
           type: 'box',
           layout: 'horizontal',
-          margin: 'md',
+          margin: 'sm',
           contents: [
-            { type: 'text', text: 'สถานะรถ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: carStatusText, color: '#d97706', size: 'sm', weight: 'bold', flex: 5, wrap: true }
+            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: maint.IssueTitle || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
           ]
         },
         {
           type: 'box',
           layout: 'horizontal',
-          margin: 'md',
+          margin: 'sm',
           contents: [
-            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: maint.IssueTitle || '-', color: '#111827', size: 'sm', flex: 5, wrap: true }
+            { type: 'text', text: 'การใช้งาน/อู่', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${usageStatus} / ${maint.ServiceLocationCode || '-'}`, color: '#111827', size: 'xs', flex: 5, wrap: true }
           ]
         },
         {
           type: 'box',
           layout: 'horizontal',
-          margin: 'md',
+          margin: 'sm',
           contents: [
-            { type: 'text', text: 'สถานที่ซ่อม', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: maint.ServiceLocationCode || '-', color: '#111827', size: 'sm', flex: 5, wrap: true }
+            { type: 'text', text: 'วันเกิดเหตุ/บันทึก', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(maint.IncidentDate)} / ${formatDateTh(maint.CreateDate)}`, color: '#111827', size: 'xs', flex: 5 }
           ]
         },
         {
           type: 'box',
           layout: 'horizontal',
-          margin: 'md',
+          margin: 'sm',
           contents: [
-            { type: 'text', text: 'วันที่แจ้งซ่อม', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: formatDateTh(maint.ReportDate || maint.MaintenanceStartDate), color: '#111827', size: 'sm', flex: 5 }
+            { type: 'text', text: 'วันที่แจ้ง/ผู้แจ้ง', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(maint.ReportDate)} (${maint.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5 }
           ]
         },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'sm',
+          contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: currentStatus, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+          ]
+        }
       ]
 
       // Add replacement car section if exists
@@ -2247,23 +2297,23 @@ async function trySendVehicleFlexMessage(
         bodyContents.push(
           {
             type: 'separator',
-            margin: 'lg',
+            margin: 'md',
             color: '#e5e7eb'
           },
           {
             type: 'text',
             text: '🚙 รถทดแทน',
             weight: 'bold',
-            size: 'sm',
+            size: 'xs',
             color: '#059669',
-            margin: 'lg'
+            margin: 'sm'
           },
           {
             type: 'box',
             layout: 'horizontal',
-            margin: 'sm',
+            margin: 'xs',
             contents: [
-              { type: 'text', text: 'VIN', color: '#6b7280', size: 'sm', flex: 3 },
+              { type: 'text', text: 'VIN', color: '#6b7280', size: 'xs', flex: 3 },
               { type: 'text', text: replacement.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
             ]
           }
@@ -2272,10 +2322,10 @@ async function trySendVehicleFlexMessage(
           bodyContents.push({
             type: 'box',
             layout: 'horizontal',
-            margin: 'sm',
+            margin: 'xs',
             contents: [
-              { type: 'text', text: 'ทะเบียน', color: '#6b7280', size: 'sm', flex: 3 },
-              { type: 'text', text: replacement.ReplRegisterNo, color: '#111827', size: 'sm', flex: 5, wrap: true }
+              { type: 'text', text: 'ทะเบียน', color: '#6b7280', size: 'xs', flex: 3 },
+              { type: 'text', text: replacement.ReplRegisterNo, color: '#111827', size: 'xs', flex: 5, wrap: true }
             ]
           })
         }
@@ -2287,40 +2337,52 @@ async function trySendVehicleFlexMessage(
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#059669',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '12px',
+          paddingBottom: '12px',
           contents: [
             {
               type: 'text',
               text: '🔧 ข้อมูลงานซ่อมรถ',
               color: '#ffffff',
               weight: 'bold',
-              size: 'lg'
+              size: 'md'
             },
             {
               type: 'text',
-              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `VIN: ${car.VinNo}`,
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
               color: '#d1fae5',
-              size: 'sm',
-              margin: 'xs'
+              size: 'xs',
+              margin: 'xs',
+              weight: 'bold'
             }
           ]
         },
         body: {
           type: 'box',
           layout: 'vertical',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '10px',
+          paddingBottom: '10px',
+          spacing: 'sm',
           contents: bodyContents
         },
         footer: {
           type: 'box',
           layout: 'vertical',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '8px',
+          paddingBottom: '12px',
           spacing: 'sm',
           contents: [
             {
               type: 'button',
               style: 'primary',
               color: '#059669',
+              height: 'sm',
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',
@@ -2330,6 +2392,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'button',
               style: 'secondary',
+              height: 'sm',
               action: {
                 type: 'uri',
                 label: '🔧 ดูรายการซ่อมทั้งหมด',
@@ -2343,10 +2406,13 @@ async function trySendVehicleFlexMessage(
       const rentResult = await pool.request()
         .input('inventoryItemId', sql.Int, car.InventoryItemID)
         .query(`
-          SELECT TOP 1 ContractNo, FirstName, LastName, ReleaseDate, ExpectedReleaseDate
-          FROM dbo.EV_RentItem
-          WHERE InventoryItemID = @inventoryItemId AND IsActive = 1
-          ORDER BY ReleaseDate DESC
+          SELECT TOP 1 
+            r.ContractNo, r.FirstName, r.LastName, r.ReleaseDate, r.ExpectedReleaseDate, r.ContractType,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+          FROM dbo.EV_RentItem r
+          LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
+          WHERE r.InventoryItemID = @inventoryItemId AND r.IsActive = 1
+          ORDER BY r.ReleaseDate DESC, r.ExpectedReleaseDate DESC
         `)
       const rent = rentResult.recordset[0] || {}
 
@@ -2354,142 +2420,97 @@ async function trySendVehicleFlexMessage(
         ? `${rent.FirstName} ${rent.LastName ? '***' : ''}`.trim()
         : '-'
 
+      const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
+      const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
+
       flexContents = {
         type: 'bubble',
         header: {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#059669',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '12px',
+          paddingBottom: '12px',
           contents: [
             {
               type: 'text',
               text: '🚗 ข้อมูลการปล่อยรถ',
               color: '#ffffff',
               weight: 'bold',
-              size: 'lg'
+              size: 'md'
             },
             {
               type: 'text',
               text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
               color: '#d1fae5',
-              size: 'sm',
-              margin: 'xs'
+              size: 'xs',
+              margin: 'xs',
+              weight: 'bold'
             }
           ]
         },
         body: {
           type: 'box',
           layout: 'vertical',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '10px',
+          paddingBottom: '10px',
+          spacing: 'sm',
           contents: [
             {
               type: 'box',
               layout: 'horizontal',
               contents: [
-                {
-                  type: 'text',
-                  text: 'รุ่น',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: car.Model || '-',
-                  color: '#111827',
-                  size: 'sm',
-                  weight: 'bold',
-                  flex: 4,
-                  wrap: true
-                }
+                { type: 'text', text: 'VIN', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: car.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
               ]
             },
             {
               type: 'box',
               layout: 'horizontal',
-              margin: 'md',
+              margin: 'sm',
               contents: [
-                {
-                  type: 'text',
-                  text: 'สถานะรถ',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: `${car.StatusName || 'ปล่อยรถแล้ว'} (${car.StatusCode})`,
-                  color: '#2563eb',
-                  size: 'sm',
-                  weight: 'bold',
-                  flex: 4
-                }
+                { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: `${car.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true }
               ]
             },
             {
               type: 'box',
               layout: 'horizontal',
-              margin: 'md',
+              margin: 'sm',
               contents: [
-                {
-                  type: 'text',
-                  text: 'ลูกค้า',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: customerName,
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4,
-                  wrap: true
-                }
+                { type: 'text', text: 'ลูกค้า/สัญญา', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: `${customerName} (${rent.ContractNo || '-'})`, color: '#111827', size: 'xs', flex: 5, wrap: true }
               ]
             },
             {
               type: 'box',
               layout: 'horizontal',
-              margin: 'md',
+              margin: 'sm',
               contents: [
-                {
-                  type: 'text',
-                  text: 'เลขสัญญา',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: rent.ContractNo || '-',
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4,
-                  wrap: true
-                }
+                { type: 'text', text: 'วันส่งมอบ/ผู้ส่ง', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: `${formatDateTh(rent.ReleaseDate || rent.ExpectedReleaseDate)} (${rent.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5 }
               ]
             },
             {
               type: 'box',
               layout: 'horizontal',
-              margin: 'md',
+              margin: 'sm',
               contents: [
-                {
-                  type: 'text',
-                  text: 'วันส่งมอบจริง',
-                  color: '#6b7280',
-                  size: 'sm',
-                  flex: 2
-                },
-                {
-                  type: 'text',
-                  text: formatDateTh(rent.ReleaseDate || rent.ExpectedReleaseDate),
-                  color: '#111827',
-                  size: 'sm',
-                  flex: 4
-                }
+                { type: 'text', text: 'ประเภทสัญญา', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: rent.ContractType || '-', color: '#111827', size: 'xs', flex: 5 }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'sm',
+              contents: [
+                { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+                { type: 'text', text: currentStatus, color: '#2563eb', size: 'xs', weight: 'bold', flex: 5, wrap: true }
               ]
             }
           ]
@@ -2497,12 +2518,16 @@ async function trySendVehicleFlexMessage(
         footer: {
           type: 'box',
           layout: 'vertical',
-          paddingAll: '16px',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '8px',
+          paddingBottom: '12px',
           contents: [
             {
               type: 'button',
               style: 'primary',
               color: '#059669',
+              height: 'sm',
               action: {
                 type: 'uri',
                 label: 'ดูรายละเอียดเพิ่มเติม',

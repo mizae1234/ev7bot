@@ -310,16 +310,16 @@ function VehicleDetailContent() {
               )}
               {activeMaint.followUps && activeMaint.followUps.length > 0 && (
                 <div className="bg-zinc-50/50 rounded-xl p-3 border border-zinc-200/60 space-y-2.5">
-                  <p className="text-xs text-zinc-500 font-bold mb-1">📋 ประวัติการติดตาม (Follow Up Logs)</p>
-                  <div className="space-y-3 border-l-2 border-zinc-200 pl-3.5 ml-1">
+                  <p className="text-xs text-zinc-800 dark:text-zinc-200 font-bold mb-1">📋 ประวัติการติดตาม (Follow Up Logs)</p>
+                  <div className="space-y-3 border-l-2 border-zinc-350 dark:border-zinc-500 pl-3.5 ml-1">
                     {activeMaint.followUps.map((f, fi) => (
                       <div key={fi} className="relative text-xs">
                         <span className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
-                        <div className="flex items-center justify-between text-zinc-400 font-medium mb-1">
+                        <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 font-semibold mb-1">
                           <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
                           <span>โดย User {f.CreateUserID || '-'}</span>
                         </div>
-                        <p className="text-zinc-700 font-normal leading-relaxed">{f.FollowUpDetail}</p>
+                        <p className="text-zinc-900 dark:text-zinc-50 font-medium leading-relaxed">{f.FollowUpDetail}</p>
                       </div>
                     ))}
                   </div>
@@ -381,16 +381,16 @@ function VehicleDetailContent() {
                     )}
                     {m.followUps && m.followUps.length > 0 && (
                       <div className="mt-3 bg-zinc-100/50 dark:bg-zinc-800/50 p-2.5 rounded-lg border border-zinc-200/40">
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">📋 ประวัติการติดตาม ({m.followUps.length} รายการ)</p>
-                        <div className="space-y-3 border-l-2 border-zinc-300 dark:border-zinc-700 pl-3 ml-1">
+                        <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider mb-2">📋 ประวัติการติดตาม ({m.followUps.length} รายการ)</p>
+                        <div className="space-y-3 border-l-2 border-zinc-400 dark:border-zinc-550 pl-3 ml-1">
                           {m.followUps.map((f, fi) => (
                             <div key={fi} className="relative text-[11px] leading-relaxed">
-                              <span className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600 border border-white dark:border-zinc-800 shadow-sm" />
-                              <div className="flex items-center justify-between text-zinc-400 font-medium">
+                              <span className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-zinc-500 dark:bg-zinc-400 border border-white dark:border-zinc-800 shadow-sm" />
+                              <div className="flex items-center justify-between text-zinc-650 dark:text-zinc-400 font-semibold">
                                 <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
                                 <span>โดย User {f.CreateUserID || '-'}</span>
                               </div>
-                              <p className="text-zinc-700 dark:text-zinc-300 mt-0.5">{f.FollowUpDetail}</p>
+                              <p className="text-zinc-900 dark:text-zinc-50 font-medium mt-0.5">{f.FollowUpDetail}</p>
                             </div>
                           ))}
                         </div>
