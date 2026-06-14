@@ -216,7 +216,7 @@ function buildReturnFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันคืนรถ', color: '#6b7280', size: 'sm', flex: 3 },
-            { type: 'text', text: formatDateTh(item.ReturnDate || item.ReceiveDate), color: '#111827', size: 'sm', flex: 5 },
+            { type: 'text', text: formatDateTh(item.ReturnDate), color: '#111827', size: 'sm', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'เลขไมล์คืน', color: '#6b7280', size: 'sm', flex: 3 },
@@ -504,8 +504,8 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_InventoryItem i ON i.VinNo = r.VinNo
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
-        WHERE COALESCE(r.ReturnDate, r.ReceiveDate) >= @since
-        ORDER BY COALESCE(r.ReturnDate, r.ReceiveDate) DESC
+        WHERE r.ReturnDate >= @since
+        ORDER BY r.ReturnDate DESC
       `)
 
     const [maintResult, deliveryResult, returnResult] = await Promise.all([
