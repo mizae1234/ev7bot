@@ -157,31 +157,52 @@ export async function GET(
       `)
     ])
 
-    // 4. ดึงรถทดแทน (ถ้ามี) สำหรับแต่ละงานซ่อม
+    // 4. ดึงรถทดแทน (ถ้ามี) และการติดตามงานซ่อมสำหรับแต่ละงานซ่อม
     const maintIds = maintResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)
     let replacements: Record<number, unknown[]> = {}
+    let followUps: Record<number, unknown[]> = {}
 
     if (maintIds.length > 0) {
       const replReq = pool.request()
+      const followUpReq = pool.request()
       const idList = maintIds.map((_: number, i: number) => `@mid${i}`).join(',')
       maintIds.forEach((id: number, i: number) => {
         replReq.input(`mid${i}`, sql.Int, id)
+        followUpReq.input(`mid${i}`, sql.Int, id)
       })
-      const replResult = await replReq.query(`
-        SELECT
-          ReplacementItemID, MaintenanceItemID, VinNo,
-          ReplacementStartDate, ReplacementReturnDate,
-          Location, Remark, IsActive
-        FROM dbo.EV_ReplacementItem
-        WHERE MaintenanceItemID IN (${idList})
-        ORDER BY ReplacementStartDate DESC
-      `)
+      const [replResult, followUpResult] = await Promise.all([
+        replReq.query(`
+          SELECT
+            ReplacementItemID, MaintenanceItemID, VinNo,
+            ReplacementStartDate, ReplacementReturnDate,
+            Location, Remark, IsActive
+          FROM dbo.EV_ReplacementItem
+          WHERE MaintenanceItemID IN (${idList})
+          ORDER BY ReplacementStartDate DESC
+        `),
+        followUpReq.query(`
+          SELECT
+            MaintenanceFollowUpID, MaintenanceItemID, FollowUpDate,
+            FollowUpDetail, IsActive, CreateDate, CreateUserID,
+            UpdateDate, UpdateUserID
+          FROM dbo.EV_MaintenanceFollowUp
+          WHERE MaintenanceItemID IN (${idList}) AND IsActive = 1
+          ORDER BY FollowUpDate DESC, CreateDate DESC
+        `)
+      ])
 
       for (const r of replResult.recordset) {
         if (!replacements[r.MaintenanceItemID]) {
           replacements[r.MaintenanceItemID] = []
         }
         replacements[r.MaintenanceItemID].push(r)
+      }
+
+      for (const f of followUpResult.recordset) {
+        if (!followUps[f.MaintenanceItemID]) {
+          followUps[f.MaintenanceItemID] = []
+        }
+        followUps[f.MaintenanceItemID].push(f)
       }
     }
 
@@ -246,6 +267,7 @@ export async function GET(
       Insurance: mapCode(m.InsuranceCode, insuranceMap),
       CarStatusDescription: carStatusMap[m.CarStatusCode as string] || (m.CarStatusCode as string) || '-',
       replacements: replacements[m.MaintenanceItemID as number] || [],
+      followUps: followUps[m.MaintenanceItemID as number] || [],
     }))
 
     const maskedReturns = returnResult.recordset.map((r: Record<string, unknown>) => ({

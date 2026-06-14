@@ -45,6 +45,18 @@ interface ReplacementInfo {
   Remark: string
 }
 
+interface MaintenanceFollowUpInfo {
+  MaintenanceFollowUpID: number
+  MaintenanceItemID: number
+  FollowUpDate: string | null
+  FollowUpDetail: string | null
+  IsActive: boolean
+  CreateDate: string
+  CreateUserID: number | null
+  UpdateDate: string | null
+  UpdateUserID: number | null
+}
+
 interface MaintenanceInfo {
   MaintenanceItemID: number
   ReportDate: string
@@ -63,6 +75,7 @@ interface MaintenanceInfo {
   FollowUpDetail: string
   IsActive: boolean
   replacements: ReplacementInfo[]
+  followUps?: MaintenanceFollowUpInfo[]
   DriverName?: string | null
   RootCauseFound?: string | null
   FixAction?: string | null
@@ -295,6 +308,23 @@ function VehicleDetailContent() {
                   <p className="text-sm text-zinc-700">{activeMaint.FollowUpDetail}</p>
                 </div>
               )}
+              {activeMaint.followUps && activeMaint.followUps.length > 0 && (
+                <div className="bg-zinc-50/50 rounded-xl p-3 border border-zinc-200/60 space-y-2.5">
+                  <p className="text-xs text-zinc-500 font-bold mb-1">📋 ประวัติการติดตาม (Follow Up Logs)</p>
+                  <div className="space-y-3 border-l-2 border-zinc-200 pl-3.5 ml-1">
+                    {activeMaint.followUps.map((f, fi) => (
+                      <div key={fi} className="relative text-xs">
+                        <span className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
+                        <div className="flex items-center justify-between text-zinc-400 font-medium mb-1">
+                          <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
+                          <span>โดย User {f.CreateUserID || '-'}</span>
+                        </div>
+                        <p className="text-zinc-700 font-normal leading-relaxed">{f.FollowUpDetail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {activeMaint.replacements.length > 0 && (
                 <div className="bg-purple-50/50 rounded-xl p-3 border border-purple-100">
                   <p className="text-xs text-purple-600 font-medium mb-2">🔄 รถทดแทน</p>
@@ -347,6 +377,23 @@ function VehicleDetailContent() {
                     {m.FollowUpDetail && (
                       <div className="mt-2 text-xs bg-zinc-100 dark:bg-zinc-800 p-2 rounded-lg text-zinc-600 dark:text-zinc-300">
                         <strong>หมายเหตุ:</strong> {m.FollowUpDetail}
+                      </div>
+                    )}
+                    {m.followUps && m.followUps.length > 0 && (
+                      <div className="mt-3 bg-zinc-100/50 dark:bg-zinc-800/50 p-2.5 rounded-lg border border-zinc-200/40">
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">📋 ประวัติการติดตาม ({m.followUps.length} รายการ)</p>
+                        <div className="space-y-3 border-l-2 border-zinc-300 dark:border-zinc-700 pl-3 ml-1">
+                          {m.followUps.map((f, fi) => (
+                            <div key={fi} className="relative text-[11px] leading-relaxed">
+                              <span className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-zinc-400 dark:bg-zinc-600 border border-white dark:border-zinc-800 shadow-sm" />
+                              <div className="flex items-center justify-between text-zinc-400 font-medium">
+                                <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
+                                <span>โดย User {f.CreateUserID || '-'}</span>
+                              </div>
+                              <p className="text-zinc-700 dark:text-zinc-300 mt-0.5">{f.FollowUpDetail}</p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     {m.replacements.length > 0 && (

@@ -46,6 +46,9 @@ FollowUpDetail, IsActive (bit)
 คอลัมน์: ReplacementItemID, MaintenanceItemID, VinNo (VIN ของรถทดแทน),
 ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
 
+### ตาราง: dbo.EV_MaintenanceFollowUp (การติดตามสถานะงานซ่อม/การแจ้งซ่อม)
+คอลัมน์: MaintenanceFollowUpID, MaintenanceItemID (FK -> EV_MaintenanceItem), FollowUpDate (วันติดตาม), FollowUpDetail (รายละเอียดการติดตาม), IsActive (bit, เอาเฉพาะ IsActive=1), CreateDate (วันสร้าง), CreateUserID (ผู้บันทึก)
+
 ### ตาราง: dbo.EV_ReturnItem (รับคืนรถ)
 คอลัมน์: ReturnItemID, VinNo, CustomerName, Model, ContractNo,
 ReceiveDate, ReturnDate, Mileage, ParkLocation
@@ -54,6 +57,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MaintenanceItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_ReplacementItem.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
+- EV_MaintenanceFollowUp.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
 - EV_ReturnItem เก็บข้อมูลแยก (ใช้ VinNo เชื่อม)
 
 ## วิธี Query ตามสถานการณ์
@@ -65,7 +69,9 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
    SELECT IssueTitle, CarStatusCode, ProblemTypeCode AS ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocationCode AS ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
-4. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
+4. ถ้ามีการสอบถามเกี่ยวกับการติดตามผล (Follow up) หรือการอัปเดตงานซ่อมย้อนหลัง → ดึงจาก EV_MaintenanceFollowUp:
+   SELECT FollowUpDate, FollowUpDetail FROM EV_MaintenanceFollowUp WHERE MaintenanceItemID = <id> AND IsActive = 1 ORDER BY FollowUpDate DESC
+5. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
    SELECT ContractNo, FirstName, LastName, ReleaseDate FROM EV_RentItem WHERE InventoryItemID = <id> AND IsActive = 1
 
 ### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE

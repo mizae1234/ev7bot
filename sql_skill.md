@@ -767,6 +767,9 @@ Sub-status สำหรับ GI (Good Inspect)
 * **ตาราง: `activity_notifications` (ข้อมูลการแจ้งเตือนงานซ่อม/ส่งมอบ)**
   * คอลัมน์สำคัญ: `id` (PK, Serial), `record_type` (varchar(30) - 'MAINTENANCE' | 'DELIVERY' | 'RETURN'), `record_id` (int), `sent_at` (timestamptz)
 
+### 11.10 ตาราง: `dbo.EV_MaintenanceFollowUp` (ประวัติการติดตามงานซ่อม/การแจ้งซ่อม)
+เก็บข้อมูลประวัติการติดตามผล รายละเอียด และความคืบหน้าของงานซ่อม
+* **คอลัมน์สำคัญ**: `MaintenanceFollowUpID` (PK, bigint), `MaintenanceItemID` (FK -> `EV_MaintenanceItem`), `FollowUpDate` (date, วันที่ติดตามผล), `FollowUpDetail` (varchar(max), รายละเอียดการติดตาม), `IsActive` (bit, แฟล็กสถานะ), `CreateDate` (datetime, วันที่สร้าง), `CreateUserID` (int, ID ผู้สร้าง), `UpdateDate` (datetime), `UpdateUserID` (int)
 
 ---
 
@@ -775,11 +778,13 @@ Sub-status สำหรับ GI (Good Inspect)
   * `EV_RentItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
   * `EV_MaintenanceItem.InventoryItemID` ➔ `EV_InventoryItem.InventoryItemID`
   * `EV_ReplacementItem.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
+  * `EV_MaintenanceFollowUp.MaintenanceItemID` ➔ `EV_MaintenanceItem.MaintenanceItemID`
   * `EV_InventoryItem.Status` ➔ `EV_MsStatus.StatusCode` (เพื่อดึงคำแปลภาษาไทยของสถานะรถคันนั้นจากคอลัมน์ `DescriptionStatus`)
   * `EV_InventoryItem.StatusType` ➔ `EV_MsSubStatus.StatusCode` (ดึงชื่อคำอธิบายภาษาไทยของสถานะย่อย เช่น เพื่อระบุว่ารถเป็นรถใหม่หรือรถเก่าจากคอลัมน์ `DescriptionStatus` โดยควรกรองด้วยเงื่อนไข `sub.Type LIKE 'STATUS_TYPE_%'`)
   * `EV_ReturnItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้บันทึกข้อมูลย้อนกลับ โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
   * `EV_RentItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้ปล่อยรถ/ทำสัญญาส่งมอบ โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
   * `EV_MaintenanceItem.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้แจ้งซ่อม/ผู้บันทึกรายการแจ้งซ่อม โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
+  * `EV_MaintenanceFollowUp.CreateUserID` ➔ `EV_User.UserID` (เพื่อดึงชื่อผู้บันทึกความคืบหน้าการติดตามผล โดยใช้ `FirstName` หรือ fallback ไปยัง `UserName`)
 
 * **เงื่อนไขคิวรี (สำคัญ)**:
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ
