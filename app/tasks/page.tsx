@@ -330,13 +330,31 @@ function TasksContent() {
     if (!dueDateStr) return <span className="text-zinc-500">-</span>
 
     try {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const due = new Date(dueDateStr)
-      due.setHours(0, 0, 0, 0)
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      }).formatToParts(new Date())
+      const nowY = Number(nowParts.find(p => p.type === 'year')?.value ?? 0)
+      const nowM = Number(nowParts.find(p => p.type === 'month')?.value ?? 0)
+      const nowD = Number(nowParts.find(p => p.type === 'day')?.value ?? 0)
+      const bkkTodayMidnight = new Date(nowY, nowM - 1, nowD)
 
-      const diffTime = due.getTime() - today.getTime()
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const due = new Date(dueDateStr)
+      const dueParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      }).formatToParts(due)
+      const dueY = Number(dueParts.find(p => p.type === 'year')?.value ?? 0)
+      const dueM = Number(dueParts.find(p => p.type === 'month')?.value ?? 0)
+      const dueD = Number(dueParts.find(p => p.type === 'day')?.value ?? 0)
+      const bkkDueMidnight = new Date(dueY, dueM - 1, dueD)
+
+      const diffTime = bkkDueMidnight.getTime() - bkkTodayMidnight.getTime()
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
 
       if (diffDays < 0) {
         return (
@@ -358,7 +376,7 @@ function TasksContent() {
         )
       } else {
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700/60">
+          <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700/60 font-medium">
             ⏳ อีก {diffDays} วัน
           </span>
         )

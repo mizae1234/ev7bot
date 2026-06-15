@@ -1964,7 +1964,15 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       }
     } catch { /* ignore */ }
 
-    const aiResponse = await askButter(text, history, { userId, userName })
+    const userContext: {
+      userId?: string
+      userName?: string
+      toolsCalled?: string[]
+      createdTaskId?: number
+      completedTaskId?: number
+    } = { userId, userName }
+
+    const aiResponse = await askButter(text, history, userContext)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
 
     // ─── Try to detect task list or vehicle identifier for Flex Message ───
@@ -1972,27 +1980,41 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
     // 1. Task Checklist Flow
     const isTaskQuery = matchAny(lower, ['งานค้าง', 'รายการงาน', 'รายการโน้ต', 'ดูงาน', 'ดูโน้ต', 'งานทั้งหมด', 'มีงานอะไร', 'จดอะไรไว้บ้าง', 'task list', 'list task'])
-    const aiMentionsTasks = aiResponse.includes('ID #') || aiResponse.includes('รายการงาน') || aiResponse.includes('งานค้าง')
 
-    if (isTaskQuery) {
+    if (userContext.createdTaskId) {
+      flexSent = await trySendSingleTaskFlexMessage(replyToken, aiResponse, userContext.createdTaskId)
+    } else if (userContext.completedTaskId) {
+      flexSent = await trySendSingleTaskFlexMessage(replyToken, aiResponse, userContext.completedTaskId)
+    } else if (isTaskQuery || (userContext.toolsCalled && userContext.toolsCalled.includes('listTaskNotes'))) {
       let vehicleRef: string | undefined = undefined
       const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
       if (vehicleMatch) {
         vehicleRef = vehicleMatch[0]
       }
-      flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
-    } else if (aiMentionsTasks) {
-      const singleTaskMatch = aiResponse.match(/ID\s*#?\s*(\d+)/i)
-      if (singleTaskMatch) {
-        const taskId = parseInt(singleTaskMatch[1], 10)
-        flexSent = await trySendSingleTaskFlexMessage(replyToken, aiResponse, taskId)
-      } else {
-        let vehicleRef: string | undefined = undefined
-        const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
-        if (vehicleMatch) {
-          vehicleRef = vehicleMatch[0]
+
+      let assigneeName: string | undefined = undefined
+      const assigneeMatch = text.match(/@([ก-ฮa-zA-Z0-9_°\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+)/)
+      if (assigneeMatch) {
+        assigneeName = assigneeMatch[1].trim()
+      }
+
+      flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef, assigneeName)
+    } else {
+      // Fallback detection (e.g. if tools were not explicitly called or text pattern match is required)
+      const aiMentionsTasks = aiResponse.includes('ID #') || aiResponse.includes('รายการงาน') || aiResponse.includes('งานค้าง')
+      if (aiMentionsTasks) {
+        const singleTaskMatch = aiResponse.match(/ID\s*#?\s*(\d+)/i)
+        if (singleTaskMatch) {
+          const taskId = parseInt(singleTaskMatch[1], 10)
+          flexSent = await trySendSingleTaskFlexMessage(replyToken, aiResponse, taskId)
+        } else {
+          let vehicleRef: string | undefined = undefined
+          const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
+          if (vehicleMatch) {
+            vehicleRef = vehicleMatch[0]
+          }
+          flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
         }
-        flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
       }
     }
 
@@ -2802,11 +2824,12 @@ async function trySendVehicleFlexMessage(
 async function trySendTaskFlexMessage(
   replyToken: string,
   aiResponse: string,
-  vehicleRef?: string
+  vehicleRef?: string,
+  assigneeName?: string
 ): Promise<boolean> {
   try {
     const { getPendingTasks } = await import('@/lib/task-service')
-    const tasks = await getPendingTasks(vehicleRef)
+    const tasks = await getPendingTasks(vehicleRef, assigneeName)
     if (!tasks || tasks.length === 0) {
       return false
     }
@@ -2926,7 +2949,11 @@ async function trySendTaskFlexMessage(
         contents: [
           {
             type: 'text',
-            text: vehicleRef ? `📋 งานค้างรถ ${vehicleRef}` : '📋 รายการภารกิจ & โน้ตทีม',
+            text: vehicleRef 
+              ? `📋 งานค้างรถ ${vehicleRef}` 
+              : assigneeName 
+                ? `📋 งานค้างของ @${assigneeName}` 
+                : '📋 รายการภารกิจ & โน้ตทีม',
             weight: 'bold',
             size: 'lg',
             color: '#ffffff'

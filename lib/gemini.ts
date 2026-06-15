@@ -269,13 +269,17 @@ const functionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: 'listTaskNotes',
-    description: 'ดึงรายการโน้ตงาน/ภารกิจทั้งหมดที่ยังทำไม่เสร็จ (PENDING) สามารถกรองตามทะเบียน/VIN หรือสถานะได้',
+    description: 'ดึงรายการโน้ตงาน/ภารกิจทั้งหมดที่ยังทำไม่เสร็จ (PENDING) สามารถกรองตามทะเบียน/VIN หรือผู้รับผิดชอบได้',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         vehicleRef: {
           type: SchemaType.STRING,
           description: 'เลขอ้างอิงรถยนต์ที่ต้องการกรองดูเฉพาะงาน (หากไม่กรองให้เว้นไว้)',
+        },
+        assigneeName: {
+          type: SchemaType.STRING,
+          description: 'ชื่อผู้รับผิดชอบงานที่ต้องการกรองดูเฉพาะงาน (เช่น พี่วิทยา, @sib)',
         },
         status: {
           type: SchemaType.STRING,
@@ -404,6 +408,22 @@ async function _askButterOnce(
             args.createUserName = userContext.userName
           }
           result = await fn(args)
+
+          // Capture tool details in userContext if provided
+          if (userContext) {
+            const uc = userContext as any
+            if (!Array.isArray(uc.toolsCalled)) {
+              uc.toolsCalled = []
+            }
+            uc.toolsCalled.push(fc.name)
+
+            if (fc.name === 'createTaskNote' && result && typeof result === 'object' && 'id' in (result as any)) {
+              uc.createdTaskId = (result as any).id
+            }
+            if (fc.name === 'completeTaskNote' && result && typeof result === 'object' && 'id' in (result as any)) {
+              uc.completedTaskId = (result as any).id
+            }
+          }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err)
           result = { error: `เกิดข้อผิดพลาดในการดึงข้อมูล: ${errMsg}` }

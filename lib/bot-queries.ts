@@ -641,7 +641,7 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
     createUserId: p.createUserId as string,
     createUserName: p.createUserName as string,
   }),
-  listTaskNotes: (p) => getPendingTasks(p.vehicleRef as string),
+  listTaskNotes: (p) => getPendingTasks(p.vehicleRef as string, p.assigneeName as string),
   completeTaskNote: (p) => completeTaskNote(Number(p.taskId)),
 }
 

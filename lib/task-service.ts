@@ -23,29 +23,25 @@ export async function createTaskNote(input: CreateTaskInput) {
   })
 }
 
-export async function getPendingTasks(vehicleRef?: string) {
+export async function getPendingTasks(vehicleRef?: string, assigneeName?: string) {
+  const where: any = { status: 'PENDING' }
+
   if (vehicleRef) {
-    // Search for tasks matching the vehicle reference (case-insensitive)
-    return await prisma.taskNote.findMany({
-      where: {
-        status: 'PENDING',
-        vehicleRef: {
-          contains: vehicleRef,
-          mode: 'insensitive',
-        },
-      },
-      orderBy: [
-        { dueDate: 'asc' },
-        { createdAt: 'desc' },
-      ],
-    })
+    where.vehicleRef = {
+      contains: vehicleRef,
+      mode: 'insensitive',
+    }
   }
 
-  // Get all pending tasks
+  if (assigneeName) {
+    where.assigneeName = {
+      contains: assigneeName,
+      mode: 'insensitive',
+    }
+  }
+
   return await prisma.taskNote.findMany({
-    where: {
-      status: 'PENDING',
-    },
+    where,
     orderBy: [
       { dueDate: 'asc' },
       { createdAt: 'desc' },
