@@ -193,7 +193,7 @@ function TaskDetailContent() {
   const getDueDateBadge = (dueDateStr: string | null, status: string) => {
     if (status === 'COMPLETED') {
       return (
-        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+        <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
           ✅ เสร็จเรียบร้อย
         </span>
       )
@@ -229,19 +229,19 @@ function TaskDetailContent() {
 
       if (diffDays < 0) {
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/15 text-rose-400 border border-rose-500/20 font-bold">
+          <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold">
             🚨 เกินกำหนด ({Math.abs(diffDays)} วัน)
           </span>
         )
       } else if (diffDays === 0) {
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/20 font-bold">
+          <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-bold">
             📅 ครบกำหนดวันนี้
           </span>
         )
       } else {
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700/60 font-bold">
+          <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 font-bold">
             ⏳ อีก {diffDays} วัน
           </span>
         )
@@ -254,10 +254,10 @@ function TaskDetailContent() {
   // Access Control check
   if (roleLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-zinc-500 font-medium animate-pulse">กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium animate-pulse">กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
         </div>
       </div>
     )
@@ -265,10 +265,10 @@ function TaskDetailContent() {
 
   if (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 text-center">
         <span className="text-5xl mb-4">🛡️</span>
-        <h1 className="text-xl font-bold text-zinc-100 mb-2">ไม่ได้รับอนุญาตให้เข้าถึง</h1>
-        <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้</p>
+        <h1 className="text-xl font-bold text-zinc-800 dark:text-zinc-100 mb-2">ไม่ได้รับอนุญาตให้เข้าถึง</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานหน้านี้</p>
         <a href="/dashboard" className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-xl text-xs font-bold text-zinc-950 transition-all shadow-md">
           กลับหน้าหลักแดชบอร์ด
         </a>
@@ -278,15 +278,15 @@ function TaskDetailContent() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
         <form 
           onSubmit={handleLogin}
-          className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-900/60 p-8 shadow-2xl backdrop-blur-md"
+          className="w-full max-w-sm rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-8 shadow-2xl backdrop-blur-md"
         >
           <div className="text-center mb-6">
             <span className="inline-block text-4xl mb-3">📋</span>
-            <h1 className="text-xl font-bold text-zinc-100">ดูรายละเอียดภารกิจ</h1>
-            <p className="text-xs text-zinc-500 mt-1">กรุณากรอกรหัสผ่านเพื่อเข้าชมข้อมูล</p>
+            <h1 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">ดูรายละเอียดภารกิจ</h1>
+            <p className="text-xs text-zinc-500 dark:text-zinc-450 mt-1">กรุณากรอกรหัสผ่านเพื่อเข้าชมข้อมูล</p>
           </div>
 
           <div className="space-y-4">
@@ -296,7 +296,7 @@ function TaskDetailContent() {
                 placeholder="รหัสผ่าน"
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-zinc-800 bg-zinc-950/50 text-zinc-200 text-center text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                className="w-full px-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 text-zinc-800 dark:text-zinc-200 text-center text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                 autoFocus
               />
             </div>
@@ -318,8 +318,8 @@ function TaskDetailContent() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200 flex flex-col justify-start items-center p-4 pt-12 md:pt-20">
-      <div className="w-full max-w-md rounded-3xl border border-zinc-850 bg-zinc-900/40 shadow-2xl backdrop-blur-md overflow-hidden">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 flex flex-col justify-start items-center p-4 pt-12 md:pt-20">
+      <div className="w-full max-w-md rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 shadow-2xl backdrop-blur-md overflow-hidden">
         
         {/* Banner mimic LINE Flex Header */}
         <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-5 text-zinc-950 flex justify-between items-center">
@@ -339,10 +339,10 @@ function TaskDetailContent() {
           </div>
         ) : error ? (
           <div className="text-center py-16 px-6 space-y-4">
-            <p className="text-rose-400 text-sm font-semibold">{error}</p>
+            <p className="text-rose-500 dark:text-rose-400 text-sm font-semibold">{error}</p>
             <button
               onClick={() => router.push('/tasks')}
-              className="px-4 py-2 bg-zinc-850 hover:bg-zinc-800 rounded-xl text-xs font-bold text-zinc-300 transition-all"
+              className="px-4 py-2 bg-zinc-200 hover:bg-zinc-350 dark:bg-zinc-800 dark:hover:bg-zinc-700/60 rounded-xl text-xs font-bold text-zinc-700 dark:text-zinc-300 transition-all"
             >
               ← ไปที่หน้ารวมภารกิจ
             </button>
@@ -353,13 +353,13 @@ function TaskDetailContent() {
             {/* Meta Cards Row */}
             <div className="flex justify-between items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-zinc-400">สถานะ:</span>
+                <span className="text-xs font-bold text-zinc-450 dark:text-zinc-400">สถานะ:</span>
                 {task.status === 'COMPLETED' ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                     เสร็จสิ้น
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/25 animate-pulse">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 animate-pulse">
                     รอดำเนินการ
                   </span>
                 )}
@@ -370,47 +370,47 @@ function TaskDetailContent() {
             </div>
 
             {/* Main Task Description */}
-            <div className="bg-zinc-950/40 border border-zinc-850 rounded-2xl p-5 space-y-1.5">
-              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">รายละเอียดภารกิจ</span>
-              <p className="text-sm font-bold text-zinc-100 leading-relaxed whitespace-pre-wrap">{task.taskDetail}</p>
+            <div className="bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-850 rounded-2xl p-5 space-y-1.5">
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider">รายละเอียดภารกิจ</span>
+              <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-relaxed whitespace-pre-wrap">{task.taskDetail}</p>
             </div>
 
             {/* Info Fields list */}
             <div className="space-y-3 pt-2">
-              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-850">
-                <span className="text-zinc-500 font-medium">🚗 รถยนต์ / VIN:</span>
-                <span className="font-bold text-zinc-200">
+              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">🚗 รถยนต์ / VIN:</span>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200">
                   {task.vehicleRef ? (
-                    <span className="px-2.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
+                    <span className="px-2.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/25">
                       {task.vehicleRef}
                     </span>
                   ) : (
-                    <span className="text-zinc-500">- (ทั่วไป)</span>
+                    <span className="text-zinc-450 dark:text-zinc-500">- (ทั่วไป)</span>
                   )}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-850">
-                <span className="text-zinc-500 font-medium">👤 ผู้รับผิดชอบ:</span>
-                <span className="font-bold text-zinc-200">{task.assigneeName}</span>
+              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">👤 ผู้รับผิดชอบ:</span>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200">{task.assigneeName}</span>
               </div>
 
-              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-850">
-                <span className="text-zinc-500 font-medium">📅 กำหนดเสร็จ:</span>
-                <span className="font-bold text-zinc-200">{formatDateShort(task.dueDate)}</span>
+              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">📅 กำหนดเสร็จ:</span>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200">{formatDateShort(task.dueDate)}</span>
               </div>
 
-              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-850">
-                <span className="text-zinc-500 font-medium">✍️ บันทึกโดย:</span>
-                <span className="font-bold text-zinc-400">
+              <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                <span className="text-zinc-500 dark:text-zinc-400 font-medium">✍️ บันทึกโดย:</span>
+                <span className="font-bold text-zinc-600 dark:text-zinc-400">
                   {task.createUserName || 'LINE Bot'} ({formatDateTime(task.createdAt)})
                 </span>
               </div>
 
               {task.completedAt && (
-                <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-850">
-                  <span className="text-emerald-500/80 font-semibold">✅ วันเสร็จสิ้น:</span>
-                  <span className="font-bold text-emerald-400">{formatDateTime(task.completedAt)}</span>
+                <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                  <span className="text-emerald-600 dark:text-emerald-450 font-semibold">✅ วันเสร็จสิ้น:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatDateTime(task.completedAt)}</span>
                 </div>
               )}
             </div>
@@ -433,7 +433,7 @@ function TaskDetailContent() {
 
               <button
                 onClick={() => router.push('/tasks')}
-                className="w-full py-3 rounded-2xl bg-zinc-800/85 hover:bg-zinc-800 border border-zinc-750 text-zinc-300 hover:text-zinc-100 font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1"
+                className="w-full py-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/85 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-750 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1"
               >
                 📋 รายการภารกิจทั้งหมดของทีม →
               </button>
