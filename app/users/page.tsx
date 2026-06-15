@@ -420,6 +420,12 @@ function UserManagementContent() {
               💬 ประวัติคุย LINE
             </a>
             <a 
+              href="/tasks"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+            >
+              📋 จัดการภารกิจ
+            </a>
+            <a 
               href="/dashboard"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold transition-all shadow-md"
             >

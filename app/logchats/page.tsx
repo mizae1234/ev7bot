@@ -273,15 +273,21 @@ function LogChatsContent() {
             </button>
             <a 
               href="/users"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-850 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-855 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
             >
               👥 จัดการสิทธิ์
             </a>
             <a 
               href="/issues"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-850 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-855 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
             >
               🐞 ระบบแจ้งบัค
+            </a>
+            <a 
+              href="/tasks"
+              className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-855 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100 transition-all"
+            >
+              📋 จัดการภารกิจ
             </a>
             <a 
               href="/dashboard"
