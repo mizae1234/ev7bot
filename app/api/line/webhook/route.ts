@@ -2435,7 +2435,6 @@ async function trySendVehicleFlexMessage(
                 type: 'box',
                 layout: 'vertical',
                 width: '16px',
-                alignItems: 'center',
                 contents: [
                   {
                     type: 'box',
