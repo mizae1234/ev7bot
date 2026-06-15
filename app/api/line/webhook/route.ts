@@ -2356,7 +2356,7 @@ async function trySendVehicleFlexMessage(
         header: {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#059669',
+          backgroundColor: '#dc2626',
           paddingStart: '16px',
           paddingEnd: '16px',
           paddingTop: '12px',
@@ -2372,7 +2372,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'text',
               text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
-              color: '#d1fae5',
+              color: '#fee2e2',
               size: 'xs',
               margin: 'xs',
               weight: 'bold'
@@ -2401,7 +2401,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'button',
               style: 'primary',
-              color: '#059669',
+              color: '#dc2626',
               height: 'sm',
               action: {
                 type: 'uri',
