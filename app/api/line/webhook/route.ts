@@ -2009,10 +2009,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       userId?: string
       userName?: string
       userRole?: string
+      chatSourceType?: string
+      chatSourceId?: string | null
       toolsCalled?: string[]
       createdTaskId?: number
       completedTaskId?: number
-    } = { userId, userName, userRole }
+    } = { userId, userName, userRole, chatSourceType, chatSourceId }
 
     const aiResponse = await askButter(text, history, userContext)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)

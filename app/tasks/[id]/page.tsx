@@ -15,6 +15,10 @@ interface TaskNote {
   createUserName: string | null
   createdAt: string
   completedAt: string | null
+  alertTarget: string
+  groupId: string | null
+  assigneeLineUserId: string | null
+  lastAlertedAt: string | null
 }
 
 function TaskDetailContent() {
@@ -151,6 +155,29 @@ function TaskDetailContent() {
         const data = await res.json()
         alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไขสถานะได้'}`)
       } else {
+        await fetchTask()
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSendReminder = async () => {
+    if (!task) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/tasks/remind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, passcode, userId: liffUserId })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถส่งข้อความเตือนได้'}`)
+      } else {
+        alert('ส่งข้อความเตือนเรียบร้อยแล้วค่ะ! 🔔💛')
         await fetchTask()
       }
     } catch (err) {
@@ -413,10 +440,41 @@ function TaskDetailContent() {
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatDateTime(task.completedAt)}</span>
                 </div>
               )}
+
+              {task.alertTarget && task.alertTarget !== 'NONE' && (
+                <>
+                  <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">📢 ช่องทางแจ้งเตือน:</span>
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                      {task.alertTarget === 'GROUP' ? 'กลุ่มไลน์' : 'แชทส่วนตัว'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pb-2.5 border-b border-zinc-200 dark:border-zinc-850">
+                    <span className="text-zinc-500 dark:text-zinc-400 font-medium">🔔 เตือนล่าสุดเมื่อ:</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400">
+                      {task.lastAlertedAt ? formatDateTime(task.lastAlertedAt) : 'ยังไม่เคยส่งเตือน'}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Action buttons */}
             <div className="space-y-2.5 pt-4">
+              {task.status === 'PENDING' && task.alertTarget && task.alertTarget !== 'NONE' && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                <button
+                  onClick={handleSendReminder}
+                  disabled={actionLoading}
+                  className="w-full py-3 rounded-2xl border border-amber-500/50 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {actionLoading ? (
+                    <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>🔔 ส่งข้อความเตือนไปยัง LINE</>
+                  )}
+                </button>
+              )}
+
               {task.status === 'PENDING' && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
                 <button
                   onClick={handleCompleteTask}

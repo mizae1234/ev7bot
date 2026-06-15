@@ -15,6 +15,10 @@ interface TaskNote {
   createUserName: string | null
   createdAt: string
   completedAt: string | null
+  alertTarget: string
+  groupId: string | null
+  assigneeLineUserId: string | null
+  lastAlertedAt: string | null
 }
 
 function TasksContent() {
@@ -38,8 +42,15 @@ function TasksContent() {
   const [formAssigneeName, setFormAssigneeName] = useState('')
   const [formTaskDetail, setFormTaskDetail] = useState('')
   const [formDueDate, setFormDueDate] = useState('')
+  const [formAlertTarget, setFormAlertTarget] = useState('NONE')
+  const [formGroupId, setFormGroupId] = useState('')
+  const [formAssigneeLineUserId, setFormAssigneeLineUserId] = useState('')
   const [formError, setFormError] = useState('')
   const [formSubmitting, setFormSubmitting] = useState(false)
+
+  // Recipient lists (for form dropdowns)
+  const [registeredUsers, setRegisteredUsers] = useState<Array<{ lineUserId: string; displayName: string }>>([])
+  const [lineGroups, setLineGroups] = useState<Array<{ groupId: string; groupName: string }>>([])
 
   // Auth / Role States
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -108,6 +119,32 @@ function TasksContent() {
       }
     }
   }, [])
+
+  // Fetch recipient users and groups
+  const fetchRecipients = async () => {
+    try {
+      const params = new URLSearchParams({
+        passcode: 'ev7admin',
+        userId: liffUserId || ''
+      })
+      const res = await fetch(`/api/admin/recipients?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setRegisteredUsers(data.users || [])
+          setLineGroups(data.groups || [])
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipients', err)
+    }
+  }
+
+  useEffect(() => {
+    if (isAuthenticated && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && liffUserId) {
+      fetchRecipients()
+    }
+  }, [isAuthenticated, userRole, liffUserId])
 
   // 3. Fetch tasks when authenticated and role is valid
   useEffect(() => {
@@ -248,12 +285,37 @@ function TasksContent() {
     }
   }
 
+  const handleSendReminder = async (id: number) => {
+    setActionLoading(id)
+    try {
+      const res = await fetch('/api/tasks/remind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, passcode, userId: liffUserId })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถส่งข้อความเตือนได้'}`)
+      } else {
+        alert('ส่งข้อความเตือนเรียบร้อยแล้วค่ะ! 🔔💛')
+        await fetchTasks()
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleOpenCreateModal = () => {
     setEditingTask(null)
     setFormVehicleRef('')
     setFormAssigneeName('')
     setFormTaskDetail('')
     setFormDueDate('')
+    setFormAlertTarget('NONE')
+    setFormGroupId('')
+    setFormAssigneeLineUserId('')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -264,6 +326,9 @@ function TasksContent() {
     setFormAssigneeName(task.assigneeName || '')
     setFormTaskDetail(task.taskDetail || '')
     setFormDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
+    setFormAlertTarget(task.alertTarget || 'NONE')
+    setFormGroupId(task.groupId || '')
+    setFormAssigneeLineUserId(task.assigneeLineUserId || '')
     setFormError('')
     setIsModalOpen(true)
   }
@@ -285,7 +350,10 @@ function TasksContent() {
         vehicleRef: formVehicleRef || null,
         assigneeName: formAssigneeName || 'ยังไม่ทราบผู้รับผิดชอบ',
         taskDetail: formTaskDetail,
-        dueDate: formDueDate || null
+        dueDate: formDueDate || null,
+        alertTarget: formAlertTarget,
+        groupId: formAlertTarget === 'GROUP' ? (formGroupId || null) : null,
+        assigneeLineUserId: formAlertTarget === 'PERSONAL' ? (formAssigneeLineUserId || null) : null
       }
 
       let res
@@ -674,6 +742,12 @@ function TasksContent() {
                     {task.completedAt && (
                       <div className="text-emerald-500/80 font-medium">✅ เสร็จสิ้น: {formatDateTime(task.completedAt)}</div>
                     )}
+                    {task.alertTarget && task.alertTarget !== 'NONE' && (
+                      <div className="text-amber-500/90 font-medium">
+                        📢 ช่องทางเตือน: {task.alertTarget === 'GROUP' ? 'กลุ่มไลน์' : 'แชทส่วนตัว'}
+                        {task.lastAlertedAt && ` (เตือนล่าสุด: ${formatDateTime(task.lastAlertedAt)})`}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -691,6 +765,15 @@ function TasksContent() {
 
                   {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
                     <div className="flex gap-2">
+                      {task.status === 'PENDING' && task.alertTarget && task.alertTarget !== 'NONE' && (
+                        <button
+                          onClick={() => handleSendReminder(task.id)}
+                          disabled={actionLoading === task.id}
+                          className="px-3 py-1.5 rounded-lg border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/10 text-amber-400 hover:text-amber-300 transition-all font-bold disabled:opacity-50"
+                        >
+                          🔔 ส่งเตือน
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenEditModal(task)}
                         disabled={actionLoading === task.id}
@@ -784,7 +867,18 @@ function TasksContent() {
                     type="text"
                     placeholder="เช่น พี่วิทยา, สมหญิง"
                     value={formAssigneeName}
-                    onChange={(e) => setFormAssigneeName(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setFormAssigneeName(val)
+                      if (formAlertTarget === 'PERSONAL' && val.trim()) {
+                        const matched = registeredUsers.find(u => 
+                          u.displayName && u.displayName.toLowerCase().includes(val.toLowerCase())
+                        )
+                        if (matched) {
+                          setFormAssigneeLineUserId(matched.lineUserId)
+                        }
+                      }
+                    }}
                     className="w-full px-4 py-2.5 text-xs rounded-xl border border-zinc-855 bg-zinc-950/40 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -810,6 +904,86 @@ function TasksContent() {
                   className="w-full px-4 py-2.5 text-xs rounded-xl border border-zinc-855 bg-zinc-950/40 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 />
               </div>
+
+              <div>
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ช่องทางแจ้งเตือนติดตามงาน</label>
+                <select
+                  value={formAlertTarget}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormAlertTarget(val)
+                    if (val === 'NONE') {
+                      setFormGroupId('')
+                      setFormAssigneeLineUserId('')
+                    } else if (val === 'GROUP') {
+                      setFormAssigneeLineUserId('')
+                      if (lineGroups.length > 0 && !formGroupId) {
+                        setFormGroupId(lineGroups[0].groupId)
+                      }
+                    } else if (val === 'PERSONAL') {
+                      setFormGroupId('')
+                      if (registeredUsers.length > 0 && !formAssigneeLineUserId) {
+                        const matched = registeredUsers.find(u => 
+                          u.displayName && formAssigneeName && u.displayName.toLowerCase().includes(formAssigneeName.toLowerCase())
+                        )
+                        setFormAssigneeLineUserId(matched ? matched.lineUserId : registeredUsers[0].lineUserId)
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-zinc-855 bg-zinc-950/40 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                >
+                  <option value="NONE">ไม่แจ้งเตือน</option>
+                  <option value="GROUP">แจ้งเตือนลงกลุ่ม LINE</option>
+                  <option value="PERSONAL">แจ้งเตือนแชทส่วนตัว LINE</option>
+                </select>
+              </div>
+
+              {formAlertTarget === 'GROUP' && (
+                <div>
+                  <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">เลือกกลุ่มไลน์ปลายทาง *</label>
+                  <select
+                    value={formGroupId}
+                    onChange={(e) => setFormGroupId(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-zinc-855 bg-zinc-950/40 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    required
+                  >
+                    {lineGroups.length === 0 ? (
+                      <option value="">-- ไม่พบกลุ่มไลน์ กรุณาลงทะเบียนกลุ่มก่อน --</option>
+                    ) : (
+                      lineGroups.map((g) => (
+                        <option key={g.groupId} value={g.groupId}>
+                          👥 {g.groupName || 'กลุ่มไม่มีชื่อ'} ({g.groupId})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {formAlertTarget === 'PERSONAL' && (
+                <div>
+                  <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">เลือกรายชื่อ LINE ผู้รับแชท *</label>
+                  <select
+                    value={formAssigneeLineUserId}
+                    onChange={(e) => setFormAssigneeLineUserId(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-zinc-855 bg-zinc-950/40 text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    required
+                  >
+                    {registeredUsers.length === 0 ? (
+                      <option value="">-- ไม่พบบุคคลลงทะเบียน กรุณาลงทะเบียนบุคคลก่อน --</option>
+                    ) : (
+                      <>
+                        <option value="">-- เลือกผู้รับแชทส่วนตัว --</option>
+                        {registeredUsers.map((u) => (
+                          <option key={u.lineUserId} value={u.lineUserId}>
+                            👤 {u.displayName || 'ไม่มีชื่อ'} ({u.lineUserId.substring(0, 8)}...)
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+              )}
 
               {formError && (
                 <p className="text-xs text-rose-500 text-center font-medium">{formError}</p>

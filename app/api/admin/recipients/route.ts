@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       where: { lineUserId: userId }
     })
 
-    if (!caller || caller.role !== 'SUPER_ADMIN') {
+    if (!caller || (caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

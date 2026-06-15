@@ -92,16 +92,20 @@ model SystemIssue {
 }
 
 model TaskNote {
-  id             Int       @id @default(autoincrement())
-  vehicleRef     String?   @map("vehicle_ref") @db.VarChar(50)
-  assigneeName   String    @default("ยังไม่ทราบผู้รับผิดชอบ") @map("assignee_name") @db.VarChar(255)
-  taskDetail     String    @map("task_detail") @db.Text
-  dueDate        DateTime? @map("due_date") @db.Date
-  status         String    @default("PENDING") @map("status") @db.VarChar(20)
-  createUserId   String?   @map("create_user_id") @db.VarChar(50)
-  createUserName String?   @map("create_user_name") @db.VarChar(255)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  id                 Int       @id @default(autoincrement())
+  vehicleRef         String?   @map("vehicle_ref") @db.VarChar(50)
+  assigneeName       String    @default("ยังไม่ทราบผู้รับผิดชอบ") @map("assignee_name") @db.VarChar(255)
+  taskDetail         String    @map("task_detail") @db.Text
+  dueDate            DateTime? @map("due_date") @db.Date
+  status             String    @default("PENDING") @map("status") @db.VarChar(20)
+  createUserId       String?   @map("create_user_id") @db.VarChar(50)
+  createUserName     String?   @map("create_user_name") @db.VarChar(255)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  alertTarget        String    @default("NONE") @map("alert_target") @db.VarChar(20)
+  groupId            String?   @map("group_id") @db.VarChar(50)
+  assigneeLineUserId String?   @map("assignee_line_user_id") @db.VarChar(50)
+  lastAlertedAt      DateTime? @map("last_alerted_at") @db.Timestamptz
 
   @@map("task_notes")
 }

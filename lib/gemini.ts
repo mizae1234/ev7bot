@@ -443,6 +443,15 @@ async function _askButterOnce(
           if (fc.name === 'createTaskNote' && userContext) {
             args.createUserId = userContext.userId
             args.createUserName = userContext.userName
+            
+            const uc = userContext as any
+            if (uc.chatSourceType === 'group' || uc.chatSourceType === 'room') {
+              args.alertTarget = 'GROUP'
+              args.groupId = uc.chatSourceId
+            } else if (uc.chatSourceType === 'user') {
+              args.alertTarget = 'PERSONAL'
+              args.assigneeLineUserId = uc.chatSourceId || userContext.userId
+            }
           }
           result = await fn(args)
 

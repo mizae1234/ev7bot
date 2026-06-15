@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { passcode, userId, vehicleRef, assigneeName, taskDetail, dueDate } = body
+    const { passcode, userId, vehicleRef, assigneeName, taskDetail, dueDate, alertTarget, groupId, assigneeLineUserId } = body
 
     if (passcode !== 'ev7admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -115,6 +115,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing taskDetail' }, { status: 400 })
     }
 
+    // Resolve assigneeLineUserId from assigneeName if not provided and it's not the default placeholder
+    let resolvedLineUserId = assigneeLineUserId || null
+    if (!resolvedLineUserId && assigneeName && assigneeName !== 'ยังไม่ทราบผู้รับผิดชอบ') {
+      try {
+        const matchedUser = await prisma.lineRegistration.findFirst({
+          where: {
+            isActive: true,
+            displayName: {
+              contains: assigneeName,
+              mode: 'insensitive'
+            }
+          }
+        })
+        if (matchedUser) {
+          resolvedLineUserId = matchedUser.lineUserId
+        }
+      } catch (err) {
+        console.error('[Tasks API POST] Failed to resolve assignee LINE ID:', err)
+      }
+    }
+
     const task = await prisma.taskNote.create({
       data: {
         vehicleRef: vehicleRef || null,
@@ -123,7 +144,10 @@ export async function POST(req: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         createUserId: userId,
         createUserName: caller.displayName || null,
-        status: 'PENDING'
+        status: 'PENDING',
+        alertTarget: alertTarget || 'NONE',
+        groupId: groupId || null,
+        assigneeLineUserId: resolvedLineUserId
       }
     })
 
@@ -137,7 +161,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, action, passcode, userId, vehicleRef, assigneeName, taskDetail, dueDate } = body
+    const { id, action, passcode, userId, vehicleRef, assigneeName, taskDetail, dueDate, alertTarget, groupId, assigneeLineUserId } = body
 
     if (passcode !== 'ev7admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -178,13 +202,37 @@ export async function PATCH(req: NextRequest) {
       })
       return NextResponse.json({ success: true, task: updated })
     } else if (action === 'edit') {
+      // Resolve assigneeLineUserId from assigneeName if not provided and it's not the default placeholder
+      let resolvedLineUserId = assigneeLineUserId || null
+      if (!resolvedLineUserId && assigneeName && assigneeName !== 'ยังไม่ทราบผู้รับผิดชอบ') {
+        try {
+          const matchedUser = await prisma.lineRegistration.findFirst({
+            where: {
+              isActive: true,
+              displayName: {
+                contains: assigneeName,
+                mode: 'insensitive'
+              }
+            }
+          })
+          if (matchedUser) {
+            resolvedLineUserId = matchedUser.lineUserId
+          }
+        } catch (err) {
+          console.error('[Tasks API PATCH] Failed to resolve assignee LINE ID:', err)
+        }
+      }
+
       const updated = await prisma.taskNote.update({
         where: { id: taskId },
         data: {
           vehicleRef: vehicleRef || null,
           assigneeName: assigneeName || 'ยังไม่ทราบผู้รับผิดชอบ',
           taskDetail: taskDetail || task.taskDetail,
-          dueDate: dueDate ? new Date(dueDate) : null
+          dueDate: dueDate ? new Date(dueDate) : null,
+          alertTarget: alertTarget || 'NONE',
+          groupId: groupId || null,
+          assigneeLineUserId: resolvedLineUserId
         }
       })
       return NextResponse.json({ success: true, task: updated })
