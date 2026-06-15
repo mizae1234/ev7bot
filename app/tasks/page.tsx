@@ -45,6 +45,7 @@ function TasksContent() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(true)
   const [liffUserId, setLiffUserId] = useState<string | null>(null)
+  const [singleTaskId, setSingleTaskId] = useState<string | null>(null)
 
   // 1. Authenticate role via user's LINE ID in AuthGuard cache
   useEffect(() => {
@@ -85,6 +86,18 @@ function TasksContent() {
     }
   }
 
+  // Parse task ID from query parameter on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const queryId = params.get('id')
+      if (queryId) {
+        setSingleTaskId(queryId)
+        setSearch(`ID: ${queryId}`)
+      }
+    }
+  }, [])
+
   // 2. Passcode cache initialization
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -99,25 +112,33 @@ function TasksContent() {
   // 3. Fetch tasks when authenticated and role is valid
   useEffect(() => {
     if (isAuthenticated && passcode && liffUserId && (userRole === 'USER' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
-      // If URL has search query for ID, e.g. /tasks?id=12
-      const params = new URLSearchParams(window.location.search)
-      const queryId = params.get('id')
-      if (queryId) {
-        setSearch(`ID: ${queryId}`)
-      }
-      fetchTasks(queryId || undefined)
+      fetchTasks(singleTaskId || undefined)
     }
-  }, [isAuthenticated, page, statusFilter, liffUserId, userRole])
+  }, [isAuthenticated, page, statusFilter, liffUserId, userRole, singleTaskId])
 
   // Debounced search trigger
   useEffect(() => {
     if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
+    if (singleTaskId) return // skip debounce when in single task view
+
     const timer = setTimeout(() => {
       setPage(1)
       fetchTasks()
     }, 400)
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, singleTaskId])
+
+  const handleClearSingleView = () => {
+    setSingleTaskId(null)
+    setSearch('')
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/tasks')
+    }
+    // Give state a brief moment to update then query full tasks list
+    setTimeout(() => {
+      fetchTasks()
+    }, 50)
+  }
 
   const fetchTasks = async (exactId?: string) => {
     setLoading(true)
@@ -486,25 +507,36 @@ function TasksContent() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-100 to-emerald-400 tracking-tight">
-                📋 Tasks & Notes Manager
+                {singleTaskId ? `📋 รายละเอียดภารกิจ ID #${singleTaskId}` : '📋 Tasks & Notes Manager'}
               </h1>
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded-md font-bold">
                 {userRole === 'USER' ? 'User View' : 'Admin Panel'}
               </span>
             </div>
             <p className="text-xs text-zinc-500 mt-1">
-              ระบบจัดการภารกิจ ติดตามงานค้าง และจดโน้ตของทีมจาก LINE Bot
+              {singleTaskId 
+                ? 'กำลังแสดงรายละเอียดของภารกิจเฉพาะเจาะจง'
+                : 'ระบบจัดการภารกิจ ติดตามงานค้าง และจดโน้ตของทีมจาก LINE Bot'}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2.5 items-center">
-            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+            {singleTaskId ? (
               <button
-                onClick={handleOpenCreateModal}
+                onClick={handleClearSingleView}
                 className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-[0.98]"
               >
-                ➕ เพิ่มภารกิจใหม่
+                📋 ดูภารกิจทั้งหมด
               </button>
+            ) : (
+              (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                <button
+                  onClick={handleOpenCreateModal}
+                  className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-[0.98]"
+                >
+                  ➕ เพิ่มภารกิจใหม่
+                </button>
+              )
             )}
             <button
               onClick={() => {
@@ -512,12 +544,13 @@ function TasksContent() {
                 setIsAuthenticated(false)
                 setPasscode('')
                 setTasks([])
+                setSingleTaskId(null)
               }}
               className="text-xs font-bold px-3.5 py-2 rounded-xl border border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 transition-all"
             >
               ออกจากระบบ 🚪
             </button>
-            {userRole === 'SUPER_ADMIN' && (
+            {!singleTaskId && userRole === 'SUPER_ADMIN' && (
               <>
                 <a 
                   href="/users"
@@ -533,7 +566,7 @@ function TasksContent() {
                 </a>
               </>
             )}
-            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+            {!singleTaskId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
               <a 
                 href="/issues"
                 className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
@@ -550,51 +583,55 @@ function TasksContent() {
           </div>
         </div>
 
-        {/* Summary Row */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-zinc-900/40 border border-zinc-900 p-4 rounded-2xl flex flex-col justify-between">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">งานทั้งหมด</span>
-            <span className="text-2xl font-extrabold text-zinc-100 mt-2">{summary.total}</span>
-          </div>
-          <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-2xl flex flex-col justify-between">
-            <span className="text-[10px] text-amber-500/80 font-bold uppercase tracking-wider">⏳ รอดำเนินการ</span>
-            <span className="text-2xl font-extrabold text-amber-400 mt-2">{summary.pending}</span>
-          </div>
-          <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl flex flex-col justify-between">
-            <span className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">✅ เสร็จสิ้นแล้ว</span>
-            <span className="text-2xl font-extrabold text-emerald-400 mt-2">{summary.completed}</span>
-          </div>
-        </div>
+        {!singleTaskId && (
+          <>
+            {/* Summary Row */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-zinc-900/40 border border-zinc-900 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">งานทั้งหมด</span>
+                <span className="text-2xl font-extrabold text-zinc-100 mt-2">{summary.total}</span>
+              </div>
+              <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] text-amber-500/80 font-bold uppercase tracking-wider">⏳ รอดำเนินการ</span>
+                <span className="text-2xl font-extrabold text-amber-400 mt-2">{summary.pending}</span>
+              </div>
+              <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] text-emerald-500/80 font-bold uppercase tracking-wider">✅ เสร็จสิ้นแล้ว</span>
+                <span className="text-2xl font-extrabold text-emerald-400 mt-2">{summary.completed}</span>
+              </div>
+            </div>
 
-        {/* Filter Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
-          <div className="md:col-span-2">
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาคำสำคัญ</label>
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อผู้รับผิดชอบ, รายละเอียดงาน, ทะเบียนรถ/VIN หรือระบุ ID: รหัสงาน..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            />
-          </div>
+            {/* Filter Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
+              <div className="md:col-span-2">
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาคำสำคัญ</label>
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อผู้รับผิดชอบ, รายละเอียดงาน, ทะเบียนรถ/VIN หรือระบุ ID: รหัสงาน..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                />
+              </div>
 
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สถานะ</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setPage(1)
-                setStatusFilter(e.target.value)
-              }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="PENDING">รอดำเนินการ</option>
-              <option value="COMPLETED">เสร็จสิ้น</option>
-            </select>
-          </div>
-        </div>
+              <div>
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สถานะ</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setStatusFilter(e.target.value)
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="PENDING">รอดำเนินการ</option>
+                  <option value="COMPLETED">เสร็จสิ้น</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Tasks List */}
         {loading ? (
@@ -693,6 +730,17 @@ function TasksContent() {
                   totalItems={total}
                   itemsPerPage={20}
                 />
+              </div>
+            )}
+
+            {singleTaskId && (
+              <div className="flex justify-center pt-6">
+                <button
+                  onClick={handleClearSingleView}
+                  className="text-xs font-bold px-6 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 hover:text-zinc-100 transition-all shadow-md flex items-center gap-2"
+                >
+                  📋 ดูภารกิจทั้งหมดของทีม
+                </button>
               </div>
             )}
           </div>
