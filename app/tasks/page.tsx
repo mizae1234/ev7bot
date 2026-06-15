@@ -91,7 +91,7 @@ function TasksContent() {
 
   // 3. Fetch tasks when authenticated and role is valid
   useEffect(() => {
-    if (isAuthenticated && passcode && liffUserId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
+    if (isAuthenticated && passcode && liffUserId && (userRole === 'USER' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
       // If URL has search query for ID, e.g. /tasks?id=12
       const params = new URLSearchParams(window.location.search)
       const queryId = params.get('id')
@@ -104,7 +104,7 @@ function TasksContent() {
 
   // Debounced search trigger
   useEffect(() => {
-    if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
+    if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
     const timer = setTimeout(() => {
       setPage(1)
       fetchTasks()
@@ -415,12 +415,12 @@ function TasksContent() {
     )
   }
 
-  // 5. Restrict access strictly to ADMIN or SUPER_ADMIN
-  if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  // 5. Restrict access strictly to USER, ADMIN or SUPER_ADMIN
+  if (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
         <span className="text-5xl mb-4">🛡️</span>
-        <h1 className="text-xl font-bold text-zinc-100 mb-2">เข้าถึงเฉพาะผู้ดูแลระบบ (Admin)</h1>
+        <h1 className="text-xl font-bold text-zinc-100 mb-2">ไม่ได้รับอนุญาตให้เข้าถึง</h1>
         <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานระบบจัดการภารกิจและโน้ตทีม</p>
         <a href="/dashboard" className="mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md">
           กลับหน้าหลักแดชบอร์ด
@@ -491,12 +491,14 @@ function TasksContent() {
           </div>
 
           <div className="flex flex-wrap gap-2.5 items-center">
-            <button
-              onClick={handleOpenCreateModal}
-              className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-[0.98]"
-            >
-              ➕ เพิ่มภารกิจใหม่
-            </button>
+            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+              <button
+                onClick={handleOpenCreateModal}
+                className="text-xs font-bold px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-[0.98]"
+              >
+                ➕ เพิ่มภารกิจใหม่
+              </button>
+            )}
             <button
               onClick={() => {
                 sessionStorage.removeItem('logchats_passcode')
@@ -641,31 +643,33 @@ function TasksContent() {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleOpenEditModal(task)}
-                      disabled={actionLoading === task.id}
-                      className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-all font-bold disabled:opacity-50"
-                    >
-                      ✏️ แก้ไข
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTask(task.id)}
-                      disabled={actionLoading === task.id}
-                      className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-rose-500 hover:text-rose-400 transition-all font-bold disabled:opacity-50"
-                    >
-                      🗑️ ลบ
-                    </button>
-                    {task.status === 'PENDING' && (
+                  {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => handleCompleteTask(task.id)}
+                        onClick={() => handleOpenEditModal(task)}
                         disabled={actionLoading === task.id}
-                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all font-bold shadow-md disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-all font-bold disabled:opacity-50"
                       >
-                        {actionLoading === task.id ? 'กำลังบันทึก...' : '✅ เสร็จสิ้นงาน'}
+                        ✏️ แก้ไข
                       </button>
-                    )}
-                  </div>
+                      <button
+                        onClick={() => handleDeleteTask(task.id)}
+                        disabled={actionLoading === task.id}
+                        className="px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60 text-rose-500 hover:text-rose-400 transition-all font-bold disabled:opacity-50"
+                      >
+                        🗑️ ลบ
+                      </button>
+                      {task.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleCompleteTask(task.id)}
+                          disabled={actionLoading === task.id}
+                          className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-all font-bold shadow-md disabled:opacity-50"
+                        >
+                          {actionLoading === task.id ? 'กำลังบันทึก...' : '✅ เสร็จสิ้นงาน'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

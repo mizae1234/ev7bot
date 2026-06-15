@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
       where: { lineUserId: userId }
     })
 
-    if (!caller || (caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
-      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 })
+    if (!caller || (caller.role !== 'USER' && caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient permissions' }, { status: 403 })
     }
 
     // Direct fetch by single ID if provided
