@@ -2446,7 +2446,8 @@ async function trySendVehicleFlexMessage(
                     width: '8px',
                     height: '8px',
                     cornerRadius: '4px',
-                    backgroundColor: '#dc2626'
+                    backgroundColor: '#dc2626',
+                    contents: []
                   },
                   ...(!isLast ? [{
                     type: 'box',
@@ -2454,7 +2455,8 @@ async function trySendVehicleFlexMessage(
                     width: '2px',
                     flex: 1,
                     backgroundColor: '#cbd5e1',
-                    margin: 'xs'
+                    margin: 'xs',
+                    contents: []
                   }] : [])
                 ]
               },
