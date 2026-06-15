@@ -455,7 +455,8 @@ export async function runCustomQuery(params: { sqlQuery: string }) {
   const trimmed = params.sqlQuery.trim().toUpperCase()
   const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE', 'MERGE']
   for (const word of forbidden) {
-    if (trimmed.includes(word)) {
+    const regex = new RegExp(`\\b${word}\\b`, 'i')
+    if (regex.test(trimmed)) {
       return { error: `ไม่อนุญาตให้ใช้คำสั่ง ${word} — อนุญาตเฉพาะ SELECT หรือ EXEC Get* เท่านั้น` }
     }
   }
