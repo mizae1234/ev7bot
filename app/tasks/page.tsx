@@ -70,6 +70,13 @@ function TasksContent() {
       if (res.ok) {
         const data = await res.json()
         setUserRole(data.role)
+        if (data.role === 'USER' || data.role === 'ADMIN' || data.role === 'SUPER_ADMIN') {
+          setPasscode('ev7admin')
+          setIsAuthenticated(true)
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('logchats_passcode', 'ev7admin')
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch user role', err)
