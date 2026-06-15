@@ -1933,43 +1933,66 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       }
     }
 
-    const aiResponse = await askButter(text, history)
+    let userName: string | undefined
+    try {
+      if (!env.MOCK_MODE && userId) {
+        const profile = await lineClient.getProfile(userId)
+        userName = profile.displayName
+      }
+    } catch { /* ignore */ }
+
+    const aiResponse = await askButter(text, history, { userId, userName })
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
 
-
-
-    // ─── Try to detect a vehicle identifier for Flex Message ───
-    let vehicleIdentifier: string | null = null
+    // ─── Try to detect task list or vehicle identifier for Flex Message ───
     let flexSent = false
 
-    // Strategy 1: Detect VIN pattern from user's original message (17-char VIN starting with L)
-    const vinFromUser = text.match(/\b(L[A-Z0-9]{16})\b/i)
-    if (vinFromUser) {
-      vehicleIdentifier = vinFromUser[1].toUpperCase()
-      console.log(`[${BOT_NAME}] Detected VIN from user input: ${vehicleIdentifier}`)
-    }
+    // 1. Task Checklist Flow
+    const isTaskQuery = matchAny(lower, ['งานค้าง', 'รายการงาน', 'รายการโน้ต', 'ดูงาน', 'ดูโน้ต', 'งานทั้งหมด', 'มีงานอะไร', 'จดอะไรไว้บ้าง', 'task list', 'list task'])
+    const aiMentionsTasks = aiResponse.includes('ID #') || aiResponse.includes('รายการงาน') || aiResponse.includes('งานค้าง')
 
-    // Strategy 2: Extract from /vehicle/xxx link in AI response (broad regex)
-    if (!vehicleIdentifier) {
-      const linkMatch = aiResponse.match(/\/vehicle\/([^\"')\]\r\n\t]+)/i)
-      if (linkMatch) {
-        vehicleIdentifier = decodeURIComponent(linkMatch[1]).trim()
-        console.log(`[${BOT_NAME}] Detected vehicle from AI link: ${vehicleIdentifier}`)
+    if (isTaskQuery || aiMentionsTasks) {
+      let vehicleRef: string | undefined = undefined
+      const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
+      if (vehicleMatch) {
+        vehicleRef = vehicleMatch[0]
       }
+      flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
     }
 
-    // Strategy 3: Detect VIN pattern from AI response text
-    if (!vehicleIdentifier) {
-      const vinFromAi = aiResponse.match(/\b(L[A-Z0-9]{16})\b/i)
-      if (vinFromAi) {
-        vehicleIdentifier = vinFromAi[1].toUpperCase()
-        console.log(`[${BOT_NAME}] Detected VIN from AI response: ${vehicleIdentifier}`)
+    // 2. Vehicle Info Flow (fallback if tasks not sent or not a task query)
+    if (!flexSent) {
+      let vehicleIdentifier: string | null = null
+
+      // Strategy 1: Detect VIN pattern from user's original message (17-char VIN starting with L)
+      const vinFromUser = text.match(/\b(L[A-Z0-9]{16})\b/i)
+      if (vinFromUser) {
+        vehicleIdentifier = vinFromUser[1].toUpperCase()
+        console.log(`[${BOT_NAME}] Detected VIN from user input: ${vehicleIdentifier}`)
       }
-    }
 
-    // Try to send Flex Message if we found a vehicle identifier
-    if (vehicleIdentifier) {
-      flexSent = await trySendVehicleFlexMessage(replyToken, vehicleIdentifier, aiResponse, appUrl)
+      // Strategy 2: Extract from /vehicle/xxx link in AI response (broad regex)
+      if (!vehicleIdentifier) {
+        const linkMatch = aiResponse.match(/\/vehicle\/([^\"')\]\r\n\t]+)/i)
+        if (linkMatch) {
+          vehicleIdentifier = decodeURIComponent(linkMatch[1]).trim()
+          console.log(`[${BOT_NAME}] Detected vehicle from AI link: ${vehicleIdentifier}`)
+        }
+      }
+
+      // Strategy 3: Detect VIN pattern from AI response text
+      if (!vehicleIdentifier) {
+        const vinFromAi = aiResponse.match(/\b(L[A-Z0-9]{16})\b/i)
+        if (vinFromAi) {
+          vehicleIdentifier = vinFromAi[1].toUpperCase()
+          console.log(`[${BOT_NAME}] Detected VIN from AI response: ${vehicleIdentifier}`)
+        }
+      }
+
+      // Try to send Flex Message if we found a vehicle identifier
+      if (vehicleIdentifier) {
+        flexSent = await trySendVehicleFlexMessage(replyToken, vehicleIdentifier, aiResponse, appUrl)
+      }
     }
 
     if (!flexSent) {
@@ -2736,6 +2759,171 @@ async function trySendVehicleFlexMessage(
     if (err.response?.data) {
       console.error('[trySendVehicleFlexMessage Error Details]', JSON.stringify(err.response.data))
     }
+    return false
+  }
+}
+
+async function trySendTaskFlexMessage(
+  replyToken: string,
+  aiResponse: string,
+  vehicleRef?: string
+): Promise<boolean> {
+  try {
+    const { getPendingTasks } = await import('@/lib/task-service')
+    const tasks = await getPendingTasks(vehicleRef)
+    if (!tasks || tasks.length === 0) {
+      return false
+    }
+
+    const maxTasks = 5
+    const displayedTasks = tasks.slice(0, maxTasks)
+
+    const taskRows = displayedTasks.map(task => {
+      const dueDateStr = task.dueDate ? formatDateTh(task.dueDate) : 'ไม่ระบุกำหนดเสร็จ'
+      const assignee = task.assigneeName || 'ยังไม่ทราบผู้รับผิดชอบ'
+      const vehicleDisplay = task.vehicleRef ? `🚗 ${task.vehicleRef}` : '📂 ทั่วไป'
+      
+      return {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: 'md',
+        backgroundColor: '#f8fafc',
+        cornerRadius: 'md',
+        margin: 'md',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `📌 ID #${task.id}`,
+                size: 'xs',
+                weight: 'bold',
+                color: '#FF6D00',
+                flex: 3
+              },
+              {
+                type: 'text',
+                text: vehicleDisplay,
+                size: 'xs',
+                weight: 'bold',
+                color: '#3b82f6',
+                align: 'end',
+                flex: 7
+              }
+            ]
+          },
+          {
+            type: 'text',
+            text: task.taskDetail,
+            size: 'sm',
+            color: '#1e293b',
+            weight: 'bold',
+            wrap: true
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `👤 ${assignee}`,
+                size: 'xs',
+                color: '#64748b',
+                flex: 6
+              },
+              {
+                type: 'text',
+                text: `📅 ${dueDateStr}`,
+                size: 'xs',
+                color: '#64748b',
+                align: 'end',
+                flex: 6
+              }
+            ]
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            color: '#059669',
+            height: 'sm',
+            action: {
+              type: 'message',
+              label: '✅ ทำเสร็จแล้ว',
+              text: `ปิดงาน #${task.id}`
+            }
+          }
+        ]
+      }
+    })
+
+    if (tasks.length > maxTasks) {
+      taskRows.push({
+        type: 'text',
+        text: `... และมีงานค้างอื่นๆ อีก ${tasks.length - maxTasks} รายการ`,
+        size: 'xs',
+        color: '#64748b',
+        align: 'center',
+        margin: 'md'
+      } as any)
+    }
+
+    const flexContents = {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#FFB300',
+        paddingAll: 'lg',
+        contents: [
+          {
+            type: 'text',
+            text: vehicleRef ? `📋 งานค้างรถ ${vehicleRef}` : '📋 รายการภารกิจ & โน้ตทีม',
+            weight: 'bold',
+            size: 'lg',
+            color: '#ffffff'
+          },
+          {
+            type: 'text',
+            text: `รายการงานค้างที่ยังไม่เสร็จสิ้น (${tasks.length} รายการ)`,
+            size: 'xs',
+            color: '#FFE082',
+            margin: 'xs'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: 'md',
+        contents: taskRows
+      }
+    }
+
+    if (env.MOCK_MODE) {
+      console.log(`[Mock ${BOT_NAME}] Sending Task Flex Message:`, JSON.stringify(flexContents, null, 2))
+      return true
+    }
+
+    await lineClient.replyMessage(replyToken, [
+      {
+        type: 'text',
+        text: aiResponse
+      },
+      {
+        type: 'flex',
+        altText: '📋 รายการงานค้าง',
+        contents: flexContents as any,
+        quickReply: quickReplyItems
+      }
+    ])
+
+    return true
+  } catch (err) {
+    console.error('[trySendTaskFlexMessage Error]', err)
     return false
   }
 }

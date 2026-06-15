@@ -16,6 +16,7 @@ const SYSTEM_PROMPT = `คุณคือ "Butter" (🧈) ผู้ช่วย 
 - ตอบคำถามเกี่ยวกับข้อมูลรถยนต์ไฟฟ้า (EV) ในระบบ
 - รายงานสถานะการส่งมอบรถ, งานซ่อม, การทดแทน, การรับคืน
 - ค้นหาข้อมูลรถตามทะเบียน, เลข VIN, รุ่น, ชื่อลูกค้า
+- จดบันทึกและติดตามงานค้างหรือโน้ตของทีม (Task & Note Tracking) เช่น ใครต้องทำอะไร เสร็จเมื่อไหร่ ทั้งงานรถและงานทั่วไป
 
 ## ฐานข้อมูล (SQL Server, read-only)
 
@@ -52,6 +53,9 @@ ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
 ### ตาราง: dbo.EV_ReturnItem (รับคืนรถ)
 คอลัมน์: ReturnItemID, VinNo, CustomerName, Model, ContractNo,
 ReceiveDate, ReturnDate, Mileage, ParkLocation
+
+### ตาราง: task_notes (จดโน้ต/ติดตามงาน - อยู่ใน PostgreSQL)
+คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
 
 ## ความสัมพันธ์ระหว่างตาราง
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
@@ -107,6 +111,11 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - EXEC GetEV_Report_ReplacementHistory → ประวัติรถทดแทน
 - EXEC GetEV_Report_WaitingForGr → รถรอ GR
 - EXEC GetEV_CarInfo @RegisterNo → ข้อมูลรถ 1 คัน
+
+### การจัดการงาน/โน้ตค้าง (Task & Note Tracking)
+- จดโน้ตใหม่: เรียกใช้ 'createTaskNote' โดยระบุรายละเอียดงาน คนทำ (ถ้ามี) และวันส่งมอบ (แปลงเวลาเช่น "วันศุกร์นี้" หรือ "พรุ่งนี้" เป็นวันที่จริง เช่น 2026-06-19)
+- ดูรายการงานค้าง: เรียกใช้ 'listTaskNotes' (สถานะงานดีฟอลต์เป็น PENDING) กรองตามเลขทะเบียนรถ/VIN ได้
+- ปิดงานที่ทำเสร็จแล้ว: เรียกใช้ 'completeTaskNote' โดยใส่รหัส ID งาน (กรุณาเรียก 'listTaskNotes' ก่อนเพื่อตรวจสอบ ID เสมอ)
 
 ## กฎสำคัญ
 - ใช้ฟังก์ชันที่มีให้ก่อนเสมอ (getDeliveryToday, getRepairStatus, searchVehicle, etc.)
@@ -232,6 +241,63 @@ const functionDeclarations: FunctionDeclaration[] = [
       properties: {},
     },
   },
+  {
+    name: 'createTaskNote',
+    description: 'จดบันทึก/สร้างโน้ตงานใหม่ (Task & Note Tracking) ทั้งงานเกี่ยวกับรถและงานทั่วไป ระบุใครทำอะไรเสร็จวันไหน',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        taskDetail: {
+          type: SchemaType.STRING,
+          description: 'รายละเอียดงาน เช่น ส่งเอกสารสิทธิ์, ซ่อมแผงไฟ',
+        },
+        assigneeName: {
+          type: SchemaType.STRING,
+          description: 'ชื่อหรือผู้รับผิดชอบงาน เช่น พี่วิทยา, คุณสมศรี (หากไม่ระบุให้เว้นไว้)',
+        },
+        dueDate: {
+          type: SchemaType.STRING,
+          description: 'วันที่นัดเสร็จสิ้นในรูปแบบ YYYY-MM-DD (เช่น 2026-06-20) หากไม่ระบุให้เว้นไว้',
+        },
+        vehicleRef: {
+          type: SchemaType.STRING,
+          description: 'ทะเบียนรถ หรือ เลข VIN ของรถยนต์ที่เกี่ยวข้อง (หากเป็นงานทั่วไปให้เว้นไว้)',
+        },
+      },
+      required: ['taskDetail'],
+    },
+  },
+  {
+    name: 'listTaskNotes',
+    description: 'ดึงรายการโน้ตงาน/ภารกิจทั้งหมดที่ยังทำไม่เสร็จ (PENDING) สามารถกรองตามทะเบียน/VIN หรือสถานะได้',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        vehicleRef: {
+          type: SchemaType.STRING,
+          description: 'เลขอ้างอิงรถยนต์ที่ต้องการกรองดูเฉพาะงาน (หากไม่กรองให้เว้นไว้)',
+        },
+        status: {
+          type: SchemaType.STRING,
+          description: 'สถานะงาน เช่น PENDING (ค้างอยู่) หรือ COMPLETED (ทำเสร็จแล้ว)',
+        },
+      },
+    },
+  },
+  {
+    name: 'completeTaskNote',
+    description: 'สั่งปิดงาน/บันทึกงานนั้นว่าเสร็จเรียบร้อยแล้ว (เปลี่ยนสถานะเป็น COMPLETED)',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        taskId: {
+          type: SchemaType.NUMBER,
+          description: 'รหัส ID ของงานที่ต้องการปิด (เช่น 1, 2)',
+        },
+      },
+      required: ['taskId'],
+    },
+  },
 ]
 
 // ─── Helper: delay ─────────────────────────────────────────────────
@@ -244,12 +310,16 @@ function delay(ms: number) {
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
-export async function askButter(userMessage: string, history: any[] = []): Promise<string> {
+export async function askButter(
+  userMessage: string,
+  history: any[] = [],
+  userContext?: { userId?: string; userName?: string }
+): Promise<string> {
   let lastError: unknown = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await _askButterOnce(userMessage, history)
+      return await _askButterOnce(userMessage, history, userContext)
     } catch (error) {
       lastError = error
       const message = error instanceof Error ? error.message : String(error)
@@ -283,7 +353,11 @@ export async function askButter(userMessage: string, history: any[] = []): Promi
 
 // ─── Single attempt ────────────────────────────────────────────────
 
-async function _askButterOnce(userMessage: string, history: any[] = []): Promise<string> {
+async function _askButterOnce(
+  userMessage: string,
+  history: any[] = [],
+  userContext?: { userId?: string; userName?: string }
+): Promise<string> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
     systemInstruction: SYSTEM_PROMPT,
@@ -324,7 +398,12 @@ async function _askButterOnce(userMessage: string, history: any[] = []): Promise
       let result: unknown
       if (fn) {
         try {
-          result = await fn((fc.args as Record<string, unknown>) || {})
+          const args: any = { ...fc.args }
+          if (fc.name === 'createTaskNote' && userContext) {
+            args.createUserId = userContext.userId
+            args.createUserName = userContext.userName
+          }
+          result = await fn(args)
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err)
           result = { error: `เกิดข้อผิดพลาดในการดึงข้อมูล: ${errMsg}` }

@@ -1,4 +1,5 @@
 import { getMSSQLPool, sql } from '@/lib/mssql'
+import { createTaskNote, getPendingTasks, completeTaskNote } from '@/lib/task-service'
 
 // ─── Helper: Get today's date range ────────────────────────────────
 function getTodayRange() {
@@ -632,5 +633,15 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
   getPortfolioSummary: () => getPortfolioSummary(),
   getDeliveryPlanAndActual: (p) => getDeliveryPlanAndActual(p as { date: string }),
   getRepairByLocation: () => getRepairByLocation(),
+  createTaskNote: (p) => createTaskNote({
+    vehicleRef: p.vehicleRef as string,
+    assigneeName: p.assigneeName as string,
+    taskDetail: p.taskDetail as string,
+    dueDate: p.dueDate as string,
+    createUserId: p.createUserId as string,
+    createUserName: p.createUserName as string,
+  }),
+  listTaskNotes: (p) => getPendingTasks(p.vehicleRef as string),
+  completeTaskNote: (p) => completeTaskNote(Number(p.taskId)),
 }
 
