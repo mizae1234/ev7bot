@@ -55,6 +55,7 @@ interface MaintenanceFollowUpInfo {
   CreateUserID: number | null
   UpdateDate: string | null
   UpdateUserID: number | null
+  CreateUserName?: string | null
 }
 
 interface MaintenanceInfo {
@@ -317,7 +318,7 @@ function VehicleDetailContent() {
                         <span className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-850 shadow-sm" />
                         <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 font-semibold mb-1">
                           <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
-                          <span>โดย User {f.CreateUserID || '-'}</span>
+                          <span>โดย {f.CreateUserName || `User ${f.CreateUserID || '-'}`}</span>
                         </div>
                         <p className="text-zinc-900 dark:text-zinc-100 font-semibold leading-relaxed">{f.FollowUpDetail}</p>
                       </div>
@@ -380,17 +381,17 @@ function VehicleDetailContent() {
                       </div>
                     )}
                     {m.followUps && m.followUps.length > 0 && (
-                      <div className="mt-3 bg-zinc-100/50 dark:bg-zinc-800/50 p-2.5 rounded-lg border border-zinc-200/40">
-                        <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider mb-2">📋 ประวัติการติดตาม ({m.followUps.length} รายการ)</p>
-                        <div className="space-y-3 border-l-2 border-zinc-400 dark:border-zinc-550 pl-3 ml-1">
+                      <div className="mt-3 bg-zinc-50/80 dark:bg-zinc-950/40 p-3 rounded-lg border border-zinc-250 dark:border-zinc-800">
+                        <p className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider mb-2">📋 ประวัติการติดตาม ({m.followUps.length} รายการ)</p>
+                        <div className="space-y-3 border-l-2 border-zinc-300 dark:border-zinc-700 pl-3.5 ml-1">
                           {m.followUps.map((f, fi) => (
                             <div key={fi} className="relative text-[11px] leading-relaxed">
-                              <span className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-zinc-500 dark:bg-zinc-400 border border-white dark:border-zinc-800 shadow-sm" />
-                              <div className="flex items-center justify-between text-zinc-650 dark:text-zinc-400 font-semibold">
+                              <span className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-zinc-500 dark:bg-zinc-400 border border-white dark:border-zinc-850 shadow-sm" />
+                              <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 font-semibold">
                                 <span>{formatDate(f.FollowUpDate || f.CreateDate)}</span>
-                                <span>โดย User {f.CreateUserID || '-'}</span>
+                                <span>โดย {f.CreateUserName || `User ${f.CreateUserID || '-'}`}</span>
                               </div>
-                              <p className="text-zinc-900 dark:text-zinc-50 font-medium mt-0.5">{f.FollowUpDetail}</p>
+                              <p className="text-zinc-900 dark:text-zinc-100 font-semibold mt-1">{f.FollowUpDetail}</p>
                             </div>
                           ))}
                         </div>

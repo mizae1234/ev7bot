@@ -182,12 +182,14 @@ export async function GET(
         `),
         followUpReq.query(`
           SELECT
-            MaintenanceFollowUpID, MaintenanceItemID, FollowUpDate,
-            FollowUpDetail, IsActive, CreateDate, CreateUserID,
-            UpdateDate, UpdateUserID
-          FROM dbo.EV_MaintenanceFollowUp
-          WHERE MaintenanceItemID IN (${idList}) AND IsActive = 1
-          ORDER BY FollowUpDate DESC, CreateDate DESC
+            f.MaintenanceFollowUpID, f.MaintenanceItemID, f.FollowUpDate,
+            f.FollowUpDetail, f.IsActive, f.CreateDate, f.CreateUserID,
+            f.UpdateDate, f.UpdateUserID,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreateUserName
+          FROM dbo.EV_MaintenanceFollowUp f
+          LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
+          WHERE f.MaintenanceItemID IN (${idList}) AND f.IsActive = 1
+          ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
         `)
       ])
 

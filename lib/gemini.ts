@@ -47,7 +47,7 @@ FollowUpDetail, IsActive (bit)
 ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
 
 ### ตาราง: dbo.EV_MaintenanceFollowUp (การติดตามสถานะงานซ่อม/การแจ้งซ่อม)
-คอลัมน์: MaintenanceFollowUpID, MaintenanceItemID (FK -> EV_MaintenanceItem), FollowUpDate (วันติดตาม), FollowUpDetail (รายละเอียดการติดตาม), IsActive (bit, เอาเฉพาะ IsActive=1), CreateDate (วันสร้าง), CreateUserID (ผู้บันทึก)
+คอลัมน์: MaintenanceFollowUpID, MaintenanceItemID (FK -> EV_MaintenanceItem), FollowUpDate (วันติดตาม), FollowUpDetail (รายละเอียดการติดตาม), IsActive (bit, เอาเฉพาะ IsActive=1), CreateDate (วันสร้าง), CreateUserID (ผู้บันทึก, สามารถ JOIN กับ EV_User.UserID เพื่อดึงชื่อ FirstName หรือ UserName ได้)
 
 ### ตาราง: dbo.EV_ReturnItem (รับคืนรถ)
 คอลัมน์: ReturnItemID, VinNo, CustomerName, Model, ContractNo,

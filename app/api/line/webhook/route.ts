@@ -2218,8 +2218,10 @@ async function trySendVehicleFlexMessage(
         const followUpResult = await pool.request()
           .input('maintId', sql.Int, maint.MaintenanceItemID)
           .query(`
-            SELECT f.FollowUpDate, f.FollowUpDetail, f.CreateDate, f.CreateUserID
+            SELECT f.FollowUpDate, f.FollowUpDetail, f.CreateDate, f.CreateUserID,
+                   ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreateUserName
             FROM dbo.EV_MaintenanceFollowUp f
+            LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
             WHERE f.MaintenanceItemID = @maintId AND f.IsActive = 1
             ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
           `)
@@ -2460,7 +2462,7 @@ async function trySendVehicleFlexMessage(
                 contents: [
                   {
                     type: 'text',
-                    text: `${formatDateTh(f.FollowUpDate || f.CreateDate)} - โดย User ${f.CreateUserID || '-'}`,
+                    text: `${formatDateTh(f.FollowUpDate || f.CreateDate)} - โดย ${f.CreateUserName || `User ${f.CreateUserID || '-'}`}`,
                     size: 'xxs',
                     color: '#6b7280',
                     weight: 'bold'
