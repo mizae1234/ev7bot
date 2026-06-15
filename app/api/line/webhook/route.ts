@@ -2727,6 +2727,9 @@ async function trySendVehicleFlexMessage(
     return false
   } catch (err: any) {
     console.error('[trySendVehicleFlexMessage Error]', err)
+    if (flexContents) {
+      console.error('[trySendVehicleFlexMessage Payload]', JSON.stringify(flexContents))
+    }
     if (err.response?.data) {
       console.error('[trySendVehicleFlexMessage Error Details]', JSON.stringify(err.response.data))
     }
