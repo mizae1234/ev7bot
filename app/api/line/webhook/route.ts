@@ -2127,6 +2127,7 @@ async function trySendVehicleFlexMessage(
   aiResponse: string,
   appUrl: string
 ): Promise<boolean> {
+  let flexContents: any = null
   try {
     const pool = await getMSSQLPool()
     if (!pool) return false
@@ -2179,7 +2180,7 @@ async function trySendVehicleFlexMessage(
       .replace(/\n{3,}/g, '\n\n')
       .trim()
 
-    let flexContents: any = null
+    flexContents = null
     if (statusCode === 'MAINTENANCE') {
       const maintResult = await pool.request()
         .input('inventoryItemId', sql.Int, car.InventoryItemID)
