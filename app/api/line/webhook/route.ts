@@ -2074,8 +2074,11 @@ async function replyText(replyToken: string, message: string) {
       text: message,
       quickReply: quickReplyItems
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error(`[${BOT_NAME} replyText Error]`, err)
+    if (err.response?.data) {
+      console.error(`[${BOT_NAME} replyText Error Details]`, JSON.stringify(err.response.data))
+    }
   }
 }
 
@@ -2722,8 +2725,11 @@ async function trySendVehicleFlexMessage(
     }
 
     return false
-  } catch (err) {
+  } catch (err: any) {
     console.error('[trySendVehicleFlexMessage Error]', err)
+    if (err.response?.data) {
+      console.error('[trySendVehicleFlexMessage Error Details]', JSON.stringify(err.response.data))
+    }
     return false
   }
 }
