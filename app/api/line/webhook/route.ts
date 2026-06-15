@@ -1974,13 +1974,26 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     const isTaskQuery = matchAny(lower, ['งานค้าง', 'รายการงาน', 'รายการโน้ต', 'ดูงาน', 'ดูโน้ต', 'งานทั้งหมด', 'มีงานอะไร', 'จดอะไรไว้บ้าง', 'task list', 'list task'])
     const aiMentionsTasks = aiResponse.includes('ID #') || aiResponse.includes('รายการงาน') || aiResponse.includes('งานค้าง')
 
-    if (isTaskQuery || aiMentionsTasks) {
+    if (isTaskQuery) {
       let vehicleRef: string | undefined = undefined
       const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
       if (vehicleMatch) {
         vehicleRef = vehicleMatch[0]
       }
       flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
+    } else if (aiMentionsTasks) {
+      const singleTaskMatch = aiResponse.match(/ID\s*#?\s*(\d+)/i)
+      if (singleTaskMatch) {
+        const taskId = parseInt(singleTaskMatch[1], 10)
+        flexSent = await trySendSingleTaskFlexMessage(replyToken, aiResponse, taskId)
+      } else {
+        let vehicleRef: string | undefined = undefined
+        const vehicleMatch = text.match(/([ก-ฮ]{2}\-\d{3,4})|([ก-ฮ]{2}\d{3,4})|\b(L[A-Z0-9]{16})\b/i)
+        if (vehicleMatch) {
+          vehicleRef = vehicleMatch[0]
+        }
+        flexSent = await trySendTaskFlexMessage(replyToken, aiResponse, vehicleRef)
+      }
     }
 
     // 2. Vehicle Info Flow (fallback if tasks not sent or not a task query)
@@ -2956,6 +2969,169 @@ async function trySendTaskFlexMessage(
     return true
   } catch (err) {
     console.error('[trySendTaskFlexMessage Error]', err)
+    return false
+  }
+}
+
+async function trySendSingleTaskFlexMessage(
+  replyToken: string,
+  aiResponse: string,
+  taskId: number
+): Promise<boolean> {
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const task = await prisma.taskNote.findUnique({
+      where: { id: taskId }
+    })
+    if (!task) {
+      return false
+    }
+
+    const dueDateStr = task.dueDate ? formatDateTh(task.dueDate) : 'ไม่ระบุกำหนดเสร็จ'
+    const assignee = task.assigneeName || 'ยังไม่ทราบผู้รับผิดชอบ'
+    const vehicleDisplay = task.vehicleRef ? `🚗 ${task.vehicleRef}` : '📂 ทั่วไป'
+    
+    const statusText = task.status === 'COMPLETED' ? '✅ เสร็จสิ้น (COMPLETED)' : '⏳ รอดำเนินการ (PENDING)'
+    const statusColor = task.status === 'COMPLETED' ? '#059669' : '#FF6D00'
+
+    const flexContents = {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#FFB300',
+        paddingAll: 'lg',
+        contents: [
+          {
+            type: 'text',
+            text: '📋 รายละเอียดภารกิจ',
+            weight: 'bold',
+            size: 'lg',
+            color: '#ffffff'
+          },
+          {
+            type: 'text',
+            text: `รหัสภารกิจ ID #${task.id}`,
+            size: 'xs',
+            color: '#FFE082',
+            margin: 'xs'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: 'md',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'box',
+            layout: 'vertical',
+            paddingAll: 'md',
+            backgroundColor: '#f8fafc',
+            cornerRadius: 'md',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `📌 ID #${task.id}`,
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#FF6D00',
+                    flex: 3
+                  },
+                  {
+                    type: 'text',
+                    text: vehicleDisplay,
+                    size: 'xs',
+                    weight: 'bold',
+                    color: '#3b82f6',
+                    align: 'end',
+                    flex: 7
+                  }
+                ]
+              },
+              {
+                type: 'text',
+                text: task.taskDetail,
+                size: 'sm',
+                color: '#1e293b',
+                weight: 'bold',
+                wrap: true
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `👤 ${assignee}`,
+                    size: 'xs',
+                    color: '#64748b',
+                    flex: 6
+                  },
+                  {
+                    type: 'text',
+                    text: `📅 ${dueDateStr}`,
+                    size: 'xs',
+                    color: '#64748b',
+                    align: 'end',
+                    flex: 6
+                  }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                margin: 'sm',
+                contents: [
+                  { type: 'text', text: 'สถานะ', color: '#6b7280', size: 'xs', flex: 3 },
+                  { type: 'text', text: statusText, color: statusColor, size: 'xs', weight: 'bold', flex: 9 }
+                ]
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                color: '#FF6D00',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '🔍 รายละเอียด',
+                  uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks?id=${task.id}`)}`
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+    if (env.MOCK_MODE) {
+      console.log(`[Mock ${BOT_NAME}] Sending Single Task Flex Message:`, JSON.stringify(flexContents, null, 2))
+      return true
+    }
+
+    await lineClient.replyMessage(replyToken, [
+      {
+        type: 'text',
+        text: aiResponse
+      },
+      {
+        type: 'flex',
+        altText: `รายละเอียดงาน #${task.id}`,
+        contents: flexContents as any,
+        quickReply: quickReplyItems
+      }
+    ])
+
+    return true
+  } catch (err) {
+    console.error('[trySendSingleTaskFlexMessage Error]', err)
     return false
   }
 }
