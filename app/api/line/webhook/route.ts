@@ -2962,7 +2962,7 @@ async function trySendTaskFlexMessage(
             action: {
               type: 'uri',
               label: '🔍 รายละเอียด',
-              uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks?id=${task.id}`)}`
+              uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks/${task.id}`)}`
             }
           }
         ]
@@ -3171,7 +3171,7 @@ async function trySendSingleTaskFlexMessage(
                 action: {
                   type: 'uri',
                   label: '🔍 รายละเอียด',
-                  uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks?id=${task.id}`)}`
+                  uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks/${task.id}`)}`
                 }
               }
             ]
