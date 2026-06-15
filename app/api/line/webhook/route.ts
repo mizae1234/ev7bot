@@ -218,7 +218,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         'คู่มือ',
         'วิธีใช้'
       ]
-      const isBypass = bypassKeywords.includes(rawLower)
+      const isBypass = bypassKeywords.includes(rawLower) || /^(ปิดงาน\s*#?\s*\d+)/i.test(rawLower)
 
       let strippedText = rawText
       let triggerFound = false
@@ -499,6 +499,29 @@ function getGuideBubble() {
 // ─── Butter Chat Handler ───────────────────────────────────────────
 
 async function handleChat(text: string, lower: string, userId: string, replyToken: string, appUrl: string, chatSourceType: string = 'user', chatSourceId: string | null = null) {
+  // ─── 📝 Direct Task Completion Command ─────────────────────────────
+  if (lower.startsWith('ปิดงาน') || lower.includes('ปิดงาน')) {
+    const taskMatch = text.match(/ปิดงาน\s*#?\s*(\d+)/i)
+    if (taskMatch) {
+      const taskId = parseInt(taskMatch[1], 10)
+      try {
+        const { completeTaskNote } = await import('@/lib/task-service')
+        await completeTaskNote(taskId)
+        await replyText(
+          replyToken,
+          `✅ ปิดงาน #${taskId} เรียบร้อยแล้วค่ะ! ✨ 🧈`
+        )
+      } catch (err: any) {
+        console.error('[Direct Complete Task Error]', err)
+        await replyText(
+          replyToken,
+          `❌ ไม่พบรหัสงาน #${taskId} หรือเกิดข้อผิดพลาดในการปิดงานค่ะ`
+        )
+      }
+      return
+    }
+  }
+
   // ─── 🆔 LINE User ID Command ──────────────────────────────────────
   if (lower === 'my id' || lower === 'line id' || lower === 'my line id') {
     await replyText(
@@ -2845,14 +2868,23 @@ async function trySendTaskFlexMessage(
             ]
           },
           {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'สถานะ', color: '#6b7280', size: 'xs', flex: 3 },
+              { type: 'text', text: '⏳ รอดำเนินการ (PENDING)', color: '#FF6D00', size: 'xs', weight: 'bold', flex: 9 }
+            ]
+          },
+          {
             type: 'button',
             style: 'secondary',
-            color: '#059669',
+            color: '#FF6D00',
             height: 'sm',
             action: {
-              type: 'message',
-              label: '✅ ทำเสร็จแล้ว',
-              text: `ปิดงาน #${task.id}`
+              type: 'uri',
+              label: '🔍 รายละเอียด',
+              uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/tasks?id=${task.id}`)}`
             }
           }
         ]
