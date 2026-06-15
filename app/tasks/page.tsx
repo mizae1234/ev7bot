@@ -482,7 +482,7 @@ function TasksContent() {
                 📋 Tasks & Notes Manager
               </h1>
               <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded-md font-bold">
-                Admin Panel
+                {userRole === 'USER' ? 'User View' : 'Admin Panel'}
               </span>
             </div>
             <p className="text-xs text-zinc-500 mt-1">
@@ -526,12 +526,14 @@ function TasksContent() {
                 </a>
               </>
             )}
-            <a 
-              href="/issues"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              🐞 แจ้งปัญหาบอท
-            </a>
+            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+              <a 
+                href="/issues"
+                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+              >
+                🐞 แจ้งปัญหาบอท
+              </a>
+            )}
             <a 
               href="/dashboard"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold transition-all shadow-md"

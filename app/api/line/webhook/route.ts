@@ -505,6 +505,29 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     if (taskMatch) {
       const taskId = parseInt(taskMatch[1], 10)
       try {
+        // Check database role of caller (Admin or Super Admin only)
+        let isAuthorized = false
+        const registration = await prisma.lineRegistration.findUnique({
+          where: { lineUserId: userId }
+        })
+        if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+          isAuthorized = true
+        } else {
+          const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+          const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+          if (adminIds.includes(userId)) {
+            isAuthorized = true
+          }
+        }
+
+        if (!isAuthorized) {
+          await replyText(
+            replyToken,
+            `❌ ขออภัยค่ะ คุณไม่มีสิทธิ์จัดการภารกิจนี้ (ต้องการสิทธิ์ Admin หรือ Super Admin) 💛`
+          )
+          return
+        }
+
         const { completeTaskNote } = await import('@/lib/task-service')
         await completeTaskNote(taskId)
         await replyText(
@@ -1964,13 +1987,32 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       }
     } catch { /* ignore */ }
 
+    let userRole = 'USER'
+    try {
+      const reg = await prisma.lineRegistration.findUnique({
+        where: { lineUserId: userId }
+      })
+      if (reg) {
+        userRole = reg.role
+      } else {
+        const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+        const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+        if (adminIds.includes(userId)) {
+          userRole = 'ADMIN'
+        }
+      }
+    } catch (err) {
+      console.error('[handleChat role check error]', err)
+    }
+
     const userContext: {
       userId?: string
       userName?: string
+      userRole?: string
       toolsCalled?: string[]
       createdTaskId?: number
       completedTaskId?: number
-    } = { userId, userName }
+    } = { userId, userName, userRole }
 
     const aiResponse = await askButter(text, history, userContext)
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)

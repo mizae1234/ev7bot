@@ -317,7 +317,7 @@ const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 export async function askButter(
   userMessage: string,
   history: any[] = [],
-  userContext?: { userId?: string; userName?: string }
+  userContext?: { userId?: string; userName?: string; userRole?: string }
 ): Promise<string> {
   let lastError: unknown = null
 
@@ -360,7 +360,7 @@ export async function askButter(
 async function _askButterOnce(
   userMessage: string,
   history: any[] = [],
-  userContext?: { userId?: string; userName?: string }
+  userContext?: { userId?: string; userName?: string; userRole?: string }
 ): Promise<string> {
   const now = new Date()
   const bkkDateStr = new Intl.DateTimeFormat('en-CA', {
@@ -433,6 +433,13 @@ async function _askButterOnce(
       if (fn) {
         try {
           const args: any = { ...fc.args }
+          if (fc.name === 'createTaskNote' || fc.name === 'completeTaskNote') {
+            const role = userContext?.userRole
+            if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+              throw new Error('คุณไม่มีสิทธิ์จัดการภารกิจค่ะ (ต้องการสิทธิ์ Admin หรือ Super Admin) 💛')
+            }
+          }
+
           if (fc.name === 'createTaskNote' && userContext) {
             args.createUserId = userContext.userId
             args.createUserName = userContext.userName
@@ -456,7 +463,7 @@ async function _askButterOnce(
           }
         } catch (err) {
           const errMsg = err instanceof Error ? err.message : String(err)
-          result = { error: `เกิดข้อผิดพลาดในการดึงข้อมูล: ${errMsg}` }
+          result = { error: errMsg.includes('ไม่มีสิทธิ์') ? errMsg : `เกิดข้อผิดพลาดในการดึงข้อมูล: ${errMsg}` }
         }
       } else {
         result = { error: `ไม่พบฟังก์ชัน ${fc.name}` }
