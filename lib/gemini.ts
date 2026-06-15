@@ -362,9 +362,39 @@ async function _askButterOnce(
   history: any[] = [],
   userContext?: { userId?: string; userName?: string }
 ): Promise<string> {
+  const now = new Date()
+  const bkkDateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now)
+  
+  const bkkDayName = new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    weekday: 'long'
+  }).format(now)
+
+  const bkkTimeStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Bangkok',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(now)
+
+  const dynamicSystemInstruction = `${SYSTEM_PROMPT}
+
+## วันเวลาปัจจุบันของระบบ (สำคัญมากสำหรับแปลงเวลา)
+- วันนี้คือ: ${bkkDayName}
+- วันที่ปัจจุบัน (ค.ศ. / AD): ${bkkDateStr}
+- เวลาปัจจุบัน: ${bkkTimeStr}
+
+เมื่อผู้ใช้งานพูดกำหนดเวลา เช่น "พรุ่งนี้", "วันศุกร์นี้", "อาทิตย์หน้า" หรือวันที่ระบุใดๆ ให้คุณคำนวณหาวันที่ ค.ศ. (ในรูปแบบ YYYY-MM-DD) โดยอ้างอิงและคำนวณจากวันที่ปัจจุบัน ค.ศ. ${bkkDateStr} ด้านบนนี้เสมอ และส่งไปให้เครื่องมือ createTaskNote เสมอ (ตัวอย่างเช่น ถ้าวันนี้คือ วันจันทร์ ค.ศ. 2026-06-15 คำสั่ง "พรุ่งนี้" จะถูกแปลงเป็น "2026-06-16")`
+
   const model = genAI.getGenerativeModel({
     model: 'gemini-3-flash-preview',
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: dynamicSystemInstruction,
     tools: [{ functionDeclarations }],
   })
 
