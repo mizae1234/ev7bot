@@ -182,7 +182,10 @@ function VehicleDetailContent() {
   if (!data) return null
 
   const { car, currentRent, rentHistory = [], maintenance, returns } = data
-  const statusInfo = getStatusInfo(car.StatusCode, car.StatusName)
+  const statusInfo = getStatusInfo(
+    car.StatusCode,
+    car.StatusCode === 'AVAILABLE' && car.SubStatusName ? car.SubStatusName : car.StatusName
+  )
   const activeMaint = maintenance.find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
 
   return (
