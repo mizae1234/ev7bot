@@ -1720,7 +1720,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(newVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-                      { type: 'text', text: 'ส่งจริงแล้ว', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   },
@@ -1773,7 +1773,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(usedVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-                      { type: 'text', text: 'ส่งจริงแล้ว', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   },
