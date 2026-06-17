@@ -1308,16 +1308,72 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         }
       }
 
+      const buildBreakdownBox = (headerText: string, breakdown: any[]): any => {
+        if (!breakdown || breakdown.length === 0) return null
+
+        const rows: any[] = []
+        for (const item of breakdown) {
+          let valColor = '#1a1a1a'
+          if (item.completed >= item.total && item.total > 0) {
+            valColor = '#2E7D32' // green (all completed)
+          } else if (item.completed < item.total && item.completed > 0) {
+            valColor = '#E65100' // orange (in progress)
+          } else if (item.completed === 0 && item.total > 0) {
+            valColor = '#C62828' // red (none completed)
+          }
+
+          rows.push({
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `• ${item.project} (${item.model})`,
+                size: 'xs',
+                color: '#555555',
+                flex: 5
+              },
+              {
+                type: 'text',
+                text: `${item.completed}/${item.total}`,
+                size: 'xs',
+                weight: 'bold',
+                color: valColor,
+                align: 'end',
+                flex: 3
+              }
+            ]
+          })
+        }
+
+        return {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'xs',
+          margin: 'md',
+          contents: [
+            {
+              type: 'text',
+              text: headerText,
+              size: 'xs',
+              weight: 'bold',
+              color: '#1a1a1a',
+              margin: 'xs'
+            },
+            ...rows
+          ]
+        }
+      }
+
       let newComparisonBox: any = null
       let usedComparisonBox: any = null
 
       if (deliveryPlanData && !('error' in deliveryPlanData)) {
         const { plans = [], actuals = [] } = deliveryPlanData as any
         const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
-        const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
 
         newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
-        usedComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถมือสอง (จริง/แผน)', [], usedActuals)
+        usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง (สำเร็จ/แผน)', (delivery as any)?.usedVehicles?.breakdown)
       }
 
       const todayFormatted = new Date().toLocaleDateString('th-TH', {
@@ -1572,12 +1628,18 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             const { plan, actual } = models[model]
             if (plan > 0 || actual > 0) {
               let valColor = '#1a1a1a'
-              if (actual >= plan && plan > 0) {
-                valColor = '#2E7D32' // green (target met)
-              } else if (actual < plan && actual > 0) {
-                valColor = '#E65100' // orange (in progress/shortfall)
-              } else if (actual === 0 && plan > 0) {
-                valColor = '#C62828' // red (not started)
+              let textVal = ''
+              if (plan > 0) {
+                textVal = `${actual}/${plan}`
+                if (actual >= plan) {
+                  valColor = '#2E7D32' // green (target met)
+                } else if (actual > 0) {
+                  valColor = '#E65100' // orange (in progress/shortfall)
+                } else {
+                  valColor = '#C62828' // red (not started)
+                }
+              } else {
+                textVal = `${actual} คัน`
               }
 
               planRows.push({
@@ -1593,7 +1655,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   },
                   {
                     type: 'text',
-                    text: `${actual}/${plan}`,
+                    text: textVal,
                     size: 'xs',
                     weight: 'bold',
                     color: valColor,
@@ -1737,7 +1799,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               },
               ...(usedPlanRows.length > 0 ? [
                 { type: 'separator', margin: 'md' },
-                { type: 'text', text: '📋 เทียบการส่งมอบ รถมือสอง (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+                { type: 'text', text: '📋 รายละเอียดส่งมอบ รถมือสอง', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
                 ...usedPlanRows
               ] : [])
             ],

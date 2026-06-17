@@ -38,20 +38,30 @@ function processRawDeliveries(rawItems: any[], dateStr: string) {
     const completed = items.filter(item => item.ReleaseDate !== null).length
     const pending = items.filter(item => item.ReleaseDate === null).length
 
-    const breakdownMap: Record<string, { project: string, model: string, count: number }> = {}
+    const breakdownMap: Record<string, { project: string, model: string, completed: number, total: number }> = {}
     for (const item of items) {
       const key = `${item.Project}_${item.Model}`
       if (!breakdownMap[key]) {
         breakdownMap[key] = {
           project: item.Project,
           model: item.Model,
-          count: 0
+          completed: 0,
+          total: 0
         }
       }
-      breakdownMap[key].count++
+      if (item.ReleaseDate !== null) {
+        breakdownMap[key].completed++
+      }
+      breakdownMap[key].total++
     }
 
-    const breakdown = Object.values(breakdownMap).sort((a, b) => b.count - a.count)
+    const breakdown = Object.values(breakdownMap).map(x => ({
+      project: x.project,
+      model: x.model,
+      count: x.total, // backward compatibility
+      completed: x.completed,
+      total: x.total
+    })).sort((a, b) => b.total - a.total)
 
     return {
       summary: { total, completed, pending },

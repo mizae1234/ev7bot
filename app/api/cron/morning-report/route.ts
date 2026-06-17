@@ -127,6 +127,63 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): a
   }
 }
 
+function buildBreakdownBox(headerText: string, breakdown: any[]): any {
+  if (!breakdown || breakdown.length === 0) return null
+
+  const rows: any[] = []
+  for (const item of breakdown) {
+    let valColor = '#1a1a1a'
+    if (item.completed >= item.total && item.total > 0) {
+      valColor = '#2E7D32' // green (all completed)
+    } else if (item.completed < item.total && item.completed > 0) {
+      valColor = '#E65100' // orange (in progress)
+    } else if (item.completed === 0 && item.total > 0) {
+      valColor = '#C62828' // red (none completed)
+    }
+
+    rows.push({
+      type: 'box',
+      layout: 'horizontal',
+      contents: [
+        {
+          type: 'text',
+          text: `• ${item.project} (${item.model})`,
+          size: 'xs',
+          color: '#555555',
+          flex: 5
+        },
+        {
+          type: 'text',
+          text: `${item.completed}/${item.total}`,
+          size: 'xs',
+          weight: 'bold',
+          color: valColor,
+          align: 'end',
+          flex: 3
+        }
+      ]
+    })
+  }
+
+  return {
+    type: 'box',
+    layout: 'vertical',
+    spacing: 'xs',
+    margin: 'md',
+    contents: [
+      {
+        type: 'text',
+        text: headerText,
+        size: 'xs',
+        weight: 'bold',
+        color: '#1a1a1a',
+        margin: 'xs'
+      },
+      ...rows
+    ]
+  }
+}
+
 function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any, deliveryPlanData?: any): any {
   const todayFormatted = new Date().toLocaleDateString('th-TH', {
     weekday: 'long',
@@ -158,7 +215,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
 
     newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
-    usedComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถมือสอง (จริง/แผน)', [], usedActuals)
+    usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง (สำเร็จ/แผน)', delivery?.usedVehicles?.breakdown)
   }
 
   // Bubble 1: Portfolio
