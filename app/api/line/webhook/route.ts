@@ -1198,10 +1198,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
       const fmt = (n: number) => n.toLocaleString('en-US')
 
-      // Build Delivery Plan Comparison (if available)
-      const planRows: any[] = []
-      if (deliveryPlanData && !('error' in deliveryPlanData)) {
-        const { plans = [], actuals = [] } = deliveryPlanData as any
+      const buildComparisonBox = (headerText: string, plans: any[], actuals: any[]): any => {
         const comparison: Record<string, {
           ES: { plan: number; actual: number };
           Y490: { plan: number; actual: number };
@@ -1249,6 +1246,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           }
         }
 
+        const planRows: any[] = []
         for (const proj of Object.keys(comparison)) {
           const models = comparison[proj]
           for (const model of ['ES', 'Y490', 'Y410'] as const) {
@@ -1288,29 +1286,46 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             }
           }
         }
+
+        if (planRows.length === 0) return null
+
+        return {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'xs',
+          margin: 'md',
+          contents: [
+            {
+              type: 'text',
+              text: headerText,
+              size: 'xs',
+              weight: 'bold',
+              color: '#1a1a1a',
+              margin: 'xs'
+            },
+            ...planRows
+          ]
+        }
       }
 
-      const comparisonBox = planRows.length > 0 ? {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'xs',
-        margin: 'md',
-        contents: [
-          {
-            type: 'text',
-            text: '📋 เทียบแผนส่งมอบ (จริง/แผน)',
-            size: 'xs',
-            weight: 'bold',
-            color: '#1a1a1a',
-            margin: 'xs'
-          },
-          ...planRows
-        ]
-      } : null
+      let newComparisonBox: any = null
+      let usedComparisonBox: any = null
+
+      if (deliveryPlanData && !('error' in deliveryPlanData)) {
+        const { plans = [], actuals = [] } = deliveryPlanData as any
+        const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
+        const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
+
+        newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
+        usedComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถมือสอง (จริง/แผน)', [], usedActuals)
+      }
+
       const todayFormatted = new Date().toLocaleDateString('th-TH', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
       })
-      const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
+      const newDeliverySummary = (delivery as any)?.newVehicles?.summary || { total: 0, completed: 0, pending: 0 }
+      const usedDeliverySummary = (delivery as any)?.usedVehicles?.summary || { total: 0, completed: 0, pending: 0 }
+      
       const repairData = {
         newReports: repairDaily?.newReports || 0,
         completed: repairDaily?.completed || 0,
@@ -1401,23 +1416,45 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'text', text: 'สรุปการส่งรถและงานซ่อม', size: 'xs', color: '#888888' },
         ], backgroundColor: '#E8F5E9', paddingAll: 'lg' },
         body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
-          { type: 'text', text: '🚛 ส่งมอบรถ', weight: 'bold', size: 'sm', color: '#1565C0' },
+          // New Delivery Section
+          { type: 'text', text: '🚛 ส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
               { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
               { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
-          ...(comparisonBox ? [comparisonBox] : []),
+          ...(newComparisonBox ? [newComparisonBox] : []),
           { type: 'separator' },
+
+          // Used Delivery Section
+          { type: 'text', text: '🚗 ปล่อยรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
+          { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+          ]},
+          ...(usedComparisonBox ? [usedComparisonBox] : []),
+          { type: 'separator' },
+
+          // Repair
           { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
@@ -1477,11 +1514,11 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         return
       }
 
-      const delivery = stats.delivery || { total: 0, completed: 0, pending: 0, pendingActual: 0 }
+      const newVehicles = stats.newVehicles || { planTotal: 0, completed: 0, pending: 0, pendingActual: 0 }
+      const usedVehicles = stats.usedVehicles || { planTotal: 0, completed: 0, pending: 0, pendingActual: 0 }
 
-      const planRows: any[] = []
-      if (stats.plans && stats.actuals) {
-        const { plans = [], actuals = [] } = stats as any
+      const buildComparisonRows = (plans: any[], actuals: any[]) => {
+        const planRows: any[] = []
         const comparison: Record<string, {
           ES: { plan: number; actual: number };
           Y490: { plan: number; actual: number };
@@ -1568,7 +1605,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             }
           }
         }
+
+        return planRows
       }
+
+      const actuals = stats.actuals || []
+      const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
+      const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
+
+      const newPlanRows = buildComparisonRows(stats.plans || [], newActuals)
+      const usedPlanRows = buildComparisonRows([], usedActuals)
 
       const flexMessage = {
         type: 'flex' as const,
@@ -1591,7 +1637,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             layout: 'vertical',
             spacing: 'md',
             contents: [
-              { type: 'text', text: '🚛 สถิติส่งมอบรวม', weight: 'bold', size: 'sm', color: '#E65100' },
+              // New Vehicles Section
+              { type: 'text', text: '🚛 สถิติส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
               {
                 type: 'box',
                 layout: 'horizontal',
@@ -1601,7 +1648,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     type: 'box',
                     layout: 'vertical',
                     contents: [
-                      { type: 'text', text: String(delivery.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+                      { type: 'text', text: String(newVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
                       { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
@@ -1610,7 +1657,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     type: 'box',
                     layout: 'vertical',
                     contents: [
-                      { type: 'text', text: String(delivery.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+                      { type: 'text', text: String(newVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
                       { type: 'text', text: 'ส่งจริงแล้ว', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
@@ -1619,7 +1666,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     type: 'box',
                     layout: 'vertical',
                     contents: [
-                      { type: 'text', text: String(delivery.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
+                      { type: 'text', text: String(newVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
                       { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
@@ -1628,17 +1675,70 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     type: 'box',
                     layout: 'vertical',
                     contents: [
-                      { type: 'text', text: String(delivery.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
+                      { type: 'text', text: String(newVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
                       { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   }
                 ]
               },
-              ...(planRows.length > 0 ? [
-                { type: 'separator', margin: 'lg' },
-                { type: 'text', text: '📋 เทียบแผนส่งมอบรายโครงการ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'md' },
-                ...planRows
+              ...(newPlanRows.length > 0 ? [
+                { type: 'separator', margin: 'md' },
+                { type: 'text', text: '📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+                ...newPlanRows
+              ] : []),
+
+              { type: 'separator', margin: 'lg' },
+
+              // Used Vehicles Section
+              { type: 'text', text: '🚗 สถิติส่งมอบรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                spacing: 'md',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(usedVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+                      { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(usedVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+                      { type: 'text', text: 'ส่งจริงแล้ว', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(usedVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
+                      { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    contents: [
+                      { type: 'text', text: String(usedVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
+                      { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
+                    ],
+                    flex: 1
+                  }
+                ]
+              },
+              ...(usedPlanRows.length > 0 ? [
+                { type: 'separator', margin: 'md' },
+                { type: 'text', text: '📋 เทียบการส่งมอบ รถมือสอง (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+                ...usedPlanRows
               ] : [])
             ],
             paddingAll: 'lg'

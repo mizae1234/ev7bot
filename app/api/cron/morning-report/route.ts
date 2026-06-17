@@ -16,6 +16,117 @@ function fmt(n: number): string {
 }
 
 // ─── Build Flex Message (carousel: portfolio + daily activity) ─────
+// ─── Build Flex Message (carousel: portfolio + daily activity) ─────
+function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): any {
+  const comparison: Record<string, {
+    ES: { plan: number; actual: number };
+    Y490: { plan: number; actual: number };
+    Y410: { plan: number; actual: number };
+  }> = {}
+
+  for (const p of plans) {
+    const proj = p.ProjectType || 'ไม่ระบุ'
+    if (!comparison[proj]) {
+      comparison[proj] = {
+        ES: { plan: 0, actual: 0 },
+        Y490: { plan: 0, actual: 0 },
+        Y410: { plan: 0, actual: 0 },
+      }
+    }
+    comparison[proj].ES.plan += p.ES_Count || 0
+    comparison[proj].Y490.plan += p.Y490_Count || 0
+    comparison[proj].Y410.plan += p.Y410_Count || 0
+  }
+
+  const categorizeModel = (modelName: string) => {
+    const m = (modelName || '').toUpperCase()
+    if (m.includes('ES')) return 'ES'
+    if (m.includes('490')) return 'Y490'
+    if (m.includes('410')) return 'Y410'
+    return 'Other'
+  }
+
+  for (const a of actuals) {
+    const proj = a.ProjectType || 'ไม่ระบุ'
+    if (!comparison[proj]) {
+      comparison[proj] = {
+        ES: { plan: 0, actual: 0 },
+        Y490: { plan: 0, actual: 0 },
+        Y410: { plan: 0, actual: 0 },
+      }
+    }
+    const modelCat = categorizeModel(a.Model)
+    if (modelCat === 'ES') {
+      comparison[proj].ES.actual += a.Count || 0
+    } else if (modelCat === 'Y490') {
+      comparison[proj].Y490.actual += a.Count || 0
+    } else if (modelCat === 'Y410') {
+      comparison[proj].Y410.actual += a.Count || 0
+    }
+  }
+
+  const planRows: any[] = []
+  for (const proj of Object.keys(comparison)) {
+    const models = comparison[proj]
+    for (const model of ['ES', 'Y490', 'Y410'] as const) {
+      const { plan, actual } = models[model]
+      if (plan > 0 || actual > 0) {
+        let valColor = '#1a1a1a'
+        if (actual >= plan && plan > 0) {
+          valColor = '#2E7D32' // green (target met)
+        } else if (actual < plan && actual > 0) {
+          valColor = '#E65100' // orange (in progress/shortfall)
+        } else if (actual === 0 && plan > 0) {
+          valColor = '#C62828' // red (not started)
+        }
+
+        planRows.push({
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            {
+              type: 'text',
+              text: `• ${proj} (${model})`,
+              size: 'xs',
+              color: '#555555',
+              flex: 5
+            },
+            {
+              type: 'text',
+              text: `${actual}/${plan}`,
+              size: 'xs',
+              weight: 'bold',
+              color: valColor,
+              align: 'end',
+              flex: 3
+            }
+          ]
+        })
+      }
+    }
+  }
+
+  if (planRows.length === 0) return null
+
+  return {
+    type: 'box',
+    layout: 'vertical',
+    spacing: 'xs',
+    margin: 'md',
+    contents: [
+      {
+        type: 'text',
+        text: headerText,
+        size: 'xs',
+        weight: 'bold',
+        color: '#1a1a1a',
+        margin: 'xs'
+      },
+      ...planRows
+    ]
+  }
+}
+
 function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any, deliveryPlanData?: any): any {
   const todayFormatted = new Date().toLocaleDateString('th-TH', {
     weekday: 'long',
@@ -25,7 +136,9 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     timeZone: 'Asia/Bangkok',
   })
 
-  const deliverySummary = delivery?.summary || { total: 0, completed: 0, pending: 0 }
+  const newDeliverySummary = delivery?.newVehicles?.summary || { total: 0, completed: 0, pending: 0 }
+  const usedDeliverySummary = delivery?.usedVehicles?.summary || { total: 0, completed: 0, pending: 0 }
+
   const repairData = {
     newReports: repairDaily?.newReports || 0,
     completed: repairDaily?.completed || 0,
@@ -33,115 +146,20 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     returns: repairDaily?.returns || 0,
   }
 
-  // Build Delivery Plan Comparison (if available)
-  const planRows: any[] = []
+  // Build New/Used Delivery Plan Comparison (if available)
+  let newComparisonBox: any = null
+  let usedComparisonBox: any = null
+
   if (deliveryPlanData && !('error' in deliveryPlanData)) {
     const { plans = [], actuals = [] } = deliveryPlanData
-    const comparison: Record<string, {
-      ES: { plan: number; actual: number };
-      Y490: { plan: number; actual: number };
-      Y410: { plan: number; actual: number };
-    }> = {}
+    
+    // Partition actuals by RentType
+    const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
+    const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
 
-    for (const p of plans) {
-      const proj = p.ProjectType || 'ไม่ระบุ'
-      if (!comparison[proj]) {
-        comparison[proj] = {
-          ES: { plan: 0, actual: 0 },
-          Y490: { plan: 0, actual: 0 },
-          Y410: { plan: 0, actual: 0 },
-        }
-      }
-      comparison[proj].ES.plan += p.ES_Count || 0
-      comparison[proj].Y490.plan += p.Y490_Count || 0
-      comparison[proj].Y410.plan += p.Y410_Count || 0
-    }
-
-    const categorizeModel = (modelName: string) => {
-      const m = (modelName || '').toUpperCase()
-      if (m.includes('ES')) return 'ES'
-      if (m.includes('490')) return 'Y490'
-      if (m.includes('410')) return 'Y410'
-      return 'Other'
-    }
-
-    for (const a of actuals) {
-      const proj = a.ProjectType || 'ไม่ระบุ'
-      if (!comparison[proj]) {
-        comparison[proj] = {
-          ES: { plan: 0, actual: 0 },
-          Y490: { plan: 0, actual: 0 },
-          Y410: { plan: 0, actual: 0 },
-        }
-      }
-      const modelCat = categorizeModel(a.Model)
-      if (modelCat === 'ES') {
-        comparison[proj].ES.actual += a.Count || 0
-      } else if (modelCat === 'Y490') {
-        comparison[proj].Y490.actual += a.Count || 0
-      } else if (modelCat === 'Y410') {
-        comparison[proj].Y410.actual += a.Count || 0
-      }
-    }
-
-    for (const proj of Object.keys(comparison)) {
-      const models = comparison[proj]
-      for (const model of ['ES', 'Y490', 'Y410'] as const) {
-        const { plan, actual } = models[model]
-        if (plan > 0 || actual > 0) {
-          let valColor = '#1a1a1a'
-          if (actual >= plan && plan > 0) {
-            valColor = '#2E7D32' // green (target met)
-          } else if (actual < plan && actual > 0) {
-            valColor = '#E65100' // orange (in progress/shortfall)
-          } else if (actual === 0 && plan > 0) {
-            valColor = '#C62828' // red (not started)
-          }
-
-          planRows.push({
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              {
-                type: 'text',
-                text: `• ${proj} (${model})`,
-                size: 'xs',
-                color: '#555555',
-                flex: 5
-              },
-              {
-                type: 'text',
-                text: `${actual}/${plan}`,
-                size: 'xs',
-                weight: 'bold',
-                color: valColor,
-                align: 'end',
-                flex: 3
-              }
-            ]
-          })
-        }
-      }
-    }
+    newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
+    usedComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถมือสอง (จริง/แผน)', [], usedActuals)
   }
-
-  const comparisonBox = planRows.length > 0 ? {
-    type: 'box',
-    layout: 'vertical',
-    spacing: 'xs',
-    margin: 'md',
-    contents: [
-      {
-        type: 'text',
-        text: '📋 เทียบแผนส่งมอบ (จริง/แผน)',
-        size: 'xs',
-        weight: 'bold',
-        color: '#1a1a1a',
-        margin: 'xs'
-      },
-      ...planRows
-    ]
-  } : null
 
   // Bubble 1: Portfolio
   const portfolioBubble = {
@@ -269,26 +287,48 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
       layout: 'vertical',
       spacing: 'md',
       contents: [
-        // Delivery
-        { type: 'text', text: '🚛 ส่งมอบรถ', weight: 'bold', size: 'sm', color: '#1565C0' },
+        // New Delivery Section
+        { type: 'text', text: '🚛 ส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
               { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(deliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
               { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
-        ...(comparisonBox ? [comparisonBox] : []),
+        ...(newComparisonBox ? [newComparisonBox] : []),
         { type: 'separator' },
+
+        // Used Delivery Section
+        { type: 'text', text: '🚗 ปล่อยรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
+        {
+          type: 'box', layout: 'horizontal', spacing: 'md', contents: [
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+            { type: 'box', layout: 'vertical', contents: [
+              { type: 'text', text: String(usedDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+            ], flex: 1 },
+          ],
+        },
+        ...(usedComparisonBox ? [usedComparisonBox] : []),
+        { type: 'separator' },
+
         // Repair
         { type: 'text', text: '🔧 งานซ่อม', weight: 'bold', size: 'sm', color: '#C62828' },
         {

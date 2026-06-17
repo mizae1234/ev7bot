@@ -29,57 +29,84 @@ function getMonthRange(year?: number, month?: number) {
   return { start, end, year: y, month: m }
 }
 
+function processRawDeliveries(rawItems: any[], dateStr: string) {
+  const newItems = rawItems.filter(item => item.RentType === 'ONRENT_NEW')
+  const usedItems = rawItems.filter(item => item.RentType === 'ONRENT_USE')
+
+  const computeSummaryAndBreakdown = (items: any[]) => {
+    const total = items.length
+    const completed = items.filter(item => item.ReleaseDate !== null).length
+    const pending = items.filter(item => item.ReleaseDate === null).length
+
+    const breakdownMap: Record<string, { project: string, model: string, count: number }> = {}
+    for (const item of items) {
+      const key = `${item.Project}_${item.Model}`
+      if (!breakdownMap[key]) {
+        breakdownMap[key] = {
+          project: item.Project,
+          model: item.Model,
+          count: 0
+        }
+      }
+      breakdownMap[key].count++
+    }
+
+    const breakdown = Object.values(breakdownMap).sort((a, b) => b.count - a.count)
+
+    return {
+      summary: { total, completed, pending },
+      breakdown
+    }
+  }
+
+  return {
+    date: dateStr,
+    newVehicles: computeSummaryAndBreakdown(newItems),
+    usedVehicles: computeSummaryAndBreakdown(usedItems),
+  }
+}
+
 // ─── Function: getDeliveryToday ────────────────────────────────────
 export async function getDeliveryToday() {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
-  const { start, end } = getTodayRange()
+  const { start, end, dateStr } = getTodayRange()
   const req = pool.request()
   req.input('startDate', sql.DateTime, start)
   req.input('endDate', sql.DateTime, end)
 
-  // Also get breakdown by project
-  const breakdownReq = pool.request()
-  breakdownReq.input('startDate', sql.DateTime, start)
-  breakdownReq.input('endDate', sql.DateTime, end)
-
-  // Execute both queries concurrently for high performance
-  const [result, breakdown] = await Promise.all([
-    req.query(`
+  try {
+    const result = await req.query(`
       SELECT
-        COUNT(*) AS total,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
+        r.RentItemID,
+        r.ReleaseDate,
+        r.ExpectedReleaseDate,
+        ISNULL(i.Project, 'ไม่ระบุ') AS Project,
+        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+        CASE 
+          WHEN v.RentType IS NOT NULL THEN v.RentType
+          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
+      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
       WHERE r.IsActive = 1
         AND (
           (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
           OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
         )
-    `),
-    breakdownReq.query(`
-      SELECT
-        ISNULL(i.Project, 'ไม่ระบุ') AS project,
-        ISNULL(i.Model, 'ไม่ระบุ') AS model,
-        COUNT(*) AS count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND (
-          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-        )
-      GROUP BY i.Project, i.Model
-      ORDER BY count DESC
     `)
-  ])
 
-  return {
-    date: getTodayRange().dateStr,
-    summary: result.recordset[0] || { total: 0, completed: 0, pending: 0 },
-    breakdown: breakdown.recordset,
+    return processRawDeliveries(result.recordset, dateStr)
+  } catch (err: any) {
+    console.error('[getDeliveryToday] Error:', err.message)
+    return { error: `ดึงข้อมูลส่งมอบไม่สำเร็จ: ${err.message}` }
   }
 }
 
@@ -93,46 +120,37 @@ export async function getDeliveryByDate(params: { date: string }) {
   req.input('startDate', sql.DateTime, start)
   req.input('endDate', sql.DateTime, end)
 
-  const breakdownReq = pool.request()
-  breakdownReq.input('startDate', sql.DateTime, start)
-  breakdownReq.input('endDate', sql.DateTime, end)
-
-  // Execute both queries concurrently for high performance
-  const [result, breakdown] = await Promise.all([
-    req.query(`
+  try {
+    const result = await req.query(`
       SELECT
-        COUNT(*) AS total,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
+        r.RentItemID,
+        r.ReleaseDate,
+        r.ExpectedReleaseDate,
+        ISNULL(i.Project, 'ไม่ระบุ') AS Project,
+        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+        CASE 
+          WHEN v.RentType IS NOT NULL THEN v.RentType
+          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
+      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
       WHERE r.IsActive = 1
         AND (
           (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
           OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
         )
-    `),
-    breakdownReq.query(`
-      SELECT
-        ISNULL(i.Project, 'ไม่ระบุ') AS project,
-        ISNULL(i.Model, 'ไม่ระบุ') AS model,
-        COUNT(*) AS count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND (
-          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-        )
-      GROUP BY i.Project, i.Model
-      ORDER BY count DESC
     `)
-  ])
 
-  return {
-    date: params.date,
-    summary: result.recordset[0] || { total: 0, completed: 0, pending: 0 },
-    breakdown: breakdown.recordset,
+    return processRawDeliveries(result.recordset, params.date)
+  } catch (err: any) {
+    console.error('[getDeliveryByDate] Error:', err.message)
+    return { error: `ดึงข้อมูลส่งมอบไม่สำเร็จ: ${err.message}` }
   }
 }
 
@@ -277,89 +295,80 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
 
   const { start, end, year, month } = getMonthRange(params.year, params.month)
 
-  // Delivery stats
-  const deliveryReq = pool.request()
-  deliveryReq.input('startDate', sql.DateTime, start)
-  deliveryReq.input('endDate', sql.DateTime, end)
-
-  // Repair stats
-  const repairReq = pool.request()
-  repairReq.input('startDate', sql.DateTime, start)
-  repairReq.input('endDate', sql.DateTime, end)
-
-  // Project breakdown
-  const projectReq = pool.request()
-  projectReq.input('startDate', sql.DateTime, start)
-  projectReq.input('endDate', sql.DateTime, end)
-
-  // Get planned count from EV_DeliveryPlan
+  // Get planned count from EV_DeliveryPlan (New only)
   const planReq = pool.request()
   planReq.input('startDate', sql.DateTime, start)
   planReq.input('endDate', sql.DateTime, end)
+
+  // Get completed counts from View_AccumarateReleaseCar
+  const completedReq = pool.request()
+  completedReq.input('startDate', sql.DateTime, start)
+  completedReq.input('endDate', sql.DateTime, end)
+
+  // Get pending counts from EV_RentItem
+  const pendingReq = pool.request()
+  pendingReq.input('startDate', sql.DateTime, start)
+  pendingReq.input('endDate', sql.DateTime, end)
 
   // Get planned breakdown by ProjectType from EV_DeliveryPlan
   const planBreakdownReq = pool.request()
   planBreakdownReq.input('startDate', sql.DateTime, start)
   planBreakdownReq.input('endDate', sql.DateTime, end)
 
-  // Get actual breakdown by ProjectType and Model from EV_RentItem
+  // Get actual breakdown by ProjectType, Model and RentType from View_AccumarateReleaseCar
   const actualBreakdownReq = pool.request()
   actualBreakdownReq.input('startDate', sql.DateTime, start)
   actualBreakdownReq.input('endDate', sql.DateTime, end)
 
-  // Run all 6 queries concurrently for high performance
+  // Repair stats
+  const repairReq = pool.request()
+  repairReq.input('startDate', sql.DateTime, start)
+  repairReq.input('endDate', sql.DateTime, end)
+
+  // Run all queries concurrently for high performance
   const [
-    deliveryRes,
-    repairRes,
-    projectRes,
     planRes,
+    completedRes,
+    pendingRes,
     planBreakdownRes,
-    actualBreakdownRes
+    actualBreakdownRes,
+    repairRes
   ] = await Promise.all([
-    deliveryReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NOT NULL THEN 1 ELSE 0 END), 0) AS completed,
-        ISNULL(SUM(CASE WHEN r.ReleaseDate IS NULL THEN 1 ELSE 0 END), 0) AS pending
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND (
-          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-        )
-    `),
-    repairReq.query(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
-        SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open]
-      FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1
-        AND (
-          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
-          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
-          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
-        )
-    `),
-    projectReq.query(`
-      SELECT
-        ISNULL(i.Project, 'ไม่ระบุ') AS project,
-        COUNT(*) AS count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND (
-          (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
-          OR (r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate)
-        )
-      GROUP BY i.Project
-      ORDER BY count DESC
-    `),
     planReq.query(`
       SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
       FROM dbo.EV_DeliveryPlan
       WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+    `),
+    completedReq.query(`
+      SELECT 
+        v.RentType,
+        COUNT(*) as cnt
+      FROM dbo.View_AccumarateReleaseCar v
+      WHERE v.ReleaseDate >= @startDate AND v.ReleaseDate <= @endDate
+      GROUP BY v.RentType
+    `),
+    pendingReq.query(`
+      SELECT 
+        CASE 
+          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType,
+        COUNT(*) as cnt
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate IS NULL
+        AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
+      GROUP BY 
+        CASE 
+          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END
     `),
     planBreakdownReq.query(`
       SELECT 
@@ -375,29 +384,62 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       SELECT 
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        v.RentType,
         COUNT(*) AS Count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
-        AND r.ReleaseDate IS NOT NULL
-      GROUP BY i.ProjectType, i.Model
+      FROM dbo.View_AccumarateReleaseCar v
+      LEFT JOIN dbo.EV_InventoryItem i ON v.InventoryItemID = i.InventoryItemID
+      WHERE v.ReleaseDate >= @startDate AND v.ReleaseDate <= @endDate
+      GROUP BY i.ProjectType, i.Model, v.RentType
+    `),
+    repairReq.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
+        SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open]
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1
+        AND (
+          (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+          OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+          OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
+        )
     `)
   ])
 
+  // Extract completed
+  let completedNew = 0
+  let completedUsed = 0
+  for (const r of completedRes.recordset) {
+    if (r.RentType === 'ONRENT_USE') completedUsed = r.cnt
+    else if (r.RentType === 'ONRENT_NEW') completedNew = r.cnt
+  }
+
+  // Extract pending
+  let pendingNew = 0
+  let pendingUsed = 0
+  for (const r of pendingRes.recordset) {
+    if (r.RentType === 'ONRENT_USE') pendingUsed = r.cnt
+    else if (r.RentType === 'ONRENT_NEW') pendingNew = r.cnt
+  }
+
   const planTotal = planRes.recordset[0]?.planTotal || 0
-  const deliveryData = deliveryRes.recordset[0] || { total: 0, completed: 0, pending: 0 }
-  const pendingActual = deliveryData.pending || 0
-  deliveryData.total = planTotal
-  deliveryData.pending = Math.max(0, planTotal - (deliveryData.completed || 0))
-  deliveryData.pendingActual = pendingActual
 
   return {
     year,
     month,
-    delivery: deliveryData,
+    newVehicles: {
+      planTotal,
+      completed: completedNew,
+      pendingActual: pendingNew,
+      pending: Math.max(0, planTotal - completedNew)
+    },
+    usedVehicles: {
+      planTotal: 0,
+      completed: completedUsed,
+      pendingActual: pendingUsed,
+      pending: 0
+    },
     repair: repairRes.recordset[0] || { total: 0, closed: 0, open: 0 },
-    projectBreakdown: projectRes.recordset,
     plans: planBreakdownRes.recordset,
     actuals: actualBreakdownRes.recordset,
   }
@@ -570,13 +612,31 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
         SELECT 
           ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
           ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+          CASE 
+            WHEN v.RentType IS NOT NULL THEN v.RentType
+            WHEN o.RentType IS NOT NULL THEN o.RentType
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END AS RentType,
           COUNT(*) AS Count
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
+        LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
           AND r.ReleaseDate IS NOT NULL
-        GROUP BY i.ProjectType, i.Model
+        GROUP BY 
+          i.ProjectType, 
+          i.Model,
+          CASE 
+            WHEN v.RentType IS NOT NULL THEN v.RentType
+            WHEN o.RentType IS NOT NULL THEN o.RentType
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END
       `)
     ])
 

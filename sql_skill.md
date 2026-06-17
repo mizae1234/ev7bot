@@ -771,6 +771,14 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บข้อมูลประวัติการติดตามผล รายละเอียด และความคืบหน้าของงานซ่อม
 * **คอลัมน์สำคัญ**: `MaintenanceFollowUpID` (PK, bigint), `MaintenanceItemID` (FK -> `EV_MaintenanceItem`), `FollowUpDate` (date, วันที่ติดตามผล), `FollowUpDetail` (varchar(max), รายละเอียดการติดตาม), `IsActive` (bit, แฟล็กสถานะ), `CreateDate` (datetime, วันที่สร้าง), `CreateUserID` (int, ID ผู้สร้าง), `UpdateDate` (datetime), `UpdateUserID` (int)
 
+### 11.11 Views สำหรับการตรวจสอบการปล่อยรถและแยกรถใหม่/รถมือสอง
+* **View: `dbo.View_AccumarateReleaseCar` (การปล่อยสะสม)**
+  * ใช้ดึงข้อมูลการปล่อยรถสะสมย้อนหลังทั้งหมดประจำวันหรือประจำเดือน โดยไม่สนใจว่าภายหลังจะมีการคืนหรือแจ้งซ่อม
+  * คอลัมน์สำคัญ: `RentItemID`, `InventoryItemID`, `RentStatusID`, `VinNo`, `ContractNo`, `ReleaseDate`, `ExpectedReleaseDate`, `RentType` (ค่าระบุประเภทรถเช่า ได้แก่ `ONRENT_NEW` สำหรับรถใหม่, `ONRENT_USE` สำหรับรถมือสอง)
+* **View: `dbo.View_GetOnrentNewOrUse` (การแยกรถเช่า Realtime)**
+  * ใช้ตรวจสอบสถานะเช่าแล้วแบบ Real-time (เฉพาะที่เป็นสถานะ ON_RENT) ว่าเป็นรถใหม่หรือรถเก่า
+  * คอลัมน์สำคัญ: `ProjectType`, `VinNo`, `Model`, `ContractNo`, `FirstName`, `LastName`, `ReleaseDate`, `RentType` (ค่าระบุประเภท ได้แก่ `ONRENT_NEW` หรือ `ONRENT_USE`)
+
 ---
 
 ## 12. ความสัมพันธ์และเงื่อนไขการ Query
