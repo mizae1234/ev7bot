@@ -714,7 +714,10 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
     groupId: p.groupId as string,
     assigneeLineUserId: p.assigneeLineUserId as string,
   }),
-  listTaskNotes: (p) => getPendingTasks(p.vehicleRef as string, p.assigneeName as string),
+  listTaskNotes: async (p) => {
+    const tasks = await getPendingTasks(p.vehicleRef as string, p.assigneeName as string)
+    return { tasks }
+  },
   completeTaskNote: (p) => completeTaskNote(Number(p.taskId)),
 }
 
