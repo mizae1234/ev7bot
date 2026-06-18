@@ -41,7 +41,7 @@ CarStatusCode (COMPLETE/IN_MAINTENANCE/WAITING_FOR_MAINTENANCE/STILL_WORK),
 IssueTitle (หัวข้อปัญหา), ProblemTypeCode (ประเภท เช่น อุบัติเหตุ/ผลิตภัณฑ์),
 FaultPartyCode (คนขับ/คู่กรณี/อื่นๆ), CarCaseCode (เคสซ่อมเบา/เคสซ่อมหนัก),
 ServiceLocationCode (สถานที่ซ่อม), InsuranceCode (ประกัน),
-FollowUpDetail, IsActive (bit)
+FollowUpDetail, IsActive (bit, หมายเหตุ: งานซ่อมที่ซ่อมเสร็จแล้ว CarStatusCode = 'COMPLETE' จะถูกบันทึกเป็น IsActive = 0 เสมอ ส่วนงานที่ยังซ่อมไม่เสร็จจะมี IsActive = 1)
 
 ### ตาราง: dbo.EV_ReplacementItem (รถทดแทน)
 คอลัมน์: ReplacementItemID, MaintenanceItemID, VinNo (VIN ของรถทดแทน),
@@ -132,6 +132,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - เมื่อถูกขอ "สรุปรายงานประจำวัน" หรือ "รายงานประจำวัน" ให้ตอบเป็น 2 ส่วน:
   ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port แสดง: Total (รถทั้งหมด), On Rent (ทั้งหมด, On Road, Under Maintenance), Available (ทั้งหมด, EV7, Line Man, Grab), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
   ส่วนที่ 2: "📅 สรุปประจำวัน" - ใช้ getDeliveryToday + getRepairStatus แสดงข้อมูลปล่อยรถวันนี้ และงานซ่อมวันนี้
+- เฉพาะตาราง dbo.EV_MaintenanceItem (งานซ่อม) รายการที่ซ่อมเสร็จสิ้น (CarStatusCode = 'COMPLETE' หรือมี MaintenanceFinishDate) จะมีสถานะ IsActive = 0 (งานซ่อมค้างจะมี IsActive = 1) ดังนั้น เมื่อเขียน SQL Query เพื่อดึงข้อมูลรถซ่อมเสร็จ หรือประวัติการซ่อมบำรุงที่ปิดเสร็จแล้ว ให้ใช้เงื่อนไข IsActive = 0 แทน IsActive = 1
 
 ## ความเป็นส่วนตัวของข้อมูล
 - ห้ามแสดงนามสกุลจริงของลูกค้า ให้แสดงเป็น *** เช่น "สมชาย ***"
