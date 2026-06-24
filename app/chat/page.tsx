@@ -31,6 +31,41 @@ function ChatContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Auth / Role States
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleLoading, setRoleLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    const cachedProfile = localStorage.getItem('liff_profile')
+    if (cachedProfile) {
+      try {
+        const profile = JSON.parse(cachedProfile)
+        if (profile.userId) {
+          fetch(`/api/auth/role?userId=${profile.userId}`)
+            .then(res => res.json())
+            .then(data => {
+              if (active) {
+                setUserRole(data.role)
+                setRoleLoading(false)
+              }
+            })
+            .catch(err => {
+              console.error('Failed to fetch user role', err)
+              if (active) setRoleLoading(false)
+            })
+          return
+        }
+      } catch (e) {
+        console.error('Failed to parse liff_profile', e)
+      }
+    }
+    setRoleLoading(false)
+    return () => {
+      active = false
+    }
+  }, [])
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -153,6 +188,70 @@ function ChatContent() {
           <span>🔗 ดูรายละเอียดรถเพิ่มเติม</span>
         </a>
         {textAfter && <span style={{ whiteSpace: 'pre-wrap' }}>{textAfter}</span>}
+      </div>
+    )
+  }
+
+  if (roleLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#09090b',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#71717a',
+        fontFamily: 'sans-serif'
+      }}>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            border: '4px solid #10b981',
+            borderTopColor: 'transparent',
+            borderRadius: '50%',
+            animation: 'pulse 1.5s infinite'
+          }} />
+          <p style={{ fontSize: '14px', fontWeight: 500 }}>กำลังตรวจสอบระดับสิทธิ์เข้าใช้งาน...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#09090b',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#f4f4f5',
+        fontFamily: 'sans-serif',
+        padding: '16px',
+        textAlign: 'center'
+      }}>
+        <span style={{ fontSize: '48px', marginBottom: '16px' }}>🛡️</span>
+        <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>เข้าถึงเฉพาะผู้ดูแลระบบ (Admin)</h1>
+        <p style={{ fontSize: '14px', color: '#71717a', maxWidth: '320px', margin: '0 auto 24px' }}>
+          คุณไม่มีสิทธิ์เข้าใช้งานระบบแชทของบัตเตอร์
+        </p>
+        <a 
+          href="/dashboard" 
+          style={{
+            padding: '10px 20px',
+            background: '#059669',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            color: '#ffffff',
+            textDecoration: 'none',
+            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)'
+          }}
+        >
+          กลับหน้าหลักแดชบอร์ด
+        </a>
       </div>
     )
   }
