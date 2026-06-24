@@ -531,15 +531,15 @@ export async function analyzeClaimMessage(message: string): Promise<{
           properties: {
             isClaim: {
               type: SchemaType.BOOLEAN,
-              description: 'Whether the message is reporting a vehicle issue, damage, accident, repair request, or claim.',
+              description: 'Whether the message is reporting a vehicle issue, damage, accident, repair request, claim, or an operational status update such as repair completion (รถเสร็จ), vehicle return (คืนรถ/คืนรถทดแทน), or customer pickup (รับรถ).',
             },
             vehicleRef: {
               type: SchemaType.STRING,
-              description: 'The vehicle license plate number or VIN. Extract as is, e.g. "3กข 1234", "ทอ-3791", or "LNAAKAA10R5E01182". Return null or empty string if not found.',
+              description: 'The vehicle license plate number or VIN. Extract as is. If multiple vehicles are mentioned, return them separated by comma, e.g. "ทอ-6340, ทอ-3571". Return null or empty string if not found.',
             },
             claimDetail: {
               type: SchemaType.STRING,
-              description: 'Brief description of the issue or damage reported. Return null or empty string if not found.',
+              description: 'Brief description of the issue, damage, status update, or action reported (e.g. "รถเสร็จ", "คืนรถทดแทน", "ลูกค้ามารับรถ"). Return null or empty string if not found.',
             },
             location: {
               type: SchemaType.STRING,
@@ -549,7 +549,7 @@ export async function analyzeClaimMessage(message: string): Promise<{
           required: ['isClaim'],
         },
       },
-      systemInstruction: 'คุณคือผู้ช่วยตรวจจับและบันทึกเคลมซ่อมรถยนต์ หน้าที่ของคุณคือสแกนข้อความแชทเพื่อตรวจสอบว่าเป็นการแจ้งปัญหา ตัวรถมีปัญหา หรือต้องการเคลม/ซ่อมแซมหรือไม่ หากใช่ ให้พยายามหาเลขทะเบียนรถหรือเลข VIN รายละเอียด และสถานที่เกิดเหตุ โดยตอบกลับเป็นรูปแบบ JSON โครงสร้างตามที่ระบุอย่างถูกต้องเคร่งครัด',
+      systemInstruction: 'คุณคือผู้ช่วยตรวจจับและบันทึกข้อมูลการแจ้งซ่อม เคลมปัญหา หรือสถานะการดำเนินงานเกี่ยวกับรถยนต์ (เช่น แจ้งซ่อม แจ้งชน รถเสร็จ ส่งมอบรถ คืนรถ คืนรถทดแทน หรือรับรถ) หน้าที่ของคุณคือตรวจสอบว่าข้อความแชทเกี่ยวข้องกับเรื่องเหล่านี้หรือไม่ หากใช่ ให้พยายามหาเลขทะเบียนรถหรือเลข VIN (หากมีหลายคัน ให้เขียนรวมกันคั่นด้วยเครื่องหมายจุลภาค) รายละเอียดการดำเนินงาน และสถานที่ (ถ้ามี) โดยตอบกลับเป็นรูปแบบ JSON ตามที่ระบุอย่างถูกต้องเคร่งครัด',
     })
 
     const result = await model.generateContent(message)

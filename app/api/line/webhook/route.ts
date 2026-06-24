@@ -242,7 +242,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               where: { groupId: gid }
             })
             if (groupDb?.enableClaimLog) {
-              const claimKeywords = [/ซ่อม/, /เคลม/, /เสีย/, /พัง/, /ชน/, /แตก/, /รั่ว/, /ไม่เย็น/, /ดัง/, /ไฟโชว์/, /สตาร์ทไม่ติด/, /มีปัญหา/, /น้ำมันเครื่อง/, /เช็คระยะ/, /เคลมแห้ง/, /ยางแบน/, /ยางแตก/, /ชนท้าย/, /กระจกแตก/, /เบรก/, /เบรค/, /หม้อน้ำ/, /สตาร์ท/]
+              const claimKeywords = [/ซ่อม/, /เคลม/, /เสีย/, /พัง/, /ชน/, /แตก/, /รั่ว/, /ไม่เย็น/, /ดัง/, /ไฟโชว์/, /สตาร์ทไม่ติด/, /มีปัญหา/, /น้ำมันเครื่อง/, /เช็คระยะ/, /เคลมแห้ง/, /ยางแบน/, /ยางแตก/, /ชนท้าย/, /กระจกแตก/, /เบรก/, /เบรค/, /หม้อน้ำ/, /สตาร์ท/, /เสร็จ/, /คืน/, /รับรถ/, /ชำระ/, /excess/i, /ex\s*\d+/i]
               const hasKeyword = claimKeywords.some(kw => kw.test(rawText))
               const hasVehicleNumber = /\d{3,4}/.test(rawText) || /vin/i.test(rawText) || /ทะเบียน/i.test(rawText)
               
