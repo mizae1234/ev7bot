@@ -233,9 +233,57 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
           triggerFound = true
         }
       }
-
       if (!triggerFound) {
-        // ไม่ได้เรียก Butter และไม่ใช่คำสั่ง Bypass → ไม่ตอบ (เงียบ)
+        // ไม่ได้เรียก Butter และไม่ใช่คำสั่ง Bypass → ตรวจสอบว่ากลุ่มนี้เปิดตรวจจับเคลมหรือไม่
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            const groupDb = await prisma.lineGroup.findUnique({
+              where: { groupId: gid }
+            })
+            if (groupDb?.enableClaimLog) {
+              const claimKeywords = [/ซ่อม/, /เคลม/, /เสีย/, /พัง/, /ชน/, /แตก/, /รั่ว/, /ไม่เย็น/, /ดัง/, /ไฟโชว์/, /สตาร์ทไม่ติด/, /มีปัญหา/, /น้ำมันเครื่อง/, /เช็คระยะ/, /เคลมแห้ง/, /ยางแบน/, /ยางแตก/, /ชนท้าย/, /กระจกแตก/, /เบรก/, /เบรค/, /หม้อน้ำ/, /สตาร์ท/]
+              const hasKeyword = claimKeywords.some(kw => kw.test(rawText))
+              const hasVehicleNumber = /\d{3,4}/.test(rawText) || /vin/i.test(rawText) || /ทะเบียน/i.test(rawText)
+              
+              if (hasKeyword && hasVehicleNumber) {
+                const { analyzeClaimMessage } = await import('@/lib/gemini')
+                const claimAnalysis = await analyzeClaimMessage(rawText)
+                if (claimAnalysis.isClaim) {
+                  let profileName = 'ผู้ใช้ LINE'
+                  try {
+                    if (!env.MOCK_MODE && event.source.userId) {
+                      const profile = await lineClient.getProfile(event.source.userId)
+                      profileName = profile.displayName
+                    }
+                  } catch { /* ignore */ }
+
+                  const createdClaim = await prisma.claimLog.create({
+                    data: {
+                      vehicleRef: claimAnalysis.vehicleRef || null,
+                      lineUserId: event.source.userId || null,
+                      displayName: profileName,
+                      message: rawText,
+                      extractedDetail: claimAnalysis.claimDetail || null,
+                      groupId: gid || null,
+                      status: 'PENDING',
+                    }
+                  })
+
+                  const displayRef = claimAnalysis.vehicleRef ? `ทะเบียน/VIN: ${claimAnalysis.vehicleRef}` : 'ไม่ระบุทะเบียน'
+                  const displayDetail = claimAnalysis.claimDetail ? ` (${claimAnalysis.claimDetail})` : ''
+                  await replyText(
+                    event.replyToken,
+                    `บัตเตอร์ได้บันทึกประวัติการแจ้งซ่อมเรียบร้อยแล้วค่ะ 🛠️\n📌 ${displayRef}${displayDetail}\n👤 ผู้แจ้ง: ${profileName}\n\n(รหัสอ้างอิง: #${createdClaim.id} — สามารถตรวจสอบประวัติเพิ่มเติมได้ที่หน้าแดชบอร์ดค่ะ) 💛`
+                  )
+                  return
+                }
+              }
+            }
+          } catch (err) {
+            console.error('[Auto Claim Detect Error]', err)
+          }
+        }
         return
       }
 
@@ -253,6 +301,49 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
       // Registration
       if (lower === 'ลงทะเบียน' || lower === 'register') {
         await handleRegister(event.source.userId!, event.replyToken)
+        return
+      }
+
+      // ตั้งค่าตรวจจับเคลมกลุ่มนี้ → บันทึก Group ID + เปิด enableClaimLog
+      if (lower === 'เปิดระบบตรวจจับเคลม' || lower === 'เปิดบันทึกเคลม') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableClaimLog: true },
+            })
+            await replyText(
+              event.replyToken,
+              `✅ เปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะเริ่มตรวจสอบและบันทึกประวัติการแจ้งซ่อมของกลุ่มนี้ลงแดชบอร์ดโดยอัตโนมัติค่ะ 🛠️💛`
+            )
+          } catch (err: any) {
+            console.error('[Enable Claim Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
+      if (lower === 'ปิดระบบตรวจจับเคลม' || lower === 'ปิดบันทึกเคลม') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableClaimLog: false },
+            })
+            await replyText(
+              event.replyToken,
+              `🚫 ปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะหยุดการตรวจสอบข้อความแจ้งซ่อมของกลุ่มนี้อัตโนมัติค่ะ 🧈`
+            )
+          } catch (err: any) {
+            console.error('[Disable Claim Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
         return
       }
 

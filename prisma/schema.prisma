@@ -43,16 +43,32 @@ model LineRegistration {
 }
 
 model LineGroup {
-  id            Int      @id @default(autoincrement())
-  groupId       String   @unique @map("group_id") @db.VarChar(50)
-  groupName     String?  @map("group_name") @db.VarChar(255)
-  groupType     String   @default("group") @map("group_type") @db.VarChar(20)
-  isActive      Boolean  @default(true) @map("is_active")
-  enableReport  Boolean  @default(false) @map("enable_report")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id              Int      @id @default(autoincrement())
+  groupId         String   @unique @map("group_id") @db.VarChar(50)
+  groupName       String?  @map("group_name") @db.VarChar(255)
+  groupType       String   @default("group") @map("group_type") @db.VarChar(20)
+  isActive        Boolean  @default(true) @map("is_active")
+  enableReport    Boolean  @default(false) @map("enable_report")
+  enableClaimLog  Boolean  @default(false) @map("enable_claim_log")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("line_groups")
+}
+
+model ClaimLog {
+  id              Int      @id @default(autoincrement())
+  vehicleRef      String?  @map("vehicle_ref") @db.VarChar(50)
+  lineUserId      String?  @map("line_user_id") @db.VarChar(50)
+  displayName     String?  @map("display_name") @db.VarChar(255)
+  message         String   @map("message") @db.Text
+  extractedDetail String?  @map("extracted_detail") @db.Text
+  status          String   @default("PENDING") @map("status") @db.VarChar(20) // 'PENDING' | 'PROCESSED' | 'CANCELLED'
+  groupId         String?  @map("group_id") @db.VarChar(50)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("claim_logs")
 }
 
 model ChatLog {

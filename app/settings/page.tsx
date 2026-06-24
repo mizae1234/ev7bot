@@ -12,6 +12,7 @@ interface LineGroup {
   groupType: string
   isActive: boolean
   enableReport: boolean
+  enableClaimLog: boolean
   createdAt: string
   updatedAt: string
 }
@@ -31,6 +32,22 @@ function SettingsContent() {
       mutate('/api/groups')
     } catch (err) {
       console.error('Failed to toggle report:', err)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const toggleClaim = async (id: number, currentValue: boolean) => {
+    setTogglingId(id)
+    try {
+      await fetch('/api/groups', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enableClaimLog: !currentValue }),
+      })
+      mutate('/api/groups')
+    } catch (err) {
+      console.error('Failed to toggle claim log:', err)
     } finally {
       setTogglingId(null)
     }
@@ -99,20 +116,20 @@ function SettingsContent() {
                   key={group.id}
                   className={`
                     rounded-2xl border transition-all duration-300
-                    ${group.enableReport
-                      ? 'bg-gradient-to-r from-amber-500/10 to-yellow-600/5 border-amber-500/30 shadow-lg shadow-amber-500/5'
-                      : 'bg-slate-800/50 border-white/10 hover:border-white/20'
+                    ${(group.enableReport || group.enableClaimLog)
+                      ? 'bg-gradient-to-r from-slate-900 to-slate-850 border-slate-700/60 shadow-lg shadow-black/10'
+                      : 'bg-slate-800/30 border-white/5 hover:border-white/10'
                     }
                   `}
                 >
-                  <div className="p-5 flex items-center justify-between">
-                    <div className="flex items-center gap-4 min-w-0">
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
                       {/* Icon */}
                       <div className={`
                         w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0
                         ${group.isActive
-                          ? 'bg-green-500/20 border border-green-500/30'
-                          : 'bg-slate-700/50 border border-slate-600/30'
+                          ? 'bg-green-500/10 border border-green-500/20'
+                          : 'bg-slate-700/30 border border-slate-600/20'
                         }
                       `}>
                         {group.groupType === 'group' ? '👥' : '💬'}
@@ -120,52 +137,88 @@ function SettingsContent() {
 
                       {/* Info */}
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-white truncate">
+                        <h3 className="font-semibold text-white truncate text-sm sm:text-base">
                           {group.groupName || 'ไม่ทราบชื่อกลุ่ม'}
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-mono text-slate-500 truncate max-w-[200px]">
+                          <span className="text-xs font-mono text-slate-500 truncate max-w-[150px] sm:max-w-[200px]">
                             {group.groupId}
                           </span>
                           <span className={`
-                            inline-flex items-center text-xs px-2 py-0.5 rounded-full
+                            inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md font-semibold
                             ${group.isActive
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-slate-600/30 text-slate-500'
+                              ? 'bg-green-500/10 text-green-400 border border-green-500/10'
+                              : 'bg-slate-650/20 text-slate-500 border border-slate-600/10'
                             }
                           `}>
-                            {group.isActive ? '● Active' : '● Inactive'}
+                            {group.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Toggle */}
-                    <button
-                      onClick={() => toggleReport(group.id, group.enableReport)}
-                      disabled={togglingId === group.id}
-                      className="flex-shrink-0 ml-4"
-                    >
-                      <div className={`
-                        relative w-14 h-8 rounded-full transition-all duration-300 cursor-pointer
-                        ${group.enableReport
-                          ? 'bg-gradient-to-r from-amber-500 to-yellow-500 shadow-lg shadow-amber-500/30'
-                          : 'bg-slate-700'
-                        }
-                        ${togglingId === group.id ? 'opacity-50' : ''}
-                      `}>
-                        <div className={`
-                          absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300
-                          ${group.enableReport ? 'left-7' : 'left-1'}
-                        `} />
+                    {/* Toggles Container */}
+                    <div className="flex items-center gap-6 flex-shrink-0 self-end sm:self-center">
+                      {/* Toggle 1: Morning Report */}
+                      <div className="flex flex-col items-center">
+                        <span className="text-[9px] text-slate-400 mb-1.5 font-bold uppercase tracking-wider">Morning Report</span>
+                        <button
+                          onClick={() => toggleReport(group.id, group.enableReport)}
+                          disabled={togglingId === group.id}
+                          className="focus:outline-none"
+                        >
+                          <div className={`
+                            relative w-12 h-6.5 rounded-full transition-all duration-300 cursor-pointer
+                            ${group.enableReport
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 shadow-md shadow-amber-500/20'
+                              : 'bg-slate-700'
+                            }
+                            ${togglingId === group.id ? 'opacity-50' : ''}
+                          `}>
+                            <div className={`
+                              absolute top-0.5 w-5.5 h-5.5 rounded-full bg-white shadow-md transition-all duration-300
+                              ${group.enableReport ? 'left-6' : 'left-0.5'}
+                            `} />
+                          </div>
+                        </button>
+                        <span className={`
+                          text-[10px] mt-1 font-semibold
+                          ${group.enableReport ? 'text-amber-400' : 'text-slate-500'}
+                        `}>
+                          {group.enableReport ? 'เปิด' : 'ปิด'}
+                        </span>
                       </div>
-                      <span className={`
-                        block text-xs mt-1 text-center
-                        ${group.enableReport ? 'text-amber-400 font-medium' : 'text-slate-500'}
-                      `}>
-                        {group.enableReport ? 'เปิด' : 'ปิด'}
-                      </span>
-                    </button>
+
+                      {/* Toggle 2: Auto Claim */}
+                      <div className="flex flex-col items-center">
+                        <span className="text-[9px] text-slate-400 mb-1.5 font-bold uppercase tracking-wider">Auto Claim</span>
+                        <button
+                          onClick={() => toggleClaim(group.id, group.enableClaimLog)}
+                          disabled={togglingId === group.id}
+                          className="focus:outline-none"
+                        >
+                          <div className={`
+                            relative w-12 h-6.5 rounded-full transition-all duration-300 cursor-pointer
+                            ${group.enableClaimLog
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-md shadow-emerald-500/20'
+                              : 'bg-slate-700'
+                            }
+                            ${togglingId === group.id ? 'opacity-50' : ''}
+                          `}>
+                            <div className={`
+                              absolute top-0.5 w-5.5 h-5.5 rounded-full bg-white shadow-md transition-all duration-300
+                              ${group.enableClaimLog ? 'left-6' : 'left-0.5'}
+                            `} />
+                          </div>
+                        </button>
+                        <span className={`
+                          text-[10px] mt-1 font-semibold
+                          ${group.enableClaimLog ? 'text-emerald-400' : 'text-slate-500'}
+                        `}>
+                          {group.enableClaimLog ? 'เปิด' : 'ปิด'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -174,7 +227,8 @@ function SettingsContent() {
               <div className="mt-4 p-4 rounded-xl bg-slate-800/30 border border-white/5">
                 <p className="text-sm text-slate-400">
                   📊 รวม {groups.length} กลุ่ม —
-                  <span className="text-amber-400 font-medium"> {groups.filter(g => g.enableReport).length} กลุ่ม</span> ได้รับรายงานประจำวัน
+                  <span className="text-amber-400 font-medium"> {groups.filter(g => g.enableReport).length} กลุ่ม</span> ได้รับรายงานประจำวัน | 
+                  <span className="text-emerald-400 font-medium"> {groups.filter(g => g.enableClaimLog).length} กลุ่ม</span> เปิดตรวจจับเคลม
                 </p>
               </div>
             </div>

@@ -515,3 +515,52 @@ async function _askButterOnce(
   return text || 'ขออภัยค่ะ 🧈 Butter ดึงข้อมูลมาแล้วแต่ยังสรุปไม่ได้ค่ะ ลองถามใหม่แบบเจาะจงขึ้นนะคะ เช่น "ซ่อมค้างกี่คัน" หรือ "สถานะรถ ทอ-3791" 💛'
 }
 
+export async function analyzeClaimMessage(message: string): Promise<{
+  isClaim: boolean
+  vehicleRef?: string
+  claimDetail?: string
+}> {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3-flash-preview',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            isClaim: {
+              type: SchemaType.BOOLEAN,
+              description: 'Whether the message is reporting a vehicle issue, damage, accident, repair request, or claim.',
+            },
+            vehicleRef: {
+              type: SchemaType.STRING,
+              description: 'The vehicle license plate number or VIN. Extract as is, e.g. "3กข 1234", "ทอ-3791", or "LNAAKAA10R5E01182". Return null or empty string if not found.',
+            },
+            claimDetail: {
+              type: SchemaType.STRING,
+              description: 'Brief description of the issue or damage reported. Return null or empty string if not found.',
+            },
+          },
+          required: ['isClaim'],
+        },
+      },
+      systemInstruction: 'คุณคือผู้ช่วยตรวจจับและบันทึกเคลมซ่อมรถยนต์ หน้าที่ของคุณคือสแกนข้อความแชทเพื่อตรวจสอบว่าเป็นการแจ้งปัญหา ตัวรถมีปัญหา หรือต้องการเคลม/ซ่อมแซมหรือไม่ หากใช่ ให้พยายามหาเลขทะเบียนรถหรือเลข VIN และสรุปประเด็นสั้นๆ โดยตอบกลับเป็นรูปแบบ JSON โครงสร้างตามที่ระบุอย่างถูกต้องเคร่งครัด',
+    })
+
+    const result = await model.generateContent(message)
+    const text = result.response.text()
+    console.log('[analyzeClaimMessage] Gemini response text:', text)
+    const data = JSON.parse(text)
+    
+    return {
+      isClaim: !!data.isClaim,
+      vehicleRef: data.vehicleRef || undefined,
+      claimDetail: data.claimDetail || undefined,
+    }
+  } catch (error) {
+    console.error('[analyzeClaimMessage Error]', error)
+    return { isClaim: false }
+  }
+}
+
+

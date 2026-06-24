@@ -16,18 +16,30 @@ export async function GET() {
   }
 }
 
-// PATCH — อัปเดต enableReport ของกลุ่ม
+// PATCH — อัปเดตการตั้งค่าของกลุ่ม (enableReport หรือ enableClaimLog)
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, enableReport } = await req.json()
+    const { id, enableReport, enableClaimLog } = await req.json()
 
-    if (!id || typeof enableReport !== 'boolean') {
-      return NextResponse.json({ error: 'Missing id or enableReport' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
+    const data: any = {}
+    if (typeof enableReport === 'boolean') {
+      data.enableReport = enableReport
+    }
+    if (typeof enableClaimLog === 'boolean') {
+      data.enableClaimLog = enableClaimLog
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'Missing setting value' }, { status: 400 })
     }
 
     const updated = await prisma.lineGroup.update({
       where: { id },
-      data: { enableReport },
+      data,
     })
 
     return NextResponse.json(updated)
