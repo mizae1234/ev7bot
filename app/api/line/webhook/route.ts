@@ -274,7 +274,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                   const displayDetail = claimAnalysis.claimDetail ? ` (${claimAnalysis.claimDetail})` : ''
                   await replyText(
                     event.replyToken,
-                    `บัตเตอร์ได้บันทึกประวัติการแจ้งซ่อมเรียบร้อยแล้วค่ะ 🛠️\n📌 ${displayRef}${displayDetail}\n👤 ผู้แจ้ง: ${profileName}\n\n(รหัสอ้างอิง: #${createdClaim.id} — สามารถตรวจสอบประวัติเพิ่มเติมได้ที่หน้าแดชบอร์ดค่ะ) 💛`
+                    `บัตเตอร์ได้บันทึกประวัติการแจ้งซ่อมเรียบร้อยแล้วค่ะ 🛠️\n📌 ${displayRef}${displayDetail}\n👤 ผู้แจ้ง: ${profileName}\n\n(รหัสอ้างอิง: #${createdClaim.id} — สามารถตรวจสอบประวัติเพิ่มเติมได้ที่หน้า claimlog ค่ะ) 💛`
                   )
                   return
                 }
