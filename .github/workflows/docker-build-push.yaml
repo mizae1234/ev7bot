@@ -34,8 +34,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: URL
-        run: echo "${{ secrets.WEBHOOK_URL }}"
       - name: Deploy
         run: |
             curl -X POST ${{ secrets.WEBHOOK_URL }}/hooks/deploy-project-ev7bot \
