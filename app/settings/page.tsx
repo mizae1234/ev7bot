@@ -168,7 +168,7 @@ function SettingsContent() {
                           className="focus:outline-none"
                         >
                           <div className={`
-                            relative w-12 h-6.5 rounded-full transition-all duration-300 cursor-pointer
+                            relative w-11 h-6 rounded-full transition-all duration-300 cursor-pointer
                             ${group.enableReport
                               ? 'bg-gradient-to-r from-amber-500 to-yellow-500 shadow-md shadow-amber-500/20'
                               : 'bg-slate-700'
@@ -176,8 +176,8 @@ function SettingsContent() {
                             ${togglingId === group.id ? 'opacity-50' : ''}
                           `}>
                             <div className={`
-                              absolute top-0.5 w-5.5 h-5.5 rounded-full bg-white shadow-md transition-all duration-300
-                              ${group.enableReport ? 'left-6' : 'left-0.5'}
+                              absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300
+                              ${group.enableReport ? 'translate-x-5' : 'translate-x-0'}
                             `} />
                           </div>
                         </button>
@@ -198,7 +198,7 @@ function SettingsContent() {
                           className="focus:outline-none"
                         >
                           <div className={`
-                            relative w-12 h-6.5 rounded-full transition-all duration-300 cursor-pointer
+                            relative w-11 h-6 rounded-full transition-all duration-300 cursor-pointer
                             ${group.enableClaimLog
                               ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-md shadow-emerald-500/20'
                               : 'bg-slate-700'
@@ -206,8 +206,8 @@ function SettingsContent() {
                             ${togglingId === group.id ? 'opacity-50' : ''}
                           `}>
                             <div className={`
-                              absolute top-0.5 w-5.5 h-5.5 rounded-full bg-white shadow-md transition-all duration-300
-                              ${group.enableClaimLog ? 'left-6' : 'left-0.5'}
+                              absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300
+                              ${group.enableClaimLog ? 'translate-x-5' : 'translate-x-0'}
                             `} />
                           </div>
                         </button>
