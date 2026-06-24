@@ -65,6 +65,7 @@ model ClaimLog {
   extractedDetail String?  @map("extracted_detail") @db.Text
   status          String   @default("PENDING") @map("status") @db.VarChar(20) // 'PENDING' | 'PROCESSED' | 'CANCELLED'
   groupId         String?  @map("group_id") @db.VarChar(50)
+  location        String?  @map("location") @db.VarChar(255)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

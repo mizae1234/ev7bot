@@ -519,6 +519,7 @@ export async function analyzeClaimMessage(message: string): Promise<{
   isClaim: boolean
   vehicleRef?: string
   claimDetail?: string
+  location?: string
 }> {
   try {
     const model = genAI.getGenerativeModel({
@@ -540,11 +541,15 @@ export async function analyzeClaimMessage(message: string): Promise<{
               type: SchemaType.STRING,
               description: 'Brief description of the issue or damage reported. Return null or empty string if not found.',
             },
+            location: {
+              type: SchemaType.STRING,
+              description: 'The location or area where the incident or damage occurred, e.g. "บางนา", "สีลม", "พระราม 9", "กม.8". Return null or empty string if not found.',
+            },
           },
           required: ['isClaim'],
         },
       },
-      systemInstruction: 'คุณคือผู้ช่วยตรวจจับและบันทึกเคลมซ่อมรถยนต์ หน้าที่ของคุณคือสแกนข้อความแชทเพื่อตรวจสอบว่าเป็นการแจ้งปัญหา ตัวรถมีปัญหา หรือต้องการเคลม/ซ่อมแซมหรือไม่ หากใช่ ให้พยายามหาเลขทะเบียนรถหรือเลข VIN และสรุปประเด็นสั้นๆ โดยตอบกลับเป็นรูปแบบ JSON โครงสร้างตามที่ระบุอย่างถูกต้องเคร่งครัด',
+      systemInstruction: 'คุณคือผู้ช่วยตรวจจับและบันทึกเคลมซ่อมรถยนต์ หน้าที่ของคุณคือสแกนข้อความแชทเพื่อตรวจสอบว่าเป็นการแจ้งปัญหา ตัวรถมีปัญหา หรือต้องการเคลม/ซ่อมแซมหรือไม่ หากใช่ ให้พยายามหาเลขทะเบียนรถหรือเลข VIN รายละเอียด และสถานที่เกิดเหตุ โดยตอบกลับเป็นรูปแบบ JSON โครงสร้างตามที่ระบุอย่างถูกต้องเคร่งครัด',
     })
 
     const result = await model.generateContent(message)
@@ -556,6 +561,7 @@ export async function analyzeClaimMessage(message: string): Promise<{
       isClaim: !!data.isClaim,
       vehicleRef: data.vehicleRef || undefined,
       claimDetail: data.claimDetail || undefined,
+      location: data.location || undefined,
     }
   } catch (error) {
     console.error('[analyzeClaimMessage Error]', error)

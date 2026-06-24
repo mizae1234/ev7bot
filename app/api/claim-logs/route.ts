@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
         { vehicleRef: { contains: search, mode: 'insensitive' } },
         { message: { contains: search, mode: 'insensitive' } },
         { extractedDetail: { contains: search, mode: 'insensitive' } },
+        { location: { contains: search, mode: 'insensitive' } },
         { lineUserId: { contains: search, mode: 'insensitive' } }
       ]
     }

@@ -266,15 +266,17 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                       message: rawText,
                       extractedDetail: claimAnalysis.claimDetail || null,
                       groupId: gid || null,
+                      location: claimAnalysis.location || null,
                       status: 'PENDING',
                     }
                   })
 
                   const displayRef = claimAnalysis.vehicleRef ? `ทะเบียน/VIN: ${claimAnalysis.vehicleRef}` : 'ไม่ระบุทะเบียน'
                   const displayDetail = claimAnalysis.claimDetail ? ` (${claimAnalysis.claimDetail})` : ''
+                  const displayLocation = claimAnalysis.location ? `\n📍 สถานที่: ${claimAnalysis.location}` : ''
                   await replyText(
                     event.replyToken,
-                    `บัตเตอร์ได้บันทึกประวัติการแจ้งซ่อมเรียบร้อยแล้วค่ะ 🛠️\n📌 ${displayRef}${displayDetail}\n👤 ผู้แจ้ง: ${profileName}\n\n(รหัสอ้างอิง: #${createdClaim.id} — สามารถตรวจสอบประวัติเพิ่มเติมได้ที่หน้า claimlog ค่ะ) 💛`
+                    `บัตเตอร์ได้บันทึกประวัติการแจ้งซ่อมเรียบร้อยแล้วค่ะ 🛠️\n📌 ${displayRef}${displayDetail}${displayLocation}\n👤 ผู้แจ้ง: ${profileName}\n\n(รหัสอ้างอิง: #${createdClaim.id} — สามารถตรวจสอบประวัติเพิ่มเติมได้ที่หน้า claimlog ค่ะ) 💛`
                   )
                   return
                 }

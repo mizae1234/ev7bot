@@ -13,6 +13,7 @@ interface ClaimLog {
   extractedDetail: string | null
   status: string
   groupId: string | null
+  location: string | null
   createdAt: string
   updatedAt: string
 }
@@ -372,7 +373,7 @@ function ClaimLogsContent() {
             <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาคำสำคัญ</label>
             <input
               type="text"
-              placeholder="ค้นหาเลขทะเบียน, ชื่อผู้แจ้ง, รายละเอียด หรือ ข้อความดิบ..."
+              placeholder="ค้นหาเลขทะเบียน, สถานที่, ชื่อผู้แจ้ง, รายละเอียด หรือ ข้อความดิบ..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
@@ -430,6 +431,12 @@ function ClaimLogsContent() {
                       ) : (
                         <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-500 border border-zinc-700/50">
                           🚗 ไม่ระบุทะเบียน
+                        </span>
+                      )}
+
+                      {claim.location && (
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                          📍 {claim.location}
                         </span>
                       )}
 
