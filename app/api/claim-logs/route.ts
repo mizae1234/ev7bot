@@ -36,8 +36,8 @@ export async function GET(req: NextRequest) {
       where: { lineUserId: userId }
     })
 
-    if (!caller || (caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
-      return NextResponse.json({ error: 'Forbidden: Admins only' }, { status: 403 })
+    if (!caller || (caller.role !== 'USER' && caller.role !== 'ADMIN' && caller.role !== 'SUPER_ADMIN')) {
+      return NextResponse.json({ error: 'Forbidden: Access denied' }, { status: 403 })
     }
 
     const page = parseInt(searchParams.get('page') || '1')

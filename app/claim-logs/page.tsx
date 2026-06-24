@@ -61,7 +61,7 @@ function ClaimLogsContent() {
       if (res.ok) {
         const data = await res.json()
         setUserRole(data.role)
-        if (data.role === 'ADMIN' || data.role === 'SUPER_ADMIN') {
+        if (data.role === 'USER' || data.role === 'ADMIN' || data.role === 'SUPER_ADMIN') {
           setPasscode('ev7admin')
           setIsAuthenticated(true)
           if (typeof window !== 'undefined') {
@@ -229,13 +229,13 @@ function ClaimLogsContent() {
     )
   }
 
-  // 5. Restrict access strictly to ADMIN or SUPER_ADMIN
-  if (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
+  // 5. Restrict access strictly to registered roles (USER, ADMIN, SUPER_ADMIN)
+  if (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-4 text-center">
         <span className="text-5xl mb-4">🛠️</span>
-        <h1 className="text-xl font-bold text-zinc-100 mb-2">เข้าถึงเฉพาะผู้ดูแลระบบ (Admin)</h1>
-        <p className="text-sm text-zinc-500 max-w-sm">คุณไม่มีสิทธิ์เข้าใช้งานระบบประวัติแจ้งซ่อมตรวจจับอัตโนมัติ</p>
+        <h1 className="text-xl font-bold text-zinc-100 mb-2">ไม่มีสิทธิ์เข้าใช้งาน</h1>
+        <p className="text-sm text-zinc-500 max-w-sm">บัญชี LINE ของคุณยังไม่ได้ลงทะเบียนในระบบ หรือไม่มีสิทธิ์เข้าใช้งานระบบนี้</p>
         <a href="/dashboard" className="mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-all shadow-md">
           กลับหน้าหลักแดชบอร์ด
         </a>
@@ -295,9 +295,11 @@ function ClaimLogsContent() {
               <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-100 to-emerald-400 tracking-tight">
                 🛠️ Auto-Detected Claim Logs
               </h1>
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded-md font-bold">
-                Admin Panel
-              </span>
+              {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded-md font-bold">
+                  Admin Panel
+                </span>
+              )}
             </div>
             <p className="text-xs text-zinc-500 mt-1">
               รายการแจ้งซ่อมรถยนต์ไฟฟ้าที่ Butter ตรวจพบจากแชทกลุ่มโดยอัตโนมัติ
@@ -332,12 +334,14 @@ function ClaimLogsContent() {
                 </a>
               </>
             )}
-            <a 
-              href="/issues"
-              className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
-            >
-              🐞 จัดการปัญหา (Issues)
-            </a>
+            {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+              <a 
+                href="/issues"
+                className="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border border-zinc-800 transition-all"
+              >
+                🐞 จัดการปัญหา (Issues)
+              </a>
+            )}
             <a 
               href="/dashboard"
               className="text-xs font-bold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold transition-all shadow-md"
@@ -484,7 +488,7 @@ function ClaimLogsContent() {
                     )}
                   </div>
 
-                  {claim.status === 'PENDING' && (
+                  {claim.status === 'PENDING' && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleAction(claim.id, 'cancel')}
