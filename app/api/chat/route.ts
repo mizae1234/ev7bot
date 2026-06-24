@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { message } = await req.json()
+    const { message, userId, displayName } = await req.json()
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return NextResponse.json({ error: 'กรุณาพิมพ์ข้อความ' }, { status: 400 })
@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'ข้อความยาวเกินไป (สูงสุด 500 ตัวอักษร)' }, { status: 400 })
     }
 
-    console.log(`[Chat API] User: "${trimmed}"`)
+    console.log(`[Chat API] User (${displayName || 'Guest'} / ${userId || 'No ID'}): "${trimmed}"`)
     const reply = await askButter(trimmed)
     console.log(`[Chat API] Butter: "${reply.substring(0, 100)}..."`)
 
     // Log web chat to database
-    logChatToDb('web', null, undefined, trimmed, reply)
+    logChatToDb('web', userId || null, displayName || undefined, trimmed, reply)
       .catch((err: any) => console.error('[Chat API logChat Error]', err))
 
     return NextResponse.json({ reply })
