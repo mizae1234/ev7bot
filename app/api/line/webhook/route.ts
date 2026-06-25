@@ -250,6 +250,12 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                 const { analyzeClaimMessage } = await import('@/lib/gemini')
                 const claimAnalysis = await analyzeClaimMessage(rawText)
                 if (claimAnalysis.isClaim) {
+                  // ถ้าตรงคีเวิร์ดแต่ไม่มีทะเบียน/VIN → ไม่บันทึก เพราะไม่รู้ว่ารถคันไหน
+                  if (!claimAnalysis.vehicleRef || claimAnalysis.vehicleRef.trim() === '') {
+                    console.log('[Auto Claim Detect] Skipped — keyword matched but no vehicleRef found, not saving.')
+                    return
+                  }
+
                   let profileName = 'ผู้ใช้ LINE'
                   try {
                     if (!env.MOCK_MODE && event.source.userId) {
