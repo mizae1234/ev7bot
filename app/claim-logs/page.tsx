@@ -89,14 +89,14 @@ function ClaimLogsContent() {
 
   // 3. Fetch claims when authenticated and role is valid
   useEffect(() => {
-    if (isAuthenticated && passcode && liffUserId && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
+    if (isAuthenticated && passcode && liffUserId && (userRole === 'USER' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN')) {
       fetchClaims()
     }
   }, [isAuthenticated, page, statusFilter, liffUserId, userRole])
 
   // Debounced search trigger
   useEffect(() => {
-    if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
+    if (!isAuthenticated || !passcode || !liffUserId || (userRole !== 'USER' && userRole !== 'ADMIN' && userRole !== 'SUPER_ADMIN')) return
     const timer = setTimeout(() => {
       setPage(1)
       fetchClaims()
@@ -488,7 +488,7 @@ function ClaimLogsContent() {
                     )}
                   </div>
 
-                  {claim.status === 'PENDING' && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                  {claim.status === 'PENDING' && (userRole === 'USER' || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleAction(claim.id, 'cancel')}
