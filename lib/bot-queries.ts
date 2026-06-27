@@ -30,8 +30,32 @@ function getMonthRange(year?: number, month?: number) {
 }
 
 function processRawDeliveries(rawItems: any[], dateStr: string) {
-  const newItems = rawItems.filter(item => item.RentType === 'ONRENT_NEW')
-  const usedItems = rawItems.filter(item => item.RentType === 'ONRENT_USE')
+  const start = new Date(`${dateStr}T00:00:00.000Z`)
+  const end = new Date(`${dateStr}T23:59:59.999Z`)
+
+  const processedItems = rawItems
+    .map(item => {
+      if (!item.ReleaseDate) {
+        return item
+      }
+      const releaseDate = new Date(item.ReleaseDate)
+      if (releaseDate >= start && releaseDate <= end) {
+        return item
+      }
+      if (releaseDate > end) {
+        // Released in the future relative to report date, so it was pending
+        return {
+          ...item,
+          ReleaseDate: null
+        }
+      }
+      // Released in the past relative to report date, exclude from today's report
+      return null
+    })
+    .filter(Boolean) as any[]
+
+  const newItems = processedItems.filter(item => item.RentType === 'ONRENT_NEW')
+  const usedItems = processedItems.filter(item => item.RentType === 'ONRENT_USE')
 
   const computeSummaryAndBreakdown = (items: any[]) => {
     const total = items.length
