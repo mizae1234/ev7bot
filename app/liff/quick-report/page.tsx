@@ -105,6 +105,7 @@ export default function QuickReportPage() {
   const [editStatus, setEditStatus] = useState('')
   const [editFollowUp, setEditFollowUp] = useState('')
   const [updatingTicket, setUpdatingTicket] = useState(false)
+  const [editAttachments, setEditAttachments] = useState<File[]>([])
 
   // Tab 2 Quick Follow-up States
   const [quickLogs, setQuickLogs] = useState<Record<number, string>>({})
@@ -546,6 +547,7 @@ export default function QuickReportPage() {
       }
     }
     setEditFollowUp('')
+    setEditAttachments([])
   }
 
   const handleSaveTicketUpdate = async () => {
@@ -568,10 +570,31 @@ export default function QuickReportPage() {
         throw new Error('ไม่สามารถอัปเดตสถานะได้')
       }
 
+      // If there are files to upload, upload them now
+      if (editAttachments.length > 0) {
+        const formData = new FormData()
+        editAttachments.forEach((file) => {
+          formData.append('files', file)
+        })
+        formData.append('maintenanceId', String(editingTicket.MaintenanceItemID))
+        formData.append('lineUserId', getLineUserId() || '')
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json()
+          throw new Error(uploadErr.error || 'ไม่สามารถอัปโหลดรูปภาพได้')
+        }
+      }
+
       const result = await res.json()
       alert(result.message || 'บันทึกอัปเดตเรียบร้อย')
       setEditingTicket(null)
       setEditFollowUp('')
+      setEditAttachments([])
 
       // Refresh list immediately
       if (selectedCar) {
@@ -818,6 +841,35 @@ export default function QuickReportPage() {
                 placeholder="ระบุรายละเอียด เช่น รถเข้าอู่ทำสีแล้ว, ช่างกำลังถอดชิ้นส่วนตรวจสอบ, หรืออะไหล่มาถึงพร้อมซ่อม..."
                 className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition resize-none"
               />
+            </div>
+
+            {/* Photo upload component in edit sub-page */}
+            <div className="border-t border-slate-100 pt-3">
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">📷 แนบรูปภาพเพิ่มเติม (สามารถแนบได้หลายภาพ)</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setEditAttachments(Array.from(e.target.files))
+                  }
+                }}
+                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+              />
+              
+              {editAttachments.length > 0 && (
+                <div className="mt-2 text-xxs text-slate-500 font-semibold flex flex-col gap-1">
+                  <span>📸 เลือกแล้ว {editAttachments.length} รูปภาพ:</span>
+                  <div className="flex flex-wrap gap-1.5 mt-0.5">
+                    {editAttachments.map((f, i) => (
+                      <span key={i} className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-600 max-w-[120px] truncate">
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
