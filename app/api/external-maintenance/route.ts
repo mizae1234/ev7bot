@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       serviceLocationCode: body.serviceLocationCode || null,
       insuranceCode: body.insurance || null,
       followUpDetail: body.issueDescription || null,
-      createUserId: dbUserId
+      createUserId: dbUserId,
+      claimNumber: body.claimNo || null
     }
 
     const insertReq = pool.request()
