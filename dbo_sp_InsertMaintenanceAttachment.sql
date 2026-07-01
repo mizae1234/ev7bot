@@ -211,7 +211,10 @@ BEGIN
             @ServiceLocationCode NVARCHAR(50),
             @InsuranceCode NVARCHAR(50),
             @FollowUpDetail NVARCHAR(MAX),
-            @CreateUserID INT;
+            @CreateUserID INT,
+            @RegisterNo NVARCHAR(50),
+            @VinNo NVARCHAR(50),
+            @DriverName NVARCHAR(255);
 
     -- Extract values from JSON
     SELECT 
@@ -225,7 +228,10 @@ BEGIN
         @ServiceLocationCode = JSON_VALUE(@MaintenanceJson, '$.serviceLocationCode'),
         @InsuranceCode = JSON_VALUE(@MaintenanceJson, '$.insuranceCode'),
         @FollowUpDetail = JSON_VALUE(@MaintenanceJson, '$.followUpDetail'),
-        @CreateUserID = JSON_VALUE(@MaintenanceJson, '$.createUserId');
+        @CreateUserID = JSON_VALUE(@MaintenanceJson, '$.createUserId'),
+        @RegisterNo = JSON_VALUE(@MaintenanceJson, '$.registerNo'),
+        @VinNo = JSON_VALUE(@MaintenanceJson, '$.vinNo'),
+        @DriverName = JSON_VALUE(@MaintenanceJson, '$.driverName');
 
     INSERT INTO dbo.EV_MaintenanceItem (
         InventoryItemID,
@@ -241,7 +247,10 @@ BEGIN
         FollowUpDetail,
         IsActive,
         CreateDate,
-        CreateUserID
+        CreateUserID,
+        RegisterNo,
+        VinNo,
+        DriverName
     )
     VALUES (
         @InventoryItemID,
@@ -257,7 +266,10 @@ BEGIN
         @FollowUpDetail,
         1, -- IsActive is 1
         GETDATE(),
-        @CreateUserID
+        @CreateUserID,
+        @RegisterNo,
+        @VinNo,
+        @DriverName
     );
 
     SET @NewMaintenanceItemID = SCOPE_IDENTITY();

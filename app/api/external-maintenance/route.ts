@@ -69,6 +69,9 @@ export async function POST(req: NextRequest) {
     // 3. Execute Stored Procedure sp_InsertMaintenanceItemJson
     const maintenanceObj = {
       inventoryItemId,
+      registerNo: registerNo || null,
+      vinNo: vinNo || null,
+      driverName: body.driverName || null,
       incidentDate: body.incidentDate ? new Date(body.incidentDate).toISOString() : null,
       carStatusCode: body.carStatusCode || null,
       issueTitle: body.issueDescription || null,
