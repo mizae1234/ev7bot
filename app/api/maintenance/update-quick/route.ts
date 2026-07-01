@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLPool, sql } from '@/lib/mssql'
 import { env } from '@/lib/env'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate } = await req.json()
+    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId } = await req.json()
 
     if (!maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
     }
 
     if (env.MOCK_MODE) {
-      console.log('[Mock Mode] Update Quick Maintenance:', { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, startDate })
+      console.log('[Mock Mode] Update Quick Maintenance:', { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, startDate, finishDate, lineUserId })
       return NextResponse.json({
         success: true,
         message: 'อัปเดตข้อมูลสำเร็จ (จำลองสถานะ MOCK_MODE)'
@@ -25,16 +26,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
+    // Resolve ev7UserId from lineUserId
+    let dbUserId = 1 // Default to 1 (System / LIFF User)
+    if (lineUserId) {
+      try {
+        const reg = await prisma.lineRegistration.findUnique({
+          where: { lineUserId }
+        })
+        if (reg?.ev7UserId) {
+          dbUserId = reg.ev7UserId
+        }
+      } catch (prismaErr) {
+        console.error('[Prisma read ev7UserId Error]', prismaErr)
+      }
+    }
+
     // 1. Update CarStatusCode only (InventoryItem status sync deferred)
     if (carStatusCode) {
       await pool.request()
         .input('maintId', sql.Int, maintenanceId)
         .input('statusCode', sql.NVarChar, carStatusCode)
+        .input('userId', sql.Int, dbUserId)
         .query(`
           -- Update Maintenance Ticket Status
           UPDATE dbo.EV_MaintenanceItem
           SET CarStatusCode = @statusCode,
-              UpdateDate = GETDATE()
+              UpdateDate = GETDATE(),
+              UpdateUserID = @userId
           WHERE MaintenanceItemID = @maintId AND IsActive = 1;
         `)
     }
@@ -44,10 +62,27 @@ export async function POST(req: NextRequest) {
       await pool.request()
         .input('maintId', sql.Int, maintenanceId)
         .input('startDate', sql.DateTime, new Date(startDate))
+        .input('userId', sql.Int, dbUserId)
         .query(`
           UPDATE dbo.EV_MaintenanceItem
           SET MaintenanceStartDate = @startDate,
-              UpdateDate = GETDATE()
+              UpdateDate = GETDATE(),
+              UpdateUserID = @userId
+          WHERE MaintenanceItemID = @maintId AND IsActive = 1;
+        `)
+    }
+
+    // 1.3 Update Finish Date if provided
+    if (finishDate) {
+      await pool.request()
+        .input('maintId', sql.Int, maintenanceId)
+        .input('finishDate', sql.DateTime, new Date(finishDate))
+        .input('userId', sql.Int, dbUserId)
+        .query(`
+          UPDATE dbo.EV_MaintenanceItem
+          SET MaintenanceFinishDate = @finishDate,
+              UpdateDate = GETDATE(),
+              UpdateUserID = @userId
           WHERE MaintenanceItemID = @maintId AND IsActive = 1;
         `)
     }
@@ -57,10 +92,12 @@ export async function POST(req: NextRequest) {
       await pool.request()
         .input('maintId', sql.Int, maintenanceId)
         .input('locCode', sql.NVarChar, serviceLocationCode)
+        .input('userId', sql.Int, dbUserId)
         .query(`
           UPDATE dbo.EV_MaintenanceItem
           SET ServiceLocationCode = @locCode,
-              UpdateDate = GETDATE()
+              UpdateDate = GETDATE(),
+              UpdateUserID = @userId
           WHERE MaintenanceItemID = @maintId AND IsActive = 1;
         `)
 
@@ -69,6 +106,7 @@ export async function POST(req: NextRequest) {
       await pool.request()
         .input('maintId', sql.Int, maintenanceId)
         .input('detail', sql.NVarChar, `📍 อัปเดตสถานที่ซ่อมบำรุงเป็น: ${locText}`)
+        .input('userId', sql.Int, dbUserId)
         .query(`
           INSERT INTO dbo.EV_MaintenanceFollowUp (
             MaintenanceItemID,
@@ -83,7 +121,7 @@ export async function POST(req: NextRequest) {
             @detail,
             1,
             GETDATE(),
-            1
+            @userId
           )
         `)
     }
@@ -93,6 +131,7 @@ export async function POST(req: NextRequest) {
       await pool.request()
         .input('maintId', sql.Int, maintenanceId)
         .input('detail', sql.NVarChar, followUpDetail.trim())
+        .input('userId', sql.Int, dbUserId)
         .query(`
           INSERT INTO dbo.EV_MaintenanceFollowUp (
             MaintenanceItemID,
@@ -107,7 +146,7 @@ export async function POST(req: NextRequest) {
             @detail,
             1,
             GETDATE(),
-            1 -- System User / Mobile LIFF
+            @userId
           )
         `)
     }

@@ -129,9 +129,13 @@ export default function QuickReportPage() {
   const [showAddIncidentForm, setShowAddIncidentForm] = useState(false)
 
   // Bulk Action States
-  const [bulkActionType, setBulkActionType] = useState<'park' | 'start' | null>(null)
+  const [bulkActionType, setBulkActionType] = useState<'park' | 'start' | 'complete' | null>(null)
   const [bulkLocation, setBulkLocation] = useState('')
   const [bulkStartDate, setBulkStartDate] = useState(() => {
+    const now = new Date()
+    return now.toISOString().slice(0, 16)
+  })
+  const [bulkFinishDate, setBulkFinishDate] = useState(() => {
     const now = new Date()
     return now.toISOString().slice(0, 16)
   })
@@ -156,6 +160,19 @@ export default function QuickReportPage() {
 
     return () => clearTimeout(delayDebounce)
   }, [searchTerm])
+
+  // Get current user's LINE User ID from AuthGuard's liff_profile cache
+  const getLineUserId = (): string | null => {
+    if (typeof window === 'undefined') return null
+    const profileStr = localStorage.getItem('liff_profile')
+    if (!profileStr) return null
+    try {
+      const profile = JSON.parse(profileStr)
+      return profile.userId || null
+    } catch {
+      return null
+    }
+  }
 
   // Fetch real details (active driver, history) when selectedCar changes
   const handleSelectCar = async (car: DbCar) => {
@@ -221,7 +238,8 @@ export default function QuickReportPage() {
         body: JSON.stringify({
           maintenanceId: maintId,
           carStatusCode: 'IN_MAINTENANCE',
-          followUpDetail: '🔴 ดำเนินการ: นำรถเข้าซ่อมบำรุง (งดใช้งาน)'
+          followUpDetail: '🔴 ดำเนินการ: นำรถเข้าซ่อมบำรุง (งดใช้งาน)',
+          lineUserId: getLineUserId()
         })
       })
 
@@ -247,7 +265,7 @@ export default function QuickReportPage() {
   }
 
   // Bulk Action Save Handler
-  const handleSaveBulkAction = async (type: 'park' | 'start') => {
+  const handleSaveBulkAction = async (type: 'park' | 'start' | 'complete') => {
     if (pendingTickets.length === 0) {
       alert('ไม่มีรายการใบงานซ่อมที่รอดำเนินการสำหรับรถคันนี้')
       return
@@ -260,17 +278,24 @@ export default function QuickReportPage() {
       const promises = pendingTickets.map(ticket => {
         const payload: any = {
           maintenanceId: ticket.MaintenanceItemID,
-          serviceLocationCode: bulkLocation,
-          serviceLocationName: locName,
+          lineUserId: getLineUserId()
         }
 
         if (type === 'park') {
           payload.carStatusCode = 'WAITING_FOR_MAINTENANCE'
+          payload.serviceLocationCode = bulkLocation
+          payload.serviceLocationName = locName
           payload.followUpDetail = `🟡 อัปเดต: รถจอดรอซ่อม ณ สถานที่: ${locName}`
-        } else {
+        } else if (type === 'start') {
           payload.carStatusCode = 'IN_MAINTENANCE'
           payload.startDate = bulkStartDate
+          payload.serviceLocationCode = bulkLocation
+          payload.serviceLocationName = locName
           payload.followUpDetail = `🔴 อัปเดต: เริ่มซ่อม ณ อู่: ${locName} เมื่อวันที่: ${formatLiffTime(bulkStartDate)}`
+        } else if (type === 'complete') {
+          payload.carStatusCode = 'COMPLETE'
+          payload.finishDate = bulkFinishDate
+          payload.followUpDetail = `🟢 อัปเดต: ซ่อมเสร็จสิ้น เมื่อวันที่: ${formatLiffTime(bulkFinishDate)}`
         }
 
         return fetch('/api/maintenance/update-quick', {
@@ -438,6 +463,7 @@ export default function QuickReportPage() {
     try {
       const payload = {
         source: 'MOBILE_LIFF',
+        lineUserId: getLineUserId(),
         carInfo: {
           registerNo: selectedCar.RegisterNo,
           vin: selectedCar.VinNo,
@@ -533,7 +559,8 @@ export default function QuickReportPage() {
         body: JSON.stringify({
           maintenanceId: editingTicket.MaintenanceItemID,
           carStatusCode: editStatus,
-          followUpDetail: editFollowUp
+          followUpDetail: editFollowUp,
+          lineUserId: getLineUserId()
         })
       })
 
@@ -568,7 +595,8 @@ export default function QuickReportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           maintenanceId: maintId,
-          followUpDetail: detail.trim()
+          followUpDetail: detail.trim(),
+          lineUserId: getLineUserId()
         })
       })
 
@@ -616,7 +644,8 @@ export default function QuickReportPage() {
         body: JSON.stringify({
           maintenanceId: targetMaintId,
           serviceLocationCode: selectedLocCode,
-          serviceLocationName: locName
+          serviceLocationName: locName,
+          lineUserId: getLineUserId()
         })
       })
 
@@ -966,7 +995,7 @@ export default function QuickReportPage() {
                           setBulkActionType(bulkActionType === 'park' ? null : 'park')
                           setBulkLocation('')
                         }}
-                        className={`font-bold px-2.5 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
+                        className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
                           bulkActionType === 'park'
                             ? 'bg-amber-100 border-amber-300 text-amber-800'
                             : 'bg-amber-50 hover:bg-amber-100 border-amber-250 text-amber-700'
@@ -982,13 +1011,29 @@ export default function QuickReportPage() {
                           const now = new Date()
                           setBulkStartDate(now.toISOString().slice(0, 16))
                         }}
-                        className={`font-bold px-2.5 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
+                        className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
                           bulkActionType === 'start'
                             ? 'bg-rose-100 border-rose-300 text-rose-800'
                             : 'bg-rose-50 hover:bg-rose-100 border-rose-250 text-rose-700'
                         }`}
                       >
                         เริ่มซ่อม
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkActionType(bulkActionType === 'complete' ? null : 'complete')
+                          setBulkLocation('')
+                          const now = new Date()
+                          setBulkFinishDate(now.toISOString().slice(0, 16))
+                        }}
+                        className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
+                          bulkActionType === 'complete'
+                            ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                            : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-250 text-emerald-700'
+                        }`}
+                      >
+                        ซ่อมเสร็จ
                       </button>
                     </div>
                   </div>
@@ -1092,6 +1137,51 @@ export default function QuickReportPage() {
                           className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xxs transition active:scale-98"
                         >
                           {submittingBulk ? '⏳ กำลังบันทึก...' : '💾 บันทึก เริ่มซ่อม'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBulkActionType(null)}
+                          className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-500 font-semibold px-3 py-2 rounded-xl text-xxs transition active:scale-95"
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {bulkActionType === 'complete' && (
+                    <div className="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4 space-y-3.5 mb-3 animate-fade-in text-slate-700">
+                      <div className="flex items-center justify-between border-b border-emerald-150 pb-1.5">
+                        <span className="text-xs font-bold text-emerald-800">🟢 ระบุรายละเอียด: ซ่อมเสร็จสิ้น</span>
+                        <button
+                          type="button"
+                          onClick={() => setBulkActionType(null)}
+                          className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                        >
+                          ปิด x
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">📅 วันที่ซ่อมเสร็จ</label>
+                          <input
+                            type="datetime-local"
+                            value={bulkFinishDate}
+                            onChange={(e) => setBulkFinishDate(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-emerald-500 font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={submittingBulk}
+                          onClick={() => handleSaveBulkAction('complete')}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xxs transition active:scale-98"
+                        >
+                          {submittingBulk ? '⏳ กำลังบันทึก...' : '💾 บันทึก ซ่อมเสร็จ'}
                         </button>
                         <button
                           type="button"

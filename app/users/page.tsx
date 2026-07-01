@@ -13,6 +13,7 @@ interface RegisteredUser {
   system: string
   isActive: boolean
   role: 'USER' | 'ADMIN' | 'SUPER_ADMIN'
+  ev7UserId?: number | null
   registeredAt: string
   updatedAt: string
 }
@@ -228,6 +229,39 @@ function UserManagementContent() {
       if (!res.ok) {
         const data = await res.json()
         alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไขสถานะได้'}`)
+      } else {
+        await fetchUsers()
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleEv7UserIdChange = async (targetLineUserId: string, value: string) => {
+    setActionLoading(targetLineUserId)
+    try {
+      const parsedVal = value.trim() ? parseInt(value.trim(), 10) : null
+      if (parsedVal !== null && isNaN(parsedVal)) {
+        alert('กรุณากรอกเฉพาะตัวเลข')
+        return
+      }
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          lineUserId: targetLineUserId, 
+          ev7UserId: parsedVal, 
+          passcode, 
+          userId: liffUserId 
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไข EV7 User ID ได้'}`)
       } else {
         await fetchUsers()
       }
@@ -698,32 +732,45 @@ function UserManagementContent() {
                       📅 ลงทะเบียนเมื่อ: <span className="text-zinc-400 font-medium">{formatDateTime(user.registeredAt)}</span>
                     </div>
 
-                    <div className="flex items-center gap-2.5">
-                      {/* Role drop-down */}
-                      <select
-                        value={user.role}
-                        disabled={actionLoading === user.lineUserId}
-                        onChange={(e) => handleRoleChange(user.lineUserId, e.target.value)}
-                        className="px-2.5 py-1.5 text-xs rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer font-bold disabled:opacity-50"
-                      >
-                        <option value="USER">User</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="SUPER_ADMIN">Super Admin</option>
-                      </select>
+                     <div className="flex items-center gap-2.5">
+                       {/* EV7 ID input */}
+                       <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1">
+                         <span className="text-[10px] text-zinc-500 font-bold">EV7 ID:</span>
+                         <input
+                           type="number"
+                           value={user.ev7UserId !== null && user.ev7UserId !== undefined ? user.ev7UserId : ''}
+                           placeholder="ยังไม่ผูก"
+                           disabled={actionLoading === user.lineUserId}
+                           onChange={(e) => handleEv7UserIdChange(user.lineUserId, e.target.value)}
+                           className="w-14 bg-transparent border-0 text-center text-xs text-zinc-300 focus:outline-none focus:ring-0 p-0 font-mono disabled:opacity-50"
+                         />
+                       </div>
 
-                      {/* Active toggle */}
-                      <button
-                        onClick={() => handleStatusToggle(user.lineUserId, user.isActive)}
-                        disabled={actionLoading === user.lineUserId}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-95 ${
-                          user.isActive
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
-                            : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                        }`}
-                      >
-                        {user.isActive ? 'ระงับการใช้งาน 🚫' : 'เปิดการใช้งาน 🟢'}
-                      </button>
-                    </div>
+                       {/* Role drop-down */}
+                       <select
+                         value={user.role}
+                         disabled={actionLoading === user.lineUserId}
+                         onChange={(e) => handleRoleChange(user.lineUserId, e.target.value)}
+                         className="px-2.5 py-1.5 text-xs rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer font-bold disabled:opacity-50"
+                       >
+                         <option value="USER">User</option>
+                         <option value="ADMIN">Admin</option>
+                         <option value="SUPER_ADMIN">Super Admin</option>
+                       </select>
+
+                       {/* Active toggle */}
+                       <button
+                         onClick={() => handleStatusToggle(user.lineUserId, user.isActive)}
+                         disabled={actionLoading === user.lineUserId}
+                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-95 ${
+                           user.isActive
+                             ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                             : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                         }`}
+                       >
+                         {user.isActive ? 'ระงับการใช้งาน 🚫' : 'เปิดการใช้งาน 🟢'}
+                       </button>
+                     </div>
                   </div>
                 </div>
 

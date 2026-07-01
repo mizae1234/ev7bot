@@ -36,6 +36,7 @@ model LineRegistration {
   system        String    @default("EV7") @map("system") @db.VarChar(50)
   isActive      Boolean   @default(true) @map("is_active")
   role          String    @default("USER") @map("role") @db.VarChar(20)
+  ev7UserId     Int?      @map("ev7_user_id")
   registeredAt  DateTime  @default(now()) @map("registered_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
