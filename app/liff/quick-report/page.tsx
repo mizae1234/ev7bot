@@ -33,6 +33,7 @@ interface MaintenanceTicket {
   CarStatusDescription: string
   IssueTitle: string
   ServiceLocation: string
+  ServiceLocationCode?: string
   followUps: FollowUpLog[]
 }
 
@@ -112,6 +113,8 @@ export default function QuickReportPage() {
   // Tab 3 Update Location States
   const [selectedMaintId, setSelectedMaintId] = useState<number | ''>('')
   const [selectedLocCode, setSelectedLocCode] = useState('')
+  const [locSearchTerm, setLocSearchTerm] = useState('')
+  const [showLocDropdown, setShowLocDropdown] = useState(false)
   const [updatingLocation, setUpdatingLocation] = useState(false)
 
   // Tab 4 Mobile Dashboard States
@@ -121,6 +124,9 @@ export default function QuickReportPage() {
 
   // Quick Check-in State
   const [checkingInId, setCheckingInId] = useState<number | null>(null)
+
+  // Show Add Incident Form State
+  const [showAddIncidentForm, setShowAddIncidentForm] = useState(false)
 
   // Bulk Action States
   const [bulkActionType, setBulkActionType] = useState<'park' | 'start' | null>(null)
@@ -157,6 +163,7 @@ export default function QuickReportPage() {
     setShowCarDropdown(false)
     setLoadingHistory(true)
     setVehicleHistory([])
+    setShowAddIncidentForm(false)
 
     try {
       const res = await fetch(`/api/vehicle/${encodeURIComponent(car.RegisterNo)}`)
@@ -175,15 +182,21 @@ export default function QuickReportPage() {
         if (data.maintenance) {
           setVehicleHistory(data.maintenance)
           const firstPending = data.maintenance.find((t: any) => t.CarStatusDescription !== 'ซ่อมเสร็จ')
+          setShowAddIncidentForm(!firstPending)
           if (firstPending) {
             setSelectedMaintId(firstPending.MaintenanceItemID)
-            setSelectedLocCode(firstPending.ServiceLocationCode || '')
+            const matchedLoc = locationOptions.find(o => o.code === firstPending.ServiceLocationCode || o.name === firstPending.ServiceLocation)
+            setSelectedLocCode(matchedLoc ? matchedLoc.code : (firstPending.ServiceLocationCode || ''))
+            setLocSearchTerm(matchedLoc ? matchedLoc.name : (firstPending.ServiceLocation || ''))
           } else if (data.maintenance.length > 0) {
             setSelectedMaintId(data.maintenance[0].MaintenanceItemID)
-            setSelectedLocCode(data.maintenance[0].ServiceLocationCode || '')
+            const matchedLoc = locationOptions.find(o => o.code === data.maintenance[0].ServiceLocationCode || o.name === data.maintenance[0].ServiceLocation)
+            setSelectedLocCode(matchedLoc ? matchedLoc.code : (data.maintenance[0].ServiceLocationCode || ''))
+            setLocSearchTerm(matchedLoc ? matchedLoc.name : (data.maintenance[0].ServiceLocation || ''))
           } else {
             setSelectedMaintId('')
             setSelectedLocCode('')
+            setLocSearchTerm('')
           }
         }
       }
@@ -486,6 +499,9 @@ export default function QuickReportPage() {
     setInsurance('')
     setClaimNo('')
     setInitialCarStatus('')
+    setShowAddIncidentForm(false)
+    setLocSearchTerm('')
+    setSelectedLocCode('')
   }
 
   const handleStartEditTicket = (ticket: MaintenanceTicket) => {
@@ -579,8 +595,14 @@ export default function QuickReportPage() {
 
   const handleUpdateLocation = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedMaintId) {
-      alert('กรุณาเลือกตั๋วงานซ่อมที่ต้องการอัปเดต')
+
+    let targetMaintId = selectedMaintId
+    if (!targetMaintId && vehicleHistory.length > 0) {
+      targetMaintId = vehicleHistory[0].MaintenanceItemID
+    }
+
+    if (!targetMaintId) {
+      alert('ไม่สามารถอัปเดตสถานที่ได้ เนื่องจากรถคันนี้ไม่มีประวัติใบงานซ่อมในระบบ (กรุณาแจ้งเหตุใหม่เพื่อเปิดเคสก่อน)')
       return
     }
 
@@ -592,7 +614,7 @@ export default function QuickReportPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          maintenanceId: selectedMaintId,
+          maintenanceId: targetMaintId,
           serviceLocationCode: selectedLocCode,
           serviceLocationName: locName
         })
@@ -1127,10 +1149,27 @@ export default function QuickReportPage() {
                 </div>
               )}
 
-              {/* Card 2: Driver & Incident Info */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1.5">👤 ชื่อ-นามสกุล คนขับ</label>
+              {/* Add Incident Button */}
+              {selectedCar && pendingTickets.length > 0 && !showAddIncidentForm && (
+                <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center space-y-2.5 animate-fade-in-up">
+                  <span className="text-xl">⚙️</span>
+                  <p className="text-xs font-bold text-slate-700">มีรายการแจ้งซ่อมค้างอยู่ ต้องการแจ้งเหตุใหม่เพิ่มเติมหรือไม่?</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddIncidentForm(true)}
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md hover:from-emerald-600 hover:to-teal-600 transition duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs"
+                  >
+                    <span>➕ เพิ่มเหตุ</span>
+                  </button>
+                </div>
+              )}
+
+              {(!selectedCar || pendingTickets.length === 0 || showAddIncidentForm) && (
+                <>
+                  {/* Card 2: Driver & Incident Info */}
+                  <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">👤 ชื่อ-นามสกุล คนขับ</label>
                   <input
                     type="text"
                     value={driverName}
@@ -1347,16 +1386,18 @@ export default function QuickReportPage() {
                 )}
               </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 disabled:from-slate-200 disabled:to-slate-350 disabled:text-slate-400 text-white font-bold py-4 px-6 rounded-2xl shadow-md hover:from-indigo-700 hover:to-blue-700 transition duration-200 active:scale-[0.98] flex items-center justify-center"
-                >
-                  {submitting ? '⏳ กำลังส่งข้อมูล...' : '✅ ส่งข้อมูลแจ้งเหตุ'}
-                </button>
-              </div>
+                  {/* Action buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 disabled:from-slate-200 disabled:to-slate-350 disabled:text-slate-400 text-white font-bold py-4 px-6 rounded-2xl shadow-md hover:from-indigo-700 hover:to-blue-700 transition duration-200 active:scale-[0.98] flex items-center justify-center"
+                    >
+                      {submitting ? '⏳ กำลังส่งข้อมูล...' : '✅ ส่งข้อมูลแจ้งเหตุ'}
+                    </button>
+                  </div>
+                </>
+              )}
 
             </form>
           )
@@ -1636,9 +1677,9 @@ export default function QuickReportPage() {
             </div>
 
             {selectedCar && (
-              vehicleHistory.length > 0 ? (
-                <form onSubmit={handleUpdateLocation} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 animate-fade-in-up">
-                  {/* Select Maintenance Ticket */}
+              <form onSubmit={handleUpdateLocation} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 animate-fade-in-up">
+                {/* Select Maintenance Ticket */}
+                {pendingTickets.length > 0 && (
                   <div>
                     <label className="text-xs font-bold text-slate-600 block mb-1.5">📝 เลือกงานซ่อมที่ต้องการเปลี่ยนสถานที่</label>
                     <select
@@ -1647,53 +1688,99 @@ export default function QuickReportPage() {
                         const mId = Number(e.target.value)
                         setSelectedMaintId(mId)
                         const t = vehicleHistory.find(x => x.MaintenanceItemID === mId)
-                        setSelectedLocCode(t?.ServiceLocation || '')
+                        const matchedLoc = locationOptions.find(o => o.code === t?.ServiceLocationCode || o.name === t?.ServiceLocation)
+                        setSelectedLocCode(matchedLoc ? matchedLoc.code : (t?.ServiceLocationCode || ''))
+                        setLocSearchTerm(matchedLoc ? matchedLoc.name : (t?.ServiceLocation || ''))
                       }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
                     >
-                      {vehicleHistory.map((t) => (
+                      {pendingTickets.map((t) => (
                         <option key={t.MaintenanceItemID} value={t.MaintenanceItemID}>
                           [{t.CarStatusDescription}] {t.IssueTitle.slice(0, 30)}... (#{t.MaintenanceItemID})
                         </option>
                       ))}
                     </select>
                   </div>
+                )}
 
-                  {/* Select New Location */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-600 block mb-1.5">📍 เลือกสถานที่ / พิกัดศูนย์บริการ / อู่ใหม่</label>
-                    <select
-                      value={selectedLocCode}
-                      onChange={(e) => setSelectedLocCode(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
-                    >
-                      <option value="">-- ไม่ระบุ / นอกสถานที่ --</option>
-                      {locationOptions.map((opt) => (
-                        <option key={opt.code} value={opt.code}>
-                          {opt.name}
-                        </option>
-                      ))}
-                    </select>
+                {/* Searchable Location Selection */}
+                <div className="relative">
+                  <label className="text-xs font-bold text-slate-600 block mb-1.5">📍 เลือกสถานที่ / พิกัดศูนย์บริการ / อู่ใหม่</label>
+                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1.5 transition">
+                    <span className="text-slate-400 mr-2">🔍</span>
+                    <input
+                      type="text"
+                      value={locSearchTerm}
+                      onChange={(e) => {
+                        setLocSearchTerm(e.target.value)
+                        setShowLocDropdown(true)
+                        const matched = locationOptions.find(o => o.name === e.target.value)
+                        setSelectedLocCode(matched ? matched.code : '')
+                      }}
+                      onFocus={() => setShowLocDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowLocDropdown(false), 200)}
+                      placeholder="พิมพ์ค้นหาชื่อสถานที่ / อู่..."
+                      className="bg-transparent text-sm w-full py-2 focus:outline-none text-slate-800 placeholder-slate-400 font-bold"
+                    />
+                    {selectedLocCode && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocCode('')
+                          setLocSearchTerm('')
+                        }}
+                        className="text-slate-400 hover:text-slate-600 transition mr-1"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
 
-                  {/* Submit Button */}
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={updatingLocation}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-350 disabled:text-slate-450 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition duration-150 active:scale-[0.98] flex items-center justify-center text-xs"
-                    >
-                      {updatingLocation ? '⏳ กำลังอัปเดตสถานที่...' : '💾 บันทึกเปลี่ยนสถานที่'}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm text-center animate-fade-in-up">
-                  <span className="text-xl">❌</span>
-                  <p className="text-xs font-bold text-slate-505 mt-2">ไม่พบประวัติการแจ้งซ่อมของรถคันนี้ในระบบ</p>
-                  <p className="text-[10px] text-slate-450 mt-1">สามารถไปเปิดเคสแจ้งซ่อมใหม่ได้ที่แท็บ "แจ้งเหตุ"</p>
+                  {/* Location list dropdown */}
+                  {showLocDropdown && (
+                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocCode('')
+                          setLocSearchTerm('')
+                          setShowLocDropdown(false)
+                        }}
+                        className="w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition text-xs font-bold text-slate-500"
+                      >
+                        -- ไม่ระบุ / นอกสถานที่ --
+                      </button>
+                      {locationOptions
+                        .filter(opt => opt.name.toLowerCase().includes(locSearchTerm.toLowerCase()))
+                        .map((opt) => (
+                          <button
+                            key={opt.code}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLocCode(opt.code)
+                              setLocSearchTerm(opt.name)
+                              setShowLocDropdown(false)
+                            }}
+                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition text-sm text-slate-800 font-semibold"
+                          >
+                            {opt.name}
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
-              )
+
+                {/* Submit Button */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={updatingLocation}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-350 disabled:text-slate-450 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition duration-150 active:scale-[0.98] flex items-center justify-center text-xs"
+                  >
+                    {updatingLocation ? '⏳ กำลังอัปเดตสถานที่...' : '💾 บันทึกเปลี่ยนสถานที่'}
+                  </button>
+                </div>
+              </form>
             )}
 
           </div>
