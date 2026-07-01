@@ -139,9 +139,9 @@ export async function GET(
           m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
           m.CarStatusCode, m.IssueTitle,
           m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
-          m.ServiceLocationCode, m.InsuranceCode,
+          m.ServiceLocationCode, m.InsuranceCode, m.ClaimNumber,
           m.FollowUpDetail, m.IsActive,
-          m.DriverName, m.RootCauseFound, m.FixAction,
+          m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
           m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID
         FROM dbo.EV_MaintenanceItem m

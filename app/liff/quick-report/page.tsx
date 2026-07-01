@@ -35,6 +35,14 @@ interface MaintenanceTicket {
   IssueTitle: string
   ServiceLocation: string
   ServiceLocationCode?: string
+  DriverName?: string
+  ProblemTypeCode?: string
+  FaultPartyCode?: string
+  CarCaseCode?: string
+  InsuranceCode?: string
+  ClaimNumber?: string
+  VinNo?: string
+  RegisterNo?: string
   followUps: FollowUpLog[]
   attachments?: any[]
 }
@@ -143,6 +151,24 @@ export default function QuickReportPage() {
   const [editAttachments, setEditAttachments] = useState<File[]>([])
   const [deletedPhotoIds, setDeletedPhotoIds] = useState<number[]>([])
   const [dbCarStatuses, setDbCarStatuses] = useState<{ StatusCode: string, StatusName: string }[]>([])
+
+  // Full Detail Edit SPA States
+  const [editDetailTicket, setEditDetailTicket] = useState<MaintenanceTicket | null>(null)
+  const [editDetailFields, setEditDetailFields] = useState({
+    driverName: '',
+    incidentDate: '',
+    issueTitle: '',
+    carStatusCode: '',
+    serviceLocationCode: '',
+    problemType: '',
+    faultParty: '',
+    carCase: '',
+    insurance: '',
+    claimNumber: '',
+  })
+  const [editDetailAttachments, setEditDetailAttachments] = useState<File[]>([])
+  const [editDetailDeletedPhotoIds, setEditDetailDeletedPhotoIds] = useState<number[]>([])
+  const [savingDetailEdit, setSavingDetailEdit] = useState(false)
 
   // Tab 2 Quick Follow-up States
   const [quickLogs, setQuickLogs] = useState<Record<number, string>>({})
@@ -674,6 +700,91 @@ export default function QuickReportPage() {
     }
   }
 
+  const handleStartDetailEdit = (ticket: MaintenanceTicket) => {
+    setEditDetailTicket(ticket)
+    setEditDetailFields({
+      driverName: ticket.DriverName || '',
+      incidentDate: ticket.IncidentDate ? new Date(ticket.IncidentDate).toISOString().slice(0, 16) : '',
+      issueTitle: ticket.IssueTitle || '',
+      carStatusCode: ticket.CarStatusCode || 'WAITING_FOR_MAINTENANCE',
+      serviceLocationCode: ticket.ServiceLocationCode || '',
+      problemType: ticket.ProblemTypeCode || 'ACCIDENT',
+      faultParty: ticket.FaultPartyCode || '',
+      carCase: ticket.CarCaseCode || '',
+      insurance: ticket.InsuranceCode || '',
+      claimNumber: ticket.ClaimNumber || '',
+    })
+    setEditDetailAttachments([])
+    setEditDetailDeletedPhotoIds([])
+  }
+
+  const handleSaveDetailEdit = async () => {
+    if (!editDetailTicket) return
+
+    setSavingDetailEdit(true)
+    try {
+      const res = await fetch('/api/maintenance/update-quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maintenanceId: editDetailTicket.MaintenanceItemID,
+          carStatusCode: editDetailFields.carStatusCode,
+          serviceLocationCode: editDetailFields.serviceLocationCode || null,
+          lineUserId: getLineUserId(),
+          deletedAttachmentIds: editDetailDeletedPhotoIds.length > 0 ? editDetailDeletedPhotoIds : null,
+          // Extended detail fields
+          driverName: editDetailFields.driverName || null,
+          incidentDate: editDetailFields.incidentDate || null,
+          issueTitle: editDetailFields.issueTitle || null,
+          problemTypeCode: editDetailFields.problemType || null,
+          faultPartyCode: editDetailFields.faultParty || null,
+          carCaseCode: editDetailFields.carCase || null,
+          insuranceCode: editDetailFields.insurance || null,
+          claimNumber: editDetailFields.claimNumber || null,
+        })
+      })
+
+      if (!res.ok) {
+        throw new Error('ไม่สามารถบันทึกการแก้ไขได้')
+      }
+
+      // Upload new attachments if any
+      if (editDetailAttachments.length > 0) {
+        const formData = new FormData()
+        editDetailAttachments.forEach((file) => {
+          formData.append('files', file)
+        })
+        formData.append('maintenanceId', String(editDetailTicket.MaintenanceItemID))
+        formData.append('lineUserId', getLineUserId() || '')
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json()
+          throw new Error(uploadErr.error || 'ไม่สามารถอัปโหลดรูปภาพได้')
+        }
+      }
+
+      const result = await res.json()
+      alert(result.message || 'บันทึกการแก้ไขเรียบร้อย')
+      setEditDetailTicket(null)
+      setEditDetailAttachments([])
+      setEditDetailDeletedPhotoIds([])
+
+      // Refresh list
+      if (selectedCar) {
+        handleSelectCar(selectedCar)
+      }
+    } catch (err: any) {
+      alert(err.message || 'เกิดข้อผิดพลาด')
+    } finally {
+      setSavingDetailEdit(false)
+    }
+  }
+
   const handleSaveQuickFollowUp = async (maintId: number) => {
     const detail = quickLogs[maintId]
     if (!detail || !detail.trim()) return
@@ -817,6 +928,300 @@ export default function QuickReportPage() {
   const getVehiclesAtLocation = (locCode: string) => {
     const repairs = mobileDashboardData?.longestRepairs || []
     return repairs.filter((r: any) => r.ServiceLocationCode === locCode || (locCode === 'ไม่ระบุ' && !r.ServiceLocationCode))
+  }
+
+  // ─── RENDER FULL DETAIL EDIT SPA VIEW ──────────────────────────────────
+  if (editDetailTicket) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-700 flex flex-col items-center justify-start p-4 pb-12">
+        <div className="w-full max-w-md space-y-4 animate-fade-in-up">
+          
+          {/* Header with Back button */}
+          <div className="flex items-center gap-3 py-3 border-b border-slate-200">
+            <button
+              onClick={() => setEditDetailTicket(null)}
+              className="bg-white hover:bg-slate-100 p-2 rounded-2xl border border-slate-200 text-slate-755 transition flex items-center justify-center active:scale-95 shadow-xs"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-base font-bold text-slate-900 leading-tight">แก้ไขรายละเอียดใบแจ้งซ่อม</h1>
+              <p className="text-[10px] text-slate-450 font-mono">เลขอ้างอิงใบงาน: #{editDetailTicket.MaintenanceItemID}</p>
+            </div>
+          </div>
+
+          {/* Car Info (Read-only) */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-lg">🚗</div>
+              <div>
+                <p className="text-sm font-bold text-slate-855">{selectedCar?.RegisterNo || editDetailTicket.RegisterNo || '-'}</p>
+                <p className="text-[10px] text-slate-500">VIN: {selectedCar?.VinNo || editDetailTicket.VinNo || '-'} | {selectedCar?.Model || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Edit Form */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-2">📝 แก้ไขข้อมูลใบแจ้งซ่อม</h3>
+
+            {/* Driver Name */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">👤 ชื่อคนขับ</label>
+              <input
+                type="text"
+                value={editDetailFields.driverName}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, driverName: e.target.value }))}
+                placeholder="ระบุชื่อคนขับ..."
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition"
+              />
+            </div>
+
+            {/* Incident Date */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ</label>
+              <input
+                type="datetime-local"
+                value={editDetailFields.incidentDate}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, incidentDate: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition"
+              />
+            </div>
+
+            {/* Issue Title */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">💬 อาการรถเสีย / รายละเอียดความเสียหาย</label>
+              <textarea
+                rows={3}
+                value={editDetailFields.issueTitle}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, issueTitle: e.target.value }))}
+                placeholder="ระบุอาการ / ความเสียหาย..."
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition resize-none"
+              />
+            </div>
+
+            {/* Car Status */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">🚦 สถานะใบแจ้งซ่อม</label>
+              <select
+                value={editDetailFields.carStatusCode}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, carStatusCode: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                {(dbCarStatuses.length > 0 ? dbCarStatuses : [
+                  { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
+                  { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
+                  { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' },
+                  { StatusCode: 'GARAGE_COMPLETE', StatusName: 'ซ่อมเสร็จ' }
+                ]).map((st) => {
+                  let emoji = '⚙️'
+                  if (st.StatusCode === 'WAITING_FOR_MAINTENANCE') emoji = '🟡'
+                  else if (st.StatusCode === 'STILL_WORK') emoji = '🔵'
+                  else if (st.StatusCode === 'IN_MAINTENANCE') emoji = '🔴'
+                  else if (st.StatusCode === 'GARAGE_COMPLETE') emoji = '🟢'
+                  return (
+                    <option key={st.StatusCode} value={st.StatusCode}>
+                      {emoji} {st.StatusName}
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+
+            {/* Service Location */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">📍 สถานที่นำส่งซ่อม</label>
+              <select
+                value={editDetailFields.serviceLocationCode}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, serviceLocationCode: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                <option value="">-- ยังไม่ระบุ --</option>
+                {locationOptions.map(loc => (
+                  <option key={loc.code} value={loc.code}>{loc.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Problem Details Card */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-2">📋 รายละเอียดเพิ่มเติม</h3>
+
+            {/* Problem Type */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">ประเภทปัญหา</label>
+              <select
+                value={editDetailFields.problemType}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, problemType: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                <option value="ACCIDENT">อุบัติเหตุ</option>
+                <option value="BREAKDOWN">รถเสีย/ขัดข้อง</option>
+                <option value="WEAR">สึกหรอ</option>
+              </select>
+            </div>
+
+            {/* Fault Party */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">ฝ่ายผิด</label>
+              <select
+                value={editDetailFields.faultParty}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, faultParty: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                <option value="">-- ยังไม่ระบุ --</option>
+                <option value="DRIVER">คนขับ</option>
+                <option value="COUNTERPART">คู่กรณี</option>
+                <option value="OTHER">อื่นๆ</option>
+                <option value="MANUFACTURER">ผู้ผลิต</option>
+              </select>
+            </div>
+
+            {/* Car Case */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">กรณีรถ</label>
+              <select
+                value={editDetailFields.carCase}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, carCase: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                <option value="">-- ยังไม่ระบุ --</option>
+                <option value="DAMAGE_LIGHT">เคสซ่อมเบา</option>
+                <option value="DAMAGE_HEAVY">เคสซ่อมหนัก</option>
+                <option value="DAMAGE_TOTAL">ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม</option>
+              </select>
+            </div>
+
+            {/* Insurance */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">ประกันภัย</label>
+              <select
+                value={editDetailFields.insurance}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, insurance: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+              >
+                <option value="">-- ยังไม่ระบุ --</option>
+                <option value="ICARE_INSURANCE">ไอแคร์ประกันภัย</option>
+                <option value="NO_INSURANCE">ไม่มีประกัน</option>
+              </select>
+            </div>
+
+            {/* Claim Number */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">เลขที่ใบเคลม</label>
+              <input
+                type="text"
+                value={editDetailFields.claimNumber}
+                onChange={(e) => setEditDetailFields(prev => ({ ...prev, claimNumber: e.target.value }))}
+                placeholder="ระบุเลขที่ใบเคลม (ถ้ามี)..."
+                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition"
+              />
+            </div>
+          </div>
+
+          {/* Attachments Card */}
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-2">🖼️ รูปภาพแนบ</h3>
+
+            {/* Existing Attachments */}
+            {editDetailTicket.attachments && editDetailTicket.attachments.length > 0 && (
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-2">รูปภาพเดิม ({editDetailTicket.attachments.length} รูป - แตะเพื่อเลือกลบ)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {editDetailTicket.attachments.map((att) => {
+                    const isQueuedForDelete = editDetailDeletedPhotoIds.includes(att.FileAttachmentID)
+                    return (
+                      <div 
+                        key={att.FileAttachmentID} 
+                        onClick={() => {
+                          if (isQueuedForDelete) {
+                            setEditDetailDeletedPhotoIds(prev => prev.filter(id => id !== att.FileAttachmentID))
+                          } else {
+                            setEditDetailDeletedPhotoIds(prev => [...prev, att.FileAttachmentID])
+                          }
+                        }}
+                        className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm cursor-pointer hover:border-indigo-300 transition"
+                      >
+                        <img
+                          src={att.FilePath}
+                          alt={att.FileName}
+                          className={`w-full h-full object-cover transition duration-150 ${isQueuedForDelete ? 'filter grayscale blur-[1px]' : ''}`}
+                        />
+                        {isQueuedForDelete ? (
+                          <div className="absolute inset-0 bg-rose-600/75 flex flex-col items-center justify-center text-white text-[10px] font-bold gap-1 transition">
+                            <span className="text-sm">🗑️</span>
+                            <span>เตรียมลบ</span>
+                          </div>
+                        ) : (
+                          <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
+                            ✕
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Upload New Photos */}
+            <div className="border-t border-slate-100 pt-3">
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">📷 แนบรูปภาพเพิ่มเติม</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setEditDetailAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                  }
+                }}
+                className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+              />
+              {editDetailAttachments.length > 0 && (
+                <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
+                  <span>📸 เลือกรูปภาพเพิ่มเติม {editDetailAttachments.length} รูป:</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {editDetailAttachments.map((f, i) => (
+                      <ImagePreview
+                        key={i}
+                        file={f}
+                        onRemove={() => {
+                          setEditDetailAttachments(prev => prev.filter((_, idx) => idx !== i))
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              type="button"
+              onClick={handleSaveDetailEdit}
+              disabled={savingDetailEdit}
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white font-bold py-4 px-6 rounded-2xl shadow-md transition duration-150 active:scale-[0.98] flex items-center justify-center"
+            >
+              {savingDetailEdit ? '⏳ กำลังบันทึก...' : '💾 บันทึกการแก้ไข'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditDetailTicket(null)}
+              className="w-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold py-3 rounded-2xl text-xs transition active:scale-95"
+            >
+              ยกเลิก
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )
   }
 
   // ─── RENDER SUB-PAGE VIEW FOR EDITING ───────────────────────────────────
@@ -1408,6 +1813,13 @@ export default function QuickReportPage() {
                               className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold px-3 py-1 rounded-xl text-[10px] flex items-center gap-1 transition active:scale-95"
                             >
                               <span>📝 อัปเดต</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStartDetailEdit(ticket)}
+                              className="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-bold px-3 py-1 rounded-xl text-[10px] flex items-center gap-1 transition active:scale-95"
+                            >
+                              <span>✏️ แก้ไข</span>
                             </button>
                           </div>
                         </div>

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds } = await req.json()
+    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber } = await req.json()
 
     if (!maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
@@ -51,7 +51,15 @@ export async function POST(req: NextRequest) {
       serviceLocationName: serviceLocationCode !== undefined ? (serviceLocationName || serviceLocationCode || 'นอกสถานที่ / ไม่ระบุ') : null,
       followUpDetail: (followUpDetail && followUpDetail.trim()) ? followUpDetail.trim() : null,
       updateUserId: dbUserId,
-      deletedAttachmentIds: (deletedAttachmentIds && Array.isArray(deletedAttachmentIds) && deletedAttachmentIds.length > 0) ? deletedAttachmentIds : null
+      deletedAttachmentIds: (deletedAttachmentIds && Array.isArray(deletedAttachmentIds) && deletedAttachmentIds.length > 0) ? deletedAttachmentIds : null,
+      driverName: driverName || null,
+      incidentDate: incidentDate || null,
+      issueTitle: issueTitle || null,
+      problemTypeCode: problemTypeCode || null,
+      faultPartyCode: faultPartyCode || null,
+      carCaseCode: carCaseCode || null,
+      insuranceCode: insuranceCode || null,
+      claimNumber: claimNumber || null,
     }
 
     await pool.request()

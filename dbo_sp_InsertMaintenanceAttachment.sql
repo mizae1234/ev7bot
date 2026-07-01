@@ -319,7 +319,15 @@ BEGIN
             @ServiceLocationName NVARCHAR(255),
             @FollowUpDetail NVARCHAR(MAX),
             @UpdateUserID INT,
-            @DeletedAttachmentIdsJson NVARCHAR(MAX);
+            @DeletedAttachmentIdsJson NVARCHAR(MAX),
+            @DriverName NVARCHAR(255),
+            @IssueTitle NVARCHAR(MAX),
+            @IncidentDate DATETIME,
+            @ProblemTypeCode NVARCHAR(50),
+            @FaultPartyCode NVARCHAR(50),
+            @CarCaseCode NVARCHAR(50),
+            @InsuranceCode NVARCHAR(50),
+            @ClaimNumber NVARCHAR(100);
 
     -- Parse JSON values
     SELECT
@@ -331,7 +339,15 @@ BEGIN
         @ServiceLocationName = JSON_VALUE(@UpdateJson, '$.serviceLocationName'),
         @FollowUpDetail = JSON_VALUE(@UpdateJson, '$.followUpDetail'),
         @UpdateUserID = JSON_VALUE(@UpdateJson, '$.updateUserId'),
-        @DeletedAttachmentIdsJson = JSON_QUERY(@UpdateJson, '$.deletedAttachmentIds');
+        @DeletedAttachmentIdsJson = JSON_QUERY(@UpdateJson, '$.deletedAttachmentIds'),
+        @DriverName = JSON_VALUE(@UpdateJson, '$.driverName'),
+        @IssueTitle = JSON_VALUE(@UpdateJson, '$.issueTitle'),
+        @IncidentDate = CASE WHEN JSON_VALUE(@UpdateJson, '$.incidentDate') IS NOT NULL THEN CAST(JSON_VALUE(@UpdateJson, '$.incidentDate') AS DATETIME) ELSE NULL END,
+        @ProblemTypeCode = JSON_VALUE(@UpdateJson, '$.problemTypeCode'),
+        @FaultPartyCode = JSON_VALUE(@UpdateJson, '$.faultPartyCode'),
+        @CarCaseCode = JSON_VALUE(@UpdateJson, '$.carCaseCode'),
+        @InsuranceCode = JSON_VALUE(@UpdateJson, '$.insuranceCode'),
+        @ClaimNumber = JSON_VALUE(@UpdateJson, '$.claimNumber');
 
     -- 1. Update EV_MaintenanceItem table
     UPDATE dbo.EV_MaintenanceItem
@@ -340,6 +356,14 @@ BEGIN
         MaintenanceStartDate = COALESCE(@MaintenanceStartDate, MaintenanceStartDate),
         MaintenanceFinishDate = COALESCE(@MaintenanceFinishDate, MaintenanceFinishDate),
         ServiceLocationCode = COALESCE(@ServiceLocationCode, ServiceLocationCode),
+        DriverName = COALESCE(@DriverName, DriverName),
+        IssueTitle = COALESCE(@IssueTitle, IssueTitle),
+        IncidentDate = COALESCE(@IncidentDate, IncidentDate),
+        ProblemTypeCode = COALESCE(@ProblemTypeCode, ProblemTypeCode),
+        FaultPartyCode = COALESCE(@FaultPartyCode, FaultPartyCode),
+        CarCaseCode = COALESCE(@CarCaseCode, CarCaseCode),
+        InsuranceCode = COALESCE(@InsuranceCode, InsuranceCode),
+        ClaimNumber = COALESCE(@ClaimNumber, ClaimNumber),
         UpdateDate = GETDATE(),
         UpdateUserID = @UpdateUserID
     WHERE MaintenanceItemID = @MaintenanceItemID AND IsActive = 1;
