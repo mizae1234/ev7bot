@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId } = await req.json()
+    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds } = await req.json()
 
     if (!maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const pool = await getMSSQLPool()
+    const pool = await getMSSQLWritePool()
     if (!pool) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
@@ -41,115 +41,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 1. Update CarStatusCode only (InventoryItem status sync deferred)
-    if (carStatusCode) {
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('statusCode', sql.NVarChar, carStatusCode)
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          -- Update Maintenance Ticket Status
-          UPDATE dbo.EV_MaintenanceItem
-          SET CarStatusCode = @statusCode,
-              UpdateDate = GETDATE(),
-              UpdateUserID = @userId
-          WHERE MaintenanceItemID = @maintId AND IsActive = 1;
-        `)
+    // Execute Stored Procedure sp_UpdateMaintenanceItemJson
+    const updateObj = {
+      maintenanceId,
+      carStatusCode: carStatusCode || null,
+      startDate: startDate || null,
+      finishDate: finishDate || null,
+      serviceLocationCode: serviceLocationCode !== undefined ? serviceLocationCode : null,
+      serviceLocationName: serviceLocationCode !== undefined ? (serviceLocationName || serviceLocationCode || 'นอกสถานที่ / ไม่ระบุ') : null,
+      followUpDetail: (followUpDetail && followUpDetail.trim()) ? followUpDetail.trim() : null,
+      updateUserId: dbUserId,
+      deletedAttachmentIds: (deletedAttachmentIds && Array.isArray(deletedAttachmentIds) && deletedAttachmentIds.length > 0) ? deletedAttachmentIds : null
     }
 
-    // 1.2 Update Start Date if provided
-    if (startDate) {
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('startDate', sql.DateTime, new Date(startDate))
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          UPDATE dbo.EV_MaintenanceItem
-          SET MaintenanceStartDate = @startDate,
-              UpdateDate = GETDATE(),
-              UpdateUserID = @userId
-          WHERE MaintenanceItemID = @maintId AND IsActive = 1;
-        `)
-    }
-
-    // 1.3 Update Finish Date if provided
-    if (finishDate) {
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('finishDate', sql.DateTime, new Date(finishDate))
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          UPDATE dbo.EV_MaintenanceItem
-          SET MaintenanceFinishDate = @finishDate,
-              UpdateDate = GETDATE(),
-              UpdateUserID = @userId
-          WHERE MaintenanceItemID = @maintId AND IsActive = 1;
-        `)
-    }
-
-    // 1.5 Update Service Location if provided
-    if (serviceLocationCode !== undefined) {
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('locCode', sql.NVarChar, serviceLocationCode)
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          UPDATE dbo.EV_MaintenanceItem
-          SET ServiceLocationCode = @locCode,
-              UpdateDate = GETDATE(),
-              UpdateUserID = @userId
-          WHERE MaintenanceItemID = @maintId AND IsActive = 1;
-        `)
-
-      // Auto-insert a follow-up log for the location update
-      const locText = serviceLocationName || serviceLocationCode || 'นอกสถานที่ / ไม่ระบุ'
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('detail', sql.NVarChar, `📍 อัปเดตสถานที่ซ่อมบำรุงเป็น: ${locText}`)
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          INSERT INTO dbo.EV_MaintenanceFollowUp (
-            MaintenanceItemID,
-            FollowUpDate,
-            FollowUpDetail,
-            IsActive,
-            CreateDate,
-            CreateUserID
-          ) VALUES (
-            @maintId,
-            CAST(GETDATE() AS DATE),
-            @detail,
-            1,
-            GETDATE(),
-            @userId
-          )
-        `)
-    }
-
-    // 2. Insert follow-up progress log
-    if (followUpDetail && followUpDetail.trim()) {
-      await pool.request()
-        .input('maintId', sql.Int, maintenanceId)
-        .input('detail', sql.NVarChar, followUpDetail.trim())
-        .input('userId', sql.Int, dbUserId)
-        .query(`
-          INSERT INTO dbo.EV_MaintenanceFollowUp (
-            MaintenanceItemID,
-            FollowUpDate,
-            FollowUpDetail,
-            IsActive,
-            CreateDate,
-            CreateUserID
-          ) VALUES (
-            @maintId,
-            CAST(GETDATE() AS DATE),
-            @detail,
-            1,
-            GETDATE(),
-            @userId
-          )
-        `)
-    }
+    await pool.request()
+      .input('UpdateJson', sql.NVarChar, JSON.stringify(updateObj))
+      .execute('dbo.sp_UpdateMaintenanceItemJson')
 
     return NextResponse.json({
       success: true,

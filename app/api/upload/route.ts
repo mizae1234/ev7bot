@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 
 const s3Client = new S3Client({
-  endpoint: 'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com',
-  region: 'sgp1',
+  endpoint: env.SPACES_ENDPOINT,
+  region: env.SPACES_REGION,
   credentials: {
-    accessKeyId: 'DO801YHZN782PLZKVJRG',
-    secretAccessKey: 'j2ITQO86C7nwWUAAh7EBKNzmEXQSZdug5+yMX7qAkX0'
+    accessKeyId: env.SPACES_KEY,
+    secretAccessKey: env.SPACES_SECRET
   }
 })
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const pool = await getMSSQLPool()
+    const pool = await getMSSQLWritePool()
     if (!pool) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูล SQL Server ได้' }, { status: 500 })
     }
@@ -76,32 +76,30 @@ export async function POST(req: NextRequest) {
 
       // Upload to DigitalOcean Spaces
       await s3Client.send(new PutObjectCommand({
-        Bucket: 'space-ev7tracking-prod',
+        Bucket: env.SPACES_BUCKET,
         Key: key,
         Body: buffer,
         ContentType: file.type,
         ACL: 'public-read'
       }))
 
-      const fileUrl = `https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com/${key}`
-      
-      // Execute the Stored Procedure to insert details into FileAttachment & EV_FileAttachmentMaintenanceItem
-      await pool.request()
-        .input('MaintenanceItemID', sql.Int, parseInt(maintenanceId, 10))
-        .input('FileName', sql.NVarChar, file.name)
-        .input('FilePath', sql.NVarChar, fileUrl)
-        .input('FileType', sql.NVarChar, file.type)
-        .input('FileSize', sql.Int, file.size)
-        .input('CreateUserID', sql.Int, dbUserId)
-        .execute('dbo.sp_InsertMaintenanceAttachment')
+      const fileUrl = `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${key}`
 
       uploadedUrls.push({
-        fileName: file.name,
-        filePath: fileUrl,
+        fileName: `${Date.now()}_${cleanFileName}`,
+        originalFileName: file.name,
+        s3Key: key,
         fileType: file.type,
         fileSize: file.size
       })
     }
+
+    // Execute Stored Procedure passing attachments as a JSON array
+    await pool.request()
+      .input('MaintenanceItemID', sql.Int, parseInt(maintenanceId, 10))
+      .input('AttachmentsJson', sql.NVarChar(sql.MAX), JSON.stringify(uploadedUrls))
+      .input('CreateUserID', sql.Int, dbUserId)
+      .execute('dbo.sp_InsertMaintenanceAttachmentsJson')
 
     return NextResponse.json({
       success: true,

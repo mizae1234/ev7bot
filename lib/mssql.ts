@@ -1,7 +1,7 @@
 import sql from 'mssql'
 import { env } from './env'
 
-const config: sql.config = {
+const readConfig: sql.config = {
   server: env.MSSQL_HOST,
   port: env.MSSQL_PORT,
   database: env.MSSQL_DATABASE,
@@ -9,8 +9,8 @@ const config: sql.config = {
   password: env.MSSQL_PASSWORD,
   options: {
     encrypt: true,
-    trustServerCertificate: true,   // set false for production with proper cert
-    readOnlyIntent: true,            // enforce read-only
+    trustServerCertificate: true,
+    readOnlyIntent: true, // enforce read-only for read pool
   },
   pool: {
     max: 10,
@@ -20,6 +20,7 @@ const config: sql.config = {
 }
 
 let pool: sql.ConnectionPool | null = null
+let writePool: sql.ConnectionPool | null = null
 
 export async function getMSSQLPool(): Promise<sql.ConnectionPool | null> {
   if (env.MOCK_MODE) {
@@ -27,8 +28,30 @@ export async function getMSSQLPool(): Promise<sql.ConnectionPool | null> {
     return null
   }
   if (pool && pool.connected) return pool
-  pool = await sql.connect(config)
+  pool = await sql.connect(readConfig)
   return pool
+}
+
+export async function getMSSQLWritePool(): Promise<sql.ConnectionPool | null> {
+  if (env.MOCK_MODE) {
+    console.log('[MSSQL] Running in Mock Mode - write connection pool skipped.')
+    return null
+  }
+  if (writePool && writePool.connected) return writePool
+
+  const writeConfig: sql.config = {
+    ...readConfig,
+    user: env.MSSQL_WRITE_USER || env.MSSQL_USER,
+    password: env.MSSQL_WRITE_PASSWORD || env.MSSQL_PASSWORD,
+    options: {
+      encrypt: true,
+      trustServerCertificate: true,
+      readOnlyIntent: false, // allow writes for write pool
+    }
+  }
+
+  writePool = await sql.connect(writeConfig)
+  return writePool
 }
 
 export { sql }

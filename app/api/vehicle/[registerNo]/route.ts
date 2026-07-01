@@ -119,8 +119,10 @@ export async function GET(
     const returnReq = pool.request()
     returnReq.input('vinNo', sql.NVarChar, car.VinNo)
 
-    // Execute rent history, maintenance records, and return history concurrently
-    const [rentResult, maintResult, returnResult] = await Promise.all([
+    const carStatusesReq = pool.request()
+
+    // Execute rent history, maintenance records, return history, and car sub-statuses concurrently
+    const [rentResult, maintResult, returnResult, carStatusesResult] = await Promise.all([
       rentReq.query(`
         SELECT
           RentItemID, ContractNo, ContractType,
@@ -154,23 +156,31 @@ export async function GET(
         LEFT JOIN dbo.EV_RentItem rent ON r.RentItemID = rent.RentItemID
         WHERE r.VinNo = @vinNo
         ORDER BY r.ReturnDate DESC
+      `),
+      carStatusesReq.query(`
+        SELECT StatusCode, StatusName 
+        FROM dbo.EV_MsSubStatus
+        WHERE Type = 'MAINTENANCE_CAR_STATUS' AND StatusCode != 'COMPLETE' AND IsActive = 1
       `)
     ])
 
-    // 4. ดึงรถทดแทน (ถ้ามี) และการติดตามงานซ่อมสำหรับแต่ละงานซ่อม
+    // 4. ดึงรถทดแทน (ถ้ามี), การติดตามงานซ่อม, และไฟล์แนบ สำหรับแต่ละงานซ่อม
     const maintIds = maintResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)
     let replacements: Record<number, unknown[]> = {}
     let followUps: Record<number, unknown[]> = {}
+    let attachments: Record<number, unknown[]> = {}
 
     if (maintIds.length > 0) {
       const replReq = pool.request()
       const followUpReq = pool.request()
+      const attachmentReq = pool.request()
       const idList = maintIds.map((_: number, i: number) => `@mid${i}`).join(',')
       maintIds.forEach((id: number, i: number) => {
         replReq.input(`mid${i}`, sql.Int, id)
         followUpReq.input(`mid${i}`, sql.Int, id)
+        attachmentReq.input(`mid${i}`, sql.Int, id)
       })
-      const [replResult, followUpResult] = await Promise.all([
+      const [replResult, followUpResult, attachmentResult] = await Promise.all([
         replReq.query(`
           SELECT
             ReplacementItemID, MaintenanceItemID, VinNo,
@@ -190,6 +200,18 @@ export async function GET(
           LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
           WHERE f.MaintenanceItemID IN (${idList}) AND f.IsActive = 1
           ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
+        `),
+        attachmentReq.query(`
+          SELECT
+            fa.FileAttachmentID,
+            link.MaintenanceItemID,
+            fa.FileName,
+            'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com/' + fa.S3Key AS FilePath,
+            fa.ContentType AS FileType,
+            fa.FileSize
+          FROM dbo.EV_FileAttachmentMaintenanceItem link
+          JOIN dbo.FileAttachment fa ON link.FileAttachmentID = fa.FileAttachmentID
+          WHERE link.MaintenanceItemID IN (${idList}) AND link.IsActive = 1
         `)
       ])
 
@@ -205,6 +227,13 @@ export async function GET(
           followUps[f.MaintenanceItemID] = []
         }
         followUps[f.MaintenanceItemID].push(f)
+      }
+
+      for (const a of attachmentResult.recordset) {
+        if (!attachments[a.MaintenanceItemID]) {
+          attachments[a.MaintenanceItemID] = []
+        }
+        attachments[a.MaintenanceItemID].push(a)
       }
     }
 
@@ -249,6 +278,7 @@ export async function GET(
     const carCaseMap: Record<string, string> = {
       'DAMAGE_LIGHT': 'เคสซ่อมเบา',
       'DAMAGE_HEAVY': 'เคสซ่อมหนัก',
+      'DAMAGE_TOTAL': 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม',
     }
     const insuranceMap: Record<string, string> = {
       'ICARE_INSURANCE': 'ไอแคร์ประกันภัย',
@@ -271,6 +301,7 @@ export async function GET(
       CarStatusDescription: carStatusMap[m.CarStatusCode as string] || (m.CarStatusCode as string) || '-',
       replacements: replacements[m.MaintenanceItemID as number] || [],
       followUps: followUps[m.MaintenanceItemID as number] || [],
+      attachments: attachments[m.MaintenanceItemID as number] || [],
     }))
 
     const maskedReturns = returnResult.recordset.map((r: Record<string, unknown>) => ({
@@ -284,6 +315,7 @@ export async function GET(
       rentHistory,
       maintenance,
       returns: maskedReturns,
+      carStatuses: carStatusesResult.recordset
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)

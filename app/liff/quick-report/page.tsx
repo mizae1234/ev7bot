@@ -16,6 +16,7 @@ interface AttachedFile {
   url: string
   type: 'image' | 'document'
   fileSize?: string
+  file?: File
 }
 
 interface FollowUpLog {
@@ -35,6 +36,7 @@ interface MaintenanceTicket {
   ServiceLocation: string
   ServiceLocationCode?: string
   followUps: FollowUpLog[]
+  attachments?: any[]
 }
 
 const locationOptions = [
@@ -60,6 +62,37 @@ const locationOptions = [
   { code: 'BB_CARPAINT', name: 'อู่ บีบี คาร์เพ้นท์' },
   { code: 'AUTOHAUS', name: 'อู่ Autohaus' }
 ]
+
+const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) => {
+  const [previewUrl, setPreviewUrl] = useState<string>('')
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [file])
+
+  if (!previewUrl) return null
+
+  return (
+    <div className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm">
+      <img
+        src={previewUrl}
+        alt={file.name}
+        className="w-full h-full object-cover"
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute top-1 right-1 bg-rose-500 hover:bg-rose-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm transition active:scale-90"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
 
 export default function QuickReportPage() {
   const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard'>('report')
@@ -88,6 +121,8 @@ export default function QuickReportPage() {
   const [problemType, setProblemType] = useState('ACCIDENT')
   const [insurance, setInsurance] = useState('')
   const [claimNo, setClaimNo] = useState('')
+  const [faultParty, setFaultParty] = useState('')
+  const [carCase, setCarCase] = useState('')
 
   // Statuses
   const [submitting, setSubmitting] = useState(false)
@@ -106,6 +141,8 @@ export default function QuickReportPage() {
   const [editFollowUp, setEditFollowUp] = useState('')
   const [updatingTicket, setUpdatingTicket] = useState(false)
   const [editAttachments, setEditAttachments] = useState<File[]>([])
+  const [deletedPhotoIds, setDeletedPhotoIds] = useState<number[]>([])
+  const [dbCarStatuses, setDbCarStatuses] = useState<{ StatusCode: string, StatusName: string }[]>([])
 
   // Tab 2 Quick Follow-up States
   const [quickLogs, setQuickLogs] = useState<Record<number, string>>({})
@@ -187,6 +224,7 @@ export default function QuickReportPage() {
       const res = await fetch(`/api/vehicle/${encodeURIComponent(car.RegisterNo)}`)
       if (res.ok) {
         const data = await res.json()
+        setDbCarStatuses(data.carStatuses || [])
         
         // 1. Set driver name if there is an active rental contract
         if (data.currentRent) {
@@ -431,7 +469,8 @@ export default function QuickReportPage() {
           name: file.name,
           url,
           type: fileType,
-          fileSize: `${sizeMb} MB`
+          fileSize: `${sizeMb} MB`,
+          file: file
         })
       }
       setAttachments(prev => [...prev, ...newAttachments])
@@ -478,6 +517,8 @@ export default function QuickReportPage() {
         problemType,
         insurance,
         claimNo,
+        faultPartyCode: faultParty,
+        carCaseCode: carCase,
         serviceLocationCode: serviceLocation,
         serviceLocationName: locationOptions.find(o => o.code === serviceLocation)?.name || '',
         location: location ? `${location.lat}, ${location.lng}` : null,
@@ -499,6 +540,28 @@ export default function QuickReportPage() {
       }
 
       const result = await res.json()
+
+      // If there are files, upload them now
+      const filesToUpload = attachments.map(a => a.file).filter((f): f is File => !!f)
+      if (filesToUpload.length > 0 && result.data?.maintenanceId) {
+        const formData = new FormData()
+        filesToUpload.forEach((file) => {
+          formData.append('files', file)
+        })
+        formData.append('maintenanceId', String(result.data.maintenanceId))
+        formData.append('lineUserId', getLineUserId() || '')
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json()
+          throw new Error(uploadErr.error || 'ไม่สามารถอัปโหลดรูปภาพแนบได้')
+        }
+      }
+
       setSubmittedData({ ...payload, response: result })
       setSubmitSuccess(true)
       
@@ -525,6 +588,8 @@ export default function QuickReportPage() {
     setProblemType('ACCIDENT')
     setInsurance('')
     setClaimNo('')
+    setFaultParty('')
+    setCarCase('')
     setInitialCarStatus('')
     setShowAddIncidentForm(false)
     setLocSearchTerm('')
@@ -562,7 +627,8 @@ export default function QuickReportPage() {
           maintenanceId: editingTicket.MaintenanceItemID,
           carStatusCode: editStatus,
           followUpDetail: editFollowUp,
-          lineUserId: getLineUserId()
+          lineUserId: getLineUserId(),
+          deletedAttachmentIds: deletedPhotoIds
         })
       })
 
@@ -595,6 +661,7 @@ export default function QuickReportPage() {
       setEditingTicket(null)
       setEditFollowUp('')
       setEditAttachments([])
+      setDeletedPhotoIds([])
 
       // Refresh list immediately
       if (selectedCar) {
@@ -697,6 +764,7 @@ export default function QuickReportPage() {
       const res = await fetch(`/api/vehicle/${encodeURIComponent(registerNo)}`)
       if (res.ok) {
         const data = await res.json()
+        setDbCarStatuses(data.carStatuses || [])
         if (data.maintenance) {
           const ticket = data.maintenance.find((t: any) => t.MaintenanceItemID === maintenanceId)
           if (ticket) {
@@ -824,10 +892,23 @@ export default function QuickReportPage() {
                  onChange={(e) => setEditStatus(e.target.value)}
                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
                >
-                 <option value="WAITING_FOR_MAINTENANCE">🟡 รถจอดรอซ่อม</option>
-                 <option value="STILL_WORK">🔵 รถยังขับใช้งานได้อยู่</option>
-                 <option value="IN_MAINTENANCE">🔴 รถอยู่ระหว่างซ่อม</option>
-                 <option value="COMPLETE">🟢 ซ่อมเสร็จสิ้น (ปิดเคส)</option>
+                 {(dbCarStatuses.length > 0 ? dbCarStatuses : [
+                   { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
+                   { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
+                   { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' }
+                 ]).map((st) => {
+                   let emoji = '⚙️'
+                   if (st.StatusCode === 'WAITING_FOR_MAINTENANCE') emoji = '🟡'
+                   else if (st.StatusCode === 'STILL_WORK') emoji = '🔵'
+                   else if (st.StatusCode === 'IN_MAINTENANCE') emoji = '🔴'
+                   else if (st.StatusCode === 'GARAGE_COMPLETE') emoji = '🟢'
+
+                   return (
+                     <option key={st.StatusCode} value={st.StatusCode}>
+                       {emoji} {st.StatusName}
+                     </option>
+                   )
+                 })}
                </select>
              </div>
 
@@ -842,6 +923,47 @@ export default function QuickReportPage() {
                 className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition resize-none"
               />
             </div>
+
+            {/* Existing Attachments / Photos */}
+            {editingTicket.attachments && editingTicket.attachments.length > 0 && (
+              <div className="border-t border-slate-100 pt-3">
+                <label className="text-xs font-bold text-slate-600 block mb-2">🖼️ รูปภาพแนบเดิมในระบบ ({editingTicket.attachments.length} รูป - แตะเพื่อเลือกเตรียมลบ)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {editingTicket.attachments.map((att) => {
+                    const isQueuedForDelete = deletedPhotoIds.includes(att.FileAttachmentID)
+                    return (
+                      <div 
+                        key={att.FileAttachmentID} 
+                        onClick={() => {
+                          if (isQueuedForDelete) {
+                            setDeletedPhotoIds(prev => prev.filter(id => id !== att.FileAttachmentID))
+                          } else {
+                            setDeletedPhotoIds(prev => [...prev, att.FileAttachmentID])
+                          }
+                        }}
+                        className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm cursor-pointer hover:border-indigo-300 transition"
+                      >
+                        <img
+                          src={att.FilePath}
+                          alt={att.FileName}
+                          className={`w-full h-full object-cover transition duration-150 ${isQueuedForDelete ? 'filter grayscale blur-[1px]' : ''}`}
+                        />
+                        {isQueuedForDelete ? (
+                          <div className="absolute inset-0 bg-rose-600/75 flex flex-col items-center justify-center text-white text-[10px] font-bold gap-1 transition">
+                            <span className="text-sm">🗑️</span>
+                            <span>เตรียมลบ</span>
+                          </div>
+                        ) : (
+                          <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
+                            ✕
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Photo upload component in edit sub-page */}
             <div className="border-t border-slate-100 pt-3">
@@ -859,13 +981,17 @@ export default function QuickReportPage() {
               />
               
               {editAttachments.length > 0 && (
-                <div className="mt-2 text-xxs text-slate-500 font-semibold flex flex-col gap-1">
-                  <span>📸 เลือกแล้ว {editAttachments.length} รูปภาพ:</span>
-                  <div className="flex flex-wrap gap-1.5 mt-0.5">
+                <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
+                  <span>📸 เลือกรูปภาพเพิ่มเติมแล้ว {editAttachments.length} รูป:</span>
+                  <div className="grid grid-cols-3 gap-2">
                     {editAttachments.map((f, i) => (
-                      <span key={i} className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10px] text-slate-600 max-w-[120px] truncate">
-                        {f.name}
-                      </span>
+                      <ImagePreview
+                        key={i}
+                        file={f}
+                        onRemove={() => {
+                          setEditAttachments(prev => prev.filter((_, idx) => idx !== i))
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1424,6 +1550,34 @@ export default function QuickReportPage() {
                       <option value="PRODUCT">ผลิตภัณฑ์</option>
                       <option value="SUPPLIER_REPAIR">งานซ่อมจาก Supplier</option>
                       <option value="OTHER_2">อื่นๆ</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold block mb-1 text-slate-705">ฝ่ายผิด</label>
+                    <select
+                      value={faultParty}
+                      onChange={(e) => setFaultParty(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="">เลือกฝ่ายผิด</option>
+                      <option value="DRIVER">คนขับ</option>
+                      <option value="COUNTERPART">คู่กรณี</option>
+                      <option value="OTHER">อื่นๆ</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold block mb-1 text-slate-705">กรณีรถ</label>
+                    <select
+                      value={carCase}
+                      onChange={(e) => setCarCase(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
+                    >
+                      <option value="">เลือกกรณีรถ</option>
+                      <option value="DAMAGE_LIGHT">เคสซ่อมเบา</option>
+                      <option value="DAMAGE_HEAVY">เคสซ่อมหนัก</option>
+                      <option value="DAMAGE_TOTAL">ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม</option>
                     </select>
                   </div>
 
