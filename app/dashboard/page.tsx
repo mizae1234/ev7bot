@@ -614,7 +614,13 @@ function DashboardContent() {
                   {activeTab === 'deliveries' && <DeliveryTable records={filteredDeliveries} periodLabel={periodLabel} />}
                   {activeTab === 'repairs' && (
                     <>
-                      <div className="flex justify-end mb-3">
+                      <div className="flex justify-end gap-2 mb-3">
+                        <a
+                          href="/maintenance/dashboard"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 bg-indigo-500/5 hover:bg-indigo-500/10 px-3 py-1.5 rounded-xl transition-all border border-indigo-500/10"
+                        >
+                          📊 แดชบอร์ดวิเคราะห์งานซ่อม →
+                        </a>
                         <a
                           href="/maintenance"
                           className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 bg-emerald-500/5 hover:bg-emerald-500/10 px-3 py-1.5 rounded-xl transition-all border border-emerald-500/10"

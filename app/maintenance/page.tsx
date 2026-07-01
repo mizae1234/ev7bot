@@ -160,6 +160,9 @@ function MaintenanceContent() {
               <a href="/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850 text-zinc-500 dark:text-zinc-400 transition-all">
                 ← กลับ Dashboard
               </a>
+              <a href="/maintenance/dashboard" className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900 dark:hover:bg-indigo-900/30 dark:text-indigo-400 transition-all flex items-center gap-1.5">
+                📊 แดชบอร์ดวิเคราะห์งานซ่อม
+              </a>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               รายละเอียดงานซ่อมทั้งหมด สถานที่ซ่อม สถานะ และรถทดแทน

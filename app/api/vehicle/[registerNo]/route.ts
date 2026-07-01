@@ -215,7 +215,8 @@ export async function GET(
     const maskedRent = activeRentRow
       ? {
           ...stripSensitiveFields(activeRentRow),
-          ...maskName(activeRentRow.FirstName, activeRentRow.LastName),
+          FirstName: activeRentRow.FirstName || '-',
+          LastName: activeRentRow.LastName || '',
           PhoneNo: maskPhone(activeRentRow.PhoneNo),
         }
       : null
@@ -229,9 +230,9 @@ export async function GET(
     // ─── Code → Description mapping ─────────────────────────────
     const carStatusMap: Record<string, string> = {
       'COMPLETE': 'ซ่อมเสร็จ',
-      'IN_MAINTENANCE': 'อยู่ระหว่างการซ่อม',
-      'WAITING_FOR_MAINTENANCE': 'รอเข้าซ่อม',
-      'STILL_WORK': 'ยังวิ่งอยู่',
+      'IN_MAINTENANCE': 'รถอยู่ระหว่างซ่อม',
+      'WAITING_FOR_MAINTENANCE': 'รถจอดรอซ่อม',
+      'STILL_WORK': 'รถยังขับใช้งานได้อยู่',
     }
     const problemTypeMap: Record<string, string> = {
       'PRODUCT': 'ผลิตภัณฑ์',
