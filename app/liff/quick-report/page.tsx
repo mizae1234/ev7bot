@@ -1948,8 +1948,17 @@ export default function QuickReportPage() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
                   >
                     <option value="" disabled>เลือกสถานะใบแจ้งซ่อม</option>
-                    <option value="WAITING_FOR_MAINTENANCE">รถจอดรอซ่อม</option>
-                    <option value="STILL_WORK">รถยังขับใช้งานได้อยู่</option>
+                    {(dbCarStatuses.length > 0 ? dbCarStatuses : [
+                      { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
+                      { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
+                    ])
+                      .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
+                      .map((st) => (
+                        <option key={st.StatusCode} value={st.StatusCode}>
+                          {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
+                        </option>
+                      ))
+                    }
                   </select>
                 </div>
               </div>
