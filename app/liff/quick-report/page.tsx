@@ -204,6 +204,7 @@ export default function QuickReportPage() {
     return now.toISOString().slice(0, 16)
   })
   const [submittingBulk, setSubmittingBulk] = useState(false)
+  const [selectedBulkTicketIds, setSelectedBulkTicketIds] = useState<number[]>([])
 
   // Fetch cars on mount or when typing (Debounced)
   useEffect(() => {
@@ -331,8 +332,9 @@ export default function QuickReportPage() {
 
   // Bulk Action Save Handler
   const handleSaveBulkAction = async (type: 'park' | 'start' | 'complete') => {
-    if (pendingTickets.length === 0) {
-      alert('ไม่มีรายการใบงานซ่อมที่รอดำเนินการสำหรับรถคันนี้')
+    const selectedTickets = pendingTickets.filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID))
+    if (selectedTickets.length === 0) {
+      alert('กรุณาเลือกรายการใบงานที่ต้องการดำเนินการอย่างน้อย 1 รายการ')
       return
     }
 
@@ -340,7 +342,7 @@ export default function QuickReportPage() {
     try {
       const locName = locationOptions.find(o => o.code === bulkLocation)?.name || 'ไม่ระบุ / นอกสถานที่'
       
-      const promises = pendingTickets.map(ticket => {
+      const promises = selectedTickets.map(ticket => {
         const payload: any = {
           maintenanceId: ticket.MaintenanceItemID,
           lineUserId: getLineUserId()
@@ -380,6 +382,7 @@ export default function QuickReportPage() {
       alert('บันทึกอัปเดตข้อมูลเรียบร้อยแล้ว')
       setBulkActionType(null)
       setBulkLocation('')
+      setSelectedBulkTicketIds([])
       
       // Refresh current vehicle data
       if (selectedCar) {
@@ -1575,8 +1578,10 @@ export default function QuickReportPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setBulkActionType(bulkActionType === 'park' ? null : 'park')
+                          const nextType = bulkActionType === 'park' ? null : 'park'
+                          setBulkActionType(nextType)
                           setBulkLocation('')
+                          setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
                           bulkActionType === 'park'
@@ -1589,8 +1594,10 @@ export default function QuickReportPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setBulkActionType(bulkActionType === 'start' ? null : 'start')
+                          const nextType = bulkActionType === 'start' ? null : 'start'
+                          setBulkActionType(nextType)
                           setBulkLocation('')
+                          setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                           const now = new Date()
                           setBulkStartDate(now.toISOString().slice(0, 16))
                         }}
@@ -1605,8 +1612,10 @@ export default function QuickReportPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setBulkActionType(bulkActionType === 'complete' ? null : 'complete')
+                          const nextType = bulkActionType === 'complete' ? null : 'complete'
+                          setBulkActionType(nextType)
                           setBulkLocation('')
+                          setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                           const now = new Date()
                           setBulkFinishDate(now.toISOString().slice(0, 16))
                         }}
@@ -1777,12 +1786,66 @@ export default function QuickReportPage() {
                     </div>
                   )}
                   <div className="space-y-2">
-                    {pendingTickets.map((ticket) => (
+                    {/* Select All / Deselect All when bulk action is active */}
+                    {bulkActionType && pendingTickets.length > 1 && (
+                      <div className="flex items-center justify-between px-1 py-1">
+                        <span className="text-[10px] font-bold text-slate-500">
+                          เลือก {selectedBulkTicketIds.length}/{pendingTickets.length} รายการ
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedBulkTicketIds.length === pendingTickets.length) {
+                              setSelectedBulkTicketIds([])
+                            } else {
+                              setSelectedBulkTicketIds(pendingTickets.map(t => t.MaintenanceItemID))
+                            }
+                          }}
+                          className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition"
+                        >
+                          {selectedBulkTicketIds.length === pendingTickets.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                        </button>
+                      </div>
+                    )}
+                    {pendingTickets.map((ticket) => {
+                      const isSelected = selectedBulkTicketIds.includes(ticket.MaintenanceItemID)
+                      return (
                       <div
                         key={ticket.MaintenanceItemID}
-                        className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex flex-col gap-2.5 hover:border-slate-300 transition"
+                        className={`bg-slate-50 border rounded-2xl p-3.5 flex flex-col gap-2.5 transition ${
+                          bulkActionType
+                            ? isSelected
+                              ? 'border-indigo-400 bg-indigo-50/40 shadow-sm'
+                              : 'border-slate-200 opacity-60'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        onClick={() => {
+                          if (bulkActionType) {
+                            setSelectedBulkTicketIds(prev =>
+                              isSelected
+                                ? prev.filter(id => id !== ticket.MaintenanceItemID)
+                                : [...prev, ticket.MaintenanceItemID]
+                            )
+                          }
+                        }}
                       >
                         <div className="flex items-start gap-2.5">
+                          {/* Checkbox when bulk action is active */}
+                          {bulkActionType && (
+                            <div className="shrink-0 flex items-center justify-center pt-0.5">
+                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition ${
+                                isSelected
+                                  ? 'bg-indigo-600 border-indigo-600'
+                                  : 'bg-white border-slate-300'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                          )}
                           <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 shrink-0 flex items-center justify-center text-sm text-amber-600">
                             🔧
                           </div>
@@ -1824,7 +1887,8 @@ export default function QuickReportPage() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )
+                    })}
                   </div>
                 </div>
               )}
