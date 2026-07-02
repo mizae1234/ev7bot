@@ -108,6 +108,7 @@ export default function QuickReportPage() {
   // Search and selection
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCar, setSelectedCar] = useState<DbCar | null>(null)
+  const [selectedCarDetails, setSelectedCarDetails] = useState<any>(null)
   const [showCarDropdown, setShowCarDropdown] = useState(false)
   const [dbCars, setDbCars] = useState<DbCar[]>([])
   const [loadingCars, setLoadingCars] = useState(false)
@@ -252,6 +253,9 @@ export default function QuickReportPage() {
       if (res.ok) {
         const data = await res.json()
         setDbCarStatuses(data.carStatuses || [])
+        if (data.car) {
+          setSelectedCarDetails(data.car)
+        }
         
         // 1. Set driver name if there is an active rental contract
         if (data.currentRent) {
@@ -606,6 +610,7 @@ export default function QuickReportPage() {
   const handleReset = () => {
     setSearchTerm('')
     setSelectedCar(null)
+    setSelectedCarDetails(null)
     setDriverName('')
     setIssueDescription('')
     setAttachments([])
@@ -1505,12 +1510,24 @@ export default function QuickReportPage() {
                     <div>
                       <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
                       <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                      <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
+                        {selectedCarDetails?.StatusName && (
+                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${
+                            selectedCarDetails.StatusName.includes('ว่าง') || selectedCarDetails.StatusName.includes('พร้อม') 
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                              : 'bg-amber-50 border-amber-250 text-amber-700'
+                          }`}>
+                            {selectedCarDetails.StatusName}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedCar(null)
+                        setSelectedCarDetails(null)
                         setVehicleHistory([])
                       }}
                       className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
