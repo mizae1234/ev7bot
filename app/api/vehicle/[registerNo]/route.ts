@@ -125,9 +125,10 @@ export async function GET(
     returnReq.input('vinNo', sql.NVarChar, car.VinNo)
 
     const carStatusesReq = pool.request()
+    const insuranceReq = pool.request()
 
-    // Execute rent history, maintenance records, return history, and car sub-statuses concurrently
-    const [rentResult, maintResult, returnResult, carStatusesResult] = await Promise.all([
+    // Execute rent history, maintenance records, return history, car sub-statuses, and insurance options concurrently
+    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult] = await Promise.all([
       rentReq.query(`
         SELECT
           RentItemID, ContractNo, ContractType,
@@ -168,6 +169,12 @@ export async function GET(
         SELECT StatusCode, StatusName 
         FROM dbo.EV_MsSubStatus
         WHERE Type = 'MAINTENANCE_CAR_STATUS' AND StatusCode != 'COMPLETE' AND IsActive = 1
+      `),
+      insuranceReq.query(`
+        SELECT StatusCode, StatusName 
+        FROM dbo.EV_MsSubStatus
+        WHERE Type = 'INSURANCE' AND IsActive = 1
+        ORDER BY StatusCode
       `)
     ])
 
@@ -339,7 +346,8 @@ export async function GET(
       rentHistory,
       maintenance,
       returns: maskedReturns,
-      carStatuses: carStatusesResult.recordset
+      carStatuses: carStatusesResult.recordset,
+      insuranceOptions: insuranceResult.recordset
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)

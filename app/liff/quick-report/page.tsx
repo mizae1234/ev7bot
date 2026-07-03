@@ -201,6 +201,7 @@ export default function QuickReportPage() {
   const [editAttachments, setEditAttachments] = useState<File[]>([])
   const [deletedPhotoIds, setDeletedPhotoIds] = useState<number[]>([])
   const [dbCarStatuses, setDbCarStatuses] = useState<{ StatusCode: string, StatusName: string }[]>([])
+  const [dbInsuranceOptions, setDbInsuranceOptions] = useState<{ StatusCode: string, StatusName: string }[]>([])
 
   // Full Detail Edit SPA States
   const [editDetailTicket, setEditDetailTicket] = useState<MaintenanceTicket | null>(null)
@@ -302,6 +303,7 @@ export default function QuickReportPage() {
       if (res.ok) {
         const data = await res.json()
         setDbCarStatuses(data.carStatuses || [])
+        setDbInsuranceOptions(data.insuranceOptions || [])
         if (data.car) {
           setSelectedCarDetails(data.car)
         }
@@ -941,6 +943,7 @@ export default function QuickReportPage() {
       if (res.ok) {
         const data = await res.json()
         setDbCarStatuses(data.carStatuses || [])
+        setDbInsuranceOptions(data.insuranceOptions || [])
         if (data.maintenance) {
           const ticket = data.maintenance.find((t: any) => t.MaintenanceItemID === maintenanceId)
           if (ticket) {
@@ -1187,8 +1190,9 @@ export default function QuickReportPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
               >
                 <option value="">-- ยังไม่ระบุ --</option>
-                <option value="ICARE_INSURANCE">ไอแคร์ประกันภัย</option>
-                <option value="NO_INSURANCE">ไม่มีประกัน</option>
+                {dbInsuranceOptions.map(opt => (
+                  <option key={opt.StatusCode} value={opt.StatusCode}>{opt.StatusName}</option>
+                ))}
               </select>
             </div>
 
@@ -2179,9 +2183,9 @@ export default function QuickReportPage() {
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
                     >
                       <option value="">ไม่ระบุ / ไม่มีประกันภัย</option>
-                      <option value="ICARE_INSURANCE">ไอแคร์ ประกันภัย</option>
-                      <option value="MUANGTHAI_INSURANCE">เมืองไทย ประกันภัย</option>
-                      <option value="NO_INSURANCE">ไม่มีประกันภัย</option>
+                      {dbInsuranceOptions.map(opt => (
+                        <option key={opt.StatusCode} value={opt.StatusCode}>{opt.StatusName}</option>
+                      ))}
                     </select>
                   </div>
 
