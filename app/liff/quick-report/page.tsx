@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import GuideTab from './GuideTab'
 
 interface DbCar {
   InventoryItemID: number
@@ -105,7 +106,7 @@ const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) 
 
 export default function QuickReportPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard'>('report')
+  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard' | 'guide'>('report')
   const [authChecking, setAuthChecking] = useState(true)
 
   // Search and selection
@@ -1084,21 +1085,14 @@ export default function QuickReportPage() {
               >
                 {(dbCarStatuses.length > 0 ? dbCarStatuses : [
                   { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
-                  { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
-                  { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' },
-                  { StatusCode: 'GARAGE_COMPLETE', StatusName: 'ซ่อมเสร็จ' }
-                ]).map((st) => {
-                  let emoji = '⚙️'
-                  if (st.StatusCode === 'WAITING_FOR_MAINTENANCE') emoji = '🟡'
-                  else if (st.StatusCode === 'STILL_WORK') emoji = '🔵'
-                  else if (st.StatusCode === 'IN_MAINTENANCE') emoji = '🔴'
-                  else if (st.StatusCode === 'GARAGE_COMPLETE') emoji = '🟢'
-                  return (
+                  { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
+                ])
+                  .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
+                  .map((st) => (
                     <option key={st.StatusCode} value={st.StatusCode}>
-                      {emoji} {st.StatusName}
+                      {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
                     </option>
-                  )
-                })}
+                  ))}
               </select>
             </div>
 
@@ -1933,6 +1927,7 @@ export default function QuickReportPage() {
                             >
                               <span>📝 อัปเดต</span>
                             </button>
+                            {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && (
                             <button
                               type="button"
                               onClick={() => handleStartDetailEdit(ticket)}
@@ -1940,6 +1935,7 @@ export default function QuickReportPage() {
                             >
                               <span>✏️ แก้ไข</span>
                             </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2911,6 +2907,10 @@ export default function QuickReportPage() {
           </div>
         )}
 
+        {/* TAB 5: USER MANUAL (GUIDE) */}
+        {activeTab === 'guide' && <GuideTab />}
+
+
       </div>
 
       {/* BOTTOM TAB NAVIGATION BAR */}
@@ -2955,6 +2955,16 @@ export default function QuickReportPage() {
         >
           <span className="text-lg">📊</span>
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">ภาพรวม</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('guide')}
+          className={`flex flex-col items-center justify-center w-full h-full transition ${
+            activeTab === 'guide' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <span className="text-lg">📖</span>
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">คู่มือ</span>
         </button>
       </nav>
 
