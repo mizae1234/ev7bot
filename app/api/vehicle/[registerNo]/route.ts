@@ -237,14 +237,18 @@ export async function GET(
       }
 
       // Resolve names from lineRegistration in Postgres for any mock/custom UserIDs
-      const registrations = await prisma.lineRegistration.findMany({
-        select: { ev7UserId: true, displayName: true }
-      })
-      const regMap = new Map<number, string>()
-      for (const reg of registrations) {
-        if (reg.ev7UserId && reg.displayName) {
-          regMap.set(Number(reg.ev7UserId), reg.displayName)
+      let regMap = new Map<number, string>()
+      try {
+        const registrations = await prisma.lineRegistration.findMany({
+          select: { ev7UserId: true, displayName: true }
+        })
+        for (const reg of registrations) {
+          if (reg.ev7UserId && reg.displayName) {
+            regMap.set(Number(reg.ev7UserId), reg.displayName)
+          }
         }
+      } catch (pgErr) {
+        console.warn('[Vehicle API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
       }
 
       for (const f of followUpResult.recordset) {
