@@ -1558,13 +1558,30 @@ export default function QuickReportPage() {
                       <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                        {selectedCarDetails?.StatusName && (
-                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${
-                            selectedCarDetails.StatusName.includes('ว่าง') || selectedCarDetails.StatusName.includes('พร้อม') 
-                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                              : 'bg-amber-50 border-amber-250 text-amber-700'
-                          }`}>
-                            {selectedCarDetails.StatusName}
+                        {selectedCarDetails?.StatusName && (() => {
+                          const name = selectedCarDetails.StatusName
+                          const statusType = selectedCarDetails.StatusType || ''
+                          let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
+                          if (name.includes('ว่าง') || name.includes('พร้อม')) {
+                            badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          } else if (name.includes('ใช้งาน')) {
+                            badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
+                          } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
+                            badgeClass = 'bg-amber-50 border-amber-200 text-amber-700'
+                          } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
+                            badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
+                          } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
+                            badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          }
+                          return (
+                            <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
+                              {name}
+                            </span>
+                          )
+                        })()}
+                        {selectedCarDetails?.StatusType && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
+                            {selectedCarDetails.StatusType.replace(/_/g, ' ')}
                           </span>
                         )}
                       </div>
