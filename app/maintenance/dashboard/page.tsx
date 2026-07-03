@@ -44,6 +44,7 @@ interface FollowUpItem {
 interface LongestRepairItem {
   MaintenanceItemID: number
   RegisterNo: string
+  VinNo: string
   Model: string
   Project: string
   IssueTitle: string
@@ -113,6 +114,7 @@ function MaintenanceDashboardContent() {
 
   const [selectedLocationFilter, setSelectedLocationFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [stuckSearchQuery, setStuckSearchQuery] = useState('')
   const router = useRouter()
 
   const handleSearch = (e: React.FormEvent) => {
@@ -129,9 +131,18 @@ function MaintenanceDashboardContent() {
   const longestRepairs = data?.longestRepairs || []
 
   // Filter longest repairs if location card is clicked, otherwise show all
-  const filteredLongestRepairs = selectedLocationFilter
+  let filteredLongestRepairs = selectedLocationFilter
     ? longestRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
     : longestRepairs
+
+  if (stuckSearchQuery.trim()) {
+    const q = stuckSearchQuery.toLowerCase().replace(/[\s-]/g, '')
+    filteredLongestRepairs = filteredLongestRepairs.filter(r => {
+      const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
+      const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
+      return reg.includes(q) || vin.includes(q)
+    })
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 pb-16 font-sans">
@@ -344,21 +355,30 @@ function MaintenanceDashboardContent() {
 
               {/* Card: Stuck Repairs (ซ่อมนานที่สุด) */}
               <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
                   <div>
                     <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                       <span>⚠️</span> รถยนต์ที่อยู่ระหว่างซ่อมค้างนานที่สุด (Stuck Repairs)
                     </h2>
                     <p className="text-[10px] text-slate-500 mt-0.5">เรียงลำดับตามวันที่เริ่มเกิดเหตุ/วันที่แจ้งซ่อมคงค้าง</p>
                   </div>
-                  {selectedLocationFilter && (
-                    <button
-                      onClick={() => setSelectedLocationFilter(null)}
-                      className="text-xs font-bold text-indigo-650 hover:underline"
-                    >
-                      ล้างตัวกรองอู่ (แสดงทั้งหมด)
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={stuckSearchQuery}
+                      onChange={(e) => setStuckSearchQuery(e.target.value)}
+                      placeholder="ค้นหาทะเบียน / VIN ในตาราง..."
+                      className="text-xs py-1.5 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-transparent placeholder:text-slate-400"
+                    />
+                    {selectedLocationFilter && (
+                      <button
+                        onClick={() => setSelectedLocationFilter(null)}
+                        className="text-xs font-bold text-indigo-650 hover:underline shrink-0"
+                      >
+                        ล้างอู่
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">

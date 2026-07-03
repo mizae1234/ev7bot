@@ -256,6 +256,7 @@ export async function GET(req: NextRequest) {
       SELECT 
         t.MaintenanceItemID,
         COALESCE(i.RegisterNo, '') AS RegisterNo,
+        COALESCE(i.VinNo, '') AS VinNo,
         i.Model,
         i.ProjectType AS Project,
         t.IssueTitle,
