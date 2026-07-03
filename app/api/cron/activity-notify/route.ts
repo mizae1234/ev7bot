@@ -546,20 +546,22 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: `No maintenance record found for VIN/RegisterNo: ${testReadyPickupVin}` }, { status: 404 })
       }
       
-      if (item.UpdateUserID) {
-        const reg = await prisma.lineRegistration.findFirst({
-          where: { ev7UserId: Number(item.UpdateUserID) }
-        })
-        if (reg?.displayName) {
-          item.UpdaterName = reg.displayName
+      if (!item.UpdaterName || item.UpdaterName.trim() === '') {
+        if (item.UpdateUserID) {
+          const reg = await prisma.lineRegistration.findFirst({
+            where: { ev7UserId: Number(item.UpdateUserID) }
+          })
+          if (reg?.displayName) {
+            item.UpdaterName = reg.displayName
+          }
         }
-      }
-      if (!item.UpdaterName && item.CreateUserID) {
-        const reg = await prisma.lineRegistration.findFirst({
-          where: { ev7UserId: Number(item.CreateUserID) }
-        })
-        if (reg?.displayName) {
-          item.UpdaterName = reg.displayName
+        if (!item.UpdaterName && item.CreateUserID) {
+          const reg = await prisma.lineRegistration.findFirst({
+            where: { ev7UserId: Number(item.CreateUserID) }
+          })
+          if (reg?.displayName) {
+            item.UpdaterName = reg.displayName
+          }
         }
       }
       item.UpdaterName = item.UpdaterName || item.CreatorName || '-'
@@ -767,10 +769,12 @@ export async function GET(req: NextRequest) {
 
     // Map correct updater name for each ready pickup item
     for (const item of newReadyPickup) {
-      if (item.UpdateUserID && regMap.has(Number(item.UpdateUserID))) {
-        item.UpdaterName = regMap.get(Number(item.UpdateUserID))
-      } else if (item.CreateUserID && regMap.has(Number(item.CreateUserID))) {
-        item.UpdaterName = regMap.get(Number(item.CreateUserID))
+      if (!item.UpdaterName || item.UpdaterName.trim() === '') {
+        if (item.UpdateUserID && regMap.has(Number(item.UpdateUserID))) {
+          item.UpdaterName = regMap.get(Number(item.UpdateUserID))
+        } else if (item.CreateUserID && regMap.has(Number(item.CreateUserID))) {
+          item.UpdaterName = regMap.get(Number(item.CreateUserID))
+        }
       }
       item.UpdaterName = item.UpdaterName || item.CreatorName || '-'
     }
