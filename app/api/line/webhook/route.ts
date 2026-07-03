@@ -2622,7 +2622,9 @@ async function trySendVehicleFlexMessage(
 
       // Add appropriate color emoji based on CarStatusCode
       const emoji =
-        maint.CarStatusCode === 'STILL_WORK' || maint.CarStatusCode === 'COMPLETE'
+        maint.CarStatusCode === 'STILL_WORK' || 
+        maint.CarStatusCode === 'COMPLETE' || 
+        maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
           ? '🟢'
           : maint.CarStatusCode === 'IN_MAINTENANCE'
           ? '🔴'
