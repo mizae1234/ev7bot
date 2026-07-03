@@ -143,8 +143,10 @@ export async function GET(
           m.FollowUpDetail, m.IsActive,
           m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
-          m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID
+          m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID,
+          ISNULL(u.FirstName, '') AS CreateUserName
         FROM dbo.EV_MaintenanceItem m
+        LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
         WHERE m.InventoryItemID = @inventoryItemId
         ORDER BY m.ReportDate DESC
       `),

@@ -45,6 +45,8 @@ interface MaintenanceTicket {
   ClaimNumber?: string
   VinNo?: string
   RegisterNo?: string
+  CreateDate?: string
+  CreateUserName?: string
   followUps: FollowUpLog[]
   attachments?: any[]
 }
@@ -981,6 +983,19 @@ export default function QuickReportPage() {
     }
   }
 
+  const formatLiffDate = (isoString: string) => {
+    try {
+      return new Date(isoString).toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Bangkok'
+      })
+    } catch {
+      return isoString
+    }
+  }
+
   const pendingTickets = vehicleHistory.filter(
     ticket => ticket.CarStatusDescription !== 'ซ่อมเสร็จ'
   )
@@ -1904,8 +1919,17 @@ export default function QuickReportPage() {
                               {ticket.IssueTitle}
                             </p>
                             <p className="text-[10px] text-slate-505 mt-0.5">
-                              แจ้งเมื่อ: {formatLiffTime(ticket.ReportDate)}
+                              บันทึกเมื่อ: {ticket.CreateDate ? formatLiffTime(ticket.CreateDate) : formatLiffDate(ticket.ReportDate)}
+                              {ticket.CreateUserName && ticket.CreateUserName.trim() && (
+                                <span className="text-slate-400"> | โดย: <span className="font-semibold text-slate-600">{ticket.CreateUserName.trim()}</span></span>
+                              )}
                             </p>
+                            {ticket.IncidentDate && (
+                              <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
+                            )}
+                            {ticket.ServiceLocationCode && (
+                              <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationOptions.find(o => o.code === ticket.ServiceLocationCode)?.name || ticket.ServiceLocation || '-'}</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex justify-between items-center mt-1 border-t border-slate-200/60 pt-2">
@@ -2339,7 +2363,18 @@ export default function QuickReportPage() {
                       <div className="flex items-start justify-between border-b border-slate-100 pb-3">
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-xs font-bold text-slate-800 leading-snug break-words">{ticket.IssueTitle}</p>
-                          <p className="text-xxs text-slate-400 mt-1">แจ้งเมื่อ: {formatLiffTime(ticket.ReportDate)}</p>
+                          <p className="text-xxs text-slate-400 mt-1">
+                            บันทึกเมื่อ: {ticket.CreateDate ? formatLiffTime(ticket.CreateDate) : formatLiffDate(ticket.ReportDate)}
+                            {ticket.CreateUserName && ticket.CreateUserName.trim() && (
+                              <span> | โดย: <span className="font-semibold text-slate-500">{ticket.CreateUserName.trim()}</span></span>
+                            )}
+                          </p>
+                          {ticket.IncidentDate && (
+                            <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
+                          )}
+                          {ticket.ServiceLocationCode && (
+                            <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationOptions.find(o => o.code === ticket.ServiceLocationCode)?.name || ticket.ServiceLocation || '-'}</p>
+                          )}
                         </div>
                         <span className={`px-2.5 py-1 text-xxs font-bold rounded-full border shrink-0 ${
                           ticket.CarStatusDescription === 'ซ่อมเสร็จ'
