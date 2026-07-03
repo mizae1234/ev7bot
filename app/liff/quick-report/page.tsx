@@ -359,7 +359,7 @@ export default function QuickReportPage() {
           payload.carStatusCode = 'WAITING_FOR_MAINTENANCE'
           payload.serviceLocationCode = bulkLocation
           payload.serviceLocationName = locName
-          payload.followUpDetail = `🟡 อัปเดต: รถจอดรอซ่อม ณ สถานที่: ${locName}`
+          payload.followUpDetail = `🟡 อัปเดต: เข้าซ่อม ณ สถานที่: ${locName}`
         } else if (type === 'start') {
           payload.carStatusCode = 'IN_MAINTENANCE'
           payload.startDate = bulkStartDate
@@ -1613,7 +1613,7 @@ export default function QuickReportPage() {
                             : 'bg-amber-50 hover:bg-amber-100 border-amber-250 text-amber-700'
                         }`}
                       >
-                        รถจอดรอซ่อม
+                        เข้าซ่อม
                       </button>
                       <button
                         type="button"
@@ -1658,7 +1658,7 @@ export default function QuickReportPage() {
                   {bulkActionType === 'park' && (
                     <div className="bg-amber-50/50 border border-amber-200 rounded-2xl p-4 space-y-3.5 mb-3 animate-fade-in text-slate-700">
                       <div className="flex items-center justify-between border-b border-amber-150 pb-1.5">
-                        <span className="text-xs font-bold text-amber-800">🟡 ระบุสถานที่: รถจอดรอซ่อม</span>
+                        <span className="text-xs font-bold text-amber-800">🟡 ระบุสถานที่: เข้าซ่อม</span>
                         <button
                           type="button"
                           onClick={() => setBulkActionType(null)}
@@ -1691,7 +1691,7 @@ export default function QuickReportPage() {
                           onClick={() => handleSaveBulkAction('park')}
                           className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xxs transition active:scale-98"
                         >
-                          {submittingBulk ? '⏳ กำลังบันทึก...' : '💾 บันทึก รถจอดรอซ่อม'}
+                          {submittingBulk ? '⏳ กำลังบันทึก...' : '💾 บันทึก เข้าซ่อม'}
                         </button>
                         <button
                           type="button"
