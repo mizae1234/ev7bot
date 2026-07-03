@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber } = await req.json()
+    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending } = await req.json()
 
     if (!maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
@@ -41,6 +41,35 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Resolve CarStatusCode if it is COMPLETE (ซ่อมเสร็จ)
+    let resolvedCarStatusCode = carStatusCode
+    let inventoryItemId: number | null = null
+    let vehicleStatusType: string | null = null
+
+    if (carStatusCode === 'COMPLETE') {
+      try {
+        const vehicleInfoReq = pool.request()
+        vehicleInfoReq.input('maintId', sql.Int, maintenanceId)
+        const vehicleInfoRes = await vehicleInfoReq.query(`
+          SELECT m.InventoryItemID, i.StatusType 
+          FROM dbo.EV_MaintenanceItem m
+          JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          WHERE m.MaintenanceItemID = @maintId
+        `)
+
+        if (vehicleInfoRes.recordset.length > 0) {
+          inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
+          vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
+
+          if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
+            resolvedCarStatusCode = 'READY_PICKUP_MAINTENANCE'
+          }
+        }
+      } catch (infoErr) {
+        console.error('[Get Vehicle Info Error]', infoErr)
+      }
+    }
+
     // Convert datetime-local format (2026-07-03T02:43) to MSSQL-compatible (2026-07-03 02:43:00)
     const toMssqlDate = (d: string | null | undefined): string | null => {
       if (!d) return null
@@ -53,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Execute Stored Procedure sp_UpdateMaintenanceItemJson
     const updateObj = {
       maintenanceId,
-      carStatusCode: carStatusCode || null,
+      carStatusCode: resolvedCarStatusCode || null,
       startDate: toMssqlDate(startDate),
       finishDate: toMssqlDate(finishDate),
       serviceLocationCode: serviceLocationCode !== undefined ? serviceLocationCode : null,
@@ -168,6 +197,86 @@ export async function POST(req: NextRequest) {
         console.log(`[Start Maintenance] MaintenanceItemID=${maintenanceId}: set IN_MAINTENANCE, StartDate=${startDate}, Location=${serviceLocationCode}`)
       } catch (startErr) {
         console.error('[Start Maintenance Update Error]', startErr)
+      }
+    }
+
+    // ─── Direct update EV_MaintenanceItem for ซ่อมเสร็จ (COMPLETE / READY_PICKUP_MAINTENANCE) ───
+    if (carStatusCode === 'COMPLETE') {
+      try {
+        const finishReq = pool.request()
+        finishReq.input('maintId', sql.Int, maintenanceId)
+        finishReq.input('statusCode', sql.NVarChar, resolvedCarStatusCode)
+        finishReq.input('finishDate', sql.NVarChar, toMssqlDate(finishDate) || new Date().toISOString().replace('T', ' ').slice(0, 19))
+        finishReq.input('userId', sql.Int, dbUserId)
+        await finishReq.query(`
+          UPDATE dbo.EV_MaintenanceItem
+          SET CarStatusCode = @statusCode,
+              MaintenanceFinishDate = @finishDate,
+              UpdateUserID = @userId,
+              UpdateDate = GETDATE()
+          WHERE MaintenanceItemID = @maintId
+        `)
+        console.log(`[Finish Maintenance] MaintenanceItemID=${maintenanceId}: set ${resolvedCarStatusCode}, FinishDate=${finishDate}`)
+      } catch (finishErr) {
+        console.error('[Finish Maintenance Update Error]', finishErr)
+      }
+    }
+
+    // ─── Update EV_InventoryItem Status & StatusType if no pending tickets remain ───
+    if (carStatusCode === 'COMPLETE' && inventoryItemId) {
+      try {
+        // Query remaining pending count
+        const countReq = pool.request()
+        countReq.input('invId', sql.Int, inventoryItemId)
+        const countRes = await countReq.query(`
+          SELECT COUNT(*) AS PendingCount 
+          FROM dbo.EV_MaintenanceItem 
+          WHERE InventoryItemID = @invId 
+            AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE')
+            AND IsActive = 1
+        `)
+        const pendingCount = countRes.recordset[0]?.PendingCount || 0
+        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Remaining Pending Count=${pendingCount}, isLastPending=${isLastPending}`)
+
+        if (isLastPending || pendingCount === 0) {
+          let newStatus: string | null = null
+          let newStatusType: string | null = null
+
+          if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
+            // Rule 1: Do nothing
+            console.log(`[Inventory Update Skipped] vehicleStatusType is ON_RENT_MAINTENANCE`)
+          } else if (vehicleStatusType === 'USE_MAINTENANCE') {
+            // Rule 2: Status = AVAILABLE, StatusType = AVAILABLE_USE
+            newStatus = 'AVAILABLE'
+            newStatusType = 'AVAILABLE_USE'
+          } else if (vehicleStatusType === 'NEW_MAINTENANCE') {
+            // Rule 3: Status = AVAILABLE, StatusType = AVAILABLE
+            newStatus = 'AVAILABLE'
+            newStatusType = 'AVAILABLE'
+          } else if (vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
+            // Rule 4: Status = REPLACEMENT, StatusType = REPLACEMENT_AVAILABLE
+            newStatus = 'REPLACEMENT'
+            newStatusType = 'REPLACEMENT_AVAILABLE'
+          }
+
+          if (newStatus && newStatusType) {
+            const updReq = pool.request()
+            updReq.input('newStatus', sql.NVarChar, newStatus)
+            updReq.input('newStatusType', sql.NVarChar, newStatusType)
+            updReq.input('invId', sql.Int, inventoryItemId)
+            updReq.input('userId', sql.Int, dbUserId)
+            await updReq.query(`
+              UPDATE dbo.EV_InventoryItem
+              SET Status = @newStatus, StatusType = @newStatusType, UpdateUserID = @userId, UpdateDate = GETDATE()
+              WHERE InventoryItemID = @invId
+            `)
+            console.log(`[Inventory Status Update Success] InventoryItemID=${inventoryItemId} set Status=${newStatus}, StatusType=${newStatusType}`)
+          }
+        } else {
+          console.log(`[Inventory Update Skipped] There are still ${pendingCount} pending tickets.`)
+        }
+      } catch (invErr) {
+        console.error('[Inventory Status Update Error]', invErr)
       }
     }
 

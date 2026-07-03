@@ -375,6 +375,7 @@ export default function QuickReportPage() {
           payload.carStatusCode = 'COMPLETE'
           payload.finishDate = bulkFinishDate
           payload.followUpDetail = `ระบบอัพเดต : ซ่อมเสร็จสิ้น เมื่อวันที่: ${formatLiffTime(bulkFinishDate)}`
+          payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
         }
 
         return fetch('/api/maintenance/update-quick', {
