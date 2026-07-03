@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
@@ -110,6 +111,15 @@ function MaintenanceDashboardContent() {
   )
 
   const [selectedLocationFilter, setSelectedLocationFilter] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const router = useRouter()
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (!q) return
+    router.push(`/vehicle/${encodeURIComponent(q)}`)
+  }
 
   const stats = data?.stats || { total: 0, in_maintenance: 0, waiting: 0, complete: 0 }
   const locations = data?.locations || []
@@ -142,7 +152,22 @@ function MaintenanceDashboardContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 justify-end">
+          <div className="flex items-center gap-3 justify-end flex-wrap">
+            <form onSubmit={handleSearch} className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ค้นหาทะเบียน / VIN..."
+                className="w-44 text-xs py-2 px-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent placeholder:text-slate-400 shadow-sm"
+              />
+              <button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-3 rounded-xl transition active:scale-95 shadow-sm"
+              >
+                🔍
+              </button>
+            </form>
             <button
               onClick={() => mutate()}
               disabled={isValidating}
