@@ -168,7 +168,10 @@ function buildReadyPickupFlex(item: any): any {
             layout: 'vertical',
             backgroundColor: '#FFF3E0',
             cornerRadius: 'md',
-            paddingAll: '10px',
+            paddingTop: '10px',
+            paddingBottom: '10px',
+            paddingStart: '10px',
+            paddingEnd: '10px',
             marginBottom: '6px',
             contents: [
               {
