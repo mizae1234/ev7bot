@@ -212,6 +212,10 @@ function VehicleDetailContent() {
               Dashboard
             </a>
             <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <a href="/maintenance/dashboard" className="text-zinc-500 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400 transition-colors text-sm">
+              🔧 ซ่อมบำรุง
+            </a>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
             <h1 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">🚗 ข้อมูลรถ {car.RegisterNo || car.VinNo}</h1>
           </div>
           <LoginProfile />
