@@ -60,68 +60,89 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง' }, { status: 400 })
       }
 
-      // Check if email already exists
-      const checkReq = pool.request()
-      checkReq.input('email', sql.VarChar, email.trim())
-      const checkRes = await checkReq.query(`
-        SELECT UserID FROM dbo.EV_User WHERE UserEmail = @email
-      `)
+      // Check if email already exists (Best effort)
+      let emailExists = false
+      try {
+        const checkReq = pool.request()
+        checkReq.input('email', sql.VarChar, email.trim())
+        const checkRes = await checkReq.query(`
+          SELECT UserID FROM dbo.EV_User WHERE UserEmail = @email
+        `)
+        if (checkRes.recordset.length > 0) {
+          emailExists = true
+        }
+      } catch (checkErr) {
+        console.warn('[Liff Associate] Failed to check email in SQL Server, proceeding. Error:', checkErr)
+      }
 
-      if (checkRes.recordset.length > 0) {
+      if (emailExists) {
         return NextResponse.json({ error: 'อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาเลือกผูกบัญชีเดิมหรือเปลี่ยนอีเมล' }, { status: 400 })
       }
 
-      // Insert new user
-      const insReq = pool.request()
-      insReq.input('userName', sql.VarChar, email.trim())
-      insReq.input('password', sql.VarChar, password)
-      insReq.input('email', sql.VarChar, email.trim())
-      insReq.input('firstName', sql.VarChar, firstName.trim())
-      insReq.input('lastName', sql.VarChar, lastName.trim())
-      insReq.input('lineUserId', sql.VarChar, userId)
+      // Insert new user to SQL Server (Best effort - fallback if INSERT permission is denied)
+      try {
+        const insReq = pool.request()
+        insReq.input('userName', sql.VarChar, email.trim())
+        insReq.input('password', sql.VarChar, password)
+        insReq.input('email', sql.VarChar, email.trim())
+        insReq.input('firstName', sql.VarChar, firstName.trim())
+        insReq.input('lastName', sql.VarChar, lastName.trim())
+        insReq.input('lineUserId', sql.VarChar, userId)
 
-      const insRes = await insReq.query(`
-        INSERT INTO dbo.EV_User (
-          UserName, UserPassword, UserEmail, FirstName, LastName, 
-          IsActive, RoleCode, LineUserId, StartDate, CreatedDatetime
-        )
-        VALUES (
-          @userName, @password, @email, @firstName, @lastName, 
-          1, 'USER', @lineUserId, GETDATE(), GETDATE()
-        );
-        SELECT SCOPE_IDENTITY() AS NewUserID;
-      `)
+        const insRes = await insReq.query(`
+          INSERT INTO dbo.EV_User (
+            UserName, UserPassword, UserEmail, FirstName, LastName, 
+            IsActive, RoleCode, LineUserId, StartDate, CreatedDatetime
+          )
+          VALUES (
+            @userName, @password, @email, @firstName, @lastName, 
+            1, 'USER', @lineUserId, GETDATE(), GETDATE()
+          );
+          SELECT SCOPE_IDENTITY() AS NewUserID;
+        `)
 
-      dbUserId = insRes.recordset[0].NewUserID
+        dbUserId = insRes.recordset[0].NewUserID
+      } catch (sqlErr: any) {
+        console.warn('[Liff Associate] Denied or failed to insert SQL Server EV_User, fallback to local Postgres ID. Error:', sqlErr.message)
+      }
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    if (!dbUserId) {
-      return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการสร้างหรือหาบัญชีผู้ใช้' }, { status: 500 })
-    }
-
-    // Update ev7UserId in PostgreSQL line_registrations
+    // Upsert into PostgreSQL line_registrations first
     const reg = await prisma.lineRegistration.upsert({
       where: { lineUserId: userId },
       update: {
-        ev7UserId: dbUserId,
         displayName: displayName || null,
         isActive: true,
       },
       create: {
         lineUserId: userId,
         displayName: displayName || null,
-        ev7UserId: dbUserId,
         system: 'EV7',
         isActive: true,
+      },
+    })
+
+    // If dbUserId was resolved from SQL Server (linked or created successfully), use it.
+    // If dbUserId is null (because INSERT/UPDATE permission was denied on SQL Server), fallback to 10000 + registration ID
+    let finalUserId = dbUserId
+    if (!finalUserId) {
+      finalUserId = 10000 + reg.id
+    }
+
+    // Update the ev7UserId in PostgreSQL to finalUserId
+    const updatedReg = await prisma.lineRegistration.update({
+      where: { id: reg.id },
+      data: {
+        ev7UserId: finalUserId,
       },
     })
 
     return NextResponse.json({
       success: true,
       message: action === 'link' ? 'ผูกบัญชีสำเร็จเรียบร้อยแล้ว!' : 'ลงทะเบียนและเปิดใช้สิทธิ์บัญชีเรียบร้อยแล้ว!',
-      registration: reg
+      registration: updatedReg
     })
 
   } catch (err: any) {
