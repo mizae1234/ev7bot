@@ -2583,7 +2583,7 @@ async function trySendVehicleFlexMessage(
              ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
            FROM dbo.EV_MaintenanceItem m
            LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
-           LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode AND sub.Type = 'MAINTENANCE_CAR_STATUS'
+           LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode
            WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
            ORDER BY m.ReportDate DESC
         `)

@@ -151,10 +151,12 @@ export async function GET(
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
           m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID,
           ISNULL(NULLIF(uc.FirstName + ' ' + ISNULL(uc.LastName, ''), ''), uc.UserName) AS CreateUserName,
-          ISNULL(NULLIF(uu.FirstName + ' ' + ISNULL(uu.LastName, ''), ''), uu.UserName) AS UpdateUserName
+          ISNULL(NULLIF(uu.FirstName + ' ' + ISNULL(uu.LastName, ''), ''), uu.UserName) AS UpdateUserName,
+          ISNULL(sub.StatusName, m.CarStatusCode) AS CarStatusName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_User uc ON m.CreateUserID = uc.UserID
         LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
+        LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode
         WHERE m.InventoryItemID = @inventoryItemId
         ORDER BY m.ReportDate DESC
       `),
@@ -335,7 +337,7 @@ export async function GET(
       CarCase: mapCode(m.CarCaseCode, carCaseMap),
       ServiceLocation: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
       Insurance: mapCode(m.InsuranceCode, insuranceMap),
-      CarStatusDescription: carStatusMap[m.CarStatusCode as string] || (m.CarStatusCode as string) || '-',
+      CarStatusDescription: m.CarStatusName || m.CarStatusCode || '-',
       replacements: replacements[m.MaintenanceItemID as number] || [],
       followUps: followUps[m.MaintenanceItemID as number] || [],
       attachments: attachments[m.MaintenanceItemID as number] || [],
