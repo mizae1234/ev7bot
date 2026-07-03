@@ -40,13 +40,20 @@ export async function getMSSQLWritePool(): Promise<sql.ConnectionPool | null> {
   if (writePool && writePool.connected) return writePool
 
   const writeConfig: sql.config = {
-    ...readConfig,
-    user: env.MSSQL_WRITE_USER || env.MSSQL_USER,
-    password: env.MSSQL_WRITE_PASSWORD || env.MSSQL_PASSWORD,
+    server: env.MSSQL_HOST,
+    port: env.MSSQL_PORT,
+    database: env.MSSQL_DATABASE,
+    user: env.MSSQL_WRITE_USER || 'app_butter',
+    password: env.MSSQL_WRITE_PASSWORD || 'Beqe5EglBpbat27CtQrXI55nxvQkQxfR',
     options: {
       encrypt: true,
       trustServerCertificate: true,
-      readOnlyIntent: false, // allow writes for write pool
+      readOnlyIntent: false,
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000,
     }
   }
 
