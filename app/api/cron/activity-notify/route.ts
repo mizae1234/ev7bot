@@ -20,6 +20,32 @@ function formatDateTh(d: Date | string | null): string {
   } catch { return String(d) }
 }
 
+const locationMap: Record<string, string> = {
+  'AION_GI_KANCHANAPISEK': 'Aion กาญจนาฯ',
+  'AION_GI_RAMINTRA_EXPRESSWAY': 'Aion เลียบด่วนฯ',
+  'AION_GI_PIBULSONGKRAM': 'Aion พิบูลฯ',
+  'AION_GI_MINBURI': 'Aion มีนบุรี',
+  'AION_GI_MAHACHAI': 'Aion มหาชัย',
+  'AION_GI_SALAYA': 'Aion ศาลายา',
+  'EV7_YARD_PRAPADAENG': 'EV7 Yard พระประแดง',
+  'SMART_TAXI': 'สมาร์ทเแท็กซี่',
+  'GARAGE_BUNGKHWANG': 'อู่ บึงขวาง',
+  'GARAGE_TS': 'อู่ TS',
+  'GARAGE_88_CAR': 'อู่ 88 คาร์',
+  'GARAGE_CRN_PAKKRET': 'อู่ CRN ปากเกร็ด',
+  'GARAGE_56_COLOR': 'อู่ 56 Color',
+  'GARAGE_PRICHA': 'อู่ ปรีชา',
+  'GARAGE_PERFECTCAR': 'อู่ เพอร์เฟคคาร์',
+  'GARAGE_SAHACAR': 'อู่ สหาคาร์',
+  'GARAGE_PREMIUMCAR': 'อู่ พรีเมี่ยมคาร์',
+  'GARAGE_BESTCARPAINT': 'อู่ เบสท์คาร์เพ้นท์',
+}
+
+function getLocationName(code: string | null | undefined): string {
+  if (!code) return '-'
+  return locationMap[code] || code.replace(/_/g, ' ')
+}
+
 function getCarStatusDisplay(
   statusName: string,
   statusCode: string,
@@ -165,7 +191,7 @@ function buildReadyPickupFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'การใช้งาน/อู่', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: `${usageStatus} / ${item.ServiceLocationCode || '-'}`, color: '#111827', size: 'xs', flex: 5, wrap: true },
+            { type: 'text', text: `${usageStatus} / ${getLocationName(item.ServiceLocationCode)}`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันเกิดเหตุ/บันทึก', color: '#6b7280', size: 'xs', flex: 3 },
@@ -176,8 +202,8 @@ function buildReadyPickupFlex(item: any): any {
             { type: 'text', text: formatDateTh(item.MaintenanceFinishDate || item.UpdateDate), color: '#d84315', size: 'xs', weight: 'bold', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'ผู้บันทึกอัปเดต', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: item.CreatorName || '-', color: '#111827', size: 'xs', flex: 5 },
+            { type: 'text', text: 'ผู้บันทึกซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: item.UpdaterName || item.CreatorName || '-', color: '#111827', size: 'xs', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
@@ -498,12 +524,14 @@ export async function GET(req: NextRequest) {
             s.DescriptionStatus AS CarStatusName,
             sub.DescriptionStatus AS CarSubStatusName,
             i.StatusType AS CarSubStatusCode,
-            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+            ISNULL(NULLIF(cu.FirstName, ''), cu.UserName) AS CreatorName,
+            ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
           LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
-          LEFT JOIN dbo.EV_User u ON m.UpdateUserID = u.UserID
+          LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
+          LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
           WHERE m.IsActive = 1
             AND (m.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY m.MaintenanceItemID DESC
@@ -667,12 +695,14 @@ export async function GET(req: NextRequest) {
           s.DescriptionStatus AS CarStatusName,
           sub.DescriptionStatus AS CarSubStatusName,
           i.StatusType AS CarSubStatusCode,
-          ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+          ISNULL(NULLIF(cu.FirstName, ''), cu.UserName) AS CreatorName,
+          ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
-        LEFT JOIN dbo.EV_User u ON m.UpdateUserID = u.UserID
+        LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
+        LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         WHERE m.IsActive = 1
           AND m.CarStatusCode = 'READY_PICKUP_MAINTENANCE'
           AND m.UpdateDate >= @since
