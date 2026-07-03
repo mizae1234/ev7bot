@@ -10,7 +10,7 @@ const prompt = Prompt({
 
 export const metadata: Metadata = {
   title: 'EV7 Operations Tracking Dashboard',
-  description: 'ระบบติดตามการส่งมอบและการซ่อมบำรุงรถยนต์ไฟฟ้าแบบเรียลไทม์ (AION, HYPTEC, GAC)',
+  description: 'ระบบติดตามการส่งมอบและการซ่อมบำรุงรถยนต์ไฟฟ้าแบบเรียลไทม์',
 }
 
 export default function RootLayout({
