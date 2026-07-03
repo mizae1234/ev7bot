@@ -12,6 +12,9 @@ interface DashboardStats {
   in_maintenance: number
   waiting: number
   complete: number
+  on_rent_maintenance?: number
+  ready_pickup?: number
+  replacement_maintenance?: number
 }
 
 interface LocationStat {
@@ -116,7 +119,7 @@ function MaintenanceDashboardContent() {
   // Filter longest repairs if location card is clicked
   const filteredLongestRepairs = selectedLocationFilter
     ? longestRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
-    : longestRepairs
+    : longestRepairs.slice(0, 30)
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 pb-16 font-sans">
@@ -161,9 +164,10 @@ function MaintenanceDashboardContent() {
 
         {/* Loading / Error States */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map(n => (
-              <div key={n} className="bg-white border border-slate-200 rounded-3xl h-28 animate-pulse shadow-sm" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200 rounded-3xl h-32 animate-pulse shadow-sm col-span-2" />
+            {[1, 2, 3, 4, 5, 6].map(n => (
+              <div key={n} className="bg-white border border-slate-200 rounded-3xl h-32 animate-pulse shadow-sm col-span-1" />
             ))}
           </div>
         )}
@@ -177,51 +181,93 @@ function MaintenanceDashboardContent() {
 
         {/* KPI Cards */}
         {!isLoading && !error && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Card 1: Total */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300">
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-2">
               <div className="absolute -right-4 -bottom-4 text-7xl text-slate-100 font-bold select-none group-hover:scale-110 transition duration-300">
                 🛠️
               </div>
-              <p className="text-xs text-slate-500 font-bold">รวมแจ้งเหตุทั้งหมด</p>
+              <p className="text-xs text-slate-500 font-bold">รวมรถซ่อมค้างทั้งหมด</p>
               <p className="text-3xl font-black text-slate-900 mt-1.5">
-                {stats.total} <span className="text-xs font-normal text-slate-500">เคส</span>
+                {stats.total} <span className="text-xs font-normal text-slate-500">คัน</span>
               </p>
               <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
                 <div className="bg-slate-400 h-full rounded-full" style={{ width: '100%' }} />
               </div>
             </div>
 
-            {/* Card 2: In Maintenance */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300">
-              <div className="absolute -right-4 -bottom-4 text-7xl text-amber-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
-                🔴
-              </div>
-              <p className="text-xs text-amber-600 font-bold">🔴 อยู่ระหว่างซ่อม (งดใช้งาน)</p>
-              <p className="text-3xl font-black text-amber-600 mt-1.5">
-                {stats.in_maintenance} <span className="text-xs font-normal text-slate-500">คัน</span>
-              </p>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: stats.total ? `${(stats.in_maintenance / stats.total) * 100}%` : '0%' }} />
-              </div>
-            </div>
-
-            {/* Card 3: Waiting */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300">
+            {/* Card 2: New Maintenance */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
               <div className="absolute -right-4 -bottom-4 text-7xl text-rose-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
                 🟡
               </div>
-              <p className="text-xs text-rose-600 font-bold">🟡 รอคิวเข้าซ่อม (วิ่งงานอยู่)</p>
+              <p className="text-xs text-rose-600 font-bold">🟡 รถใหม่เข้าซ่อม</p>
               <p className="text-3xl font-black text-rose-650 mt-1.5">
-                {stats.waiting} <span className="text-xs font-normal text-slate-500">คัน</span>
+                {stats.waiting || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
               </p>
               <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div className="bg-rose-550 h-full rounded-full" style={{ width: stats.total ? `${(stats.waiting / stats.total) * 100}%` : '0%' }} />
+                <div className="bg-rose-550 h-full rounded-full" style={{ width: stats.total ? `${((stats.waiting || 0) / stats.total) * 100}%` : '0%' }} />
               </div>
             </div>
 
-            {/* Card 4: Complete */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300">
+            {/* Card 3: Use Maintenance */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
+              <div className="absolute -right-4 -bottom-4 text-7xl text-amber-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
+                🔴
+              </div>
+              <p className="text-xs text-amber-600 font-bold">🔴 รถใช้แล้วเข้าซ่อม</p>
+              <p className="text-3xl font-black text-amber-600 mt-1.5">
+                {stats.in_maintenance || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
+              </p>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                <div className="bg-amber-500 h-full rounded-full" style={{ width: stats.total ? `${((stats.in_maintenance || 0) / stats.total) * 100}%` : '0%' }} />
+              </div>
+            </div>
+
+            {/* Card 4: On Rent Maintenance */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
+              <div className="absolute -right-4 -bottom-4 text-7xl text-indigo-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
+                🔵
+              </div>
+              <p className="text-xs text-indigo-650 font-bold">🔵 รถเช่าเข้าซ่อม</p>
+              <p className="text-3xl font-black text-indigo-650 mt-1.5">
+                {stats.on_rent_maintenance || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
+              </p>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                <div className="bg-indigo-500 h-full rounded-full" style={{ width: stats.total ? `${((stats.on_rent_maintenance || 0) / stats.total) * 100}%` : '0%' }} />
+              </div>
+            </div>
+
+            {/* Card 5: Ready to Pickup */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
+              <div className="absolute -right-4 -bottom-4 text-7xl text-orange-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
+                🟠
+              </div>
+              <p className="text-xs text-orange-600 font-bold">🟠 รถซ่อมเสร็จ รอปล่อย</p>
+              <p className="text-3xl font-black text-orange-600 mt-1.5">
+                {stats.ready_pickup || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
+              </p>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                <div className="bg-orange-500 h-full rounded-full" style={{ width: stats.total ? `${((stats.ready_pickup || 0) / stats.total) * 100}%` : '0%' }} />
+              </div>
+            </div>
+
+            {/* Card 6: Replacement Maintenance */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
+              <div className="absolute -right-4 -bottom-4 text-7xl text-purple-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
+                🟣
+              </div>
+              <p className="text-xs text-purple-600 font-bold">🟣 รถสำรองเข้าซ่อม</p>
+              <p className="text-3xl font-black text-purple-600 mt-1.5">
+                {stats.replacement_maintenance || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
+              </p>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+                <div className="bg-purple-500 h-full rounded-full" style={{ width: stats.total ? `${((stats.replacement_maintenance || 0) / stats.total) * 100}%` : '0%' }} />
+              </div>
+            </div>
+
+            {/* Card 7: Complete */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
               <div className="absolute -right-4 -bottom-4 text-7xl text-emerald-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
                 🟢
               </div>
@@ -243,6 +289,47 @@ function MaintenanceDashboardContent() {
             {/* Left 2 Columns: Stuck Repairs & Yards */}
             <div className="lg:col-span-2 space-y-6">
               
+              {/* Card: Yard / Workshop Load */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>📍</span> อู่คู่สัญญาและสถานที่ซ่อมบำรุงที่คิวยาวที่สุด (Workshop Load)
+                  </h2>
+                  <p className="text-[10px] text-slate-500 mt-0.5">จำนวนรถยนต์คงค้างที่ถูกส่งซ่อมแยกตามสถานที่ (คลิกเพื่อกรองข้อมูลด้านล่าง)</p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {locations.map((loc) => {
+                    const isSelected = selectedLocationFilter === loc.LocationCode
+                    return (
+                      <button
+                        key={loc.LocationCode}
+                        onClick={() => setSelectedLocationFilter(isSelected ? null : loc.LocationCode)}
+                        className={`text-left p-2.5 sm:p-3 rounded-xl border transition duration-200 flex items-center justify-between gap-2.5 ${
+                          isSelected
+                            ? 'bg-indigo-50 border-indigo-300 text-indigo-800 shadow-sm ring-1 ring-indigo-300'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 hover:border-slate-350 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold truncate">{loc.LocationName || 'ไม่ระบุ / นอกสถานที่'}</p>
+                          <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div
+                              className="bg-indigo-500 h-full rounded-full"
+                              style={{ width: `${Math.min((loc.Count / 10) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-base font-black">{loc.Count}</span>
+                          <span className="text-[10px] text-slate-450 block leading-none mt-0.5">คัน</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Card: Stuck Repairs (ซ่อมนานที่สุด) */}
               <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -265,46 +352,66 @@ function MaintenanceDashboardContent() {
                 <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
                   {filteredLongestRepairs.length > 0 ? (
                     filteredLongestRepairs.map((item) => (
-                      <div
+                      <a
                         key={item.MaintenanceItemID}
-                        className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-350 transition"
+                        href={`/vehicle/${encodeURIComponent(item.RegisterNo || '')}`}
+                        className="block bg-slate-50 border border-slate-150 hover:border-indigo-400 hover:shadow-xs rounded-xl p-2.5 transition no-underline text-inherit cursor-pointer"
                       >
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-250">
+                        <div className="flex flex-row items-center justify-between gap-2.5">
+                          {/* Left contents aligned in a single row */}
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                            {/* License plate */}
+                            <span className="text-xxs font-extrabold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-250 shadow-xxs shrink-0 font-mono">
                               {item.RegisterNo || 'ไม่มีทะเบียน'}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-400 font-mono">
-                              #{item.MaintenanceItemID}
-                            </span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+
+                            {/* Status */}
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
                               item.CarStatusCode === 'IN_MAINTENANCE'
                                 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                : item.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                : item.CarStatusCode === 'STILL_WORK'
+                                ? 'bg-sky-50 border-sky-200 text-sky-700'
                                 : 'bg-rose-50 border-rose-200 text-rose-700'
                             }`}>
-                              {item.CarStatusCode === 'IN_MAINTENANCE' ? 'กำลังซ่อม' : 'รอเข้าซ่อม'}
+                              {item.CarStatusCode === 'IN_MAINTENANCE' 
+                                ? 'กำลังซ่อม' 
+                                : item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' 
+                                ? 'พร้อมรับรถ' 
+                                : item.CarStatusCode === 'STILL_WORK'
+                                ? 'ยังวิ่งอยู่'
+                                : 'รอเข้าซ่อม'}
                             </span>
-                          </div>
-                          <p className="text-xs font-bold text-slate-800 leading-snug break-words mt-1">
-                            {item.IssueTitle}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
-                            <span>โครงการ: <strong className="text-slate-700">{item.Project || '-'}</strong></span>
-                            <span>|</span>
-                            <span>อู่: <strong className="text-indigo-600">{locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ'}</strong></span>
-                          </div>
-                          {item.FollowUpDetail && (
-                            <p className="text-[10px] text-slate-550 italic mt-1 bg-white p-2 rounded-lg border border-slate-100 truncate">
-                              💬 ล่าสุด: {item.FollowUpDetail}
-                            </p>
-                          )}
-                        </div>
 
-                        {/* Age Counter Block */}
-                        <div className="flex flex-row md:flex-col items-center justify-between md:justify-center border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-5 shrink-0 min-w-[100px]">
-                          <div className="text-left md:text-center">
-                            <span className="text-xxs font-bold text-slate-400 block uppercase">จอดซ่อมนาน</span>
-                            <span className={`text-xl font-black block leading-none mt-1 ${
+                            {/* Issue Title */}
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[100px] sm:max-w-[200px]" title={item.IssueTitle}>
+                              {item.IssueTitle}
+                            </span>
+
+                            {/* Details (Project & Location) */}
+                            <span className="text-[10px] text-slate-400 shrink-0">|</span>
+                            <span className="text-[10px] text-slate-500 truncate">
+                              ผู้รับผิดชอบ: <strong className={item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' ? 'text-indigo-650 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 text-[9px]' : 'text-emerald-650'}>{item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' ? 'EV7/ICI' : (locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ')}</strong>
+                            </span>
+
+                            {/* Latest follow-up inline */}
+                            {item.FollowUpDetail && (
+                              <>
+                                <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">|</span>
+                                <span className="text-[10px] text-slate-500 italic truncate max-w-[180px] lg:max-w-[250px] hidden sm:inline" title={item.FollowUpDetail}>
+                                  💬 {item.FollowUpDetail}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Right side: Days count in a compact, single-line format */}
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2 sm:pl-3 border-l border-slate-200 text-right">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">
+                              {item.CarStatusCode === 'STILL_WORK' ? 'ค้างเคส' : 'จอดซ่อม'}
+                            </span>
+                            <span className={`text-xs sm:text-sm font-black font-mono shrink-0 ${
                               item.DaysActive >= 14
                                 ? 'text-rose-600'
                                 : item.DaysActive >= 7
@@ -316,54 +423,19 @@ function MaintenanceDashboardContent() {
                           </div>
                         </div>
 
-                      </div>
+                        {/* Mobile-only follow-up row to keep layout clean */}
+                        {item.FollowUpDetail && (
+                          <div className="mt-1 text-[10px] text-slate-500 italic sm:hidden truncate">
+                            💬 {item.FollowUpDetail}
+                          </div>
+                        )}
+                      </a>
                     ))
                   ) : (
                     <div className="text-center py-8 text-xs text-slate-450 italic">
                       ไม่พบรถยนต์ซ่อมค้างคงค้างในส่วนนี้
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* Card: Yard / Workshop Load */}
-              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>📍</span> อู่คู่สัญญาและสถานที่ซ่อมบำรุงที่คิวยาวที่สุด (Workshop Load)
-                  </h2>
-                  <p className="text-[10px] text-slate-500 mt-0.5">จำนวนรถยนต์คงค้างที่ถูกส่งซ่อมแยกตามสถานที่ (คลิกเพื่อกรองข้อมูลด้านบน)</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {locations.map((loc) => {
-                    const isSelected = selectedLocationFilter === loc.LocationCode
-                    return (
-                      <button
-                        key={loc.LocationCode}
-                        onClick={() => setSelectedLocationFilter(isSelected ? null : loc.LocationCode)}
-                        className={`text-left p-3.5 rounded-2xl border transition duration-200 flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? 'bg-indigo-50 border-indigo-300 text-indigo-800 shadow-sm ring-1 ring-indigo-300'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 hover:border-slate-350 text-slate-700'
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate">{loc.LocationName || 'ไม่ระบุ / นอกสถานที่'}</p>
-                          <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div
-                              className="bg-indigo-500 h-full rounded-full"
-                              style={{ width: `${Math.min((loc.Count / 10) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-base font-black">{loc.Count}</span>
-                          <span className="text-[10px] text-slate-450 block leading-none mt-0.5">คัน</span>
-                        </div>
-                      </button>
-                    )
-                  })}
                 </div>
               </div>
 
@@ -390,7 +462,7 @@ function MaintenanceDashboardContent() {
                         <span className="absolute -left-[19.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border-2 border-white group-hover:bg-amber-400 transition" />
                         
                         <div className="flex justify-between text-slate-450">
-                          <span className="font-mono">{formatThaiDate(log.FollowUpDate || log.CreateDate)}</span>
+                          <span className="font-mono">{formatThaiDate(log.CreateDate)}</span>
                           <span className="font-bold text-slate-600">{log.CreateUserName}</span>
                         </div>
                         

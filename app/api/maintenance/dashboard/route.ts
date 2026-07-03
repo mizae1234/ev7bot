@@ -149,36 +149,55 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // 1. Basic Stats
+    // 1. Basic Stats (Matching GetEV_HeadlineDashboard and EV_MsSubStatus logic exactly)
     const statsResult = await pool.request().query(`
       SELECT
-        COUNT(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 END) AS waiting,
-        COUNT(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 END) AS in_maintenance,
-        COUNT(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 END) AS complete,
-        COUNT(*) AS total
-      FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'NEW_MAINTENANCE' AND IsActive = 1) AS waiting,
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'USE_MAINTENANCE' AND IsActive = 1) AS in_maintenance,
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'ON_RENT_MAINTENANCE' AND IsActive = 1) AS on_rent_maintenance,
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'READY_PICKUP_MAINTENANCE' AND IsActive = 1) AS ready_pickup,
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'REPLACEMENT_MAINTENANCE' AND IsActive = 1) AS replacement_maintenance,
+        (SELECT COUNT(*) FROM dbo.EV_MaintenanceItem WHERE CarStatusCode = 'COMPLETE') AS complete,
+        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND IsActive = 1) AS total
     `)
 
-    // 2. Service Location Breakdown
+    // 2. Service Location Breakdown (Only count cars currently in MAINTENANCE status, once per car)
     const locationResult = await pool.request().query(`
+      WITH LatestTickets AS (
+        SELECT 
+          m.InventoryItemID,
+          m.ServiceLocationCode,
+          ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+      )
       SELECT 
-        ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS LocationCode,
+        ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ') AS LocationCode,
         COUNT(*) AS Count
-      FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1 AND m.CarStatusCode != 'COMPLETE'
-      GROUP BY m.ServiceLocationCode
+      FROM LatestTickets
+      WHERE rn = 1
+      GROUP BY ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ')
       ORDER BY Count DESC
     `)
 
-    // 3. Problem Type Breakdown
+    // 3. Problem Type Breakdown (Only count cars currently in MAINTENANCE status, once per car)
     const problemTypeResult = await pool.request().query(`
+      WITH LatestTickets AS (
+        SELECT 
+          m.InventoryItemID,
+          m.ProblemTypeCode,
+          ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+      )
       SELECT 
-        ISNULL(NULLIF(m.ProblemTypeCode, ''), 'ไม่ระบุ') AS ProblemTypeCode,
+        ISNULL(NULLIF(ProblemTypeCode, ''), 'ไม่ระบุ') AS ProblemTypeCode,
         COUNT(*) AS Count
-      FROM dbo.EV_MaintenanceItem m
-      WHERE m.IsActive = 1 AND m.CarStatusCode != 'COMPLETE'
-      GROUP BY m.ProblemTypeCode
+      FROM LatestTickets
+      WHERE rn = 1
+      GROUP BY ISNULL(NULLIF(ProblemTypeCode, ''), 'ไม่ระบุ')
       ORDER BY Count DESC
     `)
 
@@ -198,34 +217,53 @@ export async function GET(req: NextRequest) {
       LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
       WHERE f.IsActive = 1
-      ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
+      ORDER BY f.CreateDate DESC
     `)
 
-    // 5. Longest active repairs (Stuck repairs)
+    // 5. Longest active repairs (Stuck repairs) (Only show cars currently in MAINTENANCE status, once per car)
     const longestRepairsResult = await pool.request().query(`
-      SELECT TOP 15
-        m.MaintenanceItemID,
+      WITH LatestTickets AS (
+        SELECT 
+          m.MaintenanceItemID,
+          m.InventoryItemID,
+          m.IssueTitle,
+          m.CarStatusCode,
+          m.ServiceLocationCode,
+          m.ReportDate,
+          m.FollowUpDetail,
+          ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+      )
+      SELECT 
+        t.MaintenanceItemID,
         COALESCE(i.RegisterNo, '') AS RegisterNo,
         i.Model,
         i.ProjectType AS Project,
-        m.IssueTitle,
-        m.CarStatusCode,
-        m.ServiceLocationCode,
-        m.ReportDate,
-        DATEDIFF(day, m.ReportDate, GETDATE()) AS DaysActive,
-        m.FollowUpDetail
-      FROM dbo.EV_MaintenanceItem m
-      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-      WHERE m.IsActive = 1 AND m.CarStatusCode != 'COMPLETE'
-      ORDER BY m.ReportDate ASC
+        t.IssueTitle,
+        t.CarStatusCode,
+        t.ServiceLocationCode,
+        t.ReportDate,
+        DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
+        t.FollowUpDetail
+      FROM LatestTickets t
+      JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
+      WHERE t.rn = 1
+      ORDER BY t.ReportDate ASC
     `)
 
-    // Map database results with readable names
-    const locationsMapped = locationResult.recordset.map(row => ({
-      LocationCode: row.LocationCode,
-      LocationName: locationMap[row.LocationCode] || row.LocationCode,
-      Count: row.Count
-    }))
+    // Map database results with readable names and merge duplicates
+    const locationMapObj: Record<string, { LocationCode: string; LocationName: string; Count: number }> = {}
+    for (const row of locationResult.recordset) {
+      const code = row.LocationCode
+      const name = locationMap[code] || code
+      if (!locationMapObj[name]) {
+        locationMapObj[name] = { LocationCode: code, LocationName: name, Count: 0 }
+      }
+      locationMapObj[name].Count += row.Count
+    }
+    const locationsMapped = Object.values(locationMapObj).sort((a, b) => b.Count - a.Count)
 
     const problemTypesMapped = problemTypeResult.recordset.map(row => ({
       ProblemTypeCode: row.ProblemTypeCode,
@@ -234,7 +272,7 @@ export async function GET(req: NextRequest) {
     }))
 
     return NextResponse.json({
-      stats: statsResult.recordset[0] || { total: 0, in_maintenance: 0, waiting: 0, complete: 0 },
+      stats: statsResult.recordset[0] || { total: 0, in_maintenance: 0, waiting: 0, complete: 0, on_rent_maintenance: 0, ready_pickup: 0, replacement_maintenance: 0 },
       locations: locationsMapped,
       problemTypes: problemTypesMapped,
       followUps: followUpsResult.recordset,

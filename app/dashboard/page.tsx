@@ -501,10 +501,10 @@ function DashboardContent() {
               />
               <StatCard 
                 title="ซ่อมค้างรวม" 
-                value={data.repair.open} 
+                value={data.repair.openTotal ?? data.repair.open} 
                 icon={alertIcon}
                 subValue={[
-                  { label: 'คิดเป็น', count: getPercentage(data.repair.open, data.repair.total), color: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/20' }
+                  { label: 'คิดเป็น', count: getPercentage(data.repair.openTotal ?? data.repair.open, data.repair.total), color: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/20' }
                 ]}
               />
             </>

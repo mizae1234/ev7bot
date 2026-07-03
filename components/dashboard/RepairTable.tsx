@@ -36,16 +36,40 @@ const carStatusMap: Record<string, string> = {
   'IN_MAINTENANCE': 'อยู่ระหว่างการซ่อม',
   'WAITING_FOR_MAINTENANCE': 'รอเข้าซ่อม',
   'STILL_WORK': 'ยังวิ่งอยู่',
+  'READY_PICKUP_MAINTENANCE': 'พร้อมรับรถ',
 }
-
 const mapCode = (code: string | null | undefined, map: Record<string, string>): string => {
   if (!code) return '-'
   return map[code] || code.replace(/_/g, ' ')
 }
 
+const locationMap: Record<string, string> = {
+  'AION_GI_KANCHANAPISEK': 'Aion กาญจนาฯ',
+  'AION_GI_RAMINTRA_EXPRESSWAY': 'Aion เลียบด่วนฯ',
+  'AION_GI_PIBULSONGKRAM': 'Aion พิบูลฯ',
+  'AION_GI_MINBURI': 'Aion มีนบุรี',
+  'AION_GI_MAHACHAI': 'Aion มหาชัย',
+  'AION_GI_SALAYA': 'Aion ศาลายา',
+  'EV7_YARD_PRAPADAENG': 'EV7 Yard พระประแดง',
+  'SMART_TAXI': 'สมาร์ทเแท็กซี่',
+  'GARAGE_BUNGKHWANG': 'อู่ บึงขวาง',
+  'GARAGE_TS': 'อู่ TS',
+  'GARAGE_88_CAR': 'อู่ 88 คาร์',
+  'GARAGE_CRN_PAKKRET': 'อู่ CRN ปากเกร็ด',
+  'GARAGE_56_COLOR': 'อู่ 56 Color',
+  'GARAGE_PRICHA': 'อู่ ปรีชา',
+  'GARAGE_PERFECTCAR': 'อู่ เพอร์เฟคคาร์',
+  'GARAGE_SAHACAR': 'อู่ สหาคาร์',
+  'GARAGE_PREMIUMCAR': 'อู่ พรีเมี่ยมคาร์',
+  'GARAGE_BESTCARPAINT': 'อู่ เบสท์คาร์เพ้นท์',
+  'BRANCH_AYUTTHAYA': 'สาขา อยุธยา',
+  'BB_CARPAINT': 'อู่ บีบี คาร์เพ้นท์',
+  'AUTOHAUS': 'อู่ Autohaus'
+}
+
 const formatLocation = (code: string | null | undefined): string => {
   if (!code) return '-'
-  return code.replace(/_/g, ' ')
+  return locationMap[code] || code.replace(/_/g, ' ')
 }
 
 interface RepairTableProps {
@@ -108,6 +132,7 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
       case 'COMPLETE': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400'
       case 'WAITING_FOR_MAINTENANCE': return 'bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400'
       case 'STILL_WORK': return 'bg-sky-500/10 text-sky-600 border-sky-500/20 dark:bg-sky-500/20 dark:text-sky-400'
+      case 'READY_PICKUP_MAINTENANCE': return 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400'
       default: return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:bg-zinc-500/20 dark:text-zinc-400'
     }
   }
@@ -215,6 +240,7 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
             <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-semibold bg-zinc-50/50 dark:bg-zinc-900/50">
               <th className="py-3 px-4 w-6"></th>
               <th className="py-3 pr-2">📍 สถานที่ซ่อม</th>
+              <th className="py-3 pr-2">👤 ผู้รับผิดชอบตามงาน</th>
               <th className="py-3 pr-2">ทะเบียน / VIN</th>
               <th className="py-3 pr-2">รุ่น</th>
               <th className="py-3 pr-2">อาการ</th>
@@ -238,8 +264,33 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
                     <td className="py-3.5 pr-2 text-emerald-700 dark:text-emerald-400 font-medium">
                       {formatLocation(rec.service_location)}
                     </td>
-                    <td className="py-3.5 pr-2">
-                      <div className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{rec.vehicle_id || '-'}</div>
+                    <td className="py-3.5 pr-2 font-semibold">
+                      {(() => {
+                        const statusCode = (rec.status_code || (rec.status === 'closed' ? 'COMPLETE' : rec.status === 'in_progress' ? 'IN_MAINTENANCE' : 'WAITING_FOR_MAINTENANCE')).toUpperCase()
+                        if (statusCode === 'READY_PICKUP_MAINTENANCE' || statusCode === 'STILL_WORK') {
+                          return (
+                            <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-50 border border-indigo-200 text-indigo-750 dark:bg-indigo-950/40 dark:border-indigo-900 dark:text-indigo-400">
+                              EV7/ICI
+                            </span>
+                          )
+                        } else if (statusCode === 'COMPLETE') {
+                          return <span className="text-zinc-400 font-normal">-</span>
+                        } else {
+                          return (
+                            <span className="text-zinc-700 dark:text-zinc-350">
+                              {formatLocation(rec.service_location) || '-'}
+                            </span>
+                          )
+                        }
+                      })()}
+                    </td>
+                    <td className="py-3.5 pr-2" onClick={(e) => e.stopPropagation()}>
+                      <a
+                        href={`/vehicle/${encodeURIComponent(rec.vehicle_id || rec.vin || '')}`}
+                        className="font-mono font-bold text-indigo-650 hover:text-indigo-855 hover:underline dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                      >
+                        {rec.vehicle_id || '-'}
+                      </a>
                       <div className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">{rec.vin}</div>
                     </td>
                     <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{rec.model || '-'}</td>
@@ -311,6 +362,17 @@ export function RepairTable({ records = [], periodLabel = '' }: RepairTableProps
                               <span className="text-zinc-450 font-bold block mb-1">📍 สถานที่ซ่อม (อู่):</span>
                               <span className="text-zinc-800 dark:text-zinc-200">
                                 {formatLocation(rec.service_location)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-455 font-bold block mb-1">📞 ผู้รับผิดชอบตามงาน:</span>
+                              <span className="text-indigo-650 dark:text-indigo-400 font-bold">
+                                {(() => {
+                                  const statusCode = (rec.status_code || (rec.status === 'closed' ? 'COMPLETE' : rec.status === 'in_progress' ? 'IN_MAINTENANCE' : 'WAITING_FOR_MAINTENANCE')).toUpperCase()
+                                  if (statusCode === 'READY_PICKUP_MAINTENANCE' || statusCode === 'STILL_WORK') return 'EV7/ICI'
+                                  if (statusCode === 'COMPLETE') return '-'
+                                  return formatLocation(rec.service_location) || '-'
+                                })()}
                               </span>
                             </div>
 

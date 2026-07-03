@@ -36,6 +36,7 @@ const carStatusMap: Record<string, string> = {
   'IN_MAINTENANCE': 'รถอยู่ระหว่างซ่อม',
   'WAITING_FOR_MAINTENANCE': 'รถจอดรอซ่อม',
   'STILL_WORK': 'รถยังขับใช้งานได้อยู่',
+  'READY_PICKUP_MAINTENANCE': 'พร้อมรับรถ',
 }
 
 const mapCode = (code: unknown, map: Record<string, string>): string => {

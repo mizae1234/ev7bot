@@ -19,8 +19,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="th" className={`${prompt.variable}`}>
-      <body className="antialiased min-h-screen bg-zinc-55 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 transition-colors duration-200">
+    <html lang="th" className={`${prompt.variable}`} style={{ colorScheme: 'light' }}>
+      <head>
+        <meta name="color-scheme" content="light" />
+      </head>
+      <body className="antialiased min-h-screen bg-slate-50 text-zinc-900">
         {children}
       </body>
     </html>

@@ -40,15 +40,19 @@ export async function POST(req: NextRequest) {
 
       dbUserId = userRes.recordset[0].UserID
 
-      // Update LineUserId in SQL Server EV_User
-      const updSqlReq = pool.request()
-      updSqlReq.input('userId', sql.Int, dbUserId)
-      updSqlReq.input('lineUserId', sql.VarChar, userId)
-      await updSqlReq.query(`
-        UPDATE dbo.EV_User 
-        SET LineUserId = @lineUserId, ModifiedDatetime = GETDATE()
-        WHERE UserID = @userId
-      `)
+      // Update LineUserId in SQL Server EV_User (Best effort - proceed even if UPDATE permission is denied)
+      try {
+        const updSqlReq = pool.request()
+        updSqlReq.input('userId', sql.Int, dbUserId)
+        updSqlReq.input('lineUserId', sql.VarChar, userId)
+        await updSqlReq.query(`
+          UPDATE dbo.EV_User 
+          SET LineUserId = @lineUserId, ModifiedDatetime = GETDATE()
+          WHERE UserID = @userId
+        `)
+      } catch (sqlErr: any) {
+        console.warn('[Liff Associate] Denied or failed to update SQL Server EV_User LineUserId, proceeding with Postgres association. Error:', sqlErr.message)
+      }
 
     } else if (action === 'create') {
       // --- CREATE NEW ACCOUNT ---

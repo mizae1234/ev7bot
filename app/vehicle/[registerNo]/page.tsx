@@ -181,12 +181,21 @@ function VehicleDetailContent() {
   if (error) return <ErrorState message={error} registerNo={registerNo} />
   if (!data) return null
 
-  const { car, currentRent, rentHistory = [], maintenance, returns } = data
+  const { car, currentRent, rentHistory = [], maintenance = [], returns = [] } = data
   const statusInfo = getStatusInfo(
     car.StatusCode,
     car.StatusCode === 'AVAILABLE' && car.SubStatusName ? car.SubStatusName : car.StatusName
   )
   const activeMaint = maintenance.find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
+
+  // Consolidate all follow-ups from all maintenance items
+  const allFollowUps = (maintenance || [])
+    .flatMap(m => (m.followUps || []).map(f => ({
+      ...f,
+      maintId: m.MaintenanceItemID,
+      issueTitle: m.IssueTitle
+    })))
+    .sort((a, b) => new Date(b.FollowUpDate || b.CreateDate || '').getTime() - new Date(a.FollowUpDate || a.CreateDate || '').getTime())
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-emerald-50/30 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900/40 text-zinc-900 dark:text-zinc-100">
@@ -340,6 +349,31 @@ function VehicleDetailContent() {
                   ))}
                 </div>
               )}
+            </div>
+          </SectionCard>
+        )}
+
+        {/* ── All Follow-up Timeline ── */}
+        {allFollowUps.length > 0 && (
+          <SectionCard title={`📋 บันทึกติดตามงานซ่อมบำรุงสะสม (${allFollowUps.length} รายการ)`} color="amber">
+            <div className="space-y-4 pl-3.5 border-l-2 border-slate-200 dark:border-slate-800 ml-1 py-1.5 max-h-[500px] overflow-y-auto pr-1">
+              {allFollowUps.map((log, idx) => (
+                <div key={idx} className="relative text-xs">
+                  <span className="absolute -left-[19.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border border-white dark:border-zinc-900 shadow-sm" />
+                  <div className="flex justify-between text-zinc-550 dark:text-zinc-400 font-semibold mb-1">
+                    <span className="font-mono">{formatDate(log.FollowUpDate || log.CreateDate)}</span>
+                    <span>โดย {log.CreateUserName || `User ${log.CreateUserID || '-'}`}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5">
+                    <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-450 mb-1">
+                      🔧 ใบสั่งซ่อม ID: <span className="font-mono text-zinc-700 dark:text-zinc-300 font-extrabold">#{log.maintId}</span> ({log.issueTitle || 'ไม่ระบุอาการ'})
+                    </p>
+                    <p className="text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed whitespace-pre-line">
+                      {log.FollowUpDetail}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </SectionCard>
         )}

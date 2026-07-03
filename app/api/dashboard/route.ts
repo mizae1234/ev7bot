@@ -430,14 +430,15 @@ export async function GET(req: NextRequest) {
       repairSummaryRequest.query(`
         SELECT
           COUNT(*) AS total,
-          SUM(CASE WHEN MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
-          SUM(CASE WHEN MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open]
-        FROM dbo.EV_MaintenanceItem
-        WHERE (IsActive = 1 OR MaintenanceFinishDate IS NOT NULL)
+          SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
+          SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open],
+          (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND IsActive = 1) AS openTotal
+        FROM dbo.EV_MaintenanceItem m
+        WHERE (m.IsActive = 1 OR m.MaintenanceFinishDate IS NOT NULL)
           AND (
-            (ReportDate >= @startDate AND ReportDate <= @endDate)
-            OR (MaintenanceStartDate >= @startDate AND MaintenanceStartDate <= @endDate)
-            OR (MaintenanceFinishDate >= @startDate AND MaintenanceFinishDate <= @endDate)
+            (m.ReportDate >= @startDate AND m.ReportDate <= @endDate)
+            OR (m.MaintenanceStartDate >= @startDate AND m.MaintenanceStartDate <= @endDate)
+            OR (m.MaintenanceFinishDate >= @startDate AND m.MaintenanceFinishDate <= @endDate)
           )
       `),
       planTrendRequest.query(`
@@ -694,6 +695,7 @@ export async function GET(req: NextRequest) {
         total: Number(repairSummaryResult.recordset[0]?.total || 0),
         closed: Number(repairSummaryResult.recordset[0]?.closed || 0),
         open: Number(repairSummaryResult.recordset[0]?.open || 0),
+        openTotal: Number(repairSummaryResult.recordset[0]?.openTotal || 0),
       },
       trend,
       deliveryList: (deliveryListResult.recordset || []).map((row: any) => ({
