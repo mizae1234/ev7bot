@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'อีเมลนี้ถูกใช้งานในระบบแล้ว กรุณาเลือกผูกบัญชีเดิมหรือเปลี่ยนอีเมล' }, { status: 400 })
       }
 
-      // Insert new user to SQL Server (Best effort - fallback if INSERT permission is denied)
+      // Insert new user to SQL Server (Strict requirement)
       try {
         const insReq = pool.request()
         insReq.input('userName', sql.VarChar, email.trim())
@@ -103,7 +103,10 @@ export async function POST(req: NextRequest) {
 
         dbUserId = insRes.recordset[0].NewUserID
       } catch (sqlErr: any) {
-        console.warn('[Liff Associate] Denied or failed to insert SQL Server EV_User, fallback to local Postgres ID. Error:', sqlErr.message)
+        console.error('[Liff Associate SQL Error]', sqlErr)
+        return NextResponse.json({
+          error: `ไม่สามารถบันทึกบัญชีผู้ใช้ใหม่ลงฐานข้อมูลหลักได้: ${sqlErr.message} (กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์การเขียนข้อมูลลงตาราง EV_User)`
+        }, { status: 400 })
       }
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -124,12 +127,11 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // If dbUserId was resolved from SQL Server (linked or created successfully), use it.
-    // If dbUserId is null (because INSERT/UPDATE permission was denied on SQL Server), fallback to 10000 + registration ID
-    let finalUserId = dbUserId
-    if (!finalUserId) {
-      finalUserId = 10000 + reg.id
+    // If dbUserId is null (strict block), do not proceed
+    if (!dbUserId) {
+      return NextResponse.json({ error: 'ไม่พบรหัสผู้ใช้งานในฐานข้อมูลหลัก' }, { status: 400 })
     }
+    const finalUserId = dbUserId
 
     // Update the ev7UserId in PostgreSQL to finalUserId
     const updatedReg = await prisma.lineRegistration.update({
