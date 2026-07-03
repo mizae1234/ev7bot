@@ -136,14 +136,29 @@ export async function GET(req: NextRequest) {
       itemResult
     ] = await Promise.all([
       summaryReq.query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.InventoryItemID,
+            m.CarStatusCode,
+            ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) AS rn
+          FROM dbo.EV_MaintenanceItem m
+          WHERE m.IsActive = 1
+        ),
+        VehiclesWithStatus AS (
+          SELECT 
+            i.InventoryItemID,
+            i.StatusType,
+            COALESCE(t.CarStatusCode, '') AS LatestCarStatusCode
+          FROM dbo.EV_InventoryItem i
+          LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+          WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+        )
         SELECT
-          COUNT(DISTINCT m.InventoryItemID) AS total,
-          COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN m.InventoryItemID END) AS in_maintenance,
+          COUNT(*) AS total,
+          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType <> 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
           0 AS complete,
-          COUNT(DISTINCT CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN m.InventoryItemID END) AS waiting
-        FROM dbo.EV_MaintenanceItem m
-        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'${locationWhere}
+          SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' OR StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting
+        FROM VehiclesWithStatus
       `),
       locReq.query(`
         SELECT DISTINCT m.ServiceLocationCode
@@ -153,13 +168,22 @@ export async function GET(req: NextRequest) {
         ORDER BY m.ServiceLocationCode
       `),
       repairByLocReq.query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.InventoryItemID,
+            m.ServiceLocationCode,
+            m.CarStatusCode,
+            ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+          FROM dbo.EV_MaintenanceItem m
+          JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+        )
         SELECT 
-          ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
-          COUNT(DISTINCT m.InventoryItemID) AS Count
-        FROM dbo.EV_MaintenanceItem m
-        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}
-        GROUP BY m.ServiceLocationCode
+          ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+          COUNT(*) AS Count
+        FROM LatestTickets
+        WHERE rn = 1
+        GROUP BY ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY Count DESC
       `),
       itemReq.query(`
