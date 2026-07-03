@@ -149,16 +149,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // 1. Basic Stats (Matching GetEV_HeadlineDashboard and EV_MsSubStatus logic exactly)
     const statsResult = await pool.request().query(`
+      WITH LatestTickets AS (
+        SELECT 
+          m.InventoryItemID,
+          m.CarStatusCode,
+          ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) AS rn
+        FROM dbo.EV_MaintenanceItem m
+        WHERE m.IsActive = 1
+      ),
+      VehiclesWithStatus AS (
+        SELECT 
+          i.InventoryItemID,
+          i.StatusType,
+          COALESCE(t.CarStatusCode, '') AS LatestCarStatusCode
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+        WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+      )
       SELECT
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'NEW_MAINTENANCE' AND IsActive = 1) AS waiting,
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'USE_MAINTENANCE' AND IsActive = 1) AS in_maintenance,
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'ON_RENT_MAINTENANCE' AND IsActive = 1) AS on_rent_maintenance,
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'READY_PICKUP_MAINTENANCE' AND IsActive = 1) AS ready_pickup,
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND StatusType = 'REPLACEMENT_MAINTENANCE' AND IsActive = 1) AS replacement_maintenance,
+        SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 1 ELSE 0 END) AS ready_pickup,
+        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting,
+        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'USE_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
+        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'ON_RENT_MAINTENANCE' THEN 1 ELSE 0 END) AS on_rent_maintenance,
+        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'REPLACEMENT_MAINTENANCE' THEN 1 ELSE 0 END) AS replacement_maintenance,
         (SELECT COUNT(*) FROM dbo.EV_MaintenanceItem WHERE CarStatusCode = 'COMPLETE') AS complete,
-        (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND IsActive = 1) AS total
+        COUNT(*) AS total
+      FROM VehiclesWithStatus
     `)
 
     // 2. Service Location Breakdown (Only count cars currently in MAINTENANCE status, once per car)
