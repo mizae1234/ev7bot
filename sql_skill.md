@@ -835,4 +835,51 @@ pool = await sql.connect(config)
 ### 13.3 จำกัดจำนวนแถวการแสดงผล (TOP N Limitation)
 สำหรับตารางการแสดงผลข้อมูลประวัติหรือลิสต์รายการ (เช่น รายการแจ้งซ่อม หรือรายการปล่อยรถ) ให้ใช้ `TOP 200` หรือ `TOP 500` เสมอ เพื่อป้องกันไม่ให้คำสั่งคิวรีดึงข้อมูลปริมาณมหาศาลกลับมาทั้งหมดในครั้งเดียว ซึ่งเป็นสาเหตุหลักที่ทำให้ API หน่วงและส่งผลกระทบต่อหน่วยความจำของแอปพลิเคชัน
 
+---
+
+## 14. กฎทางธุรกิจและสถานะการซ่อมบำรุงรถ (Maintenance Status Workflow)
+
+ในการปรับปรุงข้อมูลการแจ้งซ่อมและสถานะรถ ให้ใช้กฎทางธุรกิจ (Business Rules) ดังนี้เพื่อรักษาความถูกต้องและเชื่อมโยงกันระหว่างตาราง `dbo.EV_MaintenanceItem` และ `dbo.EV_InventoryItem`
+
+### 14.1 การล้างตัวอักษรพิเศษ / Emoji ก่อนบันทึก
+* หลีกเลี่ยงการบันทึก Emoji (เช่น 🟡, 🔴, 🟢) ลงในฟิลด์บันทึกติดตามผล (`FollowUpDetail`) ในฐานข้อมูล เนื่องจากบาง SQL Server instance ไม่รองรับ Unicode Emoji และอาจทำให้บันทึกเป็นเครื่องหมายคำถามคู่ `??` ให้ใช้ข้อความปกติ เช่นขึ้นต้นด้วย **"ระบบอัพเดต :"** แทน
+
+### 14.2 การแปลงรูปแบบวันที่สำหรับ MSSQL
+* เมื่อรับค่า datetime-local จากหน้าเว็บ (รูปแบบ `YYYY-MM-DDTHH:MM`) ต้องแปลงให้อยู่ในรูปแบบที่ MSSQL รองรับก่อนบันทึกเสมอ (แทนที่ `T` ด้วยช่องว่าง และเติมวินาที `:00`)
+```typescript
+const toMssqlDate = (d: string | null | undefined): string | null => {
+  if (!d) return null
+  let result = d.replace('T', ' ')
+  if (result.split(':').length === 2) result += ':00'
+  return result
+}
+```
+
+### 14.3 กฎการเปลี่ยนสถานะใบงานแจ้งซ่อม และสถานะตัวรถ (EV_InventoryItem)
+เมื่อผู้ใช้งานดำเนินการบันทึกสถานะงานซ่อม ระบบจะทำงานดังนี้:
+
+#### ก. เมื่อเริ่มซ่อม (IN_MAINTENANCE)
+* ปรับปรุงตาราง `EV_MaintenanceItem` ของใบงานนั้น:
+  * `CarStatusCode` = `'IN_MAINTENANCE'`
+  * `MaintenanceStartDate` = วันที่เริ่มซ่อม
+  * `ServiceLocationCode` และ `ServiceLocationName` = รหัสและชื่อสถานที่จัดเก็บรถ/อู่
+
+#### ข. เมื่อซ่อมเสร็จสิ้น (COMPLETE)
+1. **ตรวจสอบความปลอดภัยการอัปเดตตัวรถ (`EV_InventoryItem`)**:
+   * จะทำการอัปเดตสถานะตัวรถได้ ก็ต่อเมื่อ **"ไม่มีใบงานซ่อมค้าง (Pending) หรืองานอื่นคงเหลืออยู่สำหรับรถคันนี้แล้ว"** (โดยเช็คว่า `COUNT(ใบงานค้างที่มี CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE')) = 0`)
+   * หากยังมีใบงานอื่นของรถคันเดียวกันค้างซ่อมอยู่แม้แต่ใบเดียว ให้ปรับเฉพาะสถานะใบงานใน `EV_MaintenanceItem` เท่านั้น และ **ห้ามอัปเดต** ข้อมูลในตาราง `EV_InventoryItem` เด็ดขาด
+
+2. **กฎการปรับสถานะใบงานและสถานะตัวรถตาม `StatusType` ของรถ**:
+   หากผ่านเงื่อนไขไม่มีใบงานค้างแล้ว ให้ปรับปรุงตามตารางจับคู่ (Mapping) ด้านล่างนี้:
+
+| `StatusType` ปัจจุบันของรถ | การอัปเดตใบงาน (`EV_MaintenanceItem`) | การอัปเดตตัวรถ (`EV_InventoryItem`) |
+|---|---|---|
+| **`ON_RENT_MAINTENANCE`** | `CarStatusCode` = `'READY_PICKUP_MAINTENANCE'` | **ไม่ต้องแก้ไขตัวรถ** (คงสถานะ `ON_RENT` ไว้เหมือนเดิม) |
+| **`USE_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE_USE'` |
+| **`NEW_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE'` |
+| **`REPLACEMENT_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'REPLACEMENT'` และ `StatusType` = `'REPLACEMENT_AVAILABLE'` |
+
+*(หมายเหตุ: ทุกการอัปเดตต้องระบุ `UpdateUserID` และตั้งค่า `UpdateDate = GETDATE()` ด้วยเสมอ)*
+
+
 
