@@ -35,10 +35,29 @@ export async function POST(req: NextRequest) {
         })
         if (reg?.ev7UserId) {
           dbUserId = reg.ev7UserId
+        } else {
+          return NextResponse.json({ error: 'กรุณาทำการลงทะเบียน/ผูกบัญชีเพื่อเปิดสิทธิ์การใช้งานก่อนทำรายการ' }, { status: 400 })
         }
       } catch (prismaErr) {
         console.error('[Prisma read ev7UserId Error]', prismaErr)
       }
+    }
+
+    // Verify if dbUserId exists in SQL Server EV_User table
+    try {
+      const userCheckReq = pool.request()
+      userCheckReq.input('userId', sql.Int, dbUserId)
+      const userCheckRes = await userCheckReq.query(`
+        SELECT UserID FROM dbo.EV_User WHERE UserID = @userId AND IsActive = 1
+      `)
+      if (userCheckRes.recordset.length === 0) {
+        return NextResponse.json({
+          error: 'บัญชีผู้ใช้งานของคุณไม่มีอยู่ในตาราง EV_User หรือถูกระงับการใช้งาน กรุณาผูกบัญชีผู้ใช้จริงก่อนทำรายการ'
+        }, { status: 400 })
+      }
+    } catch (checkErr: any) {
+      console.error('[User check error]', checkErr)
+      return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ผู้ใช้งาน: ' + checkErr.message }, { status: 500 })
     }
 
     // Resolve CarStatusCode
