@@ -2575,6 +2575,7 @@ async function trySendVehicleFlexMessage(
              m.MaintenanceItemID, 
              m.IssueTitle, 
              m.CarStatusCode, 
+             ISNULL(sub.StatusName, m.CarStatusCode) AS CarStatusName,
              m.ServiceLocationCode, 
              m.ReportDate, 
              m.CreateDate, 
@@ -2582,6 +2583,7 @@ async function trySendVehicleFlexMessage(
              ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
            FROM dbo.EV_MaintenanceItem m
            LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
+           LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode AND sub.Type = 'MAINTENANCE_CAR_STATUS'
            WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
            ORDER BY m.ReportDate DESC
         `)
@@ -2618,16 +2620,17 @@ async function trySendVehicleFlexMessage(
         followUps = followUpResult.recordset || []
       }
 
-      const usageStatus =
-        maint.CarStatusCode === 'STILL_WORK'
-          ? '🟢 ยังใช้งานได้ (ยังวิ่งอยู่)'
+      // Add appropriate color emoji based on CarStatusCode
+      const emoji =
+        maint.CarStatusCode === 'STILL_WORK' || maint.CarStatusCode === 'COMPLETE'
+          ? '🟢'
           : maint.CarStatusCode === 'IN_MAINTENANCE'
-          ? '🔴 งดใช้งาน (อยู่ระหว่างซ่อม)'
+          ? '🔴'
           : maint.CarStatusCode === 'WAITING_FOR_MAINTENANCE'
-          ? '🟡 งดใช้งาน (รอเข้าซ่อม)'
-          : maint.CarStatusCode === 'COMPLETE'
-          ? '🟢 ซ่อมเสร็จสิ้น (ใช้งานได้)'
-          : maint.CarStatusCode || '-'
+          ? '🟡'
+          : '⚪'
+
+      const usageStatus = maint.CarStatusName ? `${emoji} ${maint.CarStatusName}` : '-'
 
       const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
       const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
