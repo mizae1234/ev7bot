@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface DbCar {
   InventoryItemID: number
@@ -103,7 +104,9 @@ const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) 
 }
 
 export default function QuickReportPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard'>('report')
+  const [authChecking, setAuthChecking] = useState(true)
 
   // Search and selection
   const [searchTerm, setSearchTerm] = useState('')
@@ -138,6 +141,46 @@ export default function QuickReportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submittedData, setSubmittedData] = useState<any>(null)
+
+  // Auth checking effect
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const profileStr = localStorage.getItem('liff_profile')
+      if (!profileStr) {
+        // No local cache, redirect back to /liff to login
+        console.log('[Quick Report Auth] No LINE profile found, redirecting to /liff...')
+        router.replace('/liff?path=' + encodeURIComponent(window.location.pathname + window.location.search))
+        return
+      }
+
+      try {
+        const profile = JSON.parse(profileStr)
+        if (!profile.userId) {
+          throw new Error('No userId in cache')
+        }
+
+        const res = await fetch(`/api/liff/check-auth?userId=${profile.userId}`)
+        if (!res.ok) {
+          throw new Error('Auth check failed')
+        }
+        
+        const data = await res.json()
+        if (!data.authenticated) {
+          console.log('[Quick Report Auth] User is not mapped, redirecting to registration...')
+          router.replace('/liff/register?path=' + encodeURIComponent(window.location.pathname + window.location.search))
+          return
+        }
+
+        // Auth passed!
+        setAuthChecking(false)
+      } catch (err) {
+        console.error('[Quick Report Auth Error]', err)
+        router.replace('/liff?path=' + encodeURIComponent(window.location.pathname + window.location.search))
+      }
+    }
+
+    checkAuthStatus()
+  }, [router])
   const [isRecording, setIsRecording] = useState(false)
   const [speechError, setSpeechError] = useState<string | null>(null)
 
@@ -945,6 +988,18 @@ export default function QuickReportPage() {
   const getVehiclesAtLocation = (locCode: string) => {
     const repairs = mobileDashboardData?.longestRepairs || []
     return repairs.filter((r: any) => r.ServiceLocationCode === locCode || (locCode === 'ไม่ระบุ' && !r.ServiceLocationCode))
+  }
+
+  // ─── RENDER AUTH CHECKING LOADER ──────────────────────────────────────
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-slate-500 font-bold">กำลังตรวจสอบสิทธิ์การเข้าใช้งาน...</p>
+        </div>
+      </div>
+    )
   }
 
   // ─── RENDER FULL DETAIL EDIT SPA VIEW ──────────────────────────────────
