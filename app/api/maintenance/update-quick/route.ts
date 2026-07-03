@@ -136,6 +136,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ─── Direct update EV_MaintenanceItem for เริ่มซ่อม (IN_MAINTENANCE) ───
+    if (carStatusCode === 'IN_MAINTENANCE') {
+      try {
+        const startReq = pool.request()
+        startReq.input('maintId', sql.Int, maintenanceId)
+        startReq.input('statusCode', sql.NVarChar, 'IN_MAINTENANCE')
+        startReq.input('startDate', sql.NVarChar, startDate || new Date().toISOString())
+        startReq.input('locCode', sql.NVarChar, serviceLocationCode || null)
+        startReq.input('locName', sql.NVarChar, serviceLocationName || serviceLocationCode || null)
+        startReq.input('userId', sql.Int, dbUserId)
+        await startReq.query(`
+          UPDATE dbo.EV_MaintenanceItem
+          SET CarStatusCode = @statusCode,
+              MaintenanceStartDate = @startDate,
+              ServiceLocationCode = @locCode,
+              ServiceLocationName = @locName,
+              UpdateUserID = @userId,
+              UpdateDate = GETDATE()
+          WHERE MaintenanceItemID = @maintId
+        `)
+        console.log(`[Start Maintenance] MaintenanceItemID=${maintenanceId}: set IN_MAINTENANCE, StartDate=${startDate}, Location=${serviceLocationCode}`)
+      } catch (startErr) {
+        console.error('[Start Maintenance Update Error]', startErr)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'บันทึกการอัปเดตและติดตามผลสำเร็จเรียบร้อย'
