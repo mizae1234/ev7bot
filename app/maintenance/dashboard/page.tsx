@@ -48,6 +48,7 @@ interface LongestRepairItem {
   Project: string
   IssueTitle: string
   CarStatusCode: string
+  CarStatusName: string
   ServiceLocationCode: string
   ReportDate: string
   DaysActive: number
@@ -386,13 +387,7 @@ function MaintenanceDashboardContent() {
                                 ? 'bg-sky-50 border-sky-200 text-sky-700'
                                 : 'bg-rose-50 border-rose-200 text-rose-700'
                             }`}>
-                              {item.CarStatusCode === 'IN_MAINTENANCE' 
-                                ? 'กำลังซ่อม' 
-                                : item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' 
-                                ? 'พร้อมรับรถ' 
-                                : item.CarStatusCode === 'STILL_WORK'
-                                ? 'ยังวิ่งอยู่'
-                                : 'รอเข้าซ่อม'}
+                              {item.CarStatusName || item.CarStatusCode}
                             </span>
 
                             {/* Issue Title */}

@@ -260,12 +260,14 @@ export async function GET(req: NextRequest) {
         i.ProjectType AS Project,
         t.IssueTitle,
         t.CarStatusCode,
+        ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
         t.ServiceLocationCode,
         t.ReportDate,
         DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
         t.FollowUpDetail
       FROM LatestTickets t
       JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.EV_MsSubStatus sub ON t.CarStatusCode = sub.StatusCode AND sub.Type = 'MAINTENANCE_CAR_STATUS'
       WHERE t.rn = 1
       ORDER BY t.ReportDate ASC
     `)
