@@ -669,7 +669,6 @@ export default function QuickReportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           maintenanceId: editingTicket.MaintenanceItemID,
-          carStatusCode: editStatus,
           followUpDetail: editFollowUp,
           lineUserId: getLineUserId(),
           deletedAttachmentIds: deletedPhotoIds
@@ -1306,34 +1305,6 @@ export default function QuickReportPage() {
 
           {/* Edit Form Card */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-            
-             {/* Status Selector */}
-             <div>
-               <label className="text-xs font-bold text-slate-600 block mb-1.5">🚦 ปรับสถานะใบแจ้งซ่อม</label>
-               <select
-                 value={editStatus}
-                 onChange={(e) => setEditStatus(e.target.value)}
-                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
-               >
-                 {(dbCarStatuses.length > 0 ? dbCarStatuses : [
-                   { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
-                   { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
-                   { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' }
-                 ]).map((st) => {
-                   let emoji = '⚙️'
-                   if (st.StatusCode === 'WAITING_FOR_MAINTENANCE') emoji = '🟡'
-                   else if (st.StatusCode === 'STILL_WORK') emoji = '🔵'
-                   else if (st.StatusCode === 'IN_MAINTENANCE') emoji = '🔴'
-                   else if (st.StatusCode === 'GARAGE_COMPLETE') emoji = '🟢'
-
-                   return (
-                     <option key={st.StatusCode} value={st.StatusCode}>
-                       {emoji} {st.StatusName}
-                     </option>
-                   )
-                 })}
-               </select>
-             </div>
 
             {/* Follow-up Note Textarea */}
             <div>

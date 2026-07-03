@@ -41,32 +41,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve CarStatusCode if it is COMPLETE (ซ่อมเสร็จ)
+    // Resolve CarStatusCode
     let resolvedCarStatusCode = carStatusCode
     let inventoryItemId: number | null = null
     let vehicleStatusType: string | null = null
 
-    if (carStatusCode === 'COMPLETE') {
-      try {
-        const vehicleInfoReq = pool.request()
-        vehicleInfoReq.input('maintId', sql.Int, maintenanceId)
-        const vehicleInfoRes = await vehicleInfoReq.query(`
-          SELECT m.InventoryItemID, i.StatusType 
-          FROM dbo.EV_MaintenanceItem m
-          JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-          WHERE m.MaintenanceItemID = @maintId
-        `)
+    try {
+      const vehicleInfoReq = pool.request()
+      vehicleInfoReq.input('maintId', sql.Int, maintenanceId)
+      const vehicleInfoRes = await vehicleInfoReq.query(`
+        SELECT m.InventoryItemID, m.CarStatusCode, i.StatusType 
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.MaintenanceItemID = @maintId
+      `)
 
-        if (vehicleInfoRes.recordset.length > 0) {
-          inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
-          vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
+      if (vehicleInfoRes.recordset.length > 0) {
+        inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
+        vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
 
-          if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
-            resolvedCarStatusCode = 'READY_PICKUP_MAINTENANCE'
-          }
+        // If carStatusCode is not provided in body, default to the existing one from database
+        if (carStatusCode === undefined) {
+          resolvedCarStatusCode = vehicleInfoRes.recordset[0].CarStatusCode
         }
-      } catch (infoErr) {
-        console.error('[Get Vehicle Info Error]', infoErr)
+      }
+    } catch (infoErr) {
+      console.error('[Get Vehicle Info Error]', infoErr)
+    }
+
+    if (resolvedCarStatusCode === 'COMPLETE') {
+      if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
+        resolvedCarStatusCode = 'READY_PICKUP_MAINTENANCE'
       }
     }
 
@@ -182,14 +187,12 @@ export async function POST(req: NextRequest) {
         startReq.input('statusCode', sql.NVarChar, 'IN_MAINTENANCE')
         startReq.input('startDate', sql.NVarChar, toMssqlDate(startDate) || new Date().toISOString().replace('T', ' ').slice(0, 19))
         startReq.input('locCode', sql.NVarChar, serviceLocationCode || null)
-        startReq.input('locName', sql.NVarChar, serviceLocationName || serviceLocationCode || null)
         startReq.input('userId', sql.Int, dbUserId)
         await startReq.query(`
           UPDATE dbo.EV_MaintenanceItem
           SET CarStatusCode = @statusCode,
               MaintenanceStartDate = @startDate,
               ServiceLocationCode = @locCode,
-              ServiceLocationName = @locName,
               UpdateUserID = @userId,
               UpdateDate = GETDATE()
           WHERE MaintenanceItemID = @maintId
