@@ -114,6 +114,7 @@ export default function QuickReportPage() {
   const [loadingCars, setLoadingCars] = useState(false)
 
   // Form Fields
+  const [contractorName, setContractorName] = useState('')
   const [driverName, setDriverName] = useState('')
   const [incidentDate, setIncidentDate] = useState(() => {
     const now = new Date()
@@ -260,8 +261,10 @@ export default function QuickReportPage() {
         // 1. Set driver name if there is an active rental contract
         if (data.currentRent) {
           const name = `${data.currentRent.FirstName} ${data.currentRent.LastName}`.trim()
+          setContractorName(name)
           setDriverName(name)
         } else {
+          setContractorName('')
           setDriverName('')
         }
 
@@ -611,6 +614,7 @@ export default function QuickReportPage() {
     setSearchTerm('')
     setSelectedCar(null)
     setSelectedCarDetails(null)
+    setContractorName('')
     setDriverName('')
     setIssueDescription('')
     setAttachments([])
@@ -1506,6 +1510,7 @@ export default function QuickReportPage() {
                 <label className="text-xs font-bold text-slate-600 block mb-2">🚗 1. ข้อมูลรถที่เกิดเหตุ / มีปัญหา <span className="text-rose-550">*</span></label>
                 
                 {selectedCar ? (
+                  <>
                   <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                     <div>
                       <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
@@ -1528,6 +1533,7 @@ export default function QuickReportPage() {
                       onClick={() => {
                         setSelectedCar(null)
                         setSelectedCarDetails(null)
+                        setContractorName('')
                         setVehicleHistory([])
                       }}
                       className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
@@ -1537,6 +1543,29 @@ export default function QuickReportPage() {
                       </svg>
                     </button>
                   </div>
+
+                  {/* Contractor Name (read-only) + Driver Name (editable) */}
+                  <div className="mt-3 space-y-2.5">
+                    {contractorName && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 block mb-1">📋 ชื่อ-นามสกุล ผู้ทำสัญญา</label>
+                        <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-2.5 text-sm text-slate-700 font-semibold">
+                          {contractorName}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">👤 ชื่อ-นามสกุล คนขับ</label>
+                      <input
+                        type="text"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        placeholder="ระบุชื่อคนขับ..."
+                        className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-2xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none placeholder-slate-400 transition"
+                      />
+                    </div>
+                  </div>
+                  </>
                 ) : (
                   <div className="relative">
                     <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
@@ -1925,20 +1954,10 @@ export default function QuickReportPage() {
                 </div>
               )}
 
-              {(!selectedCar || pendingTickets.length === 0 || showAddIncidentForm) && (
+              {selectedCar && (pendingTickets.length === 0 || showAddIncidentForm) && (
                 <>
-                  {/* Card 2: Driver & Incident Info */}
+                  {/* Card 2: Incident Info */}
                   <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-600 block mb-1.5">👤 ชื่อ-นามสกุล คนขับ</label>
-                  <input
-                    type="text"
-                    value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    placeholder="ดึงจากสัญญาเช่าอัตโนมัติเมื่อเลือกรถ..."
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition"
-                  />
-                </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ <span className="text-rose-555">*</span></label>
