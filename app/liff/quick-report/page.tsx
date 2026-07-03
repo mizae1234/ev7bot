@@ -2766,7 +2766,17 @@ export default function QuickReportPage() {
                         <button
                           key={item.MaintenanceItemID}
                           type="button"
-                          onClick={() => handleViewTicketDetail(item.RegisterNo, item.MaintenanceItemID)}
+                          onClick={() => {
+                            const carObj = {
+                              InventoryItemID: 0,
+                              RegisterNo: item.RegisterNo,
+                              VinNo: item.VinNo || '',
+                              Model: item.Model || '',
+                              Project: item.Project || ''
+                            }
+                            handleSelectCar(carObj)
+                            setActiveTab('report')
+                          }}
                           className="w-full text-left bg-slate-50 border border-slate-200 hover:border-indigo-300 rounded-2xl p-3 flex items-center justify-between gap-3 transition active:scale-98"
                         >
                           <div className="min-w-0 flex-1 pr-2">
@@ -2925,6 +2935,7 @@ export default function QuickReportPage() {
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">ติดตามงาน</span>
         </button>
 
+        {/* Commented out temporarily 
         <button
           onClick={() => setActiveTab('contact')}
           className={`flex flex-col items-center justify-center w-full h-full transition ${
@@ -2934,6 +2945,7 @@ export default function QuickReportPage() {
           <span className="text-lg">📍</span>
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">อัปเดตสถานที่</span>
         </button>
+        */}
 
         <button
           onClick={() => setActiveTab('dashboard')}
