@@ -86,6 +86,8 @@ interface MaintenanceInfo {
   UpdateDate?: string | null
   CreateUserID?: number | null
   UpdateUserID?: number | null
+  CreateUserName?: string | null
+  UpdateUserName?: string | null
 }
 
 interface ReturnInfo {
@@ -313,7 +315,7 @@ function VehicleDetailContent() {
                 <InfoItem label="ใบสั่งซ่อมหลัก ID" value={activeMaint.ParentMaintenanceItemID?.toString() || '-'} />
                 <InfoItem label="วันที่สร้าง" value={formatDate(activeMaint.CreateDate)} />
                 <InfoItem label="วันที่อัปเดต" value={formatDate(activeMaint.UpdateDate)} />
-                <InfoItem label="ผู้สร้าง / ผู้แก้ไข (ID)" value={`${activeMaint.CreateUserID || '-'} / ${activeMaint.UpdateUserID || '-'}`} />
+                <InfoItem label="ผู้สร้าง / ผู้แก้ไข" value={`${activeMaint.CreateUserName || '-'} / ${activeMaint.UpdateUserName || '-'}`} />
               </div>
               {activeMaint.FollowUpDetail && (
                 <div className="bg-amber-50/60 dark:bg-amber-950/20 rounded-xl p-3 border border-amber-200/80 dark:border-amber-900/50">
@@ -410,7 +412,7 @@ function VehicleDetailContent() {
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">ใบสั่งซ่อมหลัก ID: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.ParentMaintenanceItemID || '-'}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">วันที่สร้าง: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.CreateDate)}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">วันที่อัปเดต: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.UpdateDate)}</span></span>
-                      <span className="text-zinc-550 dark:text-zinc-400 font-normal">ผู้สร้าง/แก้ไข (ID): <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.CreateUserID || '-'} / {m.UpdateUserID || '-'}</span></span>
+                      <span className="text-zinc-550 dark:text-zinc-400 font-normal">ผู้สร้าง/แก้ไข: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.CreateUserName || '-'} / {m.UpdateUserName || '-'}</span></span>
                     </div>
                     {m.FollowUpDetail && (
                       <div className="mt-2 text-xs bg-zinc-100 dark:bg-zinc-955/40 p-2 rounded-lg text-zinc-700 dark:text-zinc-300 border border-zinc-200/40 dark:border-zinc-800/40">

@@ -150,9 +150,11 @@ export async function GET(
           m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
           m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID,
-          ISNULL(u.FirstName, '') AS CreateUserName
+          ISNULL(uc.FirstName, '') AS CreateUserName,
+          ISNULL(uu.FirstName, '') AS UpdateUserName
         FROM dbo.EV_MaintenanceItem m
-        LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
+        LEFT JOIN dbo.EV_User uc ON m.CreateUserID = uc.UserID
+        LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         WHERE m.InventoryItemID = @inventoryItemId
         ORDER BY m.ReportDate DESC
       `),
