@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLPool, sql } from '@/lib/mssql'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic';
 // ─── Data Masking Helpers ──────────────────────────────────────────
@@ -228,7 +229,24 @@ export async function GET(
         replacements[r.MaintenanceItemID].push(r)
       }
 
+      // Resolve names from lineRegistration in Postgres for any mock/custom UserIDs
+      const registrations = await prisma.lineRegistration.findMany({
+        select: { ev7UserId: true, displayName: true }
+      })
+      const regMap = new Map<number, string>()
+      for (const reg of registrations) {
+        if (reg.ev7UserId && reg.displayName) {
+          regMap.set(Number(reg.ev7UserId), reg.displayName)
+        }
+      }
+
       for (const f of followUpResult.recordset) {
+        if (f.CreateUserID && regMap.has(Number(f.CreateUserID))) {
+          f.CreateUserName = regMap.get(Number(f.CreateUserID))
+        }
+        if (!f.CreateUserName) {
+          f.CreateUserName = '-'
+        }
         if (!followUps[f.MaintenanceItemID]) {
           followUps[f.MaintenanceItemID] = []
         }

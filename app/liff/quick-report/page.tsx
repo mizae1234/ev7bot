@@ -26,6 +26,8 @@ interface FollowUpLog {
   FollowUpDate: string
   FollowUpDetail: string
   CreateUserName: string
+  CreateDate?: string
+  UpdateDate?: string
 }
 
 interface MaintenanceTicket {
@@ -1353,7 +1355,7 @@ export default function QuickReportPage() {
                   <div key={log.MaintenanceFollowUpID} className="relative text-xxs">
                     <span className="absolute -left-[14.5px] top-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 border border-white" />
                     <div className="flex justify-between text-slate-400">
-                      <span>{formatLiffTime(log.FollowUpDate)}</span>
+                      <span>{formatLiffTime(log.CreateDate || log.FollowUpDate)}</span>
                       <span className="font-bold">{log.CreateUserName}</span>
                     </div>
                     <p className="text-xs font-semibold text-slate-700 mt-1 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -2439,7 +2441,7 @@ export default function QuickReportPage() {
                               <div key={log.MaintenanceFollowUpID} className="relative text-xxs">
                                 <span className="absolute -left-[14.5px] top-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 border border-white" />
                                 <div className="flex justify-between text-slate-400">
-                                  <span>{formatLiffTime(log.FollowUpDate)}</span>
+                                  <span>{formatLiffTime(log.CreateDate || log.FollowUpDate)}</span>
                                   <span className="font-bold">{log.CreateUserName}</span>
                                 </div>
                                 <p className="text-xs font-semibold text-slate-700 mt-1 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -2935,7 +2937,7 @@ export default function QuickReportPage() {
                         <div key={log.MaintenanceFollowUpID} className="relative text-[10px]">
                           <span className="absolute -left-[19.5px] top-1 w-2 h-2 rounded-full bg-indigo-500 border border-white" />
                           <div className="flex justify-between text-slate-400 text-[9px]">
-                            <span>{formatLiffTime(log.FollowUpDate || log.CreateDate)}</span>
+                            <span>{formatLiffTime(log.CreateDate || log.FollowUpDate)}</span>
                             <span className="font-bold">{log.CreateUserName}</span>
                           </div>
                           
