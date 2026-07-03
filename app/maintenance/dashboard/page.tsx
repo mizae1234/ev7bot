@@ -164,8 +164,7 @@ function MaintenanceDashboardContent() {
 
         {/* Loading / Error States */}
         {isLoading && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-3xl h-32 animate-pulse shadow-sm col-span-2" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[1, 2, 3, 4, 5, 6].map(n => (
               <div key={n} className="bg-white border border-slate-200 rounded-3xl h-32 animate-pulse shadow-sm col-span-1" />
             ))}
@@ -181,9 +180,9 @@ function MaintenanceDashboardContent() {
 
         {/* KPI Cards */}
         {!isLoading && !error && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {/* Card 1: Total */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-2">
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
               <div className="absolute -right-4 -bottom-4 text-7xl text-slate-100 font-bold select-none group-hover:scale-110 transition duration-300">
                 🛠️
               </div>
@@ -202,7 +201,7 @@ function MaintenanceDashboardContent() {
                 🟡
               </div>
               <p className="text-xs text-rose-600 font-bold">🟡 รถใหม่เข้าซ่อม</p>
-              <p className="text-3xl font-black text-rose-650 mt-1.5">
+              <p className="text-3xl font-black text-rose-655 mt-1.5">
                 {stats.waiting || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
               </p>
               <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
@@ -263,20 +262,6 @@ function MaintenanceDashboardContent() {
               </p>
               <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
                 <div className="bg-purple-500 h-full rounded-full" style={{ width: stats.total ? `${((stats.replacement_maintenance || 0) / stats.total) * 100}%` : '0%' }} />
-              </div>
-            </div>
-
-            {/* Card 7: Complete */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-350 transition duration-300 col-span-1">
-              <div className="absolute -right-4 -bottom-4 text-7xl text-emerald-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
-                🟢
-              </div>
-              <p className="text-xs text-emerald-600 font-bold">🟢 ซ่อมเสร็จ/ปิดเคสแล้ว</p>
-              <p className="text-3xl font-black text-emerald-600 mt-1.5">
-                {stats.complete} <span className="text-xs font-normal text-slate-500">เคส</span>
-              </p>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div className="bg-emerald-500 h-full rounded-full" style={{ width: stats.total ? `${(stats.complete / stats.total) * 100}%` : '0%' }} />
               </div>
             </div>
           </div>
