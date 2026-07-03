@@ -311,7 +311,7 @@ export default function QuickReportPage() {
         body: JSON.stringify({
           maintenanceId: maintId,
           carStatusCode: 'IN_MAINTENANCE',
-          followUpDetail: '🔴 ดำเนินการ: นำรถเข้าซ่อมบำรุง (งดใช้งาน)',
+          followUpDetail: 'ระบบอัพเดต : นำรถเข้าซ่อมบำรุง (งดใช้งาน)',
           lineUserId: getLineUserId()
         })
       })
@@ -364,17 +364,17 @@ export default function QuickReportPage() {
           payload.carStatusCode = 'WAITING_FOR_MAINTENANCE'
           payload.serviceLocationCode = bulkLocation
           payload.serviceLocationName = locName
-          payload.followUpDetail = `🟡 อัปเดต: เข้าซ่อม ณ สถานที่: ${locName}`
+          payload.followUpDetail = `ระบบอัพเดต : เข้าซ่อม ณ สถานที่: ${locName}`
         } else if (type === 'start') {
           payload.carStatusCode = 'IN_MAINTENANCE'
           payload.startDate = bulkStartDate
           payload.serviceLocationCode = bulkLocation
           payload.serviceLocationName = locName
-          payload.followUpDetail = `🔴 อัปเดต: เริ่มซ่อม ณ อู่: ${locName} เมื่อวันที่: ${formatLiffTime(bulkStartDate)}`
+          payload.followUpDetail = `ระบบอัพเดต : เริ่มซ่อม ณ อู่: ${locName} เมื่อวันที่: ${formatLiffTime(bulkStartDate)}`
         } else if (type === 'complete') {
           payload.carStatusCode = 'COMPLETE'
           payload.finishDate = bulkFinishDate
-          payload.followUpDetail = `🟢 อัปเดต: ซ่อมเสร็จสิ้น เมื่อวันที่: ${formatLiffTime(bulkFinishDate)}`
+          payload.followUpDetail = `ระบบอัพเดต : ซ่อมเสร็จสิ้น เมื่อวันที่: ${formatLiffTime(bulkFinishDate)}`
         }
 
         return fetch('/api/maintenance/update-quick', {
