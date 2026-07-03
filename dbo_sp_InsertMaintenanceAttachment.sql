@@ -383,7 +383,7 @@ BEGIN
         VALUES (
             @MaintenanceItemID,
             CAST(GETDATE() AS DATE),
-            N'📍 อัปเดตสถานที่ซ่อมบำรุงเป็น: ' + @LocText,
+            N'อัปเดตสถานที่ซ่อมบำรุงเป็น: ' + @LocText,
             1,
             GETDATE(),
             @UpdateUserID
