@@ -109,6 +109,39 @@ export async function POST(req: NextRequest) {
       .input('UpdateJson', sql.NVarChar, JSON.stringify(updateObj))
       .execute('dbo.sp_UpdateMaintenanceItemJson')
 
+    // ─── Ensure Correct User ID is logged on both MaintenanceItem and Follow-up Log ───
+    try {
+      // 1. Update main ticket record update user log
+      const userFixReq = pool.request()
+      userFixReq.input('maintId', sql.Int, maintenanceId)
+      userFixReq.input('userId', sql.Int, dbUserId)
+      await userFixReq.query(`
+        UPDATE dbo.EV_MaintenanceItem
+        SET UpdateUserID = @userId, UpdateDate = GETDATE()
+        WHERE MaintenanceItemID = @maintId
+      `)
+
+      // 2. If followUpDetail was provided, fix the newly created follow-up log's creator user ID
+      if (followUpDetail && followUpDetail.trim()) {
+        const followUpFixReq = pool.request()
+        followUpFixReq.input('maintId', sql.Int, maintenanceId)
+        followUpFixReq.input('userId', sql.Int, dbUserId)
+        await followUpFixReq.query(`
+          UPDATE dbo.EV_MaintenanceFollowUp
+          SET CreateUserID = @userId, UpdateUserID = @userId
+          WHERE MaintenanceFollowUpID = (
+            SELECT TOP 1 f.MaintenanceFollowUpID 
+            FROM dbo.EV_MaintenanceFollowUp f
+            WHERE f.MaintenanceItemID = @maintId AND f.IsActive = 1
+            ORDER BY f.CreateDate DESC, f.MaintenanceFollowUpID DESC
+          )
+        `)
+        console.log(`[Follow-up User Fix] MaintenanceItemID=${maintenanceId}: set creator user ID to ${dbUserId}`)
+      }
+    } catch (fixErr) {
+      console.error('[User Log Fix Error]', fixErr)
+    }
+
     // ─── Update EV_InventoryItem Status when entering maintenance (เข้าซ่อม) ───
     if (carStatusCode === 'WAITING_FOR_MAINTENANCE') {
       try {
