@@ -54,9 +54,12 @@ interface MaintenanceData {
 const formatDateTh = (dateStr: string | null) => {
   if (!dateStr) return '-'
   try {
-    return new Date(dateStr).toLocaleDateString('th-TH', {
-      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok'
-    })
+    const d = new Date(dateStr)
+    const day = d.getUTCDate()
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+    const month = months[d.getUTCMonth()]
+    const year = d.getUTCFullYear() + 543
+    return `${day} ${month} ${year}`
   } catch { return dateStr }
 }
 

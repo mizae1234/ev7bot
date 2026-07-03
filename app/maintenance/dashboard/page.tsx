@@ -88,14 +88,15 @@ const locationMap: Record<string, string> = {
 function formatThaiDate(dateStr: string) {
   if (!dateStr) return '-'
   try {
-    return new Date(dateStr).toLocaleDateString('th-TH', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Asia/Bangkok'
-    })
+    // SQL Server stores Bangkok time directly — use UTC methods to avoid double +7 offset
+    const d = new Date(dateStr)
+    const day = d.getUTCDate()
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+    const month = months[d.getUTCMonth()]
+    const year = d.getUTCFullYear() + 543
+    const hour = d.getUTCHours().toString().padStart(2, '0')
+    const minute = d.getUTCMinutes().toString().padStart(2, '0')
+    return `${day} ${month} ${year} ${hour}:${minute}`
   } catch {
     return dateStr
   }
