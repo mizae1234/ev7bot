@@ -66,6 +66,75 @@ export async function POST(req: NextRequest) {
       .input('UpdateJson', sql.NVarChar, JSON.stringify(updateObj))
       .execute('dbo.sp_UpdateMaintenanceItemJson')
 
+    // ─── Update EV_InventoryItem Status when entering maintenance (เข้าซ่อม) ───
+    if (carStatusCode === 'WAITING_FOR_MAINTENANCE') {
+      try {
+        // 1. Get InventoryItemID from the maintenance item
+        const maintReq = pool.request()
+        maintReq.input('maintId', sql.Int, maintenanceId)
+        const maintRes = await maintReq.query(`
+          SELECT InventoryItemID FROM dbo.EV_MaintenanceItem WHERE MaintenanceItemID = @maintId
+        `)
+
+        if (maintRes.recordset.length > 0) {
+          const inventoryItemId = maintRes.recordset[0].InventoryItemID
+
+          // 2. Get current Status and StatusType of the vehicle
+          const invReq = pool.request()
+          invReq.input('invId', sql.Int, inventoryItemId)
+          const invRes = await invReq.query(`
+            SELECT Status, StatusType FROM dbo.EV_InventoryItem WHERE InventoryItemID = @invId
+          `)
+
+          if (invRes.recordset.length > 0) {
+            const currentStatus = invRes.recordset[0].Status
+            const currentStatusType = invRes.recordset[0].StatusType
+
+            let newStatus: string | null = null
+            let newStockType: string | null = null
+
+            // Mapping logic
+            if (currentStatus === 'MAINTENANCE') {
+              // Already in maintenance, do nothing
+            } else if (currentStatus === 'ON_RENT') {
+              newStatus = 'MAINTENANCE'
+              newStockType = 'ON_RENT_MAINTENANCE'
+            } else if (currentStatusType === 'AVAILABLE_USE') {
+              newStatus = 'MAINTENANCE'
+              newStockType = 'USE_MAINTENANCE'
+            } else if (currentStatusType === 'AVAILABLE') {
+              newStatus = 'MAINTENANCE'
+              newStockType = 'NEW_MAINTENANCE'
+            } else if (currentStatusType === 'REPLACEMENT_CAR') {
+              newStatus = 'MAINTENANCE'
+              newStockType = 'REPLACEMENT_MAINTENANCE'
+            } else if (currentStatusType === 'REPLACEMENT_AVAILABLE') {
+              newStatus = 'MAINTENANCE'
+              newStockType = 'REPLACEMENT_MAINTENANCE'
+            }
+
+            // 3. Update if mapping matched
+            if (newStatus && newStockType) {
+              const updReq = pool.request()
+              updReq.input('newStatus', sql.NVarChar, newStatus)
+              updReq.input('newStockType', sql.NVarChar, newStockType)
+              updReq.input('invId2', sql.Int, inventoryItemId)
+              updReq.input('userId', sql.Int, dbUserId)
+              await updReq.query(`
+                UPDATE dbo.EV_InventoryItem
+                SET Status = @newStatus, StockType = @newStockType, UpdateUserID = @userId, UpdateDate = GETDATE()
+                WHERE InventoryItemID = @invId2
+              `)
+              console.log(`[Inventory Update] InventoryItemID=${inventoryItemId}: ${currentStatus}/${currentStatusType} → ${newStatus}/${newStockType}`)
+            }
+          }
+        }
+      } catch (invErr) {
+        console.error('[Inventory Status Update Error]', invErr)
+        // Don't fail the whole request — maintenance update already succeeded
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'บันทึกการอัปเดตและติดตามผลสำเร็จเรียบร้อย'
