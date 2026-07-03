@@ -527,7 +527,9 @@ export async function GET(req: NextRequest) {
             sub.DescriptionStatus AS CarSubStatusName,
             i.StatusType AS CarSubStatusCode,
             ISNULL(NULLIF(cu.FirstName, ''), cu.UserName) AS CreatorName,
-            ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
+            ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName,
+            m.CreateUserID AS CreateUserID,
+            m.UpdateUserID AS UpdateUserID
           FROM dbo.EV_MaintenanceItem m
           LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
@@ -544,6 +546,24 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: `No maintenance record found for VIN/RegisterNo: ${testReadyPickupVin}` }, { status: 404 })
       }
       
+      if (item.UpdateUserID) {
+        const reg = await prisma.lineRegistration.findFirst({
+          where: { ev7UserId: Number(item.UpdateUserID) }
+        })
+        if (reg?.displayName) {
+          item.UpdaterName = reg.displayName
+        }
+      }
+      if (!item.UpdaterName && item.CreateUserID) {
+        const reg = await prisma.lineRegistration.findFirst({
+          where: { ev7UserId: Number(item.CreateUserID) }
+        })
+        if (reg?.displayName) {
+          item.UpdaterName = reg.displayName
+        }
+      }
+      item.UpdaterName = item.UpdaterName || item.CreatorName || '-'
+
       const flexMsg = buildReadyPickupFlex(item)
       let sentCount = 0
       for (const group of activeGroups) {
@@ -698,7 +718,9 @@ export async function GET(req: NextRequest) {
           sub.DescriptionStatus AS CarSubStatusName,
           i.StatusType AS CarSubStatusCode,
           ISNULL(NULLIF(cu.FirstName, ''), cu.UserName) AS CreatorName,
-          ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
+          ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName,
+          m.CreateUserID AS CreateUserID,
+          m.UpdateUserID AS UpdateUserID
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
@@ -731,6 +753,27 @@ export async function GET(req: NextRequest) {
     const newReadyPickup = readyPickupResult.recordset.filter(
       (rp: any) => !sentReadyPickupIds.has(Number(rp.MaintenanceItemID))
     )
+
+    // Fetch line registrations to resolve names for mock user IDs
+    const registrations = await prisma.lineRegistration.findMany({
+      select: { ev7UserId: true, displayName: true }
+    })
+    const regMap = new Map<number, string>()
+    for (const reg of registrations) {
+      if (reg.ev7UserId && reg.displayName) {
+        regMap.set(Number(reg.ev7UserId), reg.displayName)
+      }
+    }
+
+    // Map correct updater name for each ready pickup item
+    for (const item of newReadyPickup) {
+      if (item.UpdateUserID && regMap.has(Number(item.UpdateUserID))) {
+        item.UpdaterName = regMap.get(Number(item.UpdateUserID))
+      } else if (item.CreateUserID && regMap.has(Number(item.CreateUserID))) {
+        item.UpdaterName = regMap.get(Number(item.CreateUserID))
+      }
+      item.UpdaterName = item.UpdaterName || item.CreatorName || '-'
+    }
 
     console.log(`[Activity] Found ${newMaint.length} new maintenance, ${newDelivery.length} new deliveries, ${newReturn.length} new returns, ${newReadyPickup.length} new ready pickups`)
 
