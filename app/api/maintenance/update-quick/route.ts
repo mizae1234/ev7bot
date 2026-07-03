@@ -89,43 +89,44 @@ export async function POST(req: NextRequest) {
           if (invRes.recordset.length > 0) {
             const currentStatus = invRes.recordset[0].Status
             const currentStatusType = invRes.recordset[0].StatusType
+            console.log(`[Inventory Check] InventoryItemID=${inventoryItemId}, Status='${currentStatus}', StatusType='${currentStatusType}'`)
 
             let newStatus: string | null = null
-            let newStockType: string | null = null
+            let newStatusType: string | null = null
 
             // Mapping logic
             if (currentStatus === 'MAINTENANCE') {
               // Already in maintenance, do nothing
             } else if (currentStatus === 'ON_RENT') {
               newStatus = 'MAINTENANCE'
-              newStockType = 'ON_RENT_MAINTENANCE'
+              newStatusType = 'ON_RENT_MAINTENANCE'
             } else if (currentStatusType === 'AVAILABLE_USE') {
               newStatus = 'MAINTENANCE'
-              newStockType = 'USE_MAINTENANCE'
+              newStatusType = 'USE_MAINTENANCE'
             } else if (currentStatusType === 'AVAILABLE') {
               newStatus = 'MAINTENANCE'
-              newStockType = 'NEW_MAINTENANCE'
+              newStatusType = 'NEW_MAINTENANCE'
             } else if (currentStatusType === 'REPLACEMENT_CAR') {
               newStatus = 'MAINTENANCE'
-              newStockType = 'REPLACEMENT_MAINTENANCE'
+              newStatusType = 'REPLACEMENT_MAINTENANCE'
             } else if (currentStatusType === 'REPLACEMENT_AVAILABLE') {
               newStatus = 'MAINTENANCE'
-              newStockType = 'REPLACEMENT_MAINTENANCE'
+              newStatusType = 'REPLACEMENT_MAINTENANCE'
             }
 
             // 3. Update if mapping matched
-            if (newStatus && newStockType) {
+            if (newStatus && newStatusType) {
               const updReq = pool.request()
               updReq.input('newStatus', sql.NVarChar, newStatus)
-              updReq.input('newStockType', sql.NVarChar, newStockType)
+              updReq.input('newStatusType', sql.NVarChar, newStatusType)
               updReq.input('invId2', sql.Int, inventoryItemId)
               updReq.input('userId', sql.Int, dbUserId)
               await updReq.query(`
                 UPDATE dbo.EV_InventoryItem
-                SET Status = @newStatus, StockType = @newStockType, UpdateUserID = @userId, UpdateDate = GETDATE()
+                SET Status = @newStatus, StatusType = @newStatusType, UpdateUserID = @userId, UpdateDate = GETDATE()
                 WHERE InventoryItemID = @invId2
               `)
-              console.log(`[Inventory Update] InventoryItemID=${inventoryItemId}: ${currentStatus}/${currentStatusType} → ${newStatus}/${newStockType}`)
+              console.log(`[Inventory Update] InventoryItemID=${inventoryItemId}: ${currentStatus}/${currentStatusType} → ${newStatus}/${newStatusType}`)
             }
           }
         }
