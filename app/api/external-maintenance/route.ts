@@ -92,6 +92,117 @@ export async function POST(req: NextRequest) {
     const insertRes = await insertReq.execute('dbo.sp_InsertMaintenanceItemJson')
     const newMaintenanceId = insertRes.output.NewMaintenanceItemID
 
+    // ─── If new report is WAITING_FOR_MAINTENANCE (เข้าซ่อม), update inventory and other pending tickets ───
+    if (body.carStatusCode === 'WAITING_FOR_MAINTENANCE') {
+      try {
+        // 1. Get current Status and StatusType of the vehicle
+        const invReq = pool.request()
+        invReq.input('invId', sql.Int, inventoryItemId)
+        const invRes = await invReq.query(`
+          SELECT Status, StatusType FROM dbo.EV_InventoryItem WHERE InventoryItemID = @invId
+        `)
+
+        if (invRes.recordset.length > 0) {
+          const currentStatus = invRes.recordset[0].Status
+          const currentStatusType = invRes.recordset[0].StatusType
+
+          let newStatus: string | null = null
+          let newStatusType: string | null = null
+
+          // Mapping logic
+          if (currentStatus === 'MAINTENANCE') {
+            // Already in maintenance, do nothing
+          } else if (currentStatus === 'ON_RENT') {
+            newStatus = 'MAINTENANCE'
+            newStatusType = 'ON_RENT_MAINTENANCE'
+          } else if (currentStatusType === 'AVAILABLE_USE') {
+            newStatus = 'MAINTENANCE'
+            newStatusType = 'USE_MAINTENANCE'
+          } else if (currentStatusType === 'AVAILABLE') {
+            newStatus = 'MAINTENANCE'
+            newStatusType = 'NEW_MAINTENANCE'
+          } else if (currentStatusType === 'REPLACEMENT_CAR') {
+            newStatus = 'MAINTENANCE'
+            newStatusType = 'REPLACEMENT_MAINTENANCE'
+          } else if (currentStatusType === 'REPLACEMENT_AVAILABLE') {
+            newStatus = 'MAINTENANCE'
+            newStatusType = 'REPLACEMENT_MAINTENANCE'
+          }
+
+          if (newStatus && newStatusType) {
+            const updReq = pool.request()
+            updReq.input('newStatus', sql.NVarChar, newStatus)
+            updReq.input('newStatusType', sql.NVarChar, newStatusType)
+            updReq.input('invId', sql.Int, inventoryItemId)
+            updReq.input('userId', sql.Int, dbUserId)
+            await updReq.query(`
+              UPDATE dbo.EV_InventoryItem
+              SET Status = @newStatus, StatusType = @newStatusType, UpdateUserID = @userId, UpdateDate = GETDATE()
+              WHERE InventoryItemID = @invId
+            `)
+            console.log(`[Inventory Update from New Ticket] InventoryItemID=${inventoryItemId}: ${currentStatus}/${currentStatusType} → ${newStatus}/${newStatusType}`)
+          }
+        }
+
+        // 2. Update OTHER pending tickets of this vehicle to WAITING_FOR_MAINTENANCE
+        const locCode = body.serviceLocationCode || null
+        const locName = body.serviceLocationName || 'ไม่ระบุ / นอกสถานที่'
+
+        const pendingReq = pool.request()
+        pendingReq.input('invId', sql.Int, inventoryItemId)
+        pendingReq.input('newMaintId', sql.Int, newMaintenanceId)
+        const pendingRes = await pendingReq.query(`
+          SELECT MaintenanceItemID 
+          FROM dbo.EV_MaintenanceItem 
+          WHERE InventoryItemID = @invId 
+            AND MaintenanceItemID != @newMaintId
+            AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE')
+            AND IsActive = 1
+        `)
+
+        const otherTickets = pendingRes.recordset
+        if (otherTickets.length > 0) {
+          console.log(`[New Ticket WAITING_FOR_MAINTENANCE] Found ${otherTickets.length} other pending tickets to update.`)
+          for (const ticket of otherTickets) {
+            const tId = ticket.MaintenanceItemID
+
+            // Update ticket status & location
+            const updTicketReq = pool.request()
+            updTicketReq.input('maintId', sql.Int, tId)
+            updTicketReq.input('locCode', sql.NVarChar, locCode)
+            updTicketReq.input('userId', sql.Int, dbUserId)
+            await updTicketReq.query(`
+              UPDATE dbo.EV_MaintenanceItem
+              SET CarStatusCode = 'WAITING_FOR_MAINTENANCE',
+                  ServiceLocationCode = @locCode,
+                  UpdateUserID = @userId,
+                  UpdateDate = GETDATE()
+              WHERE MaintenanceItemID = @maintId
+            `)
+
+            // Insert follow-up log for this ticket
+            const followUpMsg = `ระบบอัพเดต : เข้าซ่อม ณ สถานที่: ${locName}`
+            const insFollowUpReq = pool.request()
+            insFollowUpReq.input('maintId', sql.Int, tId)
+            insFollowUpReq.input('detail', sql.NVarChar, followUpMsg)
+            insFollowUpReq.input('userId', sql.Int, dbUserId)
+            await insFollowUpReq.query(`
+              INSERT INTO dbo.EV_MaintenanceFollowUp (
+                MaintenanceItemID, FollowUpDate, FollowUpDetail, IsActive,
+                CreateDate, CreateUserID, UpdateDate, UpdateUserID
+              )
+              VALUES (
+                @maintId, GETDATE(), @detail, 1,
+                GETDATE(), @userId, GETDATE(), @userId
+              )
+            `)
+          }
+        }
+      } catch (bulkErr) {
+        console.error('[New Ticket WAITING_FOR_MAINTENANCE Bulk Action Error]', bulkErr)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: 'บันทึกข้อมูลแจ้งซ่อมเรียบร้อยแล้ว',
