@@ -256,13 +256,13 @@ export async function GET(
       PhoneNo: maskPhone(r.PhoneNo),
     }))
 
-    // ─── Code → Description mapping ─────────────────────────────
-    const carStatusMap: Record<string, string> = {
-      'COMPLETE': 'ซ่อมเสร็จ',
-      'IN_MAINTENANCE': 'รถอยู่ระหว่างซ่อม',
-      'WAITING_FOR_MAINTENANCE': 'รถจอดรอซ่อม',
-      'STILL_WORK': 'รถยังขับใช้งานได้อยู่',
-    }
+    // ─── Code → Description mapping (from master table) ─────────────────────────────
+    const carStatusMap: Record<string, string> = {}
+    carStatusesResult.recordset.forEach((s: { StatusCode: string; StatusName: string }) => {
+      carStatusMap[s.StatusCode] = s.StatusName
+    })
+    // Fallback for COMPLETE (not in query due to filter)
+    if (!carStatusMap['COMPLETE']) carStatusMap['COMPLETE'] = 'ซ่อมเสร็จ'
     const problemTypeMap: Record<string, string> = {
       'PRODUCT': 'ผลิตภัณฑ์',
       'ACCIDENT': 'อุบัติเหตุ',
