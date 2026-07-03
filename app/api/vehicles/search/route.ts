@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const q = (searchParams.get('q') || '').trim()
+    const cleanQuery = `%${q.replace(/[\s-]/g, '')}%`
     
     const pool = await getMSSQLPool()
     if (!pool) {
@@ -14,14 +15,17 @@ export async function GET(req: NextRequest) {
     }
 
     const request = pool.request()
-    request.input('query', sql.NVarChar, `%${q}%`)
+    request.input('cleanQuery', sql.NVarChar, cleanQuery)
 
     // Query top 15 matching active vehicles
     const result = await request.query(`
       SELECT TOP 15 InventoryItemID, VinNo, RegisterNo, Model, Project
       FROM dbo.EV_InventoryItem
       WHERE IsActive = 1
-        AND (RegisterNo LIKE @query OR VinNo LIKE @query)
+        AND (
+          REPLACE(REPLACE(RegisterNo, ' ', ''), '-', '') LIKE @cleanQuery
+          OR REPLACE(REPLACE(VinNo, ' ', ''), '-', '') LIKE @cleanQuery
+        )
       ORDER BY RegisterNo ASC
     `)
 

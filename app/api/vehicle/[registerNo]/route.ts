@@ -81,7 +81,8 @@ export async function GET(
 ) {
   try {
     const identifier = decodeURIComponent(params.registerNo).trim()
-    console.log(`[Vehicle API] Querying for identifier: "${identifier}"`)
+    const cleanIdentifier = `%${identifier.replace(/[\s-]/g, '')}%`
+    console.log(`[Vehicle API] Querying for identifier: "${identifier}" (clean: "${cleanIdentifier}")`)
     const pool = await getMSSQLPool()
     if (!pool) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
@@ -89,7 +90,7 @@ export async function GET(
 
     // 1. ดึงข้อมูลรถหลัก
     const carReq = pool.request()
-    carReq.input('identifier', sql.NVarChar, `%${identifier}%`)
+    carReq.input('cleanIdentifier', sql.NVarChar, cleanIdentifier)
     const carResult = await carReq.query(`
       SELECT TOP 1
         i.InventoryItemID, i.VinNo, i.MotorNo, i.RegisterNo, i.Model,
@@ -100,7 +101,10 @@ export async function GET(
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
-      WHERE (i.RegisterNo LIKE @identifier OR i.VinNo LIKE @identifier) AND i.IsActive = 1
+      WHERE (
+        REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') LIKE @cleanIdentifier
+        OR REPLACE(REPLACE(i.VinNo, ' ', ''), '-', '') LIKE @cleanIdentifier
+      ) AND i.IsActive = 1
     `)
 
     if (carResult.recordset.length === 0) {

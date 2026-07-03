@@ -172,7 +172,6 @@ function buildReadyPickupFlex(item: any): any {
             paddingBottom: '10px',
             paddingStart: '10px',
             paddingEnd: '10px',
-            marginBottom: '6px',
             contents: [
               {
                 type: 'text',
