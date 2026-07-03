@@ -339,8 +339,13 @@ export default function QuickReportPage() {
 
   // Bulk Action Save Handler
   const handleSaveBulkAction = async (type: 'park' | 'start' | 'complete') => {
-    const selectedTickets = pendingTickets.filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID))
-    if (selectedTickets.length === 0) {
+    // For 'park' (เข้าซ่อม): update ALL pending tickets
+    // For 'start'/'complete': update only selected tickets
+    const ticketsToProcess = type === 'park' 
+      ? pendingTickets 
+      : pendingTickets.filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID))
+    
+    if (ticketsToProcess.length === 0) {
       alert('กรุณาเลือกรายการใบงานที่ต้องการดำเนินการอย่างน้อย 1 รายการ')
       return
     }
@@ -349,7 +354,7 @@ export default function QuickReportPage() {
     try {
       const locName = locationOptions.find(o => o.code === bulkLocation)?.name || 'ไม่ระบุ / นอกสถานที่'
       
-      const promises = selectedTickets.map(ticket => {
+      const promises = ticketsToProcess.map(ticket => {
         const payload: any = {
           maintenanceId: ticket.MaintenanceItemID,
           lineUserId: getLineUserId()
