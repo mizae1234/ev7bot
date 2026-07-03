@@ -132,17 +132,28 @@ function RegisterContent() {
           </div>
         )}
 
-        {/* Information Notice Box for New Employees */}
-        <div className="bg-indigo-50/60 border border-indigo-100 p-3.5 rounded-2xl text-left space-y-1">
-          <p className="text-[11px] font-black text-indigo-800">⚠️ สำหรับพนักงานใหม่ที่ยังไม่มีบัญชี:</p>
-          <p className="text-[10px] text-indigo-700 leading-relaxed">
-            เนื่องจากนโยบายความปลอดภัยฐานข้อมูล ระบบไม่อนุญาตให้ลงทะเบียนบัญชีใหม่ผ่านช่องทางนี้โดยตรง กรุณาติดต่อ **ผู้ดูแลระบบ (Admin)** เพื่อสร้างบัญชีผู้ใช้งานในระบบ EV7Tracking ก่อนนำมาล็อกอินผูกสิทธิ์นะคะ
-          </p>
-        </div>
-
-        {/* Navigation Tabs - Locked to Link Mode */}
-        <div className="p-1 bg-slate-100 rounded-2xl border border-slate-200/40 text-center font-bold text-xs text-indigo-700 py-3 bg-white shadow-xs">
-          🔗 กรุณากรอกอีเมลและรหัสผ่าน EV7 ของท่านเพื่อผูกบัญชี
+        {/* Navigation Tabs */}
+        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/40">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('link')
+              setError(null)
+            }}
+            className={`py-2.5 text-xs font-bold rounded-xl transition-all duration-150 ${activeTab === 'link' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            🔗 ผูกบัญชีเดิมที่มีอยู่
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('create')
+              setError(null)
+            }}
+            className={`py-2.5 text-xs font-bold rounded-xl transition-all duration-150 ${activeTab === 'create' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            👤 ลงทะเบียนพนักงานใหม่
+          </button>
         </div>
 
         {/* Error message */}
