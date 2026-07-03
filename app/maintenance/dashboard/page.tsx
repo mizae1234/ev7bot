@@ -62,6 +62,7 @@ interface MaintenanceDashboardData {
   problemTypes: ProblemTypeStat[]
   followUps: FollowUpItem[]
   longestRepairs: LongestRepairItem[]
+  stillWorkRepairs: LongestRepairItem[]
 }
 
 const locationMap: Record<string, string> = {
@@ -129,6 +130,9 @@ function MaintenanceDashboardContent() {
   const problemTypes = data?.problemTypes || []
   const followUps = data?.followUps || []
   const longestRepairs = data?.longestRepairs || []
+  const stillWorkRepairs = data?.stillWorkRepairs || []
+
+  const [stillWorkSearchQuery, setStillWorkSearchQuery] = useState('')
 
   // Filter longest repairs if location card is clicked, otherwise show all
   let filteredLongestRepairs = selectedLocationFilter
@@ -138,6 +142,17 @@ function MaintenanceDashboardContent() {
   if (stuckSearchQuery.trim()) {
     const q = stuckSearchQuery.toLowerCase().replace(/[\s-]/g, '')
     filteredLongestRepairs = filteredLongestRepairs.filter(r => {
+      const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
+      const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
+      return reg.includes(q) || vin.includes(q)
+    })
+  }
+
+  // Filter still work repairs by search query
+  let filteredStillWorkRepairs = stillWorkRepairs
+  if (stillWorkSearchQuery.trim()) {
+    const q = stillWorkSearchQuery.toLowerCase().replace(/[\s-]/g, '')
+    filteredStillWorkRepairs = filteredStillWorkRepairs.filter(r => {
       const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
       const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
       return reg.includes(q) || vin.includes(q)
@@ -460,6 +475,82 @@ function MaintenanceDashboardContent() {
                   ) : (
                     <div className="text-center py-8 text-xs text-slate-450 italic">
                       ไม่พบรถยนต์ซ่อมค้างคงค้างในส่วนนี้
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card: Still Driveable Repairs (แจ้งซ่อมแต่ยังวิ่งใช้งานได้) */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>🚗</span> รถยนต์ที่แจ้งซ่อมแต่ยังวิ่งใช้งานได้อยู่ (Still Driveable)
+                    </h2>
+                    <p className="text-[10px] text-slate-500 mt-0.5">เคสขัดข้อง (STILL_WORK) เพื่อติดตามเข้าศูนย์/อู่ซ่อมบำรุงภายหลัง</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={stillWorkSearchQuery}
+                      onChange={(e) => setStillWorkSearchQuery(e.target.value)}
+                      placeholder="ค้นหาทะเบียน / VIN..."
+                      className="text-xs py-1.5 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-transparent placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 max-h-[460px] overflow-y-auto pr-1">
+                  {filteredStillWorkRepairs.length > 0 ? (
+                    filteredStillWorkRepairs.map((item) => (
+                      <a
+                        key={item.MaintenanceItemID}
+                        href={`/vehicle/${encodeURIComponent(item.RegisterNo || '')}`}
+                        className="block bg-slate-50 border border-slate-150 hover:border-indigo-400 hover:shadow-xs rounded-xl p-2.5 transition no-underline text-inherit cursor-pointer"
+                      >
+                        <div className="flex flex-row items-center justify-between gap-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                            <span className="text-xxs font-extrabold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-250 shadow-xxs shrink-0 font-mono">
+                              {item.RegisterNo || 'ไม่มีทะเบียน'}
+                            </span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-sky-50 border-sky-200 text-sky-700">
+                              {item.CarStatusName || 'ยังวิ่งอยู่'}
+                            </span>
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[100px] sm:max-w-[200px]" title={item.IssueTitle}>
+                              {item.IssueTitle}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0">|</span>
+                            <span className="text-[10px] text-slate-500 truncate">
+                              ผู้รับผิดชอบ: <strong className="text-indigo-650 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 text-[9px]">EV7/ICI</strong>
+                            </span>
+                            {item.FollowUpDetail && (
+                              <>
+                                <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">|</span>
+                                <span className="text-[10px] text-slate-500 italic truncate max-w-[180px] lg:max-w-[250px] hidden sm:inline" title={item.FollowUpDetail}>
+                                  💬 {item.FollowUpDetail}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2 sm:pl-3 border-l border-slate-200 text-right">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">ค้างเคส</span>
+                            <span className={`text-xs sm:text-sm font-black font-mono shrink-0 ${
+                              item.DaysActive >= 14 ? 'text-rose-600' : item.DaysActive >= 7 ? 'text-amber-600' : 'text-slate-800'
+                            }`}>
+                              {item.DaysActive} วัน
+                            </span>
+                          </div>
+                        </div>
+                        {item.FollowUpDetail && (
+                          <div className="mt-1 text-[10px] text-slate-500 italic sm:hidden truncate">
+                            💬 {item.FollowUpDetail}
+                          </div>
+                        )}
+                      </a>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-xs text-slate-450 italic">
+                      ไม่พบรถยนต์ที่เข้าเงื่อนไขยังวิ่งใช้งานอยู่
                     </div>
                   )}
                 </div>

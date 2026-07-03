@@ -273,6 +273,41 @@ export async function GET(req: NextRequest) {
       ORDER BY t.ReportDate ASC
     `)
 
+    // 6. Still Driveable repairs (STILL_WORK status, active tickets, regardless of inventory status)
+    const stillWorkRepairsResult = await pool.request().query(`
+      WITH LatestTickets AS (
+        SELECT 
+          m.MaintenanceItemID,
+          m.InventoryItemID,
+          m.IssueTitle,
+          m.CarStatusCode,
+          m.ServiceLocationCode,
+          m.ReportDate,
+          m.FollowUpDetail,
+          ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+        FROM dbo.EV_MaintenanceItem m
+        WHERE m.IsActive = 1
+      )
+      SELECT 
+        t.MaintenanceItemID,
+        COALESCE(i.RegisterNo, '') AS RegisterNo,
+        COALESCE(i.VinNo, '') AS VinNo,
+        i.Model,
+        i.ProjectType AS Project,
+        t.IssueTitle,
+        t.CarStatusCode,
+        ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
+        t.ServiceLocationCode,
+        t.ReportDate,
+        DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
+        t.FollowUpDetail
+      FROM LatestTickets t
+      JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.EV_MsSubStatus sub ON t.CarStatusCode = sub.StatusCode AND sub.Type = 'MAINTENANCE_CAR_STATUS'
+      WHERE t.rn = 1 AND t.CarStatusCode = 'STILL_WORK' AND i.IsActive = 1
+      ORDER BY t.ReportDate ASC
+    `)
+
     // Map database results with readable names and merge duplicates
     const locationMapObj: Record<string, { LocationCode: string; LocationName: string; Count: number }> = {}
     for (const row of locationResult.recordset) {
@@ -296,7 +331,8 @@ export async function GET(req: NextRequest) {
       locations: locationsMapped,
       problemTypes: problemTypesMapped,
       followUps: followUpsResult.recordset,
-      longestRepairs: longestRepairsResult.recordset
+      longestRepairs: longestRepairsResult.recordset,
+      stillWorkRepairs: stillWorkRepairsResult.recordset
     })
   } catch (err: any) {
     console.error('Error fetching maintenance dashboard:', err)
