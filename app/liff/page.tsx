@@ -80,14 +80,21 @@ function LiffContent() {
           }),
         })
 
-        if (!res.ok) {
-          console.warn('[LIFF] Registration in PostgreSQL failed, but proceeding...')
+        let registration: any = null
+        if (res.ok) {
+          const data = await res.json()
+          registration = data.registration
         }
 
-        // Redirect to target path
-        const redirectPath = searchParams.get('path') || '/dashboard'
-        console.log('[LIFF] Registration complete. Redirecting to:', redirectPath)
-        router.replace(redirectPath)
+        // Check if user is mapped to ev7UserId
+        const redirectTarget = searchParams.get('path') || '/dashboard'
+        if (!registration || !registration.ev7UserId) {
+          console.log('[LIFF] User has no linked ev7UserId. Redirecting to registration page...')
+          router.replace(`/liff/register?path=${encodeURIComponent(redirectTarget)}`)
+        } else {
+          console.log('[LIFF] Registration complete. Redirecting to:', redirectTarget)
+          router.replace(redirectTarget)
+        }
       } catch (err) {
         console.error('[LIFF Error]', err)
         if (active) {
