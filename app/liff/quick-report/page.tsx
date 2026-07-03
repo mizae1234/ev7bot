@@ -2421,6 +2421,7 @@ export default function QuickReportPage() {
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xxs font-bold text-amber-600">📋 ประวัติการติดตามผลล่าสุด:</p>
                           <div className="flex items-center gap-2">
+                            {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && ticket.CarStatusDescription !== 'ซ่อมเสร็จ' && (
                             <button
                               type="button"
                               onClick={() => handleStartEditTicket(ticket)}
@@ -2428,6 +2429,7 @@ export default function QuickReportPage() {
                             >
                               <span>➕ ปรับสถานะ / เปิดหน้าเต็ม</span>
                             </button>
+                            )}
                           </div>
                         </div>
                         
@@ -2450,7 +2452,8 @@ export default function QuickReportPage() {
                           <p className="text-xxs text-slate-400 italic">ยังไม่มีบันทึกการติดตามความคืบหน้า</p>
                         )}
 
-                        {/* Inline Quick Add Follow-up Form */}
+                        {/* Inline Quick Add Follow-up Form - hide for completed */}
+                        {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && ticket.CarStatusDescription !== 'ซ่อมเสร็จ' && (
                         <div className="mt-3 border-t border-slate-100 pt-3.5 flex gap-2">
                           <input
                             type="text"
@@ -2471,6 +2474,7 @@ export default function QuickReportPage() {
                             {savingQuickLogId === ticket.MaintenanceItemID ? '⏳ บันทึก...' : '💾 บันทึก'}
                           </button>
                         </div>
+                        )}
                       </div>
 
                     </div>
