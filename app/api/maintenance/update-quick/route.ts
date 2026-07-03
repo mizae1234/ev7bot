@@ -41,19 +41,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Convert datetime-local format (2026-07-03T02:43) to MSSQL-compatible (2026-07-03 02:43:00)
+    const toMssqlDate = (d: string | null | undefined): string | null => {
+      if (!d) return null
+      // Replace T with space, add :00 seconds if missing
+      let result = d.replace('T', ' ')
+      if (result.split(':').length === 2) result += ':00' // add seconds
+      return result
+    }
+
     // Execute Stored Procedure sp_UpdateMaintenanceItemJson
     const updateObj = {
       maintenanceId,
       carStatusCode: carStatusCode || null,
-      startDate: startDate || null,
-      finishDate: finishDate || null,
+      startDate: toMssqlDate(startDate),
+      finishDate: toMssqlDate(finishDate),
       serviceLocationCode: serviceLocationCode !== undefined ? serviceLocationCode : null,
       serviceLocationName: serviceLocationCode !== undefined ? (serviceLocationName || serviceLocationCode || 'นอกสถานที่ / ไม่ระบุ') : null,
       followUpDetail: (followUpDetail && followUpDetail.trim()) ? followUpDetail.trim() : null,
       updateUserId: dbUserId,
       deletedAttachmentIds: (deletedAttachmentIds && Array.isArray(deletedAttachmentIds) && deletedAttachmentIds.length > 0) ? deletedAttachmentIds : null,
       driverName: driverName || null,
-      incidentDate: incidentDate || null,
+      incidentDate: toMssqlDate(incidentDate),
       issueTitle: issueTitle || null,
       problemTypeCode: problemTypeCode || null,
       faultPartyCode: faultPartyCode || null,
@@ -142,7 +151,7 @@ export async function POST(req: NextRequest) {
         const startReq = pool.request()
         startReq.input('maintId', sql.Int, maintenanceId)
         startReq.input('statusCode', sql.NVarChar, 'IN_MAINTENANCE')
-        startReq.input('startDate', sql.NVarChar, startDate || new Date().toISOString())
+        startReq.input('startDate', sql.NVarChar, toMssqlDate(startDate) || new Date().toISOString().replace('T', ' ').slice(0, 19))
         startReq.input('locCode', sql.NVarChar, serviceLocationCode || null)
         startReq.input('locName', sql.NVarChar, serviceLocationName || serviceLocationCode || null)
         startReq.input('userId', sql.Int, dbUserId)
