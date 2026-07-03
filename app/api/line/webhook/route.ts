@@ -2580,9 +2580,12 @@ async function trySendVehicleFlexMessage(
              m.ReportDate, 
              m.CreateDate, 
              m.IncidentDate,
-             ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+             m.MaintenanceFinishDate,
+             ISNULL(NULLIF(uc.FirstName, ''), uc.UserName) AS CreatorName,
+             ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
            FROM dbo.EV_MaintenanceItem m
-           LEFT JOIN dbo.EV_User u ON m.CreateUserID = u.UserID
+           LEFT JOIN dbo.EV_User uc ON m.CreateUserID = uc.UserID
+           LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
            LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode
            WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
            ORDER BY m.ReportDate DESC
@@ -2621,10 +2624,8 @@ async function trySendVehicleFlexMessage(
       }
 
       // Add appropriate color emoji based on CarStatusCode
-      const emoji =
-        maint.CarStatusCode === 'STILL_WORK' || 
-        maint.CarStatusCode === 'COMPLETE' || 
-        maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
+      let emoji =
+        maint.CarStatusCode === 'STILL_WORK' || maint.CarStatusCode === 'COMPLETE'
           ? '🟢'
           : maint.CarStatusCode === 'IN_MAINTENANCE'
           ? '🔴'
@@ -2632,13 +2633,46 @@ async function trySendVehicleFlexMessage(
           ? '🟡'
           : '⚪'
 
-      const usageStatus = maint.CarStatusName ? `${emoji} ${maint.CarStatusName}` : '-'
+      if (maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+        emoji = '🟠'
+      }
+
+      const displayStatusName = maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
+        ? 'พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
+        : (maint.CarStatusName || maint.CarStatusCode)
+
+      const usageStatus = displayStatusName ? `${emoji} ${displayStatusName}` : '-'
 
       const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
       const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
 
       // Build body rows
-      const bodyContents: any[] = [
+      const bodyContents: any[] = []
+
+      // If READY_PICKUP_MAINTENANCE, show Next to do banner at the very top of body
+      if (maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+        bodyContents.push({
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#fff7ed',
+          borderColor: '#ffedd5',
+          borderWidth: '1px',
+          cornerRadius: 'lg',
+          paddingAll: '10px',
+          marginBottom: '12px',
+          contents: [
+            {
+              type: 'text',
+              text: '📌 Next to do : ติดตามลูกค้าเข้ารับรถ',
+              color: '#ea580c',
+              size: 'xs',
+              weight: 'bold'
+            }
+          ]
+        })
+      }
+
+      bodyContents.push(
         {
           type: 'box',
           layout: 'horizontal',
@@ -2671,7 +2705,7 @@ async function trySendVehicleFlexMessage(
           margin: 'sm',
           contents: [
             { type: 'text', text: 'การใช้งาน/อู่', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: `${usageStatus} / ${maint.ServiceLocationCode || '-'}`, color: '#111827', size: 'xs', flex: 5, wrap: true }
+            { type: 'text', text: `${usageStatus} / ${(locationMap[maint.ServiceLocationCode] || maint.ServiceLocationCode || '-').replace(/_/g, ' ')}`, color: '#111827', size: 'xs', flex: 5, wrap: true }
           ]
         },
         {
@@ -2682,8 +2716,33 @@ async function trySendVehicleFlexMessage(
             { type: 'text', text: 'วันเกิดเหตุ/บันทึก', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: `${formatDateTh(maint.IncidentDate)} / ${formatDateTh(maint.CreateDate)}`, color: '#111827', size: 'xs', flex: 5 }
           ]
-        },
-        {
+        }
+      )
+
+      // Add conditional rows for complete/finished status
+      if (maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+        bodyContents.push(
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'วันที่ซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
+              { type: 'text', text: formatDateTh(maint.MaintenanceFinishDate) || '-', color: '#ea580c', size: 'xs', weight: 'bold', flex: 5 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'ผู้บันทึกซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
+              { type: 'text', text: maint.UpdaterName || '-', color: '#111827', size: 'xs', flex: 5 }
+            ]
+          }
+        )
+      } else {
+        bodyContents.push({
           type: 'box',
           layout: 'horizontal',
           margin: 'sm',
@@ -2691,17 +2750,18 @@ async function trySendVehicleFlexMessage(
             { type: 'text', text: 'วันที่แจ้ง/ผู้แจ้ง', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: `${formatDateTh(maint.ReportDate)} (${maint.CreatorName || '-'})`, color: '#111827', size: 'xs', flex: 5 }
           ]
-        },
-        {
-          type: 'box',
-          layout: 'horizontal',
-          margin: 'sm',
-          contents: [
-            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: currentStatus, color: '#dc2626', size: 'xs', weight: 'bold', flex: 5, wrap: true }
-          ]
-        }
-      ]
+        })
+      }
+
+      bodyContents.push({
+        type: 'box',
+        layout: 'horizontal',
+        margin: 'sm',
+        contents: [
+          { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+          { type: 'text', text: currentStatus, color: '#dc2626', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+        ]
+      })
 
       // Add replacement car section if exists
       if (replacement) {
@@ -2742,12 +2802,17 @@ async function trySendVehicleFlexMessage(
         }
       }
 
+      const isReadyPickup = maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
+      const mainThemeColor = isReadyPickup ? '#ea580c' : '#dc2626'
+      const subThemeColor = isReadyPickup ? '#ffedd5' : '#fee2e2'
+      const headerTitle = isReadyPickup ? '🟠 รถซ่อมเสร็จ รอปล่อย' : '🔧 ข้อมูลงานซ่อมรถ'
+
       const mainBubble = {
         type: 'bubble',
         header: {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#dc2626',
+          backgroundColor: mainThemeColor,
           paddingStart: '16px',
           paddingEnd: '16px',
           paddingTop: '12px',
@@ -2755,7 +2820,7 @@ async function trySendVehicleFlexMessage(
           contents: [
             {
               type: 'text',
-              text: '🔧 ข้อมูลงานซ่อมรถ',
+              text: headerTitle,
               color: '#ffffff',
               weight: 'bold',
               size: 'md'
@@ -2763,7 +2828,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'text',
               text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
-              color: '#fee2e2',
+              color: subThemeColor,
               size: 'xs',
               margin: 'xs',
               weight: 'bold'
@@ -2792,7 +2857,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'button',
               style: 'primary',
-              color: '#dc2626',
+              color: mainThemeColor,
               height: 'sm',
               action: {
                 type: 'uri',
