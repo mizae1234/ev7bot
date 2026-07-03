@@ -116,6 +116,79 @@ function buildMaintenanceFlex(item: any): any {
   }
 }
 
+// ─── Build Flex: Ready Pickup Alert ──────────────────────────────────
+function buildReadyPickupFlex(item: any): any {
+  const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
+  return {
+    type: 'flex',
+    altText: `🟠 รถซ่อมเสร็จ รอปล่อย: ${item.RegisterNo || item.VinNo}`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: '#E65100', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
+        contents: [
+          { type: 'text', text: '🟠 รถซ่อมเสร็จ รอปล่อย', color: '#ffffff', weight: 'bold', size: 'md' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#ffe0b2', size: 'xs', margin: 'xs', weight: 'bold' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '10px', paddingBottom: '10px', spacing: 'sm',
+        contents: [
+          // Next to do banner
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#FFF3E0',
+            cornerRadius: 'md',
+            paddingAll: '10px',
+            marginBottom: '6px',
+            contents: [
+              {
+                type: 'text',
+                text: '📌 Next to do : ติดตามลูกค้าเข้ารับรถ',
+                color: '#E65100',
+                weight: 'bold',
+                size: 'xs',
+                wrap: true
+              }
+            ]
+          },
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${item.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'อาการที่ซ่อม', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: item.IssueTitle || '-', color: '#111827', size: 'xs', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'สถานที่ซ่อม', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: item.ServiceLocationCode || '-', color: '#111827', size: 'xs', flex: 5, wrap: true },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'วันที่อัปเดต', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: formatDateTh(item.UpdateDate || item.CreateDate), color: '#111827', size: 'xs', flex: 5 },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'ผู้บันทึกอัปเดต', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: item.CreatorName || '-', color: '#111827', size: 'xs', flex: 5 },
+          ]}
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
+        contents: [{
+          type: 'button', style: 'primary', color: '#E65100', height: 'sm',
+          action: {
+            type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
+            uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
+          },
+        }],
+      },
+    },
+  }
+}
+
 // ─── Build Flex: New Delivery Alert ─────────────────────────────────
 function buildDeliveryFlex(item: any): any {
   const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
@@ -247,10 +320,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No active groups', alerts: 0 })
     }
 
-    // ─── Test Mode (if testVin, testMaintVin or testReturnVin is provided) ──
+    // ─── Test Mode (if testVin, testMaintVin, testReturnVin or testReadyPickupVin is provided) ──
     const testVin = req.nextUrl.searchParams.get('testVin')
     const testMaintVin = req.nextUrl.searchParams.get('testMaintVin')
     const testReturnVin = req.nextUrl.searchParams.get('testReturnVin')
+    const testReadyPickupVin = req.nextUrl.searchParams.get('testReadyPickupVin')
 
     if (testVin) {
       const deliveryResult = await pool.request()
@@ -392,6 +466,54 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: `Test return alert sent for ${item.RegisterNo || item.VinNo}`, item, sentCount })
     }
 
+    if (testReadyPickupVin) {
+      const maintResult = await pool.request()
+        .input('vin', sql.NVarChar, testReadyPickupVin)
+        .query(`
+          SELECT TOP 1
+            m.MaintenanceItemID,
+            m.VinNo,
+            m.IssueTitle,
+            m.CarStatusCode,
+            m.ServiceLocationCode,
+            m.ReportDate,
+            m.CreateDate,
+            m.IncidentDate,
+            m.UpdateDate,
+            i.RegisterNo,
+            i.Model,
+            i.ProjectType,
+            i.Status AS CarInventoryStatusCode,
+            s.DescriptionStatus AS CarStatusName,
+            sub.DescriptionStatus AS CarSubStatusName,
+            i.StatusType AS CarSubStatusCode,
+            ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+          FROM dbo.EV_MaintenanceItem m
+          LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+          LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+          LEFT JOIN dbo.EV_User u ON m.UpdateUserID = u.UserID
+          WHERE m.IsActive = 1
+            AND (m.VinNo = @vin OR i.RegisterNo = @vin)
+          ORDER BY m.MaintenanceItemID DESC
+        `)
+      
+      const item = maintResult.recordset[0]
+      if (!item) {
+        return NextResponse.json({ error: `No maintenance record found for VIN/RegisterNo: ${testReadyPickupVin}` }, { status: 404 })
+      }
+      
+      const flexMsg = buildReadyPickupFlex(item)
+      let sentCount = 0
+      for (const group of activeGroups) {
+        if (!env.MOCK_MODE) {
+          await lineClient.pushMessage({ to: group.groupId, messages: [flexMsg] })
+        }
+        sentCount++
+      }
+      return NextResponse.json({ success: true, message: `Test ready pickup alert sent for ${item.RegisterNo || item.VinNo}`, item, sentCount })
+    }
+
     // Get already-sent IDs to skip
     const sentMaint = await prisma.activityNotification.findMany({
       where: { recordType: 'MAINTENANCE' },
@@ -405,9 +527,15 @@ export async function GET(req: NextRequest) {
       where: { recordType: 'RETURN' },
       select: { recordId: true },
     })
+    const sentReadyPickup = await prisma.activityNotification.findMany({
+      where: { recordType: 'READY_PICKUP' },
+      select: { recordId: true },
+    })
+
     const sentMaintIds = new Set(sentMaint.map(s => s.recordId))
     const sentDeliveryIds = new Set(sentDelivery.map(s => s.recordId))
     const sentReturnIds = new Set(sentReturn.map(s => s.recordId))
+    const sentReadyPickupIds = new Set(sentReadyPickup.map(s => s.recordId))
 
     // ── Poll new records since start of today (Bangkok midnight) ──
     const now = new Date()
@@ -507,10 +635,43 @@ export async function GET(req: NextRequest) {
         ORDER BY r.CreateDate DESC
       `)
 
-    const [maintResult, deliveryResult, returnResult] = await Promise.all([
+    const readyPickupQueryPromise = pool.request()
+      .input('since', sql.DateTime, since)
+      .query(`
+        SELECT 
+          m.MaintenanceItemID,
+          m.VinNo,
+          m.IssueTitle,
+          m.CarStatusCode,
+          m.ServiceLocationCode,
+          m.ReportDate,
+          m.CreateDate,
+          m.IncidentDate,
+          m.UpdateDate,
+          i.RegisterNo,
+          i.Model,
+          i.ProjectType,
+          i.Status AS CarInventoryStatusCode,
+          s.DescriptionStatus AS CarStatusName,
+          sub.DescriptionStatus AS CarSubStatusName,
+          i.StatusType AS CarSubStatusCode,
+          ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreatorName
+        FROM dbo.EV_MaintenanceItem m
+        LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+        LEFT JOIN dbo.EV_User u ON m.UpdateUserID = u.UserID
+        WHERE m.IsActive = 1
+          AND m.CarStatusCode = 'READY_PICKUP_MAINTENANCE'
+          AND m.UpdateDate >= @since
+        ORDER BY m.UpdateDate DESC
+      `)
+
+    const [maintResult, deliveryResult, returnResult, readyPickupResult] = await Promise.all([
       maintQueryPromise,
       deliveryQueryPromise,
-      returnQueryPromise
+      returnQueryPromise,
+      readyPickupQueryPromise
     ])
 
     // Filter out already-sent
@@ -523,8 +684,11 @@ export async function GET(req: NextRequest) {
     const newReturn = returnResult.recordset.filter(
       (r: any) => !sentReturnIds.has(Number(r.ReturnItemID))
     )
+    const newReadyPickup = readyPickupResult.recordset.filter(
+      (rp: any) => !sentReadyPickupIds.has(Number(rp.MaintenanceItemID))
+    )
 
-    console.log(`[Activity] Found ${newMaint.length} new maintenance, ${newDelivery.length} new deliveries, ${newReturn.length} new returns`)
+    console.log(`[Activity] Found ${newMaint.length} new maintenance, ${newDelivery.length} new deliveries, ${newReturn.length} new returns, ${newReadyPickup.length} new ready pickups`)
 
     let alertsSent = 0
 
@@ -588,6 +752,26 @@ export async function GET(req: NextRequest) {
       alertsSent++
     }
 
+    // Send ready pickup alerts (max 5 per poll)
+    for (const item of newReadyPickup.slice(0, 5)) {
+      const flexMsg = buildReadyPickupFlex(item)
+      for (const group of activeGroups) {
+        try {
+          if (!env.MOCK_MODE) {
+            await lineClient.pushMessage({ to: group.groupId, messages: [flexMsg] })
+          }
+          console.log(`[Activity] ✅ Ready pickup alert ${item.MaintenanceItemID} → ${group.groupName}`)
+        } catch (err: any) {
+          console.error(`[Activity] ❌ Ready pickup push failed:`, err.message)
+        }
+      }
+      // Mark as sent (cast to number to match Prisma schema)
+      await prisma.activityNotification.create({
+        data: { recordType: 'READY_PICKUP', recordId: Number(item.MaintenanceItemID) },
+      }).catch(() => { /* unique constraint = already sent */ })
+      alertsSent++
+    }
+
     // Cleanup old records (> 7 days) to prevent table bloat
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     await prisma.activityNotification.deleteMany({
@@ -599,6 +783,7 @@ export async function GET(req: NextRequest) {
       newMaintenance: newMaint.length,
       newDeliveries: newDelivery.length,
       newReturns: newReturn.length,
+      newReadyPickup: newReadyPickup.length,
       alertsSent,
       groupsNotified: activeGroups.length,
     })
