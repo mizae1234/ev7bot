@@ -111,7 +111,7 @@ function RegisterContent() {
           <div className="text-4xl">🔧🤖</div>
           <h1 className="text-xl font-black text-slate-800">ตั้งค่าสิทธิ์เข้าใช้งานระบบ</h1>
           <p className="text-xs text-slate-500">
-            สวัสดีค่ะคุณ <strong>{lineProfile?.displayName || 'ผู้ใช้งาน LINE'}</strong> เพื่อสิทธิ์การอ้างอิงข้อมูลลงระบบอย่างถูกต้อง กรุณาลงทะเบียนหรือผูกบัญชีเดิมก่อนเข้าใช้งานนะคะ
+            สวัสดีค่ะคุณ <strong>{lineProfile?.displayName || 'ผู้ใช้งาน LINE'}</strong> เพื่อสิทธิ์การอ้างอิงข้อมูลลงระบบอย่างถูกต้อง กรุณาลงทะเบียนหรือผูกบัญชีเดิมของระบบ EV7Tracking ก่อนเข้าใช้งานนะคะ
           </p>
         </div>
 
