@@ -1543,28 +1543,6 @@ export default function QuickReportPage() {
                       </svg>
                     </button>
                   </div>
-
-                  {/* Contractor Name (read-only) + Driver Name (editable) */}
-                  <div className="mt-3 space-y-2.5">
-                    {contractorName && (
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 block mb-1">📋 ชื่อ-นามสกุล ผู้ทำสัญญา</label>
-                        <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-2.5 text-sm text-slate-700 font-semibold">
-                          {contractorName}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">👤 ชื่อ-นามสกุล คนขับ</label>
-                      <input
-                        type="text"
-                        value={driverName}
-                        onChange={(e) => setDriverName(e.target.value)}
-                        placeholder="ระบุชื่อคนขับ..."
-                        className="w-full bg-white border border-slate-200 focus:border-indigo-500 rounded-2xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none placeholder-slate-400 transition"
-                      />
-                    </div>
-                  </div>
                   </>
                 ) : (
                   <div className="relative">
@@ -1956,48 +1934,69 @@ export default function QuickReportPage() {
 
               {selectedCar && (pendingTickets.length === 0 || showAddIncidentForm) && (
                 <>
-                  {/* Card 2: Incident Info */}
+                  {/* Card 2: Contractor, Driver, Incident Date & Status */}
                   <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
 
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ <span className="text-rose-555">*</span></label>
-                  <input
-                    type="datetime-local"
-                    value={incidentDate}
-                    onChange={(e) => setIncidentDate(e.target.value)}
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition"
-                  />
-                </div>
-              </div>
+                    {/* Contractor Name (read-only) */}
+                    {contractorName && (
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1.5">📋 ชื่อ-นามสกุล ผู้ทำสัญญา</label>
+                        <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-700 font-semibold">
+                          {contractorName}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Card 2.5: Repair Status Selection (REQUIRED FIELD) */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-2">
-                    <span className="text-rose-555">*</span> สถานะใบแจ้งซ่อม
-                  </label>
-                  <select
-                    value={initialCarStatus}
-                    onChange={(e) => setInitialCarStatus(e.target.value)}
-                    required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
-                  >
-                    <option value="" disabled>เลือกสถานะใบแจ้งซ่อม</option>
-                    {(dbCarStatuses.length > 0 ? dbCarStatuses : [
-                      { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
-                      { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
-                    ])
-                      .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
-                      .map((st) => (
-                        <option key={st.StatusCode} value={st.StatusCode}>
-                          {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
-                        </option>
-                      ))
-                    }
-                  </select>
-                </div>
-              </div>
+                    {/* Driver Name (editable) */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">👤 ชื่อ-นามสกุล คนขับ</label>
+                      <input
+                        type="text"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        placeholder="ระบุชื่อคนขับ..."
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition"
+                      />
+                    </div>
+
+                    {/* Incident Date */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ <span className="text-rose-555">*</span></label>
+                      <input
+                        type="datetime-local"
+                        value={incidentDate}
+                        onChange={(e) => setIncidentDate(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition"
+                      />
+                    </div>
+
+                    {/* Status Selection */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                        <span className="text-rose-555">*</span> สถานะใบแจ้งซ่อม
+                      </label>
+                      <select
+                        value={initialCarStatus}
+                        onChange={(e) => setInitialCarStatus(e.target.value)}
+                        required
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+                      >
+                        <option value="" disabled>เลือกสถานะใบแจ้งซ่อม</option>
+                        {(dbCarStatuses.length > 0 ? dbCarStatuses : [
+                          { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
+                          { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
+                        ])
+                          .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
+                          .map((st) => (
+                            <option key={st.StatusCode} value={st.StatusCode}>
+                              {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
+                            </option>
+                          ))
+                        }
+                      </select>
+                    </div>
+                  </div>
 
               {/* Card 3: Description & Speech-to-Text (REQUIRED FIELD) */}
               <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
