@@ -119,6 +119,8 @@ function buildMaintenanceFlex(item: any): any {
 // ─── Build Flex: Ready Pickup Alert ──────────────────────────────────
 function buildReadyPickupFlex(item: any): any {
   const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
+  const usageStatus = '🟠 พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
+
   return {
     type: 'flex',
     altText: `🟠 รถซ่อมเสร็จ รอปล่อย: ${item.RegisterNo || item.VinNo}`,
@@ -158,20 +160,28 @@ function buildReadyPickupFlex(item: any): any {
             { type: 'text', text: `${item.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'อาการที่ซ่อม', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: 'อาการ', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: item.IssueTitle || '-', color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'สถานที่ซ่อม', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: item.ServiceLocationCode || '-', color: '#111827', size: 'xs', flex: 5, wrap: true },
+            { type: 'text', text: 'การใช้งาน/อู่', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${usageStatus} / ${item.ServiceLocationCode || '-'}`, color: '#111827', size: 'xs', flex: 5, wrap: true },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
-            { type: 'text', text: 'วันที่อัปเดต', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: formatDateTh(item.UpdateDate || item.CreateDate), color: '#111827', size: 'xs', flex: 5 },
+            { type: 'text', text: 'วันเกิดเหตุ/บันทึก', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${formatDateTh(item.IncidentDate)} / ${formatDateTh(item.CreateDate)}`, color: '#111827', size: 'xs', flex: 5 },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'วันที่ซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: formatDateTh(item.MaintenanceFinishDate || item.UpdateDate), color: '#d84315', size: 'xs', weight: 'bold', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'ผู้บันทึกอัปเดต', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: item.CreatorName || '-', color: '#111827', size: 'xs', flex: 5 },
+          ]},
+          { type: 'box', layout: 'horizontal', contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: getCarStatusDisplay(item.CarStatusName, item.CarInventoryStatusCode, item.CarSubStatusName, item.CarSubStatusCode), color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true },
           ]}
         ],
       },
@@ -480,6 +490,7 @@ export async function GET(req: NextRequest) {
             m.CreateDate,
             m.IncidentDate,
             m.UpdateDate,
+            m.MaintenanceFinishDate,
             i.RegisterNo,
             i.Model,
             i.ProjectType,
@@ -648,6 +659,7 @@ export async function GET(req: NextRequest) {
           m.CreateDate,
           m.IncidentDate,
           m.UpdateDate,
+          m.MaintenanceFinishDate,
           i.RegisterNo,
           i.Model,
           i.ProjectType,
