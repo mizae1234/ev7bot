@@ -128,10 +128,10 @@ function MaintenanceDashboardContent() {
   const followUps = data?.followUps || []
   const longestRepairs = data?.longestRepairs || []
 
-  // Filter longest repairs if location card is clicked
+  // Filter longest repairs if location card is clicked, otherwise show all
   const filteredLongestRepairs = selectedLocationFilter
     ? longestRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
-    : longestRepairs.slice(0, 30)
+    : longestRepairs
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 pb-16 font-sans">
