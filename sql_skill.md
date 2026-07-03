@@ -881,5 +881,44 @@ const toMssqlDate = (d: string | null | undefined): string | null => {
 
 *(หมายเหตุ: ทุกการอัปเดตต้องระบุ `UpdateUserID` และตั้งค่า `UpdateDate = GETDATE()` ด้วยเสมอ)*
 
+### 14.4 เวลาในฐานข้อมูล SQL Server เป็นเวลาไทย (UTC+7) อยู่แล้ว
+* SQL Server ใช้ `GETDATE()` ซึ่งคืนค่าเวลาท้องถิ่นของเครื่อง Server (ตั้งเป็น Bangkok time UTC+7 แล้ว)
+* **ห้ามแปลง timezone ซ้ำ** เมื่อนำมาแสดงผลฝั่ง Frontend — ถ้าใช้ `toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })` จะทำให้เวลาเร็วไป 7 ชั่วโมง (บวก +7 ซ้ำ)
+* **วิธีที่ถูกต้อง**: ใช้ `getUTC*()` methods ของ JavaScript `Date` object เพื่ออ่านค่าวันเวลาตรง ๆ ตามที่ SQL Server ส่งมา โดยไม่ต้องแปลง timezone เพิ่ม
+```typescript
+// ✅ ถูกต้อง — อ่านค่าตรง ๆ จาก SQL Server (เวลาไทยอยู่แล้ว)
+const d = new Date(isoString)
+const hour = d.getUTCHours()  // ไม่แปลง timezone ซ้ำ
+
+// ❌ ผิด — แปลง timezone ซ้ำ ทำให้เร็วไป 7 ชม.
+new Date(isoString).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+```
+
+### 14.5 สิทธิ์การเชื่อมต่อฐานข้อมูล (Database Connection Users)
+* **`user_readonly`**: ใช้สำหรับการอ่านข้อมูลเท่านั้น (Read-only) — ใช้ใน `getMSSQLPool()` พร้อมตั้งค่า `readOnlyIntent: true`
+* **`app_butter`**: ใช้สำหรับการเขียนข้อมูล (Read/Write) — ใช้ใน `getMSSQLWritePool()` — มีสิทธิ์ **INSERT, UPDATE, DELETE** บนทุกตาราง รวมถึง `dbo.EV_User`
+* **ข้อสำคัญ**: เมื่อต้องการเขียนข้อมูล (เช่น สร้างผู้ใช้ใหม่, อัปเดตงานซ่อม) ต้องใช้ `getMSSQLWritePool()` เสมอ ห้ามใช้ `getMSSQLPool()` เพราะจะโดน Permission Denied
+
+### 14.6 ตาราง EV_MsSubStatus — ประเภท (Type) ที่ใช้งาน
+ตาราง `dbo.EV_MsSubStatus` ใช้เก็บ dropdown options หลายประเภทตามค่าในคอลัมน์ `Type`:
+
+| Type | คำอธิบาย | ตัวอย่าง StatusCode |
+|---|---|---|
+| `STATUS_TYPE_AVAILABLE` | สถานะย่อยของรถพร้อมส่ง | `AVAILABLE`, `AVAILABLE_USE`, `RESERVE` |
+| `STATUS_TYPE_MAINTENANCE` | สถานะย่อยของรถซ่อม | `NEW_MAINTENANCE`, `USE_MAINTENANCE` |
+| `MAINTENANCE_CAR_STATUS` | สถานะงานซ่อมบำรุง | `IN_MAINTENANCE`, `STILL_WORK`, `WAITING_FOR_MAINTENANCE` |
+| `INSURANCE` | รายชื่อบริษัทประกันภัย | `ICARE_INSURANCE`, `MUANGTHAI_INSURANCE`, `NO_INSURANCE` |
+| `PROBLEM_TYPE` | ประเภทปัญหา | `PRODUCT`, `ACCIDENT` |
+| `FAULT_PARTY` | ฝ่ายที่ผิด | `DRIVER`, `COUNTERPART` |
+| `CAR_CASE` | เคสงานซ่อม | (เบา/หนัก) |
+
+* **การเพิ่ม dropdown option ใหม่**: เพียงแค่ INSERT ข้อมูลลงตาราง `EV_MsSubStatus` ด้วย `Type` ที่ต้องการ ระบบจะดึงมาแสดงใน dropdown อัตโนมัติโดยไม่ต้องแก้โค้ด
+* **Query ตัวอย่าง**:
+```sql
+SELECT StatusCode, StatusName 
+FROM dbo.EV_MsSubStatus
+WHERE Type = 'INSURANCE' AND IsActive = 1
+ORDER BY StatusCode
+```
 
 
