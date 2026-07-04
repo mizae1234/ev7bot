@@ -133,14 +133,13 @@ export async function GET(req: NextRequest) {
         activeTicketsCount: rec.ActiveTicketsCount || 1,
       }
 
-      // Categorize based on dates
-      if (hasFinishDate) {
-        if (rec.VehicleStatus !== 'AVAILABLE') {
-          column3.push(formattedRecord)
-        }
-      } else if (hasStartDate || status === 'IN_MAINTENANCE') {
+      // Categorize based on CarStatusCode and VehicleStatus
+      if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
+        column3.push(formattedRecord)
+      } else if (status === 'IN_MAINTENANCE' || status === 'COMPLETE') {
         column2.push(formattedRecord)
       } else {
+        // WAITING_FOR_MAINTENANCE, STILL_WORK, etc.
         column1.push(formattedRecord)
       }
     })
