@@ -145,18 +145,25 @@ function buildMaintenanceFlex(item: any): any {
 // ─── Build Flex: Ready Pickup Alert ──────────────────────────────────
 function buildReadyPickupFlex(item: any): any {
   const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
-  const usageStatus = '🟠 พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
+  const isComplete = item.CarStatusCode === 'COMPLETE'
+  const accentColor = isComplete ? '#2E7D32' : '#E65100'
+  const titleText = isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอปล่อย'
+  const nextToDoText = isComplete ? '📌 Next to do : รถซ่อมเสร็จ สแตนบายรอปล่อยงาน / รอสลับรถ' : '📌 Next to do : ติดตามลูกค้าเข้ารับรถ'
+  const bannerBg = isComplete ? '#E8F5E9' : '#FFF3E0'
+  const headerBg = isComplete ? '#c8e6c9' : '#ffe0b2'
+  const altText = `${isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอปล่อย'}: ${item.RegisterNo || item.VinNo}`
+  const usageStatus = isComplete ? '🟢 พร้อมใช้ (ซ่อมเสร็จ)' : '🟠 พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
 
   return {
     type: 'flex',
-    altText: `🟠 รถซ่อมเสร็จ รอปล่อย: ${item.RegisterNo || item.VinNo}`,
+    altText: altText,
     contents: {
       type: 'bubble',
       header: {
-        type: 'box', layout: 'vertical', backgroundColor: '#E65100', paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
+        type: 'box', layout: 'vertical', backgroundColor: accentColor, paddingStart: '16px', paddingEnd: '16px', paddingTop: '12px', paddingBottom: '12px',
         contents: [
-          { type: 'text', text: '🟠 รถซ่อมเสร็จ รอปล่อย', color: '#ffffff', weight: 'bold', size: 'md' },
-          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: '#ffe0b2', size: 'xs', margin: 'xs', weight: 'bold' },
+          { type: 'text', text: titleText, color: '#ffffff', weight: 'bold', size: 'md' },
+          { type: 'text', text: item.RegisterNo || item.VinNo || '-', color: headerBg, size: 'xs', margin: 'xs', weight: 'bold' },
         ],
       },
       body: {
@@ -166,7 +173,7 @@ function buildReadyPickupFlex(item: any): any {
           {
             type: 'box',
             layout: 'vertical',
-            backgroundColor: '#FFF3E0',
+            backgroundColor: bannerBg,
             cornerRadius: 'md',
             paddingTop: '10px',
             paddingBottom: '10px',
@@ -175,8 +182,8 @@ function buildReadyPickupFlex(item: any): any {
             contents: [
               {
                 type: 'text',
-                text: '📌 Next to do : ติดตามลูกค้าเข้ารับรถ',
-                color: '#E65100',
+                text: nextToDoText,
+                color: accentColor,
                 weight: 'bold',
                 size: 'xs',
                 wrap: true
@@ -201,7 +208,7 @@ function buildReadyPickupFlex(item: any): any {
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'วันที่ซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
-            { type: 'text', text: formatDateTh(item.MaintenanceFinishDate || item.UpdateDate), color: '#d84315', size: 'xs', weight: 'bold', flex: 5 },
+            { type: 'text', text: formatDateTh(item.MaintenanceFinishDate || item.UpdateDate), color: isComplete ? '#2E7D32' : '#d84315', size: 'xs', weight: 'bold', flex: 5 },
           ]},
           { type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: 'ผู้บันทึกซ่อมเสร็จ', color: '#6b7280', size: 'xs', flex: 3 },
@@ -216,7 +223,7 @@ function buildReadyPickupFlex(item: any): any {
       footer: {
         type: 'box', layout: 'vertical', paddingStart: '16px', paddingEnd: '16px', paddingTop: '8px', paddingBottom: '12px',
         contents: [{
-          type: 'button', style: 'primary', color: '#E65100', height: 'sm',
+          type: 'button', style: 'primary', color: accentColor, height: 'sm',
           action: {
             type: 'uri', label: 'ดูรายละเอียดเพิ่มเติม',
             uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${item.RegisterNo || item.VinNo}`)}`,
@@ -730,7 +737,7 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
         LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         WHERE m.IsActive = 1
-          AND m.CarStatusCode = 'READY_PICKUP_MAINTENANCE'
+          AND m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'COMPLETE')
           AND m.UpdateDate >= @since
         ORDER BY m.UpdateDate DESC
       `)
