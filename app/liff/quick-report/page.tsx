@@ -2074,10 +2074,21 @@ export default function QuickReportPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (selectedBulkTicketIds.length === pendingTickets.length) {
-                              setSelectedBulkTicketIds([])
+                            const selectableIds = pendingTickets
+                              .filter(t => !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                              .map(t => t.MaintenanceItemID)
+                            
+                            const allSelectableSelected = selectableIds.length > 0 && selectableIds.every(id => selectedBulkTicketIds.includes(id))
+                            if (allSelectableSelected) {
+                              setSelectedBulkTicketIds(prev => prev.filter(id => !selectableIds.includes(id)))
                             } else {
-                              setSelectedBulkTicketIds(pendingTickets.map(t => t.MaintenanceItemID))
+                              setSelectedBulkTicketIds(prev => {
+                                const next = [...prev]
+                                for (const id of selectableIds) {
+                                  if (!next.includes(id)) next.push(id)
+                                }
+                                return next
+                              })
                             }
                           }}
                           className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition"
@@ -2088,18 +2099,22 @@ export default function QuickReportPage() {
                     )}
                     {pendingTickets.map((ticket) => {
                       const isSelected = selectedBulkTicketIds.includes(ticket.MaintenanceItemID)
+                      const isUnselectable = ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(ticket.CarStatusCode || '')
                       return (
                       <div
                         key={ticket.MaintenanceItemID}
                         className={`bg-slate-50 border rounded-2xl p-3.5 flex flex-col gap-2.5 transition ${
                           bulkActionType
-                            ? isSelected
+                            ? isUnselectable
+                              ? 'border-slate-150 bg-slate-100/40 opacity-40'
+                              : isSelected
                               ? 'border-indigo-400 bg-indigo-50/40 shadow-sm'
                               : 'border-slate-200 opacity-60'
                             : 'border-slate-200 hover:border-slate-300'
                         }`}
                         onClick={() => {
                           if (bulkActionType) {
+                            if (isUnselectable) return
                             setSelectedBulkTicketIds(prev =>
                               isSelected
                                 ? prev.filter(id => id !== ticket.MaintenanceItemID)
@@ -2112,17 +2127,23 @@ export default function QuickReportPage() {
                           {/* Checkbox when bulk action is active */}
                           {bulkActionType && (
                             <div className="shrink-0 flex items-center justify-center pt-0.5">
-                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition ${
-                                isSelected
-                                  ? 'bg-indigo-600 border-indigo-600'
-                                  : 'bg-white border-slate-300'
-                              }`}>
-                                {isSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </div>
+                              {isUnselectable ? (
+                                <div className="w-5 h-5 rounded-md border border-slate-200 bg-slate-150 flex items-center justify-center text-slate-400 text-[10px] font-bold">
+                                  🔒
+                                </div>
+                              ) : (
+                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition ${
+                                  isSelected
+                                    ? 'bg-indigo-600 border-indigo-600'
+                                    : 'bg-white border-slate-300'
+                                }`}>
+                                  {isSelected && (
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                           <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 shrink-0 flex items-center justify-center text-sm text-amber-600">
@@ -2174,7 +2195,7 @@ export default function QuickReportPage() {
                             >
                               <span>📝 อัปเดต</span>
                             </button>
-                            {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && (
+                            {!['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(ticket.CarStatusCode || '') && (
                             <button
                               type="button"
                               onClick={() => handleStartDetailEdit(ticket)}
