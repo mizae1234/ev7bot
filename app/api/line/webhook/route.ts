@@ -758,7 +758,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       const registration = await prisma.lineRegistration.findUnique({
         where: { lineUserId: userId }
       })
-      if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+      if (registration?.isActive) {
         isAuthorized = true
       }
     } catch (err) {
