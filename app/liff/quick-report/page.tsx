@@ -634,6 +634,17 @@ export default function QuickReportPage() {
       return
     }
 
+    if (hasReplacement) {
+      if (!replacementVin) {
+        alert('กรุณาเลือกข้อมูลรถทดแทน')
+        return
+      }
+      if (!replacementLocation) {
+        alert('กรุณาเลือกสถานที่รับ/คืนรถทดแทน')
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
       const payload = {
@@ -845,6 +856,17 @@ export default function QuickReportPage() {
 
   const handleSaveDetailEdit = async () => {
     if (!editDetailTicket) return
+
+    if (editDetailFields.hasReplacement) {
+      if (!editDetailFields.replacementVin) {
+        alert('กรุณาเลือกข้อมูลรถทดแทน')
+        return
+      }
+      if (!editDetailFields.replacementLocation) {
+        alert('กรุณาเลือกสถานที่รับ/คืนรถทดแทน')
+        return
+      }
+    }
 
     setSavingDetailEdit(true)
     try {
