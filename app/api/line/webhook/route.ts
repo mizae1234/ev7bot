@@ -2679,6 +2679,7 @@ async function trySendVehicleFlexMessage(
         {
           type: 'box',
           layout: 'horizontal',
+          margin: maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE' ? 'md' : 'none',
           contents: [
             { type: 'text', text: 'VIN', color: '#6b7280', size: 'xs', flex: 3 },
             { type: 'text', text: car.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
@@ -2906,7 +2907,7 @@ async function trySendVehicleFlexMessage(
                     height: '8px',
                     cornerRadius: '4px',
                     backgroundColor: '#dc2626',
-                    contents: []
+                    contents: [{ type: 'filler' }]
                   },
                   ...(!isLast ? [{
                     type: 'box',
@@ -2915,7 +2916,7 @@ async function trySendVehicleFlexMessage(
                     flex: 1,
                     backgroundColor: '#cbd5e1',
                     margin: 'xs',
-                    contents: []
+                    contents: [{ type: 'filler' }]
                   }] : [])
                 ]
               },
