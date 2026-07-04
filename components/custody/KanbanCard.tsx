@@ -28,6 +28,8 @@ export interface CardData {
   vehicleStatus?: string
   vehicleStatusType?: string
   vehicleSubStatusName?: string
+  carStatusCode?: string
+  activeTicketsCount?: number
 }
 
 interface KanbanCardProps {

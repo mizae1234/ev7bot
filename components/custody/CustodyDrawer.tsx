@@ -105,6 +105,28 @@ export function CustodyDrawer({ card, onClose }: CustodyDrawerProps) {
                   </p>
                 </div>
 
+                {/* 🚗 สถานะการซ่อมและขับขี่ */}
+                <div className="grid grid-cols-2 gap-4 text-xs bg-zinc-50 border border-zinc-100 p-4 rounded-2xl dark:bg-zinc-950 dark:border-zinc-800">
+                  <div>
+                    <span className="text-zinc-400 block mb-1">ความสามารถในการขับขี่:</span>
+                    {card.carStatusCode === 'STILL_WORK' || card.carStatusCode === 'COMPLETE' || card.carStatusCode === 'READY_PICKUP_MAINTENANCE' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300">
+                        🟢 ขับใช้งานได้ปกติ (ยังวิ่งได้)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-300 animate-pulse">
+                        🔴 งดใช้งาน (จอด/รอซ่อม)
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block mb-1">จำนวนใบงานซ่อมทั้งหมด:</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/20 dark:text-indigo-300">
+                      📋 มีทั้งหมด {card.activeTicketsCount || 1} ใบงานค้าง
+                    </span>
+                  </div>
+                </div>
+
                 {/* 🛠️ ข้อมูลทั่วไปของตัวรถ */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">ข้อมูลทั่วไป</h3>

@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
         rep.VinNo AS ReplacementVin,
         repi.RegisterNo AS ReplacementRegisterNo,
         f.FollowUpDetail AS LatestFollowUpDetail,
-        f.FollowUpDate AS LatestFollowUpDate
+        f.FollowUpDate AS LatestFollowUpDate,
+        tc.ActiveTicketsCount
       FROM dbo.EV_MaintenanceItem m
       JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
@@ -52,6 +53,14 @@ export async function GET(req: NextRequest) {
         WHERE MaintenanceItemID = m.MaintenanceItemID AND IsActive = 1
         ORDER BY FollowUpDate DESC, MaintenanceFollowUpID DESC
       ) f
+      OUTER APPLY (
+        SELECT COUNT(*) AS ActiveTicketsCount
+        FROM dbo.EV_MaintenanceItem t
+        WHERE t.InventoryItemID = m.InventoryItemID
+          AND t.IsActive = 1
+          AND t.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
+          AND t.MaintenanceReturnDate IS NULL
+      ) tc
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
         AND m.MaintenanceReturnDate IS NULL
@@ -115,6 +124,8 @@ export async function GET(req: NextRequest) {
         latestFollowUpDetail: rec.LatestFollowUpDetail || null,
         latestFollowUpDate: rec.LatestFollowUpDate || null,
         ageingDays: ageingDays >= 0 ? ageingDays : 0,
+        carStatusCode: rec.CarStatusCode,
+        activeTicketsCount: rec.ActiveTicketsCount || 1,
       }
 
       // Categorize based on dates
