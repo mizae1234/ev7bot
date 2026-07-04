@@ -544,6 +544,7 @@ export async function GET(req: NextRequest) {
           LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
           LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
           WHERE m.IsActive = 1
+            AND m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'COMPLETE')
             AND (m.VinNo = @vin OR i.RegisterNo = @vin)
           ORDER BY m.MaintenanceItemID DESC
         `)
