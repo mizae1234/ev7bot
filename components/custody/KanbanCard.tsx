@@ -15,6 +15,7 @@ export interface TicketData {
   latestFollowUpDate: string | null
   carStatusCode?: string
   location?: string
+  carSubStatusName?: string
 }
 
 export interface CardData {
@@ -305,11 +306,11 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
                     <div className="flex flex-wrap gap-1.5 text-[9px]">
                       {isDrivable ? (
                         <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300">
-                          🟢 ขับปกติ
+                          🟢 {t.carSubStatusName || 'ขับปกติ'}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-950/20 dark:text-rose-300 animate-pulse">
-                          🔴 งดใช้งาน
+                          🔴 {t.carSubStatusName || 'งดใช้งาน'}
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-100 dark:bg-amber-950/20 dark:text-amber-400">

@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
         i.Status AS VehicleStatus,
         i.StatusType AS VehicleStatusType,
         sub.DescriptionStatus AS VehicleSubStatusName,
+        msStatus.DescriptionStatus AS VehicleMainStatusName,
+        ticketSub.DescriptionStatus AS CarSubStatusName,
         m.CarStatusCode,
         m.IssueTitle,
         m.ServiceLocationCode,
@@ -47,6 +49,8 @@ export async function GET(req: NextRequest) {
       LEFT JOIN dbo.EV_ReplacementItem rep ON m.MaintenanceItemID = rep.MaintenanceItemID AND rep.IsActive = 1
       LEFT JOIN dbo.EV_InventoryItem repi ON rep.VinNo = repi.VinNo AND repi.IsActive = 1
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsStatus msStatus ON i.Status = msStatus.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus ticketSub ON m.CarStatusCode = ticketSub.StatusCode AND ticketSub.Type = 'MAINTENANCE_CAR_STATUS'
       OUTER APPLY (
         SELECT TOP 1 FollowUpDetail, FollowUpDate
         FROM dbo.EV_MaintenanceFollowUp
@@ -97,24 +101,6 @@ export async function GET(req: NextRequest) {
         ageingDays = Math.floor((now.getTime() - report.getTime()) / (1000 * 60 * 60 * 24))
       }
 
-      const getStatusThai = (status: string | null) => {
-        if (!status) return null
-        switch (status.toUpperCase()) {
-          case 'ON_RENT':
-          case 'RENTED':
-          case 'RENT':
-            return 'อยู่ระหว่างเช่า'
-          case 'AVAILABLE':
-            return 'พร้อมใช้งาน'
-          case 'MAINTENANCE':
-            return 'อยู่ระหว่างซ่อม'
-          case 'RESERVED':
-            return 'จองแล้ว'
-          default:
-            return status
-        }
-      }
-
       const formattedRecord = {
         maintenanceId: rec.MaintenanceItemID,
         inventoryItemId: rec.InventoryItemID,
@@ -125,7 +111,8 @@ export async function GET(req: NextRequest) {
         projectType: rec.ProjectType,
         vehicleStatus: rec.VehicleStatus,
         vehicleStatusType: rec.VehicleStatusType,
-        vehicleSubStatusName: rec.VehicleSubStatusName || rec.VehicleStatusType || getStatusThai(rec.VehicleStatus) || 'ไม่ระบุสถานะ',
+        vehicleSubStatusName: rec.VehicleSubStatusName || rec.VehicleMainStatusName || 'ไม่ระบุสถานะ',
+        carSubStatusName: rec.CarSubStatusName || rec.CarStatusCode || 'ไม่ระบุสถานะ',
         issueTitle: rec.IssueTitle || 'ไม่มีอาการระบุ',
         location: rec.ServiceLocationCode || 'ไม่ระบุสถานที่',
         reportDate: rec.ReportDate,
@@ -178,6 +165,7 @@ export async function GET(req: NextRequest) {
               latestFollowUpDetail: card.latestFollowUpDetail,
               latestFollowUpDate: card.latestFollowUpDate,
               carStatusCode: card.carStatusCode,
+              carSubStatusName: card.carSubStatusName,
               location: card.location,
             } ]
           })
@@ -194,6 +182,7 @@ export async function GET(req: NextRequest) {
             latestFollowUpDetail: card.latestFollowUpDetail,
             latestFollowUpDate: card.latestFollowUpDate,
             carStatusCode: card.carStatusCode,
+            carSubStatusName: card.carSubStatusName,
             location: card.location,
           })
           
@@ -210,6 +199,7 @@ export async function GET(req: NextRequest) {
             existing.latestFollowUpDetail = card.latestFollowUpDetail
             existing.latestFollowUpDate = card.latestFollowUpDate
             existing.carStatusCode = card.carStatusCode
+            existing.carSubStatusName = card.carSubStatusName
           }
         }
       })
