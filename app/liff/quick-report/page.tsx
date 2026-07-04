@@ -49,6 +49,8 @@ interface MaintenanceTicket {
   RegisterNo?: string
   CreateDate?: string
   CreateUserName?: string
+  UpdateUserName?: string
+  MaintenanceFinishDate?: string
   followUps: FollowUpLog[]
   attachments?: any[]
   replacements?: any[]
@@ -2136,6 +2138,15 @@ export default function QuickReportPage() {
                                 <span className="text-slate-400"> | โดย: <span className="font-semibold text-slate-600">{ticket.CreateUserName.trim()}</span></span>
                               )}
                             </p>
+                            {ticket.MaintenanceFinishDate && (
+                              <p className="text-[10px] text-emerald-650 mt-0.5 font-medium flex items-center gap-1">
+                                <span>🟢 ซ่อมเสร็จเมื่อ:</span>
+                                <span>{formatLiffTime(ticket.MaintenanceFinishDate)}</span>
+                                {ticket.UpdateUserName && ticket.UpdateUserName.trim() && (
+                                  <span className="text-slate-400"> | โดย: <span className="font-semibold text-emerald-700">{ticket.UpdateUserName.trim()}</span></span>
+                                )}
+                              </p>
+                            )}
                             {ticket.IncidentDate && (
                               <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
                             )}
@@ -2684,6 +2695,15 @@ export default function QuickReportPage() {
                               <span> | โดย: <span className="font-semibold text-slate-500">{ticket.CreateUserName.trim()}</span></span>
                             )}
                           </p>
+                          {ticket.MaintenanceFinishDate && (
+                            <p className="text-xxs text-emerald-650 mt-1 font-medium flex items-center gap-1">
+                              <span>🟢 ซ่อมเสร็จเมื่อ:</span>
+                              <span>{formatLiffTime(ticket.MaintenanceFinishDate)}</span>
+                              {ticket.UpdateUserName && ticket.UpdateUserName.trim() && (
+                                <span className="text-slate-400"> | โดย: <span className="font-semibold text-emerald-700">{ticket.UpdateUserName.trim()}</span></span>
+                              )}
+                            </p>
+                          )}
                           {ticket.IncidentDate && (
                             <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
                           )}

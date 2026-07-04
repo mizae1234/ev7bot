@@ -286,6 +286,36 @@ export async function GET(
         }
         attachments[a.MaintenanceItemID].push(a)
       }
+
+      for (const m of maintResult.recordset) {
+        const cOriginalName = (m.CreateUserName || '').trim()
+        const cLineDisplayName = m.CreateUserID ? regMap.get(Number(m.CreateUserID)) : null
+        if (cOriginalName && cLineDisplayName) {
+          if (cOriginalName.includes('@')) {
+            m.CreateUserName = cLineDisplayName
+          } else if (cOriginalName !== cLineDisplayName) {
+            m.CreateUserName = `${cOriginalName} (${cLineDisplayName})`
+          } else {
+            m.CreateUserName = cOriginalName
+          }
+        } else if (cLineDisplayName) {
+          m.CreateUserName = cLineDisplayName
+        }
+
+        const uOriginalName = (m.UpdateUserName || '').trim()
+        const uLineDisplayName = m.UpdateUserID ? regMap.get(Number(m.UpdateUserID)) : null
+        if (uOriginalName && uLineDisplayName) {
+          if (uOriginalName.includes('@')) {
+            m.UpdateUserName = uLineDisplayName
+          } else if (uOriginalName !== uLineDisplayName) {
+            m.UpdateUserName = `${uOriginalName} (${uLineDisplayName})`
+          } else {
+            m.UpdateUserName = uOriginalName
+          }
+        } else if (uLineDisplayName) {
+          m.UpdateUserName = uLineDisplayName
+        }
+      }
     }
 
     // ─── Apply Data Masking ────────────────────────────────────
