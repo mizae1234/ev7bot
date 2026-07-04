@@ -126,9 +126,10 @@ export async function GET(
 
     const carStatusesReq = pool.request()
     const insuranceReq = pool.request()
+    const problemTypesReq = pool.request()
 
     // Execute rent history, maintenance records, return history, car sub-statuses, and insurance options concurrently
-    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult] = await Promise.all([
+    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult, problemTypesResult] = await Promise.all([
       rentReq.query(`
         SELECT
           RentItemID, ContractNo, ContractType,
@@ -143,11 +144,8 @@ export async function GET(
         SELECT
           m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
           m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
-          m.CarStatusCode, m.IssueTitle,
-          m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode,
-          m.ServiceLocationCode, m.InsuranceCode, m.ClaimNumber,
-          m.FollowUpDetail, m.IsActive,
-          m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
+          m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode,
+          m.InsuranceCode, m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
           m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID,
           ISNULL(NULLIF(uc.FirstName + ' ' + ISNULL(uc.LastName, ''), ''), uc.UserName) AS CreateUserName,
@@ -178,6 +176,12 @@ export async function GET(
         SELECT StatusCode, StatusName 
         FROM dbo.EV_MsSubStatus
         WHERE Type = 'INSURANCE' AND IsActive = 1
+        ORDER BY StatusCode
+      `),
+      problemTypesReq.query(`
+        SELECT StatusCode, StatusName 
+        FROM dbo.EV_MsSubStatus
+        WHERE Type = 'MAINTENANCE_PROBLEM_TYPE' AND IsActive = 1
         ORDER BY StatusCode
       `)
     ])
@@ -397,7 +401,8 @@ export async function GET(
       maintenance,
       returns: maskedReturns,
       carStatuses: carStatusesResult.recordset,
-      insuranceOptions: insuranceResult.recordset
+      insuranceOptions: insuranceResult.recordset,
+      problemTypes: problemTypesResult.recordset
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)

@@ -62,6 +62,7 @@ export default function NewMaintenancePage() {
   const [replCarSearch, setReplCarSearch] = useState('')
   const [replacementCars, setReplacementCars] = useState<any[]>([])
   const [loadingReplacementCars, setLoadingReplacementCars] = useState(false)
+  const [dbProblemTypes, setDbProblemTypes] = useState<any[]>([])
 
   const loadReplacementCars = async (search: string = '') => {
     setLoadingReplacementCars(true)
@@ -120,6 +121,7 @@ export default function NewMaintenancePage() {
       const res = await fetch(`/api/vehicle/${encodeURIComponent(regNo.trim())}`)
       if (res.ok) {
         const data = await res.json()
+        setDbProblemTypes(data.problemTypes || [])
         if (data.currentRent) {
           const name = `${data.currentRent.FirstName} ${data.currentRent.LastName}`.trim()
           setDriverName(name)
@@ -352,10 +354,18 @@ export default function NewMaintenancePage() {
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
                   >
                     <option value="">เลือกประเภทของปัญหา</option>
-                    <option value="ACCIDENT">อุบัติเหตุ (ACCIDENT)</option>
-                    <option value="PRODUCT">ชิ้นส่วนผลิตไม่ได้คุณภาพ (PRODUCT)</option>
-                    <option value="USAGE">การใช้งานผิดวิธี (USAGE)</option>
-                    <option value="WEAR">การเสื่อมสภาพจากการสึกหรอ (WEAR)</option>
+                    {dbProblemTypes.length > 0 ? (
+                      dbProblemTypes.map(opt => (
+                        <option key={opt.StatusCode} value={opt.StatusCode}>{opt.StatusName}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="ACCIDENT">อุบัติเหตุ (ACCIDENT)</option>
+                        <option value="PRODUCT">ชิ้นส่วนผลิตไม่ได้คุณภาพ (PRODUCT)</option>
+                        <option value="USAGE">การใช้งานผิดวิธี (USAGE)</option>
+                        <option value="WEAR">การเสื่อมสภาพจากการสึกหรอ (WEAR)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

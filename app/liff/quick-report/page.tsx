@@ -218,6 +218,7 @@ export default function QuickReportPage() {
   const [deletedPhotoIds, setDeletedPhotoIds] = useState<number[]>([])
   const [dbCarStatuses, setDbCarStatuses] = useState<{ StatusCode: string, StatusName: string }[]>([])
   const [dbInsuranceOptions, setDbInsuranceOptions] = useState<{ StatusCode: string, StatusName: string }[]>([])
+  const [dbProblemTypes, setDbProblemTypes] = useState<{ StatusCode: string, StatusName: string }[]>([])
 
   // Full Detail Edit SPA States
   const [editDetailTicket, setEditDetailTicket] = useState<MaintenanceTicket | null>(null)
@@ -349,6 +350,7 @@ export default function QuickReportPage() {
         const data = await res.json()
         setDbCarStatuses(data.carStatuses || [])
         setDbInsuranceOptions(data.insuranceOptions || [])
+        setDbProblemTypes(data.problemTypes || [])
         if (data.car) {
           setSelectedCarDetails(data.car)
         }
@@ -1030,6 +1032,7 @@ export default function QuickReportPage() {
         const data = await res.json()
         setDbCarStatuses(data.carStatuses || [])
         setDbInsuranceOptions(data.insuranceOptions || [])
+        setDbProblemTypes(data.problemTypes || [])
         if (data.maintenance) {
           const ticket = data.maintenance.find((t: any) => t.MaintenanceItemID === maintenanceId)
           if (ticket) {
@@ -1335,9 +1338,18 @@ export default function QuickReportPage() {
                 onChange={(e) => setEditDetailFields(prev => ({ ...prev, problemType: e.target.value }))}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
               >
-                <option value="ACCIDENT">อุบัติเหตุ</option>
-                <option value="BREAKDOWN">รถเสีย/ขัดข้อง</option>
-                <option value="WEAR">สึกหรอ</option>
+                {dbProblemTypes.length > 0 ? (
+                  dbProblemTypes.map(opt => (
+                    <option key={opt.StatusCode} value={opt.StatusCode}>{opt.StatusName}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="ACCIDENT">อุบัติเหตุ</option>
+                    <option value="PRODUCT">ผลิตภัณฑ์</option>
+                    <option value="SUPPLIER_REPAIR">งานซ่อมจาก Supplier</option>
+                    <option value="OTHER_2">อื่นๆ</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -2464,10 +2476,18 @@ export default function QuickReportPage() {
                       onChange={(e) => setProblemType(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
                     >
-                      <option value="ACCIDENT">อุบัติเหตุ</option>
-                      <option value="PRODUCT">ผลิตภัณฑ์</option>
-                      <option value="SUPPLIER_REPAIR">งานซ่อมจาก Supplier</option>
-                      <option value="OTHER_2">อื่นๆ</option>
+                      {dbProblemTypes.length > 0 ? (
+                        dbProblemTypes.map(opt => (
+                          <option key={opt.StatusCode} value={opt.StatusCode}>{opt.StatusName}</option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="ACCIDENT">อุบัติเหตุ</option>
+                          <option value="PRODUCT">ผลิตภัณฑ์</option>
+                          <option value="SUPPLIER_REPAIR">งานซ่อมจาก Supplier</option>
+                          <option value="OTHER_2">อื่นๆ</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
