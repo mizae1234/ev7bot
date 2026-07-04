@@ -10,6 +10,27 @@ import { getMSSQLPool, sql } from '@/lib/mssql'
 
 export const dynamic = 'force-dynamic';
 
+const locationMap: Record<string, string> = {
+  'AION_GI_KANCHANAPISEK': 'Aion กาญจนาฯ',
+  'AION_GI_RAMINTRA_EXPRESSWAY': 'Aion เลียบด่วนฯ',
+  'AION_GI_PIBULSONGKRAM': 'Aion พิบูลฯ',
+  'AION_GI_MINBURI': 'Aion มีนบุรี',
+  'AION_GI_MAHACHAI': 'Aion มหาชัย',
+  'AION_GI_SALAYA': 'Aion ศาลายา',
+  'EV7_YARD_PRAPADAENG': 'EV7 Yard พระประแดง',
+  'SMART_TAXI': 'สมาร์ทเแท็กซี่',
+  'GARAGE_BUNGKHWANG': 'อู่ บึงขวาง',
+  'GARAGE_TS': 'อู่ TS',
+  'GARAGE_88_CAR': 'อู่ 88 คาร์',
+  'GARAGE_CRN_PAKKRET': 'อู่ CRN ปากเกร็ด',
+  'GARAGE_56_COLOR': 'อู่ 56 Color',
+  'GARAGE_PRICHA': 'อู่ ปรีชา',
+  'GARAGE_PERFECTCAR': 'อู่ เพอร์เฟคคาร์',
+  'GARAGE_SAHACAR': 'อู่ สหาคาร์',
+  'GARAGE_PREMIUMCAR': 'อู่ พรีเมี่ยมคาร์',
+  'GARAGE_BESTCARPAINT': 'อู่ เบสท์คาร์เพ้นท์',
+};
+
 const pendingLogs = new Map<string, {
   userId?: string
   sourceType: string
@@ -2567,61 +2588,62 @@ async function trySendVehicleFlexMessage(
       .trim()
 
     flexContents = null
-    if (statusCode === 'MAINTENANCE') {
-      const maintResult = await pool.request()
-        .input('inventoryItemId', sql.Int, car.InventoryItemID)
-        .query(`
-           SELECT TOP 1 
-             m.MaintenanceItemID, 
-             m.IssueTitle, 
-             m.CarStatusCode, 
-             ISNULL(sub.StatusName, m.CarStatusCode) AS CarStatusName,
-             m.ServiceLocationCode, 
-             m.ReportDate, 
-             m.CreateDate, 
-             m.IncidentDate,
-             m.MaintenanceFinishDate,
-             ISNULL(NULLIF(uc.FirstName, ''), uc.UserName) AS CreatorName,
-             ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
-           FROM dbo.EV_MaintenanceItem m
-           LEFT JOIN dbo.EV_User uc ON m.CreateUserID = uc.UserID
-           LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
-           LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode
-           WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
-           ORDER BY m.ReportDate DESC
-        `)
-      const maint = maintResult.recordset[0] || {}
 
+    // 1. Query active/pending maintenance ticket (IsActive = 1, NOT COMPLETE)
+    const maintResult = await pool.request()
+      .input('inventoryItemId', sql.Int, car.InventoryItemID)
+      .query(`
+         SELECT TOP 1 
+           m.MaintenanceItemID, 
+           m.IssueTitle, 
+           m.CarStatusCode, 
+           ISNULL(sub.StatusName, m.CarStatusCode) AS CarStatusName,
+           m.ServiceLocationCode, 
+           m.ReportDate, 
+           m.CreateDate, 
+           m.IncidentDate,
+           m.MaintenanceFinishDate,
+           ISNULL(NULLIF(uc.FirstName, ''), uc.UserName) AS CreatorName,
+           ISNULL(NULLIF(uu.FirstName, ''), uu.UserName) AS UpdaterName
+         FROM dbo.EV_MaintenanceItem m
+         LEFT JOIN dbo.EV_User uc ON m.CreateUserID = uc.UserID
+         LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
+         LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarStatusCode = sub.StatusCode
+         WHERE m.InventoryItemID = @inventoryItemId AND m.IsActive = 1
+           AND m.CarStatusCode NOT IN ('COMPLETE')
+         ORDER BY m.ReportDate DESC
+      `)
+    const maint = maintResult.recordset[0]
+
+    let maintBubble: any = null
+    let timelineBubble: any = null
+
+    if (maint) {
       // Query replacement car if exists
       let replacement: any = null
-      if (maint.MaintenanceItemID) {
-        const replResult = await pool.request()
-          .input('maintId', sql.Int, maint.MaintenanceItemID)
-          .query(`
-            SELECT TOP 1 r.VinNo, i.RegisterNo AS ReplRegisterNo, r.ReplacementStartDate, r.Location
-            FROM dbo.EV_ReplacementItem r
-            LEFT JOIN dbo.EV_InventoryItem i ON r.VinNo = i.VinNo
-            WHERE r.MaintenanceItemID = @maintId AND r.IsActive = 1
-            ORDER BY r.ReplacementStartDate DESC
-          `)
-        replacement = replResult.recordset[0] || null
-      }
+      const replResult = await pool.request()
+        .input('maintId', sql.Int, maint.MaintenanceItemID)
+        .query(`
+          SELECT TOP 1 r.VinNo, i.RegisterNo AS ReplRegisterNo, r.ReplacementStartDate, r.Location
+          FROM dbo.EV_ReplacementItem r
+          LEFT JOIN dbo.EV_InventoryItem i ON r.VinNo = i.VinNo
+          WHERE r.MaintenanceItemID = @maintId AND r.IsActive = 1
+          ORDER BY r.ReplacementStartDate DESC
+        `)
+      replacement = replResult.recordset[0] || null
 
       // Query follow-up logs if exist
-      let followUps: any[] = []
-      if (maint.MaintenanceItemID) {
-        const followUpResult = await pool.request()
-          .input('maintId', sql.Int, maint.MaintenanceItemID)
-          .query(`
-            SELECT f.FollowUpDate, f.FollowUpDetail, f.CreateDate, f.CreateUserID,
-                   ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreateUserName
-            FROM dbo.EV_MaintenanceFollowUp f
-            LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
-            WHERE f.MaintenanceItemID = @maintId AND f.IsActive = 1
-            ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
-          `)
-        followUps = followUpResult.recordset || []
-      }
+      const followUpResult = await pool.request()
+        .input('maintId', sql.Int, maint.MaintenanceItemID)
+        .query(`
+          SELECT f.FollowUpDate, f.FollowUpDetail, f.CreateDate, f.CreateUserID,
+                 ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreateUserName
+          FROM dbo.EV_MaintenanceFollowUp f
+          LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
+          WHERE f.MaintenanceItemID = @maintId AND f.IsActive = 1
+          ORDER BY f.FollowUpDate DESC, f.CreateDate DESC
+        `)
+      const followUps = followUpResult.recordset || []
 
       // Add appropriate color emoji based on CarStatusCode
       let emoji =
@@ -2642,7 +2664,6 @@ async function trySendVehicleFlexMessage(
         : (maint.CarStatusName || maint.CarStatusCode)
 
       const usageStatus = displayStatusName ? `${emoji} ${displayStatusName}` : '-'
-
       const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
       const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
 
@@ -2811,7 +2832,7 @@ async function trySendVehicleFlexMessage(
       const subThemeColor = isReadyPickup ? '#ffedd5' : '#fee2e2'
       const headerTitle = isReadyPickup ? '🟠 รถซ่อมเสร็จ รอปล่อย' : '🔧 ข้อมูลงานซ่อมรถ'
 
-      const mainBubble = {
+      maintBubble = {
         type: 'bubble',
         header: {
           type: 'box',
@@ -2958,7 +2979,7 @@ async function trySendVehicleFlexMessage(
           })
         }
 
-        const timelineBubble = {
+        timelineBubble = {
           type: 'bubble',
           header: {
             type: 'box',
@@ -3018,18 +3039,12 @@ async function trySendVehicleFlexMessage(
             ]
           }
         }
-
-        flexContents = {
-          type: 'carousel',
-          contents: [
-            mainBubble,
-            timelineBubble
-          ]
-        }
-      } else {
-        flexContents = mainBubble
       }
-    } else if (statusCode === 'ON_RENT') {
+    }
+
+    // 2. Query rent bubble if statusCode === 'ON_RENT'
+    let rentBubble: any = null
+    if (statusCode === 'ON_RENT') {
       const rentResult = await pool.request()
         .input('inventoryItemId', sql.Int, car.InventoryItemID)
         .query(`
@@ -3050,7 +3065,7 @@ async function trySendVehicleFlexMessage(
       const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
       const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
 
-      flexContents = {
+      rentBubble = {
         type: 'bubble',
         header: {
           type: 'box',
@@ -3162,6 +3177,35 @@ async function trySendVehicleFlexMessage(
               }
             }
           ]
+        }
+      }
+    }
+
+    // 3. Assemble flexContents
+    if (statusCode === 'MAINTENANCE') {
+      if (maintBubble) {
+        if (timelineBubble) {
+          flexContents = {
+            type: 'carousel',
+            contents: [maintBubble, timelineBubble]
+          }
+        } else {
+          flexContents = maintBubble
+        }
+      }
+    } else if (statusCode === 'ON_RENT') {
+      if (rentBubble) {
+        if (maintBubble) {
+          const carouselContents = [rentBubble, maintBubble]
+          if (timelineBubble) {
+            carouselContents.push(timelineBubble)
+          }
+          flexContents = {
+            type: 'carousel',
+            contents: carouselContents
+          }
+        } else {
+          flexContents = rentBubble
         }
       }
     }
