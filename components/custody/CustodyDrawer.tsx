@@ -249,7 +249,7 @@ export function CustodyDrawer({ card, onClose }: CustodyDrawerProps) {
               {/* Drawer Footer Actions */}
               <div className="bg-zinc-50 px-6 py-4 border-t border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 space-y-2">
                 <a
-                  href={`/maintenance/${card.maintenanceId}/edit`}
+                  href="/liff/quick-report"
                   className="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors duration-200"
                 >
                   📝 ไปหน้าบันทึกประวัติการซ่อมบำรุง
