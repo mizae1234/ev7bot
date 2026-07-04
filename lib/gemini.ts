@@ -34,6 +34,9 @@ FirstName, LastName, PhoneNo,
 ExpectedReleaseDate (วันนัดส่งมอบ), ReleaseDate (วันส่งมอบจริง),
 ContractCancellationDate, IsActive (bit, เอาแค่ IsActive=1)
 
+### ตาราง: dbo.EV_RentItemLinemanHistory (ประวัติการเช่าของโครงการ Line Man ที่เป็นรถวน)
+คอลัมน์: RentItemID, InventoryItemID, ContractNo, ContractType, FirstName, LastName, PhoneNo, ExpectedReleaseDate, ReleaseDate, ReturnDate (เทียบเท่า ContractCancellationDate), IsActive (bit, จะเป็น 0 เสมอเนื่องจากเป็นประวัติสัญญาเก่า)
+
 ### ตาราง: dbo.EV_MaintenanceItem (งานซ่อม)
 คอลัมน์: MaintenanceItemID, InventoryItemID, ReportDate, IncidentDate,
 MaintenanceStartDate, MaintenanceFinishDate, MaintenanceReturnDate,
@@ -56,6 +59,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ### View: dbo.View_AccumarateReleaseCar (ข้อมูลการปล่อยรถสะสมย้อนหลัง)
 คอลัมน์: RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo, ReleaseDate, ExpectedReleaseDate, RentType (ค่าระบุประเภทรถเช่า ได้แก่ 'ONRENT_NEW' สำหรับรถใหม่, 'ONRENT_USE' สำหรับรถมือสอง)
+*คำเตือนสำคัญเกี่ยวกับสถิติตัวเลข*: เนื่องจากรถโครงการ Line Man ที่เป็นรถวน (Reassigned) จะใช้ RentItemID ตัวเดิมซ้ำ โดยย้ายข้อมูลสัญญาเก่าไปเก็บใน dbo.EV_RentItemLinemanHistory ดังนั้นหากต้องการคัดกรองหรือหาประเภทรถเช่า (รถใหม่/รถเก่า) ให้ถูกต้อง ห้ามใช้ฟิลด์ RentType จาก View_AccumarateReleaseCar หรือตารางหลักตรงๆ แต่ต้องตรวจสอบกับประวัติในอดีตผ่าน UNION ตามตัวอย่างเงื่อนไขด้านล่าง
 
 ### View: dbo.View_GetOnrentNewOrUse (การแยกรถเช่าแบบ Real-time เฉพาะที่มีสถานะ ON_RENT)
 คอลัมน์: ProjectType, VinNo, Model, ContractNo, FirstName, LastName, ReleaseDate, RentType (ค่าระบุประเภท ได้แก่ 'ONRENT_NEW' หรือ 'ONRENT_USE')
@@ -65,6 +69,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ## ความสัมพันธ์ระหว่างตาราง
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
+- EV_RentItemLinemanHistory.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MaintenanceItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_ReplacementItem.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
 - EV_MaintenanceFollowUp.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
@@ -81,12 +86,34 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
 4. ถ้ามีการสอบถามเกี่ยวกับการติดตามผล (Follow up) หรือการอัปเดตงานซ่อมย้อนหลัง → ดึงจาก EV_MaintenanceFollowUp:
    SELECT FollowUpDate, FollowUpDetail FROM EV_MaintenanceFollowUp WHERE MaintenanceItemID = <id> AND IsActive = 1 ORDER BY FollowUpDate DESC
-5. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem และเช็คประเภทรถเช่า (รถใหม่/รถมือสอง) จาก View_AccumarateReleaseCar หรือ View_GetOnrentNewOrUse:
+5. ถ้า Status = 'ON_RENT' หรือเมื่อดึงข้อมูลประวัติส่งมอบเพื่อระบุประเภทรถเช่า (รถใหม่/รถมือสอง):
+   ห้ามดึงจาก View_AccumarateReleaseCar.RentType ตรงๆ แต่ให้ใช้ SQL ตรวจสอบประวัติการเคยปล่อยรถจริงในอดีต (ผ่านตาราง EV_RentItem รวมกับประวัติรถวนใน EV_RentItemLinemanHistory) ดังนี้:
    SELECT r.ContractNo, r.FirstName, r.LastName, r.ReleaseDate,
-          COALESCE(v.RentType, o.RentType, 'ONRENT_NEW') AS RentType
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION ALL
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND (
+                  prev.RentItemID < r.RentItemID
+                  OR (
+                    prev.RentItemID = r.RentItemID
+                    AND (
+                      prev.ReleaseDate < r.ReleaseDate
+                      OR (r.ReleaseDate IS NULL AND prev.ReleaseDate IS NOT NULL)
+                    )
+                  )
+                )
+            ) THEN 'ONRENT_USE'
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END AS RentType
    FROM EV_RentItem r
-   LEFT JOIN View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
-   LEFT JOIN View_GetOnrentNewOrUse o ON r.ContractNo = o.ContractNo
+   LEFT JOIN EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
    WHERE r.InventoryItemID = <id> AND r.IsActive = 1
 
 ### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE

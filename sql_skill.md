@@ -798,7 +798,32 @@ Sub-status สำหรับ GI (Good Inspect)
   * ในการ Query ทุกตาราง **ต้องใส่เงื่อนไข `IsActive = 1` เสมอ** เพื่อดึงเฉพาะรายการที่ยังไม่ถูกยกเลิกหรือลบ **(ยกเว้นตาราง `dbo.EV_MaintenanceItem` สำหรับรายการที่ซ่อมเสร็จแล้วหรือปิดเคสซ่อมแล้ว ซึ่งในฐานข้อมูลจะบันทึกเป็น `IsActive = 0` ส่วนงานที่ยังซ่อมค้างอยู่จะมี `IsActive = 1` ดังนั้นเวลา Query ข้อมูลรถที่ซ่อมเสร็จสิ้นหรือประวัติการซ่อมที่ปิดเรียบร้อยแล้ว ให้กรองด้วยเงื่อนไข `IsActive = 0` แทน)**
   * หากรถยังไม่มีเลขทะเบียน (`RegisterNo` เป็น NULL หรือค่าว่าง) ให้ใช้ `VinNo` ในการระบุและแสดงผลแทนทะเบียนรถเสมอ
   * การนับจำนวนการปล่อยเช่าสำเร็จ (**Completed Delivery**): จะนับเมื่อมีข้อมูล `r.ReleaseDate IS NOT NULL` เท่านั้น หากยังไม่มีข้อมูลวันส่งมอบจริงจะถูกนับเป็นรอดำเนินการ (**Pending**) ทั้งนี้แม้รถจะกลับมาเข้าซ่อมและมีสถานะเป็น `MAINTENANCE` ในภายหลัง ก็ยังถือว่าการส่งมอบสำเร็จแล้ว
-  * **การตรวจสอบประเภทรถใหม่/รถเก่า (รถมือสอง)**: เมื่อรถอยู่ในสถานะ `ON_RENT` (ถูกปล่อยเช่าแล้ว) คอลัมน์ `StatusType` ใน `dbo.EV_InventoryItem` มักจะเป็น `NULL` เสมอ **ห้ามอ้างอิงสถานะความเป็นรถใหม่/เก่าจากคอลัมน์ `StatusType` หรือ `Status` ในตารางหลักตรงๆ เป็นอันขาด** แต่จะต้องทำการเชื่อมข้อมูล (JOIN) เพื่อดึงคอลัมน์ `RentType` จากมุมมอง `dbo.View_AccumarateReleaseCar` หรือ `dbo.View_GetOnrentNewOrUse` แทน โดยค่า `ONRENT_NEW` หมายถึงรถใหม่ และ `ONRENT_USE` หมายถึงรถเก่า/รถมือสอง
+  * **การตรวจสอบประเภทรถใหม่/รถเก่า (รถมือสอง)**: เมื่อรถอยู่ในสถานะ `ON_RENT` (ถูกปล่อยเช่าแล้ว) คอลัมน์ `StatusType` ใน `dbo.EV_InventoryItem` มักจะเป็น `NULL` เสมอ **ห้ามอ้างอิงสถานะความเป็นรถใหม่/เก่าจากคอลัมน์ `StatusType` หรือ `Status` ในตารางหลักตรงๆ เป็นอันขาด** หากเป็นรถยนต์โครงการ Line Man (รถวน) จะใช้ `RentItemID` ตัวเดิมซ้ำ โดยย้ายประวัติสัญญาเก่าไปเก็บใน `dbo.EV_RentItemLinemanHistory` ดังนั้นเพื่อให้การคำนวณประเภทรถใหม่/เก่าถูกต้องในทุกสถานการณ์และครอบคลุมรถวน ห้ามอ้างอิง `RentType` จาก `dbo.View_AccumarateReleaseCar` หรือตารางหลักตรงๆ แต่จะต้องตรวจสอบประวัติการปล่อยรถจริงในอดีต (ผ่าน UNION ตารางสัญญาปัจจุบัน `EV_RentItem` และตารางประวัติรถวน `EV_RentItemLinemanHistory` ที่มี `ReleaseDate IS NOT NULL`) ดังนี้:
+    ```sql
+    CASE 
+      WHEN EXISTS (
+        SELECT 1 FROM (
+          SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+          UNION ALL
+          SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+        ) prev 
+        WHERE prev.InventoryItemID = r.InventoryItemID 
+          AND (
+            prev.RentItemID < r.RentItemID
+            OR (
+              prev.RentItemID = r.RentItemID
+              AND (
+                prev.ReleaseDate < r.ReleaseDate
+                OR (r.ReleaseDate IS NULL AND prev.ReleaseDate IS NOT NULL)
+              )
+            )
+          )
+      ) THEN 'ONRENT_USE'
+      WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+           OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+      ELSE 'ONRENT_NEW'
+    END AS RentType
+    ```
   * **หลีกเลี่ยงชื่อคอลัมน์ทับซ้อน (Column Naming Conflicts/Shadowing)**:
     เนื่องจากตารางใบแจ้งซ่อม `EV_MaintenanceItem` มีคอลัมน์ชื่อ `CarStatusCode` (เช่น STILL_WORK, IN_MAINTENANCE) หากมีการเชื่อมกับตาราง `EV_InventoryItem` เพื่อดึงสถานะตัวรถ (เช่น MAINTENANCE, ON_RENT) ให้ตั้งชื่อนามแฝง (Alias) ของสถานะตัวรถเป็นอย่างอื่น เช่น `i.Status AS CarInventoryStatusCode` แทนการใช้ `CarStatusCode` เพื่อไม่ให้เขียนทับค่าสถานะการซ่อมใน Object ผลลัพธ์
 
