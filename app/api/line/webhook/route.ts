@@ -2657,8 +2657,11 @@ async function trySendVehicleFlexMessage(
           backgroundColor: '#fff7ed',
           borderColor: '#ffedd5',
           borderWidth: '1px',
-          cornerRadius: 'lg',
-          paddingAll: '10px',
+          cornerRadius: 'md',
+          paddingStart: '10px',
+          paddingEnd: '10px',
+          paddingTop: '10px',
+          paddingBottom: '10px',
           marginBottom: '12px',
           contents: [
             {
