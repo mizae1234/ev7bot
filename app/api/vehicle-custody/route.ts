@@ -117,7 +117,9 @@ export async function GET(req: NextRequest) {
 
       // Categorize based on dates
       if (hasFinishDate) {
-        column3.push(formattedRecord)
+        if (rec.VehicleStatus !== 'AVAILABLE') {
+          column3.push(formattedRecord)
+        }
       } else if (hasStartDate || status === 'IN_MAINTENANCE') {
         column2.push(formattedRecord)
       } else {
