@@ -742,6 +742,52 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     return
   }
 
+  // ─── 🔗 Maintenance Dashboard Link Request (Admin/Super Admin only) ──
+  const isMaintenanceLinkRequest = (
+    /((ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์|dashboard|แดชบอร์ด|แดชบอด).*(งานซ่อม|ซ่อมบำรุง|ซ่อม))/i.test(lower) ||
+    /((งานซ่อม|ซ่อมบำรุง|ซ่อม).*(ลิ้งค์|ลิ้ง|ลิงก์|ลิงค์|dashboard|แดชบอร์ด|แดชบอด))/i.test(lower) ||
+    lower.includes('ขอลิ้งงานซ่อม') ||
+    lower.includes('ขอลิงก์งานซ่อม') ||
+    lower.includes('ขอลิ้งค์งานซ่อม') ||
+    lower.includes('ขอลิงค์งานซ่อม')
+  )
+
+  if (isMaintenanceLinkRequest) {
+    let isAuthorized = false
+    try {
+      const registration = await prisma.lineRegistration.findUnique({
+        where: { lineUserId: userId }
+      })
+      if (registration?.role === 'ADMIN' || registration?.role === 'SUPER_ADMIN') {
+        isAuthorized = true
+      }
+    } catch (err) {
+      console.error('[maintenance link request authorization check error]', err)
+    }
+
+    if (!isAuthorized) {
+      const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+      const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+      if (adminIds.includes(userId)) {
+        isAuthorized = true
+      }
+    }
+
+    if (!isAuthorized) {
+      await replyText(
+        replyToken,
+        `ท่านไม่มีสิทธิ์เข้าถึงข้อมูลดังกล่าว`
+      )
+      return
+    }
+
+    await replyText(
+      replyToken,
+      `🔗 ลิงก์สำหรับเข้าดูระบบวิเคราะห์งานซ่อมบำรุง (Maintenance Dashboard) ค่ะ:\n${appUrl}/maintenance/dashboard 💛`
+    )
+    return
+  }
+
   // ─── 🔧 Fixed Command (Admin only) ──────────────────────────────────
   if (lower.startsWith('fixed')) {
     const fixedMatch = text.trim().match(/^fixed\s*#?(\d+)/i)
