@@ -2686,7 +2686,6 @@ async function trySendVehicleFlexMessage(
           paddingEnd: '10px',
           paddingTop: '10px',
           paddingBottom: '10px',
-          marginBottom: '12px',
           contents: [
             {
               type: 'text',
