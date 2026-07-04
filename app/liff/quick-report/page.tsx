@@ -51,6 +51,20 @@ interface MaintenanceTicket {
   CreateUserName?: string
   followUps: FollowUpLog[]
   attachments?: any[]
+  replacements?: any[]
+}
+
+const isMaintComplete = (ticket: any): boolean => {
+  if (!ticket) return false
+  const status = ticket.CarStatusCode
+  const desc = ticket.CarStatusDescription
+  if (status === 'COMPLETE' || status === 'GARAGE_COMPLETE' || status === 'READY_PICKUP_MAINTENANCE') {
+    return true
+  }
+  if (desc === 'ซ่อมเสร็จ' || desc === 'ซ่อมเสร็จสิ้น' || desc === 'ปิดเคส' || desc === 'ปิดงาน') {
+    return true
+  }
+  return false
 }
 
 const locationOptions = [
@@ -216,8 +230,37 @@ export default function QuickReportPage() {
     carCase: '',
     insurance: '',
     claimNumber: '',
+    hasReplacement: false,
+    replacementVin: '',
+    replacementLocation: '',
+    replacementStartDate: '',
   })
   const [editDetailAttachments, setEditDetailAttachments] = useState<File[]>([])
+  
+  // Replacement Car Search and Selection States
+  const [hasReplacement, setHasReplacement] = useState(false)
+  const [replacementVin, setReplacementVin] = useState('')
+  const [replacementLocation, setReplacementLocation] = useState('')
+  const [replacementStartDate, setReplacementStartDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [replacementCars, setReplacementCars] = useState<any[]>([])
+  const [loadingReplacementCars, setLoadingReplacementCars] = useState(false)
+
+  const loadReplacementCars = async (search: string = '') => {
+    setLoadingReplacementCars(true)
+    try {
+      const res = await fetch(`/api/vehicles/search?replacement=true&q=${encodeURIComponent(search)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setReplacementCars(data)
+      }
+    } catch (err) {
+      console.error('Failed to load replacement cars:', err)
+    } finally {
+      setLoadingReplacementCars(false)
+    }
+  }
+  const [replCarSearch, setReplCarSearch] = useState('')
+  const [editReplCarSearch, setEditReplCarSearch] = useState('')
   const [editDetailDeletedPhotoIds, setEditDetailDeletedPhotoIds] = useState<number[]>([])
   const [savingDetailEdit, setSavingDetailEdit] = useState(false)
 
@@ -321,7 +364,7 @@ export default function QuickReportPage() {
         // 2. Set maintenance history & prepopulate location states for Tab 3
         if (data.maintenance) {
           setVehicleHistory(data.maintenance)
-          const firstPending = data.maintenance.find((t: any) => t.CarStatusDescription !== 'ซ่อมเสร็จ')
+          const firstPending = data.maintenance.find((t: any) => !isMaintComplete(t))
           setShowAddIncidentForm(!firstPending)
           if (firstPending) {
             setSelectedMaintId(firstPending.MaintenanceItemID)
@@ -614,6 +657,10 @@ export default function QuickReportPage() {
         serviceLocationCode: serviceLocation,
         serviceLocationName: locationOptions.find(o => o.code === serviceLocation)?.name || '',
         location: location ? `${location.lat}, ${location.lng}` : null,
+        hasReplacement,
+        replacementVin: hasReplacement ? replacementVin : null,
+        replacementLocation: hasReplacement ? replacementLocation : null,
+        replacementStartDate: hasReplacement ? replacementStartDate : null,
         attachments: attachments.map(a => ({
           name: a.name,
           type: a.type,
@@ -697,7 +744,7 @@ export default function QuickReportPage() {
     } else {
       if (ticket.CarStatusDescription === 'อยู่ระหว่างการซ่อม' || ticket.CarStatusDescription === 'รถอยู่ระหว่างซ่อม') {
         setEditStatus('IN_MAINTENANCE')
-      } else if (ticket.CarStatusDescription === 'ซ่อมเสร็จ' || ticket.CarStatusDescription === 'ซ่อมเสร็จสิ้น') {
+      } else if (ticket.CarStatusDescription === 'ซ่อมเสร็จ' || ticket.CarStatusDescription === 'ซ่อมเสร็จสิ้น' || ticket.CarStatusDescription === 'ปิดเคส' || ticket.CarStatusDescription === 'ปิดงาน') {
         setEditStatus('COMPLETE')
       } else if (ticket.CarStatusDescription === 'รถยังขับใช้งานได้อยู่' || ticket.CarStatusDescription === 'ยังวิ่งอยู่') {
         setEditStatus('STILL_WORK')
@@ -768,6 +815,11 @@ export default function QuickReportPage() {
   }
 
   const handleStartDetailEdit = (ticket: MaintenanceTicket) => {
+    const activeRepl = ticket.replacements && ticket.replacements.length > 0
+      ? ticket.replacements.find((r: any) => r.IsActive !== false)
+      : null
+
+    setEditReplCarSearch(activeRepl ? activeRepl.VinNo : '')
     setEditDetailTicket(ticket)
     setEditDetailFields({
       driverName: ticket.DriverName || '',
@@ -780,6 +832,12 @@ export default function QuickReportPage() {
       carCase: ticket.CarCaseCode || '',
       insurance: ticket.InsuranceCode || '',
       claimNumber: ticket.ClaimNumber || '',
+      hasReplacement: !!activeRepl,
+      replacementVin: activeRepl ? activeRepl.VinNo : '',
+      replacementLocation: activeRepl ? (activeRepl.Location || '') : '',
+      replacementStartDate: activeRepl && activeRepl.ReplacementStartDate
+        ? new Date(activeRepl.ReplacementStartDate).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
     })
     setEditDetailAttachments([])
     setEditDetailDeletedPhotoIds([])
@@ -808,6 +866,10 @@ export default function QuickReportPage() {
           carCaseCode: editDetailFields.carCase || null,
           insuranceCode: editDetailFields.insurance || null,
           claimNumber: editDetailFields.claimNumber || null,
+          hasReplacement: editDetailFields.hasReplacement,
+          replacementVin: editDetailFields.hasReplacement ? editDetailFields.replacementVin : null,
+          replacementLocation: editDetailFields.hasReplacement ? editDetailFields.replacementLocation : null,
+          replacementStartDate: editDetailFields.hasReplacement ? editDetailFields.replacementStartDate : null,
         })
       })
 
@@ -1004,7 +1066,7 @@ export default function QuickReportPage() {
   }
 
   const pendingTickets = vehicleHistory.filter(
-    ticket => ticket.CarStatusDescription !== 'ซ่อมเสร็จ'
+    ticket => !isMaintComplete(ticket)
   )
 
   // Group vehicles at location from Mobile Dashboard Data
@@ -1117,6 +1179,109 @@ export default function QuickReportPage() {
                   ))}
               </select>
             </div>
+
+            {/* Replacement Car Assignment */}
+            {editDetailFields.carStatusCode === 'WAITING_FOR_MAINTENANCE' && (
+              <div className="space-y-4 pt-2 border-t border-slate-100 animate-fade-in-up">
+                <div className="flex items-center gap-2.5 bg-slate-50/50 p-3 rounded-2xl border border-slate-150">
+                  <input
+                    type="checkbox"
+                    id="editHasReplacement"
+                    checked={editDetailFields.hasReplacement}
+                    onChange={(e) => {
+                      setEditDetailFields(prev => ({ ...prev, hasReplacement: e.target.checked }))
+                      if (e.target.checked) {
+                        loadReplacementCars('')
+                      } else {
+                        setEditDetailFields(prev => ({ ...prev, replacementVin: '' }))
+                        setEditReplCarSearch('')
+                      }
+                    }}
+                    className="w-4.5 h-4.5 text-indigo-650 border-slate-350 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="editHasReplacement" className="text-xs font-bold text-slate-700 cursor-pointer">
+                    ต้องการรถทดแทนหรือไม่
+                  </label>
+                </div>
+
+                {editDetailFields.hasReplacement && (
+                  <div className="bg-indigo-50/20 p-4 rounded-3xl border border-indigo-100/50 space-y-4 animate-scale-up">
+                    {/* Searchable Replacement Car */}
+                    <div className="relative">
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                        <span className="text-rose-555">*</span> ข้อมูลรถทดแทน
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="🔎 ค้นหาทะเบียน หรือ VIN รถทดแทน..."
+                        value={editReplCarSearch}
+                        onChange={(e) => {
+                          setEditReplCarSearch(e.target.value)
+                          loadReplacementCars(e.target.value)
+                        }}
+                        onFocus={() => loadReplacementCars(editReplCarSearch)}
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
+                      />
+                      {/* Results dropdown list */}
+                      {replacementCars.length > 0 && (
+                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto z-50">
+                          {replacementCars.map((car) => (
+                            <div
+                              key={car.InventoryItemID}
+                              onClick={() => {
+                                setEditDetailFields(prev => ({ ...prev, replacementVin: car.VinNo }))
+                                setEditReplCarSearch(`${car.RegisterNo || '-'} (${car.Model || '-'}) [Project: ${car.Project || '-'}]`)
+                                setReplacementCars([]) // Hide dropdown
+                              }}
+                              className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-100 last:border-0 text-xs text-slate-800"
+                            >
+                              <span className="font-bold text-indigo-650">{car.RegisterNo || '-'}</span> 
+                              <span className="text-slate-500"> (VIN: {car.VinNo} | {car.Model || '-'})</span>
+                              <div className="text-[10px] text-slate-400 mt-0.5">โครงการ: <span className="font-semibold text-slate-600">{car.Project || '-'}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {editDetailFields.replacementVin && (
+                        <div className="mt-1.5 text-xxs font-bold text-emerald-600 flex items-center gap-1">
+                          <span>✓ เลือกแล้ว:</span> <span className="font-mono">{editDetailFields.replacementVin}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location select */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                        <span className="text-rose-555">*</span> สถานที่รับ/คืนรถทดแทน
+                      </label>
+                      <select
+                        value={editDetailFields.replacementLocation}
+                        onChange={(e) => setEditDetailFields(prev => ({ ...prev, replacementLocation: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+                      >
+                        <option value="">เลือกสถานที่รับ/คืนรถทดแทน</option>
+                        {locationOptions.map((loc) => (
+                          <option key={loc.code} value={loc.code}>
+                            {loc.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Start Date */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันที่ขอรถทดแทน</label>
+                      <input
+                        type="date"
+                        value={editDetailFields.replacementStartDate}
+                        onChange={(e) => setEditDetailFields(prev => ({ ...prev, replacementStartDate: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Service Location */}
             <div>
@@ -2073,6 +2238,109 @@ export default function QuickReportPage() {
                         }
                       </select>
                     </div>
+
+                    {/* Replacement Car Assignment */}
+                    {initialCarStatus === 'WAITING_FOR_MAINTENANCE' && (
+                      <div className="col-span-2 space-y-4 pt-2 border-t border-slate-100 animate-fade-in-up">
+                        <div className="flex items-center gap-2.5 bg-slate-50/50 p-3 rounded-2xl border border-slate-150">
+                          <input
+                            type="checkbox"
+                            id="hasReplacement"
+                            checked={hasReplacement}
+                            onChange={(e) => {
+                              setHasReplacement(e.target.checked)
+                              if (e.target.checked) {
+                                loadReplacementCars('')
+                              } else {
+                                setReplacementVin('')
+                                setReplCarSearch('')
+                              }
+                            }}
+                            className="w-4.5 h-4.5 text-indigo-650 border-slate-350 rounded focus:ring-indigo-500"
+                          />
+                          <label htmlFor="hasReplacement" className="text-xs font-bold text-slate-700 cursor-pointer">
+                            ต้องการรถทดแทนหรือไม่
+                          </label>
+                        </div>
+
+                        {hasReplacement && (
+                          <div className="bg-indigo-50/20 p-4 rounded-3xl border border-indigo-100/50 space-y-4 animate-scale-up">
+                            {/* Searchable Replacement Car */}
+                            <div className="relative">
+                              <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                                <span className="text-rose-555">*</span> ข้อมูลรถทดแทน
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="🔎 ค้นหาทะเบียน หรือ VIN รถทดแทน..."
+                                value={replCarSearch}
+                                onChange={(e) => {
+                                  setReplCarSearch(e.target.value)
+                                  loadReplacementCars(e.target.value)
+                                }}
+                                onFocus={() => loadReplacementCars(replCarSearch)}
+                                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
+                              />
+                              {/* Results dropdown list */}
+                              {replacementCars.length > 0 && (
+                                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-48 overflow-y-auto z-50">
+                                  {replacementCars.map((car) => (
+                                    <div
+                                      key={car.InventoryItemID}
+                                      onClick={() => {
+                                        setReplacementVin(car.VinNo)
+                                        setReplCarSearch(`${car.RegisterNo || '-'} (${car.Model || '-'}) [Project: ${car.Project || '-'}]`)
+                                        setReplacementCars([]) // Hide dropdown
+                                      }}
+                                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-100 last:border-0 text-xs text-slate-800"
+                                    >
+                                      <span className="font-bold text-indigo-650">{car.RegisterNo || '-'}</span> 
+                                      <span className="text-slate-500"> (VIN: {car.VinNo} | {car.Model || '-'})</span>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">โครงการ: <span className="font-semibold text-slate-600">{car.Project || '-'}</span></div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {replacementVin && (
+                                <div className="mt-1.5 text-xxs font-bold text-emerald-600 flex items-center gap-1">
+                                  <span>✓ เลือกแล้ว:</span> <span className="font-mono">{replacementVin}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Location select */}
+                            <div>
+                              <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                                <span className="text-rose-555">*</span> สถานที่รับ/คืนรถทดแทน
+                              </label>
+                              <select
+                                value={replacementLocation}
+                                onChange={(e) => setReplacementLocation(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+                              >
+                                <option value="">เลือกสถานที่รับ/คืนรถทดแทน</option>
+                                {locationOptions.map((loc) => (
+                                  <option key={loc.code} value={loc.code}>
+                                    {loc.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Start Date */}
+                            <div>
+                              <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันที่ขอรถทดแทน</label>
+                              <input
+                                type="date"
+                                value={replacementStartDate}
+                                onChange={(e) => setReplacementStartDate(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
               {/* Card 3: Description & Speech-to-Text (REQUIRED FIELD) */}
@@ -2402,9 +2670,9 @@ export default function QuickReportPage() {
                           )}
                         </div>
                         <span className={`px-2.5 py-1 text-xxs font-bold rounded-full border shrink-0 ${
-                          ticket.CarStatusDescription === 'ซ่อมเสร็จ'
+                          isMaintComplete(ticket)
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                            : ticket.CarStatusDescription === 'อยู่ระหว่างการซ่อม'
+                            : (ticket.CarStatusDescription === 'อยู่ระหว่างการซ่อม' || ticket.CarStatusDescription === 'รถอยู่ระหว่างซ่อม')
                             ? 'bg-orange-50 border-orange-200 text-orange-700'
                             : 'bg-blue-50 border-blue-200 text-blue-700'
                         }`}>
@@ -2429,7 +2697,7 @@ export default function QuickReportPage() {
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xxs font-bold text-amber-600">📋 ประวัติการติดตามผลล่าสุด:</p>
                           <div className="flex items-center gap-2">
-                            {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && ticket.CarStatusDescription !== 'ซ่อมเสร็จ' && (
+                            {!isMaintComplete(ticket) && (
                             <button
                               type="button"
                               onClick={() => handleStartEditTicket(ticket)}
@@ -2461,7 +2729,7 @@ export default function QuickReportPage() {
                         )}
 
                         {/* Inline Quick Add Follow-up Form - hide for completed */}
-                        {ticket.CarStatusCode !== 'GARAGE_COMPLETE' && ticket.CarStatusDescription !== 'ซ่อมเสร็จ' && (
+                        {!isMaintComplete(ticket) && (
                         <div className="mt-3 border-t border-slate-100 pt-3.5 flex gap-2">
                           <input
                             type="text"

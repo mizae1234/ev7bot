@@ -13,6 +13,25 @@ interface AttachedFile {
 
 export default function NewMaintenancePage() {
   const router = useRouter()
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl max-w-md w-full space-y-4">
+        <div className="w-16 h-16 bg-amber-50 rounded-full border border-amber-200 flex items-center justify-center text-3xl mx-auto">🚧</div>
+        <h2 className="text-xl font-bold text-slate-900">หน้านี้ยังไม่เปิดใช้งาน</h2>
+        <p className="text-sm text-slate-500 leading-relaxed">
+          ระบบยังไม่เปิดให้แจ้งซ่อมผ่านหน้าจอ Web Admin Desktop ในขณะนี้ กรุณาทำรายการผ่านมือถือ (Mobile LIFF) แทน
+        </p>
+        <button
+          onClick={() => router.back()}
+          className="w-full bg-indigo-650 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-2xl shadow-md transition"
+        >
+          ย้อนกลับ
+        </button>
+      </div>
+    </div>
+  )
+
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [createdId, setCreatedId] = useState<number | null>(null)
@@ -37,6 +56,27 @@ export default function NewMaintenancePage() {
   // 3. Maintenance Details
   const [statusCode, setStatusCode] = useState('WAITING_FOR_MAINTENANCE')
   const [needsReplacement, setNeedsReplacement] = useState(false)
+  const [replacementVin, setReplacementVin] = useState('')
+  const [replacementLocation, setReplacementLocation] = useState('')
+  const [replacementStartDate, setReplacementStartDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [replCarSearch, setReplCarSearch] = useState('')
+  const [replacementCars, setReplacementCars] = useState<any[]>([])
+  const [loadingReplacementCars, setLoadingReplacementCars] = useState(false)
+
+  const loadReplacementCars = async (search: string = '') => {
+    setLoadingReplacementCars(true)
+    try {
+      const res = await fetch(`/api/vehicles/search?replacement=true&q=${encodeURIComponent(search)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setReplacementCars(data)
+      }
+    } catch (err) {
+      console.error('Failed to load replacement cars:', err)
+    } finally {
+      setLoadingReplacementCars(false)
+    }
+  }
   const [serviceLocation, setServiceLocation] = useState('')
   const [startDate, setStartDate] = useState('')
   const [finishDate, setFinishDate] = useState('')
@@ -117,6 +157,10 @@ export default function NewMaintenancePage() {
         fixAction,
         statusCode,
         needsReplacement,
+        hasReplacement: needsReplacement,
+        replacementVin: needsReplacement ? replacementVin : null,
+        replacementLocation: needsReplacement ? replacementLocation : null,
+        replacementStartDate: needsReplacement ? replacementStartDate : null,
         serviceLocation,
         startDate: startDate || null,
         finishDate: finishDate || null,
@@ -482,12 +526,110 @@ export default function NewMaintenancePage() {
                     <input
                       type="checkbox"
                       checked={needsReplacement}
-                      onChange={(e) => setNeedsReplacement(e.target.checked)}
+                      onChange={(e) => {
+                        setNeedsReplacement(e.target.checked)
+                        if (e.target.checked) {
+                          loadReplacementCars('')
+                        } else {
+                          setReplacementVin('')
+                          setReplCarSearch('')
+                        }
+                      }}
                       className="w-4 h-4 rounded border-slate-350 text-indigo-650 focus:ring-indigo-500"
                     />
                     <span className="text-sm font-semibold text-slate-700">ต้องการรถทดแทนระหว่างการซ่อม</span>
                   </label>
                 </div>
+
+                {needsReplacement && (
+                  <div className="col-span-2 grid grid-cols-2 gap-4 bg-indigo-50/10 p-4 rounded-2xl border border-indigo-100/30">
+                    <div className="relative">
+                      <label className="text-xs font-semibold block mb-1 text-slate-700">
+                        <span className="text-rose-550">*</span> ข้อมูลรถทดแทน
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="🔎 ค้นหาทะเบียน หรือ VIN..."
+                        value={replCarSearch}
+                        onChange={(e) => {
+                          setReplCarSearch(e.target.value)
+                          loadReplacementCars(e.target.value)
+                        }}
+                        onFocus={() => loadReplacementCars(replCarSearch)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-semibold"
+                      />
+                      {/* Results dropdown list */}
+                      {replacementCars.length > 0 && (
+                        <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50">
+                          {replacementCars.map((car) => (
+                            <div
+                              key={car.InventoryItemID}
+                              onClick={() => {
+                                setReplacementVin(car.VinNo)
+                                setReplCarSearch(`${car.RegisterNo || '-'} (${car.Model || '-'}) [Project: ${car.Project || '-'}]`)
+                                setReplacementCars([]) // Hide dropdown
+                              }}
+                              className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-100 last:border-0 text-xs text-slate-800"
+                            >
+                              <span className="font-bold text-indigo-650">{car.RegisterNo || '-'}</span> 
+                              <span className="text-slate-500"> (VIN: {car.VinNo} | {car.Model || '-'})</span>
+                              <div className="text-[10px] text-slate-450 mt-0.5">โครงการ: <span className="font-semibold text-slate-650">{car.Project || '-'}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {replacementVin && (
+                        <div className="mt-1 text-xxs font-bold text-emerald-600">
+                          ✓ เลือกแล้ว: {replacementVin}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-slate-700">
+                        <span className="text-rose-550">*</span> สถานที่รับ/คืนรถทดแทน
+                      </label>
+                      <select
+                        value={replacementLocation}
+                        onChange={(e) => setReplacementLocation(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
+                      >
+                        <option value="">เลือกสถานที่รับ/คืนรถทดแทน</option>
+                        <option value="AION_GI_KANCHANAPISEK">Aion กาญจนาฯ</option>
+                        <option value="AION_GI_RAMINTRA_EXPRESSWAY">Aion เลียบด่วนฯ</option>
+                        <option value="AION_GI_PIBULSONGKRAM">Aion พิบูลฯ</option>
+                        <option value="AION_GI_MINBURI">Aion มีนบุรี</option>
+                        <option value="AION_GI_MAHACHAI">Aion มหาชัย</option>
+                        <option value="AION_GI_SALAYA">Aion ศาลายา</option>
+                        <option value="EV7_YARD_PRAPADAENG">EV7 Yard พระประแดง</option>
+                        <option value="SMART_TAXI">สมาร์ทเแท็กซี่</option>
+                        <option value="GARAGE_BUNGKHWANG">อู่ บึงขวาง</option>
+                        <option value="GARAGE_TS">อู่ TS</option>
+                        <option value="GARAGE_88_CAR">อู่ 88 คาร์</option>
+                        <option value="GARAGE_CRN_PAKKRET">อู่ CRN ปากเกร็ด</option>
+                        <option value="GARAGE_56_COLOR">อู่ 56 Color</option>
+                        <option value="GARAGE_PRICHA">อู่ ปรีชา</option>
+                        <option value="GARAGE_PERFECTCAR">อู่ เพอร์เฟคคาร์</option>
+                        <option value="GARAGE_SAHACAR">อู่ สหาคาร์</option>
+                        <option value="GARAGE_PREMIUMCAR">อู่ พรีเมี่ยมคาร์</option>
+                        <option value="GARAGE_BESTCARPAINT">อู่ เบสท์คาร์เพ้นท์</option>
+                        <option value="BRANCH_AYUTTHAYA">สาขา อยุธยา</option>
+                        <option value="BB_CARPAINT">อู่ บีบี คาร์เพ้นท์</option>
+                        <option value="AUTOHAUS">อู่ Autohaus</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-slate-700">วันที่ขอรถทดแทน</label>
+                      <input
+                        type="date"
+                        value={replacementStartDate}
+                        onChange={(e) => setReplacementStartDate(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-semibold block mb-1 text-slate-700">สถานที่ทำการ (ตรวจเช็ค/แก้ไข)</label>

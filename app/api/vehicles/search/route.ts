@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
     const q = (searchParams.get('q') || '').trim()
     const cleanQuery = `%${q.replace(/[\s-]/g, '')}%`
     
+    const isReplacement = searchParams.get('replacement') === 'true'
+    
     const pool = await getMSSQLPool()
     if (!pool) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
@@ -18,17 +20,23 @@ export async function GET(req: NextRequest) {
     request.input('cleanQuery', sql.NVarChar, cleanQuery)
 
     // Query top 15 matching active vehicles
-    const result = await request.query(`
+    let sqlQuery = `
       SELECT TOP 15 InventoryItemID, VinNo, RegisterNo, Model, Project
       FROM dbo.EV_InventoryItem
       WHERE IsActive = 1
+    `
+    if (isReplacement) {
+      sqlQuery += ` AND StatusType = 'REPLACEMENT_AVAILABLE' `
+    }
+    sqlQuery += `
         AND (
           REPLACE(REPLACE(RegisterNo, ' ', ''), '-', '') LIKE @cleanQuery
           OR REPLACE(REPLACE(VinNo, ' ', ''), '-', '') LIKE @cleanQuery
         )
       ORDER BY RegisterNo ASC
-    `)
+    `
 
+    const result = await request.query(sqlQuery)
     return NextResponse.json(result.recordset)
   } catch (error) {
     console.error('[Vehicle Search API Error]', error)
