@@ -121,16 +121,19 @@ export async function getDeliveryToday() {
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         CASE 
-          WHEN v.RentType IS NOT NULL THEN v.RentType
-          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
           ELSE 'ONRENT_NEW'
         END AS RentType
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
-      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
       WHERE r.IsActive = 1
         AND (
           (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
@@ -165,16 +168,19 @@ export async function getDeliveryByDate(params: { date: string }) {
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         CASE 
-          WHEN v.RentType IS NOT NULL THEN v.RentType
-          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
           ELSE 'ONRENT_NEW'
         END AS RentType
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
-      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
       WHERE r.IsActive = 1
         AND (
           (r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate)
@@ -376,16 +382,14 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     `),
     completedReq.query(`
       SELECT 
-        v.RentType,
-        COUNT(*) as cnt
-      FROM dbo.View_AccumarateReleaseCar v
-      WHERE v.ReleaseDate >= @startDate AND v.ReleaseDate <= @endDate
-      GROUP BY v.RentType
-    `),
-    pendingReq.query(`
-      SELECT 
         CASE 
-          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
           ELSE 'ONRENT_NEW'
@@ -393,13 +397,52 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
         COUNT(*) as cnt
       FROM dbo.EV_RentItem r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+        AND r.ReleaseDate IS NOT NULL
+      GROUP BY 
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END
+    `),
+    pendingReq.query(`
+      SELECT 
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType,
+        COUNT(*) as cnt
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
         AND r.ReleaseDate IS NULL
         AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
       GROUP BY 
         CASE 
-          WHEN o.RentType IS NOT NULL THEN o.RentType
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
           ELSE 'ONRENT_NEW'
@@ -419,12 +462,39 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       SELECT 
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-        v.RentType,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType,
         COUNT(*) AS Count
-      FROM dbo.View_AccumarateReleaseCar v
-      LEFT JOIN dbo.EV_InventoryItem i ON v.InventoryItemID = i.InventoryItemID
-      WHERE v.ReleaseDate >= @startDate AND v.ReleaseDate <= @endDate
-      GROUP BY i.ProjectType, i.Model, v.RentType
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+        AND r.ReleaseDate IS NOT NULL
+      GROUP BY 
+        i.ProjectType, 
+        i.Model,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.EV_RentItem prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.IsActive = 1 
+              AND prev.ReleaseDate IS NOT NULL 
+              AND prev.RentItemID < r.RentItemID
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END
     `),
     repairReq.query(`
       SELECT
@@ -657,8 +727,13 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
           ISNULL(i.Model, 'ไม่ระบุ') AS Model,
           CASE 
-            WHEN v.RentType IS NOT NULL THEN v.RentType
-            WHEN o.RentType IS NOT NULL THEN o.RentType
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.EV_RentItem prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.IsActive = 1 
+                AND prev.ReleaseDate IS NOT NULL 
+                AND prev.RentItemID < r.RentItemID
+            ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                  OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
             ELSE 'ONRENT_NEW'
@@ -666,8 +741,6 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           COUNT(*) AS Count
         FROM dbo.EV_RentItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-        LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
-        LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
           AND r.ReleaseDate IS NOT NULL
@@ -675,8 +748,13 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           i.ProjectType, 
           i.Model,
           CASE 
-            WHEN v.RentType IS NOT NULL THEN v.RentType
-            WHEN o.RentType IS NOT NULL THEN o.RentType
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.EV_RentItem prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.IsActive = 1 
+                AND prev.ReleaseDate IS NOT NULL 
+                AND prev.RentItemID < r.RentItemID
+            ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
                  OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
             ELSE 'ONRENT_NEW'
