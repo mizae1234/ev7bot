@@ -205,10 +205,12 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
             <span className="font-semibold text-zinc-600 dark:text-zinc-400">ลูกค้า:</span> {card.customerName}
           </div>
         ) : (
-          <div>
-            <span className="font-semibold text-zinc-600 dark:text-zinc-400">อู่/สถานที่:</span>{' '}
-            <span className="font-semibold text-amber-700 dark:text-amber-400">{card.location}</span>
-          </div>
+          card.vehicleStatus?.toUpperCase() !== 'ON_RENT' && (
+            <div>
+              <span className="font-semibold text-zinc-600 dark:text-zinc-400">อู่/สถานที่:</span>{' '}
+              <span className="font-semibold text-amber-700 dark:text-amber-400">{card.location}</span>
+            </div>
+          )
         )}
       </div>
 
