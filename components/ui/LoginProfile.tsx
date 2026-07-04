@@ -11,8 +11,10 @@ interface LiffProfile {
 
 export function LoginProfile() {
   const [profile, setProfile] = useState<LiffProfile | null>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     // 1. Try reading from localStorage first for instant display
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('liff_profile')
@@ -68,6 +70,10 @@ export function LoginProfile() {
       active = false
     }
   }, [])
+
+  if (!mounted) {
+    return <div className="w-[100px] h-9" />
+  }
 
   if (!profile) {
     const isLocalhost = typeof window !== 'undefined' && (
