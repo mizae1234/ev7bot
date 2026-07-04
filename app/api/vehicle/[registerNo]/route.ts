@@ -142,7 +142,7 @@ export async function GET(
             FirstName, LastName, PhoneNo,
             ExpectedReleaseDate, ReleaseDate,
             ContractCancellationDate, IsActive,
-            ROW_NUMBER() OVER(PARTITION BY RentItemID ORDER BY Source ASC) as rn
+            ROW_NUMBER() OVER(PARTITION BY RentItemID, CAST(ReleaseDate AS DATE) ORDER BY Source ASC) as rn
           FROM (
             SELECT
               RentItemID, ContractNo, ContractType,
