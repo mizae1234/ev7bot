@@ -52,6 +52,7 @@ interface LongestRepairItem {
   CarStatusName: string
   ServiceLocationCode: string
   ReportDate: string
+  MaintenanceFinishDate?: string
   DaysActive: number
   FollowUpDetail: string | null
 }
@@ -133,11 +134,30 @@ function MaintenanceDashboardContent() {
   const stillWorkRepairs = data?.stillWorkRepairs || []
 
   const [stillWorkSearchQuery, setStillWorkSearchQuery] = useState('')
+  const [readyPickupSearchQuery, setReadyPickupSearchQuery] = useState('')
+
+  // Separate longestRepairs into ready-to-release and still stuck
+  const readyPickupRepairs = longestRepairs.filter(r => r.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
+  const actualStuckRepairs = longestRepairs.filter(r => r.CarStatusCode !== 'READY_PICKUP_MAINTENANCE')
+
+  // Filter ready to release repairs
+  let filteredReadyPickupRepairs = selectedLocationFilter
+    ? readyPickupRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
+    : readyPickupRepairs
+
+  if (readyPickupSearchQuery.trim()) {
+    const q = readyPickupSearchQuery.toLowerCase().replace(/[\s-]/g, '')
+    filteredReadyPickupRepairs = filteredReadyPickupRepairs.filter(r => {
+      const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
+      const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
+      return reg.includes(q) || vin.includes(q)
+    })
+  }
 
   // Filter longest repairs if location card is clicked, otherwise show all
   let filteredLongestRepairs = selectedLocationFilter
-    ? longestRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
-    : longestRepairs
+    ? actualStuckRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
+    : actualStuckRepairs
 
   if (stuckSearchQuery.trim()) {
     const q = stuckSearchQuery.toLowerCase().replace(/[\s-]/g, '')
@@ -365,6 +385,93 @@ function MaintenanceDashboardContent() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              {/* Card: Ready to Release (รถซ่อมเสร็จ รอปล่อย) */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>🟠</span> รายการรถซ่อมเสร็จ รอปล่อย (Ready to Release)
+                    </h2>
+                    <p className="text-[10px] text-slate-500 mt-0.5">รถยนต์ที่ซ่อมเสร็จเรียบร้อยและอยู่ระหว่างติดตามส่งมอบคืนลูกค้า/ผู้เช่า</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={readyPickupSearchQuery}
+                      onChange={(e) => setReadyPickupSearchQuery(e.target.value)}
+                      placeholder="ค้นหาทะเบียน / VIN ในตาราง..."
+                      className="text-xs py-1.5 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400 focus:border-transparent placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 max-h-[350px] overflow-y-auto pr-1">
+                  {filteredReadyPickupRepairs.length > 0 ? (
+                    filteredReadyPickupRepairs.map((item) => (
+                      <a
+                        key={item.MaintenanceItemID}
+                        href={`/vehicle/${encodeURIComponent(item.RegisterNo || '')}`}
+                        className="block bg-orange-50/20 border border-orange-100 hover:border-orange-400 hover:shadow-xs rounded-xl p-2.5 transition no-underline text-inherit cursor-pointer"
+                      >
+                        <div className="flex flex-row items-center justify-between gap-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                            {/* License plate */}
+                            <span className="text-xxs font-extrabold text-slate-800 bg-white px-2 py-0.5 rounded border border-orange-200 shadow-xxs shrink-0 font-mono">
+                              {item.RegisterNo || 'ไม่มีทะเบียน'}
+                            </span>
+
+                            {/* Status */}
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-orange-100 border-orange-200 text-orange-700">
+                              {item.CarStatusName || 'ซ่อมเสร็จ รอปล่อย'}
+                            </span>
+
+                            {/* Issue Title */}
+                            <span className="text-xs font-bold text-slate-800 truncate max-w-[100px] sm:max-w-[200px]" title={item.IssueTitle}>
+                              {item.IssueTitle}
+                            </span>
+
+                            {/* Details (Project & Location) */}
+                            <span className="text-[10px] text-slate-400 shrink-0">|</span>
+                            <span className="text-[10px] text-slate-500 truncate">
+                              ผู้รับผิดชอบ: <strong className="text-orange-650 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 text-[9px]">{locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ'}</strong>
+                            </span>
+
+                            {/* Latest follow-up inline */}
+                            {item.FollowUpDetail && (
+                              <>
+                                <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">|</span>
+                                <span className="text-[10px] text-slate-500 italic truncate max-w-[180px] lg:max-w-[250px] hidden sm:inline" title={item.FollowUpDetail}>
+                                  💬 {item.FollowUpDetail}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Right side: Finish Date / Wait Days */}
+                          <div className="flex items-center gap-1.5 shrink-0 pl-2 sm:pl-3 border-l border-orange-200 text-right">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0">รอปล่อย</span>
+                            <span className="text-xs sm:text-sm font-black font-mono shrink-0 text-orange-600">
+                              {item.MaintenanceFinishDate ? `${Math.max(0, Math.floor((Date.now() - new Date(item.MaintenanceFinishDate).getTime()) / (1000 * 60 * 60 * 24)))}` : '0'} วัน
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Mobile-only follow-up row */}
+                        {item.FollowUpDetail && (
+                          <div className="mt-1 text-[10px] text-slate-500 italic sm:hidden truncate">
+                            💬 {item.FollowUpDetail}
+                          </div>
+                        )}
+                      </a>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-xs text-slate-450 italic">
+                      ไม่มีรายการรถซ่อมเสร็จรอปล่อยตัว
+                    </div>
+                  )}
                 </div>
               </div>
 

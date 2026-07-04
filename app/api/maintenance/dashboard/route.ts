@@ -248,6 +248,7 @@ export async function GET(req: NextRequest) {
           m.ServiceLocationCode,
           m.ReportDate,
           m.FollowUpDetail,
+          m.MaintenanceFinishDate,
           ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
@@ -264,6 +265,7 @@ export async function GET(req: NextRequest) {
         ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
         t.ServiceLocationCode,
         t.ReportDate,
+        t.MaintenanceFinishDate,
         DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
         t.FollowUpDetail
       FROM LatestTickets t
