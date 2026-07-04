@@ -35,6 +35,7 @@ export default function CustodyPage() {
         c.registerNo.toLowerCase().includes(search.toLowerCase()) ||
         c.vin.toLowerCase().includes(search.toLowerCase()) ||
         c.model.toLowerCase().includes(search.toLowerCase()) ||
+        c.project.toLowerCase().includes(search.toLowerCase()) ||
         c.customerName.toLowerCase().includes(search.toLowerCase()) ||
         c.location.toLowerCase().includes(search.toLowerCase())
     )

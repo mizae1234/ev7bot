@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
         registerNo: rec.RegisterNo || rec.VinNo || 'ไม่ระบุทะเบียน',
         vin: rec.VinNo,
         model: rec.Model,
-        project: rec.Project || 'ไม่ระบุโครงการ',
+        project: (rec.Project && rec.Project.toUpperCase() === 'TAXI') ? 'EV7' : (rec.Project || 'ไม่ระบุโครงการ'),
         projectType: rec.ProjectType,
         vehicleStatus: rec.VehicleStatus,
         vehicleStatusType: rec.VehicleStatusType,
