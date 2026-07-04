@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
     const insertRes = await insertReq.execute('dbo.sp_InsertMaintenanceItemJson')
     const newMaintenanceId = insertRes.output.NewMaintenanceItemID
 
-    // ─── If new report is WAITING_FOR_MAINTENANCE (เข้าซ่อม), update inventory and other pending tickets ───
-    if (body.carStatusCode === 'WAITING_FOR_MAINTENANCE') {
+    // ─── If new report is WAITING_FOR_MAINTENANCE or IN_MAINTENANCE, update inventory and other pending tickets ───
+    if (body.carStatusCode === 'WAITING_FOR_MAINTENANCE' || body.carStatusCode === 'IN_MAINTENANCE') {
       try {
         // 1. Get current Status and StatusType of the vehicle
         const invReq = pool.request()
@@ -144,10 +144,61 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // 2. Update OTHER pending tickets of this vehicle to WAITING_FOR_MAINTENANCE
         const locCode = body.serviceLocationCode || null
         const locName = body.serviceLocationName || 'ไม่ระบุ / นอกสถานที่'
 
+        // 1.5. Update READY_PICKUP_MAINTENANCE tickets of this vehicle to COMPLETE
+        const readyPickupReq = pool.request()
+        readyPickupReq.input('invId', sql.Int, inventoryItemId)
+        readyPickupReq.input('newMaintId', sql.Int, newMaintenanceId)
+        const readyPickupRes = await readyPickupReq.query(`
+          SELECT MaintenanceItemID 
+          FROM dbo.EV_MaintenanceItem 
+          WHERE InventoryItemID = @invId 
+            AND MaintenanceItemID != @newMaintId
+            AND CarStatusCode = 'READY_PICKUP_MAINTENANCE'
+            AND IsActive = 1
+        `)
+
+        const readyTickets = readyPickupRes.recordset
+        if (readyTickets.length > 0) {
+          console.log(`[New Ticket] Found ${readyTickets.length} ready-to-pickup tickets to complete automatically.`)
+          for (const ticket of readyTickets) {
+            const tId = ticket.MaintenanceItemID
+
+            // Update ticket status & MaintenanceFinishDate
+            const updReadyReq = pool.request()
+            updReadyReq.input('maintId', sql.Int, tId)
+            updReadyReq.input('userId', sql.Int, dbUserId)
+            await updReadyReq.query(`
+              UPDATE dbo.EV_MaintenanceItem
+              SET CarStatusCode = 'COMPLETE',
+                  MaintenanceFinishDate = GETDATE(),
+                  UpdateUserID = @userId,
+                  UpdateDate = GETDATE()
+              WHERE MaintenanceItemID = @maintId
+            `)
+
+            // Insert follow-up log for this ticket
+            const followUpMsg = `ระบบอัพเดต : ปิดงานอัตโนมัติเนื่องจากมีใบแจ้งซ่อมใหม่ (${body.issueDescription || 'ไม่ระบุอาการ'})`
+            const insFollowUpReq = pool.request()
+            insFollowUpReq.input('maintId', sql.Int, tId)
+            insFollowUpReq.input('detail', sql.NVarChar, followUpMsg)
+            insFollowUpReq.input('userId', sql.Int, dbUserId)
+            await insFollowUpReq.query(`
+              INSERT INTO dbo.EV_MaintenanceFollowUp (
+                MaintenanceItemID, FollowUpDate, FollowUpDetail, IsActive,
+                CreateDate, CreateUserID, UpdateDate, UpdateUserID
+              )
+              VALUES (
+                @maintId, GETDATE(), @detail, 1,
+                GETDATE(), @userId, GETDATE(), @userId
+              )
+            `)
+          }
+        }
+
+        // 2. Update OTHER pending tickets of this vehicle to WAITING_FOR_MAINTENANCE
         const pendingReq = pool.request()
         pendingReq.input('invId', sql.Int, inventoryItemId)
         pendingReq.input('newMaintId', sql.Int, newMaintenanceId)
@@ -162,7 +213,7 @@ export async function POST(req: NextRequest) {
 
         const otherTickets = pendingRes.recordset
         if (otherTickets.length > 0) {
-          console.log(`[New Ticket WAITING_FOR_MAINTENANCE] Found ${otherTickets.length} other pending tickets to update.`)
+          console.log(`[New Ticket] Found ${otherTickets.length} other pending tickets to update to WAITING_FOR_MAINTENANCE.`)
           for (const ticket of otherTickets) {
             const tId = ticket.MaintenanceItemID
 
@@ -199,7 +250,7 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (bulkErr) {
-        console.error('[New Ticket WAITING_FOR_MAINTENANCE Bulk Action Error]', bulkErr)
+        console.error('[New Ticket Bulk Action Error]', bulkErr)
       }
     }
 
