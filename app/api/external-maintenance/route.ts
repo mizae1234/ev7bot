@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูล SQL Server ได้' }, { status: 500 })
     }
 
-    // 1. Get InventoryItemID from RegisterNo or VinNo
-    const registerNo = body.carInfo?.registerNo
-    const vinNo = body.carInfo?.vin
+    // 1. Get InventoryItemID from RegisterNo or VinNo (Supports both LIFF carInfo and Admin root fields)
+    const registerNo = body.carInfo?.registerNo || body.registerNo || null
+    const vinNo = body.carInfo?.vin || body.vinNo || body.vin || null
 
     if (!registerNo && !vinNo) {
       return NextResponse.json({ error: 'ไม่พบข้อมูลทะเบียนรถหรือหมายเลขตัวถังในการแจ้งซ่อม' }, { status: 400 })
@@ -66,23 +66,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Execute Stored Procedure sp_InsertMaintenanceItemJson
+    // 3. Execute Stored Procedure sp_InsertMaintenanceItemJson (Handle both issueTitle and issueDescription)
+    const carStatusCode = body.carStatusCode || body.statusCode || null
+    const issueTitle = body.issueDescription || body.issueTitle || null
+
     const maintenanceObj = {
       inventoryItemId,
-      registerNo: registerNo || null,
-      vinNo: vinNo || null,
+      registerNo: registerNo,
+      vinNo: vinNo,
       driverName: body.driverName || null,
       incidentDate: body.incidentDate ? new Date(body.incidentDate).toISOString() : null,
-      carStatusCode: body.carStatusCode || null,
-      issueTitle: body.issueDescription || null,
+      carStatusCode: carStatusCode,
+      issueTitle: issueTitle,
       problemTypeCode: body.problemType || null,
-      faultPartyCode: body.faultPartyCode || null,
-      carCaseCode: body.carCaseCode || null,
-      serviceLocationCode: body.serviceLocationCode || null,
-      insuranceCode: body.insurance || null,
-      followUpDetail: body.issueDescription || null,
+      faultPartyCode: body.faultPartyCode || body.faultParty || null,
+      carCaseCode: body.carCaseCode || body.carCase || null,
+      serviceLocationCode: body.serviceLocationCode || body.serviceLocation || null,
+      insuranceCode: body.insuranceCode || body.insurance || null,
+      followUpDetail: issueTitle,
       createUserId: dbUserId,
-      claimNumber: body.claimNo || null
+      claimNumber: body.claimNo || body.claimNumber || null
     }
 
     const insertReq = pool.request()
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
     const newMaintenanceId = insertRes.output.NewMaintenanceItemID
 
     // ─── If new report is WAITING_FOR_MAINTENANCE or IN_MAINTENANCE, update inventory and other pending tickets ───
-    if (body.carStatusCode === 'WAITING_FOR_MAINTENANCE' || body.carStatusCode === 'IN_MAINTENANCE') {
+    if (carStatusCode === 'WAITING_FOR_MAINTENANCE' || carStatusCode === 'IN_MAINTENANCE') {
       try {
         // 1. Get current Status and StatusType of the vehicle
         const invReq = pool.request()
@@ -179,7 +182,7 @@ export async function POST(req: NextRequest) {
             `)
 
             // Insert follow-up log for this ticket
-            const followUpMsg = `ระบบอัพเดต : ปิดงานอัตโนมัติเนื่องจากมีใบแจ้งซ่อมใหม่ (${body.issueDescription || 'ไม่ระบุอาการ'})`
+            const followUpMsg = `ระบบอัพเดต : ปิดงานอัตโนมัติเนื่องจากมีใบแจ้งซ่อมใหม่ (${issueTitle || 'ไม่ระบุอาการ'})`
             const insFollowUpReq = pool.request()
             insFollowUpReq.input('maintId', sql.Int, tId)
             insFollowUpReq.input('detail', sql.NVarChar, followUpMsg)
