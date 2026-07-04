@@ -106,8 +106,8 @@ export async function POST(req: NextRequest) {
         `)
 
         if (invRes.recordset.length > 0) {
-          const currentStatus = invRes.recordset[0].Status
-          const currentStatusType = invRes.recordset[0].StatusType
+          const currentStatus = (invRes.recordset[0].Status || '').toUpperCase().trim()
+          const currentStatusType = (invRes.recordset[0].StatusType || '').toUpperCase().trim()
 
           let newStatus: string | null = null
           let newStatusType: string | null = null
