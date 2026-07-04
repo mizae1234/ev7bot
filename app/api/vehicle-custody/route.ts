@@ -81,6 +81,11 @@ export async function GET(req: NextRequest) {
     const now = new Date()
 
     records.forEach((rec) => {
+      // Skip if vehicle is AVAILABLE (repaired and returned to stock for Sale)
+      if (rec.VehicleStatus === 'AVAILABLE' || rec.VehicleStatus?.startsWith('AVAILABLE')) {
+        return
+      }
+
       const status = rec.CarStatusCode
       const hasStartDate = !!rec.MaintenanceStartDate
       const hasFinishDate = !!rec.MaintenanceFinishDate
