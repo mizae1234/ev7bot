@@ -1754,10 +1754,10 @@ export default function QuickReportPage() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
                         {selectedCarDetails?.StatusName && (() => {
-                          const name = selectedCarDetails.StatusName
+                          const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
                           const statusType = selectedCarDetails.StatusType || ''
                           let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
-                          if (name.includes('ว่าง') || name.includes('พร้อม')) {
+                          if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
                             badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
                           } else if (name.includes('ใช้งาน')) {
                             badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
