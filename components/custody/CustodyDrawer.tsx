@@ -23,20 +23,21 @@ export function CustodyDrawer({ card, onClose, onFollowUpSubmit, submitting, err
     setFollowUpText('')
   }
 
-  const formatDateTime = (dateStr: string | null) => {
+  const formatDateOnly = (dateStr: string | null) => {
     if (!dateStr) return '-'
     try {
-      const date = new Date(dateStr)
-      return (
-        date.toLocaleDateString('th-TH', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Bangkok',
-        }) + ' น.'
-      )
+      const datePart = dateStr.split(/[T ]/)[0]
+      const [year, month, day] = datePart.split('-').map(Number)
+      
+      const thaiMonths = [
+        'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+        'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+      ]
+      
+      const BuddhistYear = year + 543
+      const thaiMonth = thaiMonths[month - 1]
+      
+      return `${day} ${thaiMonth} ${BuddhistYear}`
     } catch {
       return dateStr
     }
@@ -152,15 +153,15 @@ export function CustodyDrawer({ card, onClose, onFollowUpSubmit, submitting, err
                   <div className="space-y-2 text-xs bg-zinc-50 p-4 rounded-xl dark:bg-zinc-950">
                     <div className="flex justify-between">
                       <span className="text-zinc-500">วันที่แจ้ง/เปิดเคส (Report Date):</span>
-                      <span className="font-semibold">{formatDateTime(card.reportDate)}</span>
+                      <span className="font-semibold">{formatDateOnly(card.reportDate)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">วันที่เริ่มซ่อม (Start Date):</span>
-                      <span className="font-semibold">{formatDateTime(card.startDate)}</span>
+                      <span className="font-semibold">{formatDateOnly(card.startDate)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-zinc-500">วันที่ซ่อมเสร็จ (Finish Date):</span>
-                      <span className="font-semibold">{formatDateTime(card.finishDate)}</span>
+                      <span className="font-semibold">{formatDateOnly(card.finishDate)}</span>
                     </div>
                   </div>
                 </div>
