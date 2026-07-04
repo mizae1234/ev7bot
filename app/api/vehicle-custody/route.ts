@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLPool, getMSSQLWritePool, sql } from '@/lib/mssql'
 
-// GET: Fetch all active vehicles in the custody tracking pipeline
+// GET: Fetch all active vehicles in the custody tracking pipeline and available vehicles
 export async function GET(req: NextRequest) {
   try {
     const pool = await getMSSQLPool()
@@ -9,11 +9,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // Single query to fetch all active cases and their custody info
+    // UNION query to fetch both vehicles in maintenance AND vacant available vehicles
     const result = await pool.request().query(`
       SELECT 
         m.MaintenanceItemID,
-        m.InventoryItemID,
+        i.InventoryItemID,
         i.RegisterNo,
         i.VinNo,
         i.Model,
@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
         repi.RegisterNo AS ReplacementRegisterNo,
         f.FollowUpDetail AS LatestFollowUpDetail,
         f.FollowUpDate AS LatestFollowUpDate,
-        tc.ActiveTicketsCount
+        tc.ActiveTicketsCount,
+        i.UpdateDate,
+        i.CreateDate
       FROM dbo.EV_MaintenanceItem m
       JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
@@ -68,7 +70,52 @@ export async function GET(req: NextRequest) {
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
         AND m.MaintenanceReturnDate IS NULL
-      ORDER BY m.ReportDate DESC
+
+      UNION ALL
+
+      SELECT 
+        NULL AS MaintenanceItemID,
+        i.InventoryItemID,
+        i.RegisterNo,
+        i.VinNo,
+        i.Model,
+        i.Project,
+        i.ProjectType,
+        i.Status AS VehicleStatus,
+        i.StatusType AS VehicleStatusType,
+        sub.DescriptionStatus AS VehicleSubStatusName,
+        msStatus.DescriptionStatus AS VehicleMainStatusName,
+        NULL AS CarSubStatusName,
+        NULL AS CarStatusCode,
+        NULL AS IssueTitle,
+        NULL AS ServiceLocationCode,
+        NULL AS ReportDate,
+        NULL AS IncidentDate,
+        NULL AS MaintenanceStartDate,
+        NULL AS MaintenanceFinishDate,
+        (
+          SELECT TOP 1 MaintenanceReturnDate 
+          FROM dbo.EV_MaintenanceItem 
+          WHERE InventoryItemID = i.InventoryItemID AND IsActive = 1 AND MaintenanceReturnDate IS NOT NULL 
+          ORDER BY MaintenanceReturnDate DESC
+        ) AS MaintenanceReturnDate,
+        NULL AS InsuranceCode,
+        NULL AS ClaimNumber,
+        NULL AS ContractNo,
+        NULL AS CustomerFirstName,
+        NULL AS CustomerLastName,
+        NULL AS PhoneNo,
+        NULL AS ReplacementVin,
+        NULL AS ReplacementRegisterNo,
+        NULL AS LatestFollowUpDetail,
+        NULL AS LatestFollowUpDate,
+        0 AS ActiveTicketsCount,
+        i.UpdateDate,
+        i.CreateDate
+      FROM dbo.EV_InventoryItem i
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsStatus msStatus ON i.Status = msStatus.StatusCode
+      WHERE i.Status = 'AVAILABLE' AND i.IsActive = 1
     `)
 
     const records = result.recordset
@@ -77,22 +124,24 @@ export async function GET(req: NextRequest) {
     const column1: any[] = [] // แจ้งเคส / รอคิวเข้าซ่อม (ICI Claims)
     const column2: any[] = [] // กำลังซ่อม & จัดหารถทดแทน (Workshop & Replacement)
     const column3: any[] = [] // ซ่อมเสร็จ รอส่งมอบคืน (EV7 Operations)
+    const column4: any[] = [] // รถว่าง รอจัดหาลูกค้า (EV7 & Sales)
 
     const now = new Date()
 
     records.forEach((rec) => {
-      // Skip if vehicle is AVAILABLE (repaired and returned to stock for Sale)
-      if (rec.VehicleStatus === 'AVAILABLE' || rec.VehicleStatus?.startsWith('AVAILABLE')) {
-        return
-      }
-
+      const isAvailable = rec.VehicleStatus === 'AVAILABLE' || rec.VehicleStatus?.startsWith('AVAILABLE')
       const status = rec.CarStatusCode
       const hasStartDate = !!rec.MaintenanceStartDate
       const hasFinishDate = !!rec.MaintenanceFinishDate
 
-      // Calculate Ageing Days (Days in current column)
+      // Calculate Ageing Days (Days in current column/status)
       let ageingDays = 0
-      if (hasFinishDate) {
+
+      if (isAvailable) {
+        // For available vehicles: days since it became available
+        const availDate = rec.MaintenanceReturnDate ? new Date(rec.MaintenanceReturnDate) : (rec.UpdateDate ? new Date(rec.UpdateDate) : new Date(rec.CreateDate))
+        ageingDays = Math.floor((now.getTime() - availDate.getTime()) / (1000 * 60 * 60 * 24))
+      } else if (hasFinishDate) {
         // In Column 3: Days since finished
         const finish = new Date(rec.MaintenanceFinishDate)
         ageingDays = Math.floor((now.getTime() - finish.getTime()) / (1000 * 60 * 60 * 24))
@@ -107,7 +156,7 @@ export async function GET(req: NextRequest) {
       }
 
       const formattedRecord = {
-        maintenanceId: rec.MaintenanceItemID,
+        maintenanceId: rec.MaintenanceItemID || rec.InventoryItemID, // Fallback for key/ID
         inventoryItemId: rec.InventoryItemID,
         registerNo: rec.RegisterNo || rec.VinNo || 'ไม่ระบุทะเบียน',
         vin: rec.VinNo,
@@ -124,6 +173,9 @@ export async function GET(req: NextRequest) {
         incidentDate: rec.IncidentDate || null,
         startDate: rec.MaintenanceStartDate,
         finishDate: rec.MaintenanceFinishDate,
+        maintenanceReturnDate: rec.MaintenanceReturnDate,
+        updateDate: rec.UpdateDate,
+        createDate: rec.CreateDate,
         insuranceCode: rec.InsuranceCode || '-',
         claimNumber: rec.ClaimNumber || '-',
         contractNo: rec.ContractNo || '-',
@@ -138,8 +190,10 @@ export async function GET(req: NextRequest) {
         activeTicketsCount: rec.ActiveTicketsCount || 1,
       }
 
-      // Categorize based on CarStatusCode and VehicleStatus
-      if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
+      // Categorize based on VehicleStatus first, then CarStatusCode
+      if (isAvailable) {
+        column4.push(formattedRecord)
+      } else if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
         column3.push(formattedRecord)
       } else if (status === 'IN_MAINTENANCE' || status === 'COMPLETE') {
         column2.push(formattedRecord)
@@ -157,7 +211,7 @@ export async function GET(req: NextRequest) {
         if (!existing) {
           groupedMap.set(card.inventoryItemId, {
             ...card,
-            tickets: [ {
+            tickets: card.carStatusCode ? [ {
               maintenanceId: card.maintenanceId,
               issueTitle: card.issueTitle,
               reportDate: card.reportDate,
@@ -171,9 +225,9 @@ export async function GET(req: NextRequest) {
               carStatusCode: card.carStatusCode,
               carSubStatusName: card.carSubStatusName,
               location: card.location,
-            } ]
+            } ] : []
           })
-        } else {
+        } else if (card.carStatusCode) {
           existing.tickets.push({
             maintenanceId: card.maintenanceId,
             issueTitle: card.issueTitle,
@@ -214,6 +268,7 @@ export async function GET(req: NextRequest) {
     const finalColumn1 = groupColumnCards(column1)
     const finalColumn2 = groupColumnCards(column2)
     const finalColumn3 = groupColumnCards(column3)
+    const finalColumn4 = groupColumnCards(column4)
 
     return NextResponse.json({
       board: {
@@ -231,6 +286,11 @@ export async function GET(req: NextRequest) {
           id: 'ready_pickup',
           title: '📁 ซ่อมเสร็จ รอส่งมอบคืน (EV7 Operations)',
           cards: finalColumn3
+        },
+        column4: {
+          id: 'available_sales',
+          title: '📁 รถว่าง รอจัดหาลูกค้า (EV7 & Sales)',
+          cards: finalColumn4
         }
       }
     })

@@ -18,6 +18,7 @@ interface KanbanResponse {
     column1: ColumnData
     column2: ColumnData
     column3: ColumnData
+    column4: ColumnData
   }
 }
 
@@ -32,12 +33,12 @@ export default function CustodyPage() {
     if (!search.trim()) return cards
     return cards.filter(
       (c) =>
-        c.registerNo.toLowerCase().includes(search.toLowerCase()) ||
-        c.vin.toLowerCase().includes(search.toLowerCase()) ||
-        c.model.toLowerCase().includes(search.toLowerCase()) ||
-        c.project.toLowerCase().includes(search.toLowerCase()) ||
-        c.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        c.location.toLowerCase().includes(search.toLowerCase())
+        (c.registerNo || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.vin || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.model || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.project || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.customerName || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.location || '').toLowerCase().includes(search.toLowerCase())
     )
   }
 
@@ -49,7 +50,7 @@ export default function CustodyPage() {
     <div className="min-h-screen bg-slate-50 text-zinc-900 pb-12 dark:bg-zinc-950 dark:text-zinc-50">
       {/* HEADER SECTION */}
       <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/80">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="mx-auto max-w-[95rem] px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <a
               href="/dashboard"
@@ -92,7 +93,7 @@ export default function CustodyPage() {
       </header>
 
       {/* FILTER & SEARCH */}
-      <div className="mx-auto max-w-7xl px-4 mt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[95rem] px-4 mt-6 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
           <div className="pointer-events-none absolute inset-y-0 left-6 flex items-center">
             <svg className="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -110,7 +111,7 @@ export default function CustodyPage() {
       </div>
 
       {/* KANBAN BOARD */}
-      <main className="mx-auto max-w-7xl px-4 mt-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[95rem] px-4 mt-6 sm:px-6 lg:px-8">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
@@ -121,7 +122,7 @@ export default function CustodyPage() {
             ⚠️ ไม่สามารถดึงข้อมูลบอร์ดติดตามได้: {error.message}
           </div>
         ) : board ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
             <KanbanColumn
               title={board.column1.title}
               cards={filterCards(board.column1.cards)}
@@ -152,6 +153,17 @@ export default function CustodyPage() {
               accentColorClass="group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
               hoverBorderClass="hover:border-emerald-400/50 dark:hover:border-emerald-500/50"
               icon="✅"
+              onRefresh={handleRefresh}
+            />
+
+            <KanbanColumn
+              title={board.column4.title}
+              cards={filterCards(board.column4.cards)}
+              headerColorClass="text-indigo-700 dark:text-indigo-400"
+              badgeColorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400"
+              accentColorClass="group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+              hoverBorderClass="hover:border-indigo-400/50 dark:hover:border-indigo-500/50"
+              icon="✨"
               onRefresh={handleRefresh}
             />
           </div>
