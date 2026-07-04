@@ -436,7 +436,11 @@ function MaintenanceDashboardContent() {
                             {/* Details (Project & Location) */}
                             <span className="text-[10px] text-slate-400 shrink-0">|</span>
                             <span className="text-[10px] text-slate-500 truncate">
-                              ผู้รับผิดชอบ: <strong className="text-orange-650 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 text-[9px]">{locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ'}</strong>
+                              ผู้รับผิดชอบ: <strong className="text-orange-650 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 text-[9px]">EV7</strong>
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0">|</span>
+                            <span className="text-[10px] text-slate-500 truncate">
+                              สถานที่: <strong className="text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[9px]">{locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ'}</strong>
                             </span>
 
                             {/* Latest follow-up inline */}
