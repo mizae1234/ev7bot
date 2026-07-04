@@ -273,7 +273,7 @@ function VehicleDetailContent() {
                 <div key={i} className={`rounded-xl border p-3 ${r.IsActive ? 'border-blue-300 bg-blue-50/30 dark:border-blue-800/40 dark:bg-blue-950/20' : 'border-zinc-200 bg-zinc-50/30 dark:border-zinc-800/40 dark:bg-zinc-900/30'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">สัญญาเช่า {r.ContractNo}</span>
-                    {r.IsActive && <span className="text-xs font-bold text-blue-600 dark:text-blue-450">สัญญาปัจจุบัน</span>}
+                    {!!r.IsActive && <span className="text-xs font-bold text-blue-600 dark:text-blue-450">สัญญาปัจจุบัน</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <span className="text-zinc-500 dark:text-zinc-400">ลูกค้า: <span className="text-zinc-700 dark:text-zinc-300">{r.FirstName} {r.LastName}</span></span>
