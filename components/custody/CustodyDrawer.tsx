@@ -43,6 +43,27 @@ export function CustodyDrawer({ card, onClose, onFollowUpSubmit, submitting, err
     }
   }
 
+  const formatDateTimeOnly = (dateStr: string | null) => {
+    if (!dateStr) return '-'
+    try {
+      const parts = dateStr.split(/[T ]/)
+      const datePart = parts[0]
+      const timePart = parts[1] ? parts[1].slice(0, 5) : ''
+      
+      const [year, month, day] = datePart.split('-').map(Number)
+      const thaiMonths = [
+        'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+        'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+      ]
+      const BuddhistYear = year + 543
+      const thaiMonth = thaiMonths[month - 1]
+      
+      return `${day} ${thaiMonth} ${BuddhistYear} ${timePart} น.`
+    } catch {
+      return dateStr
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
       <div className="absolute inset-0 overflow-hidden">
@@ -165,6 +186,19 @@ export function CustodyDrawer({ card, onClose, onFollowUpSubmit, submitting, err
                     </div>
                   </div>
                 </div>
+
+                {/* CURRENT NEXT TO DO NOTE */}
+                {card.latestFollowUpDetail && (
+                  <div className="space-y-2 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">💬 บันทึกความคืบหน้าล่าสุด (Next to do)</h3>
+                    <div className="bg-zinc-50 p-4 rounded-xl dark:bg-zinc-950 text-xs space-y-1.5">
+                      <p className="text-zinc-700 dark:text-zinc-300 font-medium">"{card.latestFollowUpDetail}"</p>
+                      {card.latestFollowUpDate && (
+                        <p className="text-[10px] text-zinc-400 font-normal">อัปเดตเมื่อ: {formatDateTimeOnly(card.latestFollowUpDate)}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* ADD NEW FOLLOW-UP FORM */}
                 <form onSubmit={handleSubmit} className="space-y-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">

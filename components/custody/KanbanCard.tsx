@@ -37,6 +37,27 @@ interface KanbanCardProps {
   icon: string
 }
 
+const formatDateTimeOnly = (dateStr: string | null) => {
+  if (!dateStr) return '-'
+  try {
+    const parts = dateStr.split(/[T ]/)
+    const datePart = parts[0]
+    const timePart = parts[1] ? parts[1].slice(0, 5) : ''
+    
+    const [year, month, day] = datePart.split('-').map(Number)
+    const thaiMonths = [
+      'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+    ]
+    const BuddhistYear = year + 543
+    const thaiMonth = thaiMonths[month - 1]
+    
+    return `${day} ${thaiMonth} ${BuddhistYear} ${timePart} น.`
+  } catch {
+    return dateStr
+  }
+}
+
 export function KanbanCard({ card, onClick, accentColorClass, hoverBorderClass, icon }: KanbanCardProps) {
   return (
     <div
@@ -94,6 +115,11 @@ export function KanbanCard({ card, onClick, accentColorClass, hoverBorderClass, 
       {card.latestFollowUpDetail ? (
         <div className="mt-2 text-[11px] text-zinc-500 line-clamp-2 italic border-t pt-2 border-zinc-100 dark:border-zinc-800">
           💬 {card.latestFollowUpDetail}
+          {card.latestFollowUpDate && (
+            <span className="block mt-1 text-[9px] text-zinc-400 font-normal not-italic">
+              (อัปเดต: {formatDateTimeOnly(card.latestFollowUpDate)})
+            </span>
+          )}
         </div>
       ) : (
         <div className="mt-2 text-[10px] text-zinc-400 border-t pt-2 border-zinc-100 dark:border-zinc-800 italic">
