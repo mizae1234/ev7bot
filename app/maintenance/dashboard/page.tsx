@@ -678,7 +678,7 @@ function MaintenanceDashboardContent() {
                   <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                     <span>📋</span> อัปเดตความคืบหน้าเรียลไทม์ (Live Follow-up Feed)
                   </h2>
-                  <p className="text-[10px] text-slate-500 mt-0.5">ประวัติการบันทึกงานซ่อมบำรุงล่าสุดจากมือถือคนขับ / อู่คู่สัญญา</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">ประวัติการบันทึกงานซ่อมบำรุงล่าสุด</p>
                 </div>
 
                 <div className="space-y-4 pl-3.5 border-l border-slate-200 py-1.5 max-h-[500px] overflow-y-auto pr-1">
