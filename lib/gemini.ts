@@ -54,6 +54,12 @@ ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
 คอลัมน์: ReturnItemID, VinNo, CustomerName, Model, ContractNo,
 ReceiveDate, ReturnDate, Mileage, ParkLocation
 
+### View: dbo.View_AccumarateReleaseCar (ข้อมูลการปล่อยรถสะสมย้อนหลัง)
+คอลัมน์: RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo, ReleaseDate, ExpectedReleaseDate, RentType (ค่าระบุประเภทรถเช่า ได้แก่ 'ONRENT_NEW' สำหรับรถใหม่, 'ONRENT_USE' สำหรับรถมือสอง)
+
+### View: dbo.View_GetOnrentNewOrUse (การแยกรถเช่าแบบ Real-time เฉพาะที่มีสถานะ ON_RENT)
+คอลัมน์: ProjectType, VinNo, Model, ContractNo, FirstName, LastName, ReleaseDate, RentType (ค่าระบุประเภท ได้แก่ 'ONRENT_NEW' หรือ 'ONRENT_USE')
+
 ### ตาราง: task_notes (จดโน้ต/ติดตามงาน - อยู่ใน PostgreSQL)
 คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
 
@@ -75,8 +81,13 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
 4. ถ้ามีการสอบถามเกี่ยวกับการติดตามผล (Follow up) หรือการอัปเดตงานซ่อมย้อนหลัง → ดึงจาก EV_MaintenanceFollowUp:
    SELECT FollowUpDate, FollowUpDetail FROM EV_MaintenanceFollowUp WHERE MaintenanceItemID = <id> AND IsActive = 1 ORDER BY FollowUpDate DESC
-5. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem:
-   SELECT ContractNo, FirstName, LastName, ReleaseDate FROM EV_RentItem WHERE InventoryItemID = <id> AND IsActive = 1
+5. ถ้า Status = 'ON_RENT' → ดึงจาก EV_RentItem และเช็คประเภทรถเช่า (รถใหม่/รถมือสอง) จาก View_AccumarateReleaseCar หรือ View_GetOnrentNewOrUse:
+   SELECT r.ContractNo, r.FirstName, r.LastName, r.ReleaseDate,
+          COALESCE(v.RentType, o.RentType, 'ONRENT_NEW') AS RentType
+   FROM EV_RentItem r
+   LEFT JOIN View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
+   LEFT JOIN View_GetOnrentNewOrUse o ON r.ContractNo = o.ContractNo
+   WHERE r.InventoryItemID = <id> AND r.IsActive = 1
 
 ### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE
 - RegisterNo อาจมี - หรือไม่มี (เช่น ทอ-3791 หรือ ทอ3791)

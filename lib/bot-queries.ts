@@ -64,10 +64,11 @@ function processRawDeliveries(rawItems: any[], dateStr: string) {
 
     const breakdownMap: Record<string, { project: string, model: string, completed: number, total: number }> = {}
     for (const item of items) {
-      const key = `${item.Project}_${item.Model}`
+      const displayProject = item.Project === 'Taxi' ? 'EV7' : item.Project
+      const key = `${displayProject}_${item.Model}`
       if (!breakdownMap[key]) {
         breakdownMap[key] = {
-          project: item.Project,
+          project: displayProject,
           model: item.Model,
           completed: 0,
           total: 0
@@ -504,9 +505,18 @@ export async function searchVehicle(params: { keyword: string }) {
       r.PhoneNo,
       r.ReleaseDate,
       r.ExpectedReleaseDate,
-      r.IsActive AS rentActive
+      r.IsActive AS rentActive,
+      CASE 
+        WHEN v.RentType IS NOT NULL THEN v.RentType
+        WHEN o.RentType IS NOT NULL THEN o.RentType
+        WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+             OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+        ELSE 'ONRENT_NEW'
+      END AS RentType
     FROM dbo.EV_InventoryItem i
     LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
+    LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
+    LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
     WHERE i.VinNo LIKE @keyword
       OR i.RegisterNo LIKE @keyword
       OR i.Model LIKE @keyword
