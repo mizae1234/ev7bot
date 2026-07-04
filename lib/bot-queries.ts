@@ -381,72 +381,62 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       WHERE PlanDate >= @startDate AND PlanDate <= @endDate
     `),
     completedReq.query(`
-      SELECT 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType,
-        COUNT(*) as cnt
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
-        AND r.ReleaseDate IS NOT NULL
-      GROUP BY 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END
+      WITH RentItemsWithRentType AS (
+        SELECT 
+          r.RentItemID,
+          r.ReleaseDate,
+          r.ExpectedReleaseDate,
+          r.IsActive,
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.EV_RentItem prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.IsActive = 1 
+                AND prev.ReleaseDate IS NOT NULL 
+                AND prev.RentItemID < r.RentItemID
+            ) THEN 'ONRENT_USE'
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END AS RentType
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      )
+      SELECT RentType, COUNT(*) as cnt
+      FROM RentItemsWithRentType
+      WHERE IsActive = 1
+        AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+        AND ReleaseDate IS NOT NULL
+      GROUP BY RentType
     `),
     pendingReq.query(`
-      SELECT 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType,
-        COUNT(*) as cnt
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate IS NULL
-        AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
-      GROUP BY 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END
+      WITH RentItemsWithRentType AS (
+        SELECT 
+          r.RentItemID,
+          r.ReleaseDate,
+          r.ExpectedReleaseDate,
+          r.IsActive,
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.EV_RentItem prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.IsActive = 1 
+                AND prev.ReleaseDate IS NOT NULL 
+                AND prev.RentItemID < r.RentItemID
+            ) THEN 'ONRENT_USE'
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END AS RentType
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      )
+      SELECT RentType, COUNT(*) as cnt
+      FROM RentItemsWithRentType
+      WHERE IsActive = 1
+        AND ReleaseDate IS NULL
+        AND ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate
+      GROUP BY RentType
     `),
     planBreakdownReq.query(`
       SELECT 
@@ -459,42 +449,35 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       GROUP BY ProjectType
     `),
     actualBreakdownReq.query(`
-      SELECT 
-        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType,
-        COUNT(*) AS Count
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
-        AND r.ReleaseDate IS NOT NULL
-      GROUP BY 
-        i.ProjectType, 
-        i.Model,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END
+      WITH RentItemsWithRentType AS (
+        SELECT 
+          r.RentItemID,
+          r.ReleaseDate,
+          r.ExpectedReleaseDate,
+          r.IsActive,
+          ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+          ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.EV_RentItem prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.IsActive = 1 
+                AND prev.ReleaseDate IS NOT NULL 
+                AND prev.RentItemID < r.RentItemID
+            ) THEN 'ONRENT_USE'
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+              ELSE 'ONRENT_NEW'
+          END AS RentType
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      )
+      SELECT ProjectType, Model, RentType, COUNT(*) AS Count
+      FROM RentItemsWithRentType
+      WHERE IsActive = 1
+        AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+        AND ReleaseDate IS NOT NULL
+      GROUP BY ProjectType, Model, RentType
     `),
     repairReq.query(`
       SELECT
