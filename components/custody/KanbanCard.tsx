@@ -41,7 +41,7 @@ export interface CardData {
   replacementRegisterNo: string | null
   latestFollowUpDetail: string | null
   latestFollowUpDate: string | null
-  ageingDays: number
+  ageingDays: number | null
   vehicleStatus?: string
   vehicleStatusType?: string
   vehicleSubStatusName?: string
@@ -183,7 +183,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
         </div>
         <div className="text-right flex flex-col items-end">
           <span className="text-[10px] text-zinc-400">
-            {card.vehicleStatus === 'AVAILABLE' ? 'ว่างสะสม' : card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays} วัน
+            {card.vehicleStatus === 'AVAILABLE' ? 'ว่างสะสม' : card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays !== null && card.ageingDays !== undefined && card.ageingDays >= 0 ? `${card.ageingDays} วัน` : 'ไม่มีข้อมูล'}
           </span>
           <button
             type="button"
@@ -205,7 +205,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
         </div>
         {card.vehicleStatus === 'AVAILABLE' ? (
           <div className="text-[11px] text-zinc-500 font-semibold mt-1">
-            📅 ว่างตั้งแต่วันที่: <span className="text-emerald-600 dark:text-emerald-400">{formatDateOnly(card.maintenanceReturnDate || card.updateDate || card.createDate || null)}</span>
+            📅 ว่างตั้งแต่วันที่: <span className="text-emerald-600 dark:text-emerald-450">{card.maintenanceReturnDate ? formatDateOnly(card.maintenanceReturnDate) : 'ไม่มีข้อมูล'}</span>
           </div>
         ) : card.finishDate ? (
           <div>

@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
         f.FollowUpDate AS LatestFollowUpDate,
         tc.ActiveTicketsCount,
         i.UpdateDate,
-        i.CreateDate
+        i.CreateDate,
+        i.AvailableDate
       FROM dbo.EV_MaintenanceItem m
       JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
@@ -111,7 +112,8 @@ export async function GET(req: NextRequest) {
         NULL AS LatestFollowUpDate,
         0 AS ActiveTicketsCount,
         i.UpdateDate,
-        i.CreateDate
+        i.CreateDate,
+        i.AvailableDate
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsStatus msStatus ON i.Status = msStatus.StatusCode
@@ -135,12 +137,22 @@ export async function GET(req: NextRequest) {
       const hasFinishDate = !!rec.MaintenanceFinishDate
 
       // Calculate Ageing Days (Days in current column/status)
-      let ageingDays = 0
+      let ageingDays: number | null = 0
+      let displayReturnDate: string | null = null
 
       if (isAvailable) {
-        // For available vehicles: days since it became available
-        const availDate = rec.MaintenanceReturnDate ? new Date(rec.MaintenanceReturnDate) : (rec.UpdateDate ? new Date(rec.UpdateDate) : new Date(rec.CreateDate))
-        ageingDays = Math.floor((now.getTime() - availDate.getTime()) / (1000 * 60 * 60 * 24))
+        // Fallback sequence: 1. MaintenanceReturnDate, 2. AvailableDate, 3. null
+        const availDate = rec.MaintenanceReturnDate 
+          ? new Date(rec.MaintenanceReturnDate) 
+          : (rec.AvailableDate ? new Date(rec.AvailableDate) : null)
+        
+        if (availDate) {
+          ageingDays = Math.floor((now.getTime() - availDate.getTime()) / (1000 * 60 * 60 * 24))
+          displayReturnDate = availDate.toISOString()
+        } else {
+          ageingDays = null
+          displayReturnDate = null
+        }
       } else if (hasFinishDate) {
         // In Column 3: Days since finished
         const finish = new Date(rec.MaintenanceFinishDate)
@@ -173,7 +185,7 @@ export async function GET(req: NextRequest) {
         incidentDate: rec.IncidentDate || null,
         startDate: rec.MaintenanceStartDate,
         finishDate: rec.MaintenanceFinishDate,
-        maintenanceReturnDate: rec.MaintenanceReturnDate,
+        maintenanceReturnDate: displayReturnDate,
         updateDate: rec.UpdateDate,
         createDate: rec.CreateDate,
         insuranceCode: rec.InsuranceCode || '-',
@@ -185,7 +197,7 @@ export async function GET(req: NextRequest) {
         replacementRegisterNo: rec.ReplacementRegisterNo || null,
         latestFollowUpDetail: rec.LatestFollowUpDetail || null,
         latestFollowUpDate: rec.LatestFollowUpDate || null,
-        ageingDays: ageingDays >= 0 ? ageingDays : 0,
+        ageingDays: ageingDays !== null && ageingDays >= 0 ? ageingDays : null,
         carStatusCode: rec.CarStatusCode,
         activeTicketsCount: rec.ActiveTicketsCount || 1,
       }
