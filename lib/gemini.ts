@@ -58,8 +58,7 @@ ReplacementStartDate, ReplacementReturnDate, Location, Remark, IsActive
 ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ### View: dbo.View_AccumarateReleaseCar (ข้อมูลการปล่อยรถสะสมย้อนหลัง)
-คอลัมน์: RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo, ReleaseDate, ExpectedReleaseDate, RentType (ค่าระบุประเภทรถเช่า ได้แก่ 'ONRENT_NEW' สำหรับรถใหม่, 'ONRENT_USE' สำหรับรถมือสอง)
-*คำเตือนสำคัญเกี่ยวกับสถิติตัวเลข*: เนื่องจากรถโครงการ Line Man ที่เป็นรถวน (Reassigned) จะใช้ RentItemID ตัวเดิมซ้ำ โดยย้ายข้อมูลสัญญาเก่าไปเก็บใน dbo.EV_RentItemLinemanHistory ดังนั้นหากต้องการคัดกรองหรือหาประเภทรถเช่า (รถใหม่/รถเก่า) ให้ถูกต้อง ห้ามใช้ฟิลด์ RentType จาก View_AccumarateReleaseCar หรือตารางหลักตรงๆ แต่ต้องตรวจสอบกับประวัติในอดีตผ่าน UNION ตามตัวอย่างเงื่อนไขด้านล่าง
+คอลัมน์: RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo, ReleaseDate, ExpectedReleaseDate, RentType (ค่าระบุประเภทรถเช่า ได้แก่ 'ONRENT_NEW' สำหรับรถใหม่, 'ONRENT_USE' สำหรับรถมือสอง - มิติข้อมูลนี้ได้รับการปรับปรุงข้อมูลย้อนหลังครบถ้วนแล้ว สามารถใช้สืบค้นได้โดยตรงอย่างถูกต้อง)
 
 ### View: dbo.View_GetOnrentNewOrUse (การแยกรถเช่าแบบ Real-time เฉพาะที่มีสถานะ ON_RENT)
 คอลัมน์: ProjectType, VinNo, Model, ContractNo, FirstName, LastName, ReleaseDate, RentType (ค่าระบุประเภท ได้แก่ 'ONRENT_NEW' หรือ 'ONRENT_USE')
@@ -87,34 +86,19 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 4. ถ้ามีการสอบถามเกี่ยวกับการติดตามผล (Follow up) หรือการอัปเดตงานซ่อมย้อนหลัง → ดึงจาก EV_MaintenanceFollowUp:
    SELECT FollowUpDate, FollowUpDetail FROM EV_MaintenanceFollowUp WHERE MaintenanceItemID = <id> AND IsActive = 1 ORDER BY FollowUpDate DESC
 5. ถ้า Status = 'ON_RENT' หรือเมื่อดึงข้อมูลประวัติส่งมอบเพื่อระบุประเภทรถเช่า (รถใหม่/รถมือสอง):
-   ห้ามดึงจาก View_AccumarateReleaseCar.RentType ตรงๆ แต่ให้ใช้ SQL ตรวจสอบประวัติการเคยปล่อยรถจริงในอดีต (ผ่านตาราง EV_RentItem รวมกับประวัติรถวนใน EV_RentItemLinemanHistory) ดังนี้:
-   SELECT r.ContractNo, r.FirstName, r.LastName, r.ReleaseDate,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION ALL
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND (
-                  prev.RentItemID < r.RentItemID
-                  OR (
-                    prev.RentItemID = r.RentItemID
-                    AND (
-                      prev.ReleaseDate < r.ReleaseDate
-                      OR (r.ReleaseDate IS NULL AND prev.ReleaseDate IS NOT NULL)
-                    )
-                  )
-                )
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-            ELSE 'ONRENT_NEW'
-          END AS RentType
-   FROM EV_RentItem r
-   LEFT JOIN EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-   WHERE r.InventoryItemID = <id> AND r.IsActive = 1
+   สามารถดึง RentType (รถใหม่/รถเก่า) ได้โดยตรงจากวิวตามสถานการณ์:
+   - กรณีเช็คสถานะปัจจุบันแบบ Real-time (Status = 'ON_RENT'): ให้ดึงจากวิว View_GetOnrentNewOrUse เช่น:
+     SELECT r.ContractNo, r.FirstName, r.LastName, r.ReleaseDate,
+            ISNULL(o.RentType, 'ONRENT_NEW') AS RentType
+     FROM EV_RentItem r
+     LEFT JOIN View_GetOnrentNewOrUse o ON r.ContractNo = o.ContractNo
+     WHERE r.InventoryItemID = <id> AND r.IsActive = 1
+   - กรณีดึงข้อมูลปล่อยรถสะสมย้อนหลังทั้งหมด (เช่น การนับจำนวนการปล่อยรถสะสม): ให้ดึงจากวิว View_AccumarateReleaseCar เช่น:
+     SELECT RentType, COUNT(*) as cnt
+     FROM View_AccumarateReleaseCar
+     WHERE IsActive = 1
+       AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+     GROUP BY RentType
 
 ### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE
 - RegisterNo อาจมี - หรือไม่มี (เช่น ทอ-3791 หรือ ทอ3791)

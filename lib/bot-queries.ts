@@ -120,21 +120,8 @@ export async function getDeliveryToday() {
         ISNULL(i.Project, 'ไม่ระบุ') AS Project,
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM (
-              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-              UNION
-              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-            ) prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType
-      FROM dbo.EV_RentItem r
+        r.RentType
+      FROM dbo.View_AccumarateReleaseCar r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
         AND (
@@ -169,21 +156,8 @@ export async function getDeliveryByDate(params: { date: string }) {
         ISNULL(i.Project, 'ไม่ระบุ') AS Project,
         ISNULL(i.Model, 'ไม่ระบุ') AS Model,
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM (
-              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-              UNION
-              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-            ) prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.RentItemID < r.RentItemID
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType
-      FROM dbo.EV_RentItem r
+        r.RentType
+      FROM dbo.View_AccumarateReleaseCar r
       LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
       WHERE r.IsActive = 1
         AND (
@@ -385,66 +359,42 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       WHERE PlanDate >= @startDate AND PlanDate <= @endDate
     `),
     completedReq.query(`
-      WITH RentItemsWithRentType AS (
-        SELECT 
-          r.RentItemID,
-          r.ReleaseDate,
-          r.ExpectedReleaseDate,
-          r.IsActive,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.RentItemID < r.RentItemID
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-            ELSE 'ONRENT_NEW'
-          END AS RentType
-        FROM dbo.EV_RentItem r
-        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      )
       SELECT RentType, COUNT(*) as cnt
-      FROM RentItemsWithRentType
+      FROM dbo.View_AccumarateReleaseCar
       WHERE IsActive = 1
         AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
         AND ReleaseDate IS NOT NULL
       GROUP BY RentType
     `),
     pendingReq.query(`
-      WITH RentItemsWithRentType AS (
-        SELECT 
-          r.RentItemID,
-          r.ReleaseDate,
-          r.ExpectedReleaseDate,
-          r.IsActive,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.RentItemID < r.RentItemID
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-            ELSE 'ONRENT_NEW'
-          END AS RentType
-        FROM dbo.EV_RentItem r
-        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      )
-      SELECT RentType, COUNT(*) as cnt
-      FROM RentItemsWithRentType
-      WHERE IsActive = 1
-        AND ReleaseDate IS NULL
-        AND ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate
-      GROUP BY RentType
+      SELECT 
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.View_AccumarateReleaseCar prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.ReleaseDate IS NOT NULL
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END AS RentType,
+        COUNT(*) as cnt
+      FROM dbo.EV_RentItem r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate IS NULL
+        AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
+      GROUP BY 
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM dbo.View_AccumarateReleaseCar prev 
+            WHERE prev.InventoryItemID = r.InventoryItemID 
+              AND prev.ReleaseDate IS NOT NULL
+          ) THEN 'ONRENT_USE'
+          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+          ELSE 'ONRENT_NEW'
+        END
     `),
     planBreakdownReq.query(`
       SELECT 
@@ -457,37 +407,17 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       GROUP BY ProjectType
     `),
     actualBreakdownReq.query(`
-      WITH RentItemsWithRentType AS (
-        SELECT 
-          r.RentItemID,
-          r.ReleaseDate,
-          r.ExpectedReleaseDate,
-          r.IsActive,
-          ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
-          ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.RentItemID < r.RentItemID
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-              ELSE 'ONRENT_NEW'
-          END AS RentType
-        FROM dbo.EV_RentItem r
-        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      )
-      SELECT ProjectType, Model, RentType, COUNT(*) AS Count
-      FROM RentItemsWithRentType
-      WHERE IsActive = 1
-        AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
-        AND ReleaseDate IS NOT NULL
-      GROUP BY ProjectType, Model, RentType
+      SELECT 
+        ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+        ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+        r.RentType,
+        COUNT(*) AS Count
+      FROM dbo.View_AccumarateReleaseCar r
+      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+      WHERE r.IsActive = 1
+        AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+        AND r.ReleaseDate IS NOT NULL
+      GROUP BY i.ProjectType, i.Model, r.RentType
     `),
     repairReq.query(`
       SELECT
@@ -719,22 +649,9 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
         SELECT 
           ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
           ISNULL(i.Model, 'ไม่ระบุ') AS Model,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.RentItemID < r.RentItemID
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-            ELSE 'ONRENT_NEW'
-          END AS RentType,
+          r.RentType,
           COUNT(*) AS Count
-        FROM dbo.EV_RentItem r
+        FROM dbo.View_AccumarateReleaseCar r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         WHERE r.IsActive = 1
           AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
@@ -742,20 +659,7 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
         GROUP BY 
           i.ProjectType, 
           i.Model,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM (
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
-                UNION
-                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
-              ) prev 
-              WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.RentItemID < r.RentItemID
-            ) THEN 'ONRENT_USE'
-            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-            ELSE 'ONRENT_NEW'
-          END
+          r.RentType
       `)
     ])
 

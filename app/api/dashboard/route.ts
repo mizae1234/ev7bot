@@ -420,7 +420,7 @@ export async function GET(req: NextRequest) {
       deliverySummaryRequest.query(`
         SELECT
           SUM(CASE WHEN ReleaseDate IS NOT NULL THEN 1 ELSE 0 END) AS completed
-        FROM dbo.EV_RentItem
+        FROM dbo.View_AccumarateReleaseCar
         WHERE IsActive = 1
           AND (
             (ExpectedReleaseDate >= @startDate AND ExpectedReleaseDate <= @endDate)
@@ -453,7 +453,7 @@ export async function GET(req: NextRequest) {
         SELECT
           MONTH(ReleaseDate) AS monthNum,
           COUNT(*) AS completed
-        FROM dbo.EV_RentItem
+        FROM dbo.View_AccumarateReleaseCar
         WHERE IsActive = 1
           AND YEAR(ReleaseDate) = @year
           AND ReleaseDate IS NOT NULL
@@ -492,7 +492,7 @@ export async function GET(req: NextRequest) {
           cu.LastName AS CreateUserLastName,
           uu.FirstName AS UpdateUserFirstName,
           uu.LastName AS UpdateUserLastName
-        FROM dbo.EV_RentItem r
+        FROM dbo.View_AccumarateReleaseCar r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
         LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
