@@ -256,11 +256,23 @@ export async function GET(
       }
 
       for (const f of followUpResult.recordset) {
-        if (f.CreateUserID && regMap.has(Number(f.CreateUserID))) {
-          f.CreateUserName = regMap.get(Number(f.CreateUserID))
-        }
-        if (!f.CreateUserName) {
-          f.CreateUserName = '-'
+        const originalName = (f.CreateUserName || '').trim();
+        const lineDisplayName = f.CreateUserID ? regMap.get(Number(f.CreateUserID)) : null;
+
+        if (originalName && lineDisplayName) {
+          // If originalName contains email or is just a fallback, use lineDisplayName.
+          // Otherwise, show both as: originalName (lineDisplayName)
+          if (originalName.includes('@')) {
+            f.CreateUserName = lineDisplayName;
+          } else if (originalName !== lineDisplayName) {
+            f.CreateUserName = `${originalName} (${lineDisplayName})`;
+          } else {
+            f.CreateUserName = originalName;
+          }
+        } else if (lineDisplayName) {
+          f.CreateUserName = lineDisplayName;
+        } else if (!originalName) {
+          f.CreateUserName = '-';
         }
         if (!followUps[f.MaintenanceItemID]) {
           followUps[f.MaintenanceItemID] = []
