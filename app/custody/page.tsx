@@ -26,8 +26,6 @@ export default function CustodyPage() {
   const { data, error, mutate, isValidating } = useSWR<KanbanResponse>('/api/vehicle-custody', fetcher)
   const [search, setSearch] = useState('')
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const board = data?.board
   const isLoading = !data && !error
@@ -46,52 +44,6 @@ export default function CustodyPage() {
 
   const handleCardClick = (card: CardData) => {
     setSelectedCard(card)
-    setSubmitError(null)
-  }
-
-  const handleFollowUpSubmit = async (text: string) => {
-    if (!selectedCard) return
-
-    setSubmitting(true)
-    setSubmitError(null)
-
-    try {
-      const res = await fetch('/api/vehicle-custody', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          maintenanceId: selectedCard.maintenanceId,
-          followUpDetail: text,
-        }),
-      })
-
-      const result = await res.json()
-      if (!res.ok) {
-        throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึก')
-      }
-
-      // Refresh SWR data
-      const updatedData = await mutate()
-      
-      // Update selected card state to show the new follow-up
-      if (updatedData?.board) {
-        const allCards = [
-          ...updatedData.board.column1.cards,
-          ...updatedData.board.column2.cards,
-          ...updatedData.board.column3.cards,
-        ]
-        const matched = allCards.find((c) => c.maintenanceId === selectedCard.maintenanceId)
-        if (matched) {
-          setSelectedCard(matched)
-        }
-      }
-    } catch (err: any) {
-      setSubmitError(err.message)
-    } finally {
-      setSubmitting(false)
-    }
   }
 
   return (
@@ -211,9 +163,6 @@ export default function CustodyPage() {
       <CustodyDrawer
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
-        onFollowUpSubmit={handleFollowUpSubmit}
-        submitting={submitting}
-        error={submitError}
       />
     </div>
   )

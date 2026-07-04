@@ -12,6 +12,7 @@ export interface CardData {
   issueTitle: string
   location: string
   reportDate: string | null
+  incidentDate: string | null
   startDate: string | null
   finishDate: string | null
   insuranceCode: string
