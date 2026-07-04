@@ -60,7 +60,14 @@ export function CustodyDrawer({ card, onClose, onFollowUpSubmit, submitting, err
                   <h2 className="text-base font-bold text-zinc-800 dark:text-zinc-100" id="slide-over-title">
                     🚗 รายละเอียด ทะเบียน {card.registerNo}
                   </h2>
-                  <p className="text-xs text-zinc-500">ID เคสซ่อม: #{card.maintenanceId}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-zinc-500">ID เคสซ่อม: #{card.maintenanceId}</span>
+                    {card.vehicleSubStatusName && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        {card.vehicleSubStatusName}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   type="button"

@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
         i.Model,
         i.Project,
         i.ProjectType,
+        i.Status AS VehicleStatus,
+        i.StatusType AS VehicleStatusType,
+        sub.DescriptionStatus AS VehicleSubStatusName,
         m.CarStatusCode,
         m.IssueTitle,
         m.ServiceLocationCode,
@@ -41,6 +44,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
       LEFT JOIN dbo.EV_ReplacementItem rep ON m.MaintenanceItemID = rep.MaintenanceItemID AND rep.IsActive = 1
       LEFT JOIN dbo.EV_InventoryItem repi ON rep.VinNo = repi.VinNo AND repi.IsActive = 1
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       OUTER APPLY (
         SELECT TOP 1 FollowUpDetail, FollowUpDate
         FROM dbo.EV_MaintenanceFollowUp
@@ -91,6 +95,9 @@ export async function GET(req: NextRequest) {
         model: rec.Model,
         project: rec.Project || 'ไม่ระบุโครงการ',
         projectType: rec.ProjectType,
+        vehicleStatus: rec.VehicleStatus,
+        vehicleStatusType: rec.VehicleStatusType,
+        vehicleSubStatusName: rec.VehicleSubStatusName || rec.VehicleStatusType || 'ไม่ระบุสถานะ',
         issueTitle: rec.IssueTitle || 'ไม่มีอาการระบุ',
         location: rec.ServiceLocationCode || 'ไม่ระบุสถานที่',
         reportDate: rec.ReportDate,

@@ -24,6 +24,9 @@ export interface CardData {
   latestFollowUpDetail: string | null
   latestFollowUpDate: string | null
   ageingDays: number
+  vehicleStatus?: string
+  vehicleStatusType?: string
+  vehicleSubStatusName?: string
 }
 
 interface KanbanCardProps {
@@ -41,9 +44,16 @@ export function KanbanCard({ card, onClick, accentColorClass, hoverBorderClass, 
       className={`cursor-pointer group relative rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200 dark:border-zinc-800 dark:bg-zinc-900 ${hoverBorderClass}`}
     >
       <div className="flex justify-between items-start mb-2">
-        <span className={`text-sm font-bold text-zinc-800 dark:text-zinc-100 transition-colors ${accentColorClass}`}>
-          {icon} {card.registerNo}
-        </span>
+        <div className="flex flex-col gap-1.5 items-start">
+          <span className={`text-sm font-bold text-zinc-800 dark:text-zinc-100 transition-colors ${accentColorClass}`}>
+            {icon} {card.registerNo}
+          </span>
+          {card.vehicleSubStatusName && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100/50 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-900/30">
+              🏷️ {card.vehicleSubStatusName}
+            </span>
+          )}
+        </div>
         <span className="text-[10px] text-zinc-400">
           {card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays} วัน
         </span>
