@@ -173,7 +173,6 @@ export async function POST(req: NextRequest) {
             await updReadyReq.query(`
               UPDATE dbo.EV_MaintenanceItem
               SET CarStatusCode = 'COMPLETE',
-                  MaintenanceFinishDate = GETDATE(),
                   UpdateUserID = @userId,
                   UpdateDate = GETDATE()
               WHERE MaintenanceItemID = @maintId
