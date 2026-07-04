@@ -3139,29 +3139,46 @@ export default function QuickReportPage() {
             ) : (
               mobileDashboardData && (
                 <>
-                  {/* KPI grid (3 columns) */}
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 text-center">
-                      <span className="text-lg block">🔴</span>
-                      <span className="text-[10px] font-bold text-amber-700 block mt-1">กำลังซ่อม</span>
-                      <span className="text-lg font-black text-amber-800 block mt-0.5">
-                        {mobileDashboardData.stats?.in_maintenance || 0} <span className="text-[9px] font-normal text-amber-600">คัน</span>
+                  {/* KPI grid (2x2 Layout) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* 1. รอเข้าซ่อม */}
+                    <div className="bg-amber-50/60 border border-amber-200/60 rounded-3xl p-4 text-center shadow-sm">
+                      <span className="text-2xl block">🟡</span>
+                      <span className="text-[11px] font-extrabold text-amber-850 block mt-1">รอเข้าซ่อม</span>
+                      <span className="text-xl font-black text-amber-900 block mt-0.5">
+                        {mobileDashboardData.stats?.waiting || 0} <span className="text-xs font-normal text-amber-700">คัน</span>
                       </span>
                     </div>
 
-                    <div className="bg-rose-50/70 border border-rose-200/80 rounded-2xl p-3 text-center">
-                      <span className="text-lg block">🟡</span>
-                      <span className="text-[10px] font-bold text-rose-700 block mt-1">รอเข้าซ่อม</span>
-                      <span className="text-lg font-black text-rose-800 block mt-0.5">
-                        {mobileDashboardData.stats?.waiting || 0} <span className="text-[9px] font-normal text-rose-600">คัน</span>
+                    {/* 2. กำลังซ่อม */}
+                    <div className="bg-rose-50/60 border border-rose-200/60 rounded-3xl p-4 text-center shadow-sm">
+                      <span className="text-2xl block">🔴</span>
+                      <span className="text-[11px] font-extrabold text-rose-850 block mt-1">กำลังซ่อม</span>
+                      <span className="text-xl font-black text-rose-900 block mt-0.5">
+                        {(mobileDashboardData.stats?.in_maintenance || 0) + 
+                         (mobileDashboardData.stats?.on_rent_maintenance || 0) + 
+                         (mobileDashboardData.stats?.replacement_maintenance || 0)} <span className="text-xs font-normal text-rose-700">คัน</span>
+                      </span>
+                      <span className="text-[9px] text-rose-500 block mt-0.5 font-semibold">
+                        ใช้แล้ว {mobileDashboardData.stats?.in_maintenance || 0} · เช่า {mobileDashboardData.stats?.on_rent_maintenance || 0}
                       </span>
                     </div>
 
-                    <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3 text-center">
-                      <span className="text-lg block">🟢</span>
-                      <span className="text-[10px] font-bold text-emerald-700 block mt-1">ซ่อมเสร็จ</span>
-                      <span className="text-lg font-black text-emerald-800 block mt-0.5">
-                        {mobileDashboardData.stats?.complete || 0} <span className="text-[9px] font-normal text-emerald-600">เคส</span>
+                    {/* 3. ซ่อมเสร็จ รอปล่อย */}
+                    <div className="bg-orange-50/60 border border-orange-200/60 rounded-3xl p-4 text-center shadow-sm">
+                      <span className="text-2xl block">🟠</span>
+                      <span className="text-[11px] font-extrabold text-orange-850 block mt-1">ซ่อมเสร็จ รอปล่อย</span>
+                      <span className="text-xl font-black text-orange-900 block mt-0.5">
+                        {mobileDashboardData.stats?.ready_pickup || 0} <span className="text-xs font-normal text-orange-700">คัน</span>
+                      </span>
+                    </div>
+
+                    {/* 4. ซ่อมเสร็จสิ้นสะสม */}
+                    <div className="bg-emerald-50/60 border border-emerald-200/60 rounded-3xl p-4 text-center shadow-sm">
+                      <span className="text-2xl block">🟢</span>
+                      <span className="text-[11px] font-extrabold text-emerald-850 block mt-1">ซ่อมเสร็จสิ้นสะสม</span>
+                      <span className="text-xl font-black text-emerald-900 block mt-0.5">
+                        {mobileDashboardData.stats?.complete || 0} <span className="text-xs font-normal text-emerald-700">เคส</span>
                       </span>
                     </div>
                   </div>
