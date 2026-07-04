@@ -122,10 +122,12 @@ export async function getDeliveryToday() {
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         CASE 
           WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
+            SELECT 1 FROM (
+              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+              UNION
+              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+            ) prev 
             WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
               AND prev.RentItemID < r.RentItemID
           ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -169,10 +171,12 @@ export async function getDeliveryByDate(params: { date: string }) {
         ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
         CASE 
           WHEN EXISTS (
-            SELECT 1 FROM dbo.EV_RentItem prev 
+            SELECT 1 FROM (
+              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+              UNION
+              SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+            ) prev 
             WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.IsActive = 1 
-              AND prev.ReleaseDate IS NOT NULL 
               AND prev.RentItemID < r.RentItemID
           ) THEN 'ONRENT_USE'
           WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -389,10 +393,12 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
           r.IsActive,
           CASE 
             WHEN EXISTS (
-              SELECT 1 FROM dbo.EV_RentItem prev 
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
               WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.IsActive = 1 
-                AND prev.ReleaseDate IS NOT NULL 
                 AND prev.RentItemID < r.RentItemID
             ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -418,10 +424,12 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
           r.IsActive,
           CASE 
             WHEN EXISTS (
-              SELECT 1 FROM dbo.EV_RentItem prev 
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
               WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.IsActive = 1 
-                AND prev.ReleaseDate IS NOT NULL 
                 AND prev.RentItemID < r.RentItemID
             ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -459,10 +467,12 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
           ISNULL(i.Model, 'ไม่ระบุ') AS Model,
           CASE 
             WHEN EXISTS (
-              SELECT 1 FROM dbo.EV_RentItem prev 
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
               WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.IsActive = 1 
-                AND prev.ReleaseDate IS NOT NULL 
                 AND prev.RentItemID < r.RentItemID
             ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -711,10 +721,12 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           ISNULL(i.Model, 'ไม่ระบุ') AS Model,
           CASE 
             WHEN EXISTS (
-              SELECT 1 FROM dbo.EV_RentItem prev 
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
               WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.IsActive = 1 
-                AND prev.ReleaseDate IS NOT NULL 
                 AND prev.RentItemID < r.RentItemID
             ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
@@ -732,10 +744,12 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           i.Model,
           CASE 
             WHEN EXISTS (
-              SELECT 1 FROM dbo.EV_RentItem prev 
+              SELECT 1 FROM (
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItem WHERE IsActive = 1 AND ReleaseDate IS NOT NULL
+                UNION
+                SELECT InventoryItemID, RentItemID, ReleaseDate FROM dbo.EV_RentItemLinemanHistory WHERE ReleaseDate IS NOT NULL
+              ) prev 
               WHERE prev.InventoryItemID = r.InventoryItemID 
-                AND prev.IsActive = 1 
-                AND prev.ReleaseDate IS NOT NULL 
                 AND prev.RentItemID < r.RentItemID
             ) THEN 'ONRENT_USE'
             WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
