@@ -158,7 +158,7 @@ export async function GET(
               FirstName, LastName, PhoneNo,
               ExpectedReleaseDate, ReleaseDate,
               ReturnDate AS ContractCancellationDate,
-              1 AS IsActive,
+              0 AS IsActive,
               2 AS Source
             FROM dbo.EV_RentItemLinemanHistory
             WHERE InventoryItemID = @inventoryItemId
