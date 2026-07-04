@@ -136,8 +136,35 @@ export async function GET(
           FirstName, LastName, PhoneNo,
           ExpectedReleaseDate, ReleaseDate,
           ContractCancellationDate, IsActive
-        FROM dbo.EV_RentItem
-        WHERE InventoryItemID = @inventoryItemId
+        FROM (
+          SELECT
+            RentItemID, ContractNo, ContractType,
+            FirstName, LastName, PhoneNo,
+            ExpectedReleaseDate, ReleaseDate,
+            ContractCancellationDate, IsActive,
+            ROW_NUMBER() OVER(PARTITION BY RentItemID ORDER BY Source ASC) as rn
+          FROM (
+            SELECT
+              RentItemID, ContractNo, ContractType,
+              FirstName, LastName, PhoneNo,
+              ExpectedReleaseDate, ReleaseDate,
+              ContractCancellationDate, IsActive,
+              1 AS Source
+            FROM dbo.EV_RentItem
+            WHERE InventoryItemID = @inventoryItemId
+            UNION ALL
+            SELECT
+              RentItemID, ContractNo, ContractType,
+              FirstName, LastName, PhoneNo,
+              ExpectedReleaseDate, ReleaseDate,
+              ReturnDate AS ContractCancellationDate,
+              1 AS IsActive,
+              2 AS Source
+            FROM dbo.EV_RentItemLinemanHistory
+            WHERE InventoryItemID = @inventoryItemId
+          ) combined
+        ) t
+        WHERE rn = 1
         ORDER BY ExpectedReleaseDate DESC, ReleaseDate DESC
       `),
       maintReq.query(`
