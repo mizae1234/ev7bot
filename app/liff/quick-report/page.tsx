@@ -58,10 +58,10 @@ const isMaintComplete = (ticket: any): boolean => {
   if (!ticket) return false
   const status = ticket.CarStatusCode
   const desc = ticket.CarStatusDescription
-  if (status === 'COMPLETE' || status === 'GARAGE_COMPLETE' || status === 'READY_PICKUP_MAINTENANCE') {
+  if (status === 'COMPLETE') {
     return true
   }
-  if (desc === 'ซ่อมเสร็จ' || desc === 'ซ่อมเสร็จสิ้น' || desc === 'ปิดเคส' || desc === 'ปิดงาน') {
+  if (desc === 'ปิดเคส' || desc === 'ปิดงาน') {
     return true
   }
   return false
@@ -2692,7 +2692,7 @@ export default function QuickReportPage() {
                           )}
                         </div>
                         <span className={`px-2.5 py-1 text-xxs font-bold rounded-full border shrink-0 ${
-                          isMaintComplete(ticket)
+                          (isMaintComplete(ticket) || ticket.CarStatusDescription === 'ซ่อมเสร็จ' || ticket.CarStatusDescription === 'ซ่อมเสร็จสิ้น')
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                             : (ticket.CarStatusDescription === 'อยู่ระหว่างการซ่อม' || ticket.CarStatusDescription === 'รถอยู่ระหว่างซ่อม')
                             ? 'bg-orange-50 border-orange-200 text-orange-700'
