@@ -229,7 +229,7 @@ export async function GET(
             fa.FileAttachmentID,
             link.MaintenanceItemID,
             fa.FileName,
-            'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com/' + fa.S3Key AS FilePath,
+            fa.S3Key,
             fa.ContentType AS FileType,
             fa.FileSize
           FROM dbo.EV_FileAttachmentMaintenanceItem link
@@ -285,11 +285,46 @@ export async function GET(
         followUps[f.MaintenanceItemID].push(f)
       }
 
+      // Initialize S3 Client to generate signed URLs offline
+      const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3')
+      const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+      const { env } = require('@/lib/env')
+
+      const s3ClientForSign = new S3Client({
+        endpoint: env.SPACES_ENDPOINT,
+        region: env.SPACES_REGION,
+        credentials: {
+          accessKeyId: env.SPACES_KEY,
+          secretAccessKey: env.SPACES_SECRET
+        }
+      })
+
       for (const a of attachmentResult.recordset) {
+        let signedUrl = ''
+        try {
+          const command = new GetObjectCommand({
+            Bucket: env.SPACES_BUCKET,
+            Key: a.S3Key
+          })
+          signedUrl = await getSignedUrl(s3ClientForSign, command, { expiresIn: 86400 })
+        } catch (s3Err) {
+          console.error('[S3 Presign Error]', s3Err)
+          signedUrl = `https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com/${a.S3Key}`
+        }
+
+        const attachmentObj = {
+          FileAttachmentID: a.FileAttachmentID,
+          MaintenanceItemID: a.MaintenanceItemID,
+          FileName: a.FileName,
+          FilePath: signedUrl,
+          FileType: a.FileType,
+          FileSize: a.FileSize
+        }
+
         if (!attachments[a.MaintenanceItemID]) {
           attachments[a.MaintenanceItemID] = []
         }
-        attachments[a.MaintenanceItemID].push(a)
+        attachments[a.MaintenanceItemID].push(attachmentObj)
       }
 
       for (const m of maintResult.recordset) {
