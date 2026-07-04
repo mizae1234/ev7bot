@@ -68,40 +68,78 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): a
   const planRows: any[] = []
   for (const proj of Object.keys(comparison)) {
     const models = comparison[proj]
-    for (const model of ['ES', 'Y490', 'Y410'] as const) {
-      const { plan, actual } = models[model]
-      if (plan > 0 || actual > 0) {
-        let valColor = '#1a1a1a'
-        if (actual >= plan && plan > 0) {
-          valColor = '#2E7D32' // green (target met)
-        } else if (actual < plan && actual > 0) {
-          valColor = '#E65100' // orange (in progress/shortfall)
-        } else if (actual === 0 && plan > 0) {
-          valColor = '#C62828' // red (not started)
-        }
+    const totalActual = models.ES.actual + models.Y490.actual + models.Y410.actual;
+    const totalPlan = models.ES.plan + models.Y490.plan + models.Y410.plan;
 
-        planRows.push({
-          type: 'box',
-          layout: 'horizontal',
-          contents: [
-            {
-              type: 'text',
-              text: `• ${proj} (${model})`,
-              size: 'xs',
-              color: '#555555',
-              flex: 5
-            },
-            {
-              type: 'text',
-              text: `${actual}/${plan}`,
-              size: 'xs',
-              weight: 'bold',
-              color: valColor,
-              align: 'end',
-              flex: 3
-            }
-          ]
-        })
+    if (totalPlan > 0 || totalActual > 0) {
+      let totalColor = '#1a1a1a'
+      if (totalActual >= totalPlan && totalPlan > 0) {
+        totalColor = '#2E7D32' // green
+      } else if (totalActual < totalPlan && totalActual > 0) {
+        totalColor = '#E65100' // orange
+      } else if (totalActual === 0 && totalPlan > 0) {
+        totalColor = '#C62828' // red
+      }
+
+      planRows.push({
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          {
+            type: 'text',
+            text: `📁 ${proj} (รวม)`,
+            size: 'xs',
+            weight: 'bold',
+            color: '#1a1a1a',
+            flex: 5
+          },
+          {
+            type: 'text',
+            text: `${totalActual}/${totalPlan}`,
+            size: 'xs',
+            weight: 'bold',
+            color: totalColor,
+            align: 'end',
+            flex: 3
+          }
+        ]
+      })
+
+      for (const model of ['ES', 'Y490', 'Y410'] as const) {
+        const { plan, actual } = models[model]
+        if (plan > 0 || actual > 0) {
+          let valColor = '#555555'
+          if (actual >= plan && plan > 0) {
+            valColor = '#2E7D32'
+          } else if (actual < plan && actual > 0) {
+            valColor = '#E65100'
+          } else if (actual === 0 && plan > 0) {
+            valColor = '#C62828'
+          }
+
+          planRows.push({
+            type: 'box',
+            layout: 'horizontal',
+            margin: 'xs',
+            contents: [
+              {
+                type: 'text',
+                text: `    • ${model}`,
+                size: 'xs',
+                color: '#888888',
+                flex: 5
+              },
+              {
+                type: 'text',
+                text: `${actual}/${plan}`,
+                size: 'xs',
+                color: valColor,
+                align: 'end',
+                flex: 3
+              }
+            ]
+          })
+        }
       }
     }
   }
