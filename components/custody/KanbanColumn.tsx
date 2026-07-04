@@ -10,7 +10,7 @@ interface KanbanColumnProps {
   accentColorClass: string
   hoverBorderClass: string
   icon: string
-  onCardClick: (card: CardData) => void
+  onRefresh?: () => Promise<void>
 }
 
 export function KanbanColumn({
@@ -21,7 +21,7 @@ export function KanbanColumn({
   accentColorClass,
   hoverBorderClass,
   icon,
-  onCardClick,
+  onRefresh,
 }: KanbanColumnProps) {
   return (
     <div className="flex flex-col rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-900/40 min-h-[500px]">
@@ -39,10 +39,10 @@ export function KanbanColumn({
             <KanbanCard
               key={card.maintenanceId}
               card={card}
-              onClick={() => onCardClick(card)}
               accentColorClass={accentColorClass}
               hoverBorderClass={hoverBorderClass}
               icon={icon}
+              onRefresh={onRefresh}
             />
           ))
         )}

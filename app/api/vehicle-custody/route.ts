@@ -97,6 +97,24 @@ export async function GET(req: NextRequest) {
         ageingDays = Math.floor((now.getTime() - report.getTime()) / (1000 * 60 * 60 * 24))
       }
 
+      const getStatusThai = (status: string | null) => {
+        if (!status) return null
+        switch (status.toUpperCase()) {
+          case 'ON_RENT':
+          case 'RENTED':
+          case 'RENT':
+            return 'อยู่ระหว่างเช่า'
+          case 'AVAILABLE':
+            return 'พร้อมใช้งาน'
+          case 'MAINTENANCE':
+            return 'อยู่ระหว่างซ่อม'
+          case 'RESERVED':
+            return 'จองแล้ว'
+          default:
+            return status
+        }
+      }
+
       const formattedRecord = {
         maintenanceId: rec.MaintenanceItemID,
         inventoryItemId: rec.InventoryItemID,
@@ -107,7 +125,7 @@ export async function GET(req: NextRequest) {
         projectType: rec.ProjectType,
         vehicleStatus: rec.VehicleStatus,
         vehicleStatusType: rec.VehicleStatusType,
-        vehicleSubStatusName: rec.VehicleSubStatusName || rec.VehicleStatusType || 'ไม่ระบุสถานะ',
+        vehicleSubStatusName: rec.VehicleSubStatusName || rec.VehicleStatusType || getStatusThai(rec.VehicleStatus) || 'ไม่ระบุสถานะ',
         issueTitle: rec.IssueTitle || 'ไม่มีอาการระบุ',
         location: rec.ServiceLocationCode || 'ไม่ระบุสถานที่',
         reportDate: rec.ReportDate,
@@ -140,22 +158,85 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    const groupColumnCards = (cards: any[]) => {
+      const groupedMap = new Map<number, any>()
+      
+      cards.forEach(card => {
+        const existing = groupedMap.get(card.inventoryItemId)
+        if (!existing) {
+          groupedMap.set(card.inventoryItemId, {
+            ...card,
+            tickets: [ {
+              maintenanceId: card.maintenanceId,
+              issueTitle: card.issueTitle,
+              reportDate: card.reportDate,
+              incidentDate: card.incidentDate,
+              startDate: card.startDate,
+              finishDate: card.finishDate,
+              insuranceCode: card.insuranceCode,
+              claimNumber: card.claimNumber,
+              latestFollowUpDetail: card.latestFollowUpDetail,
+              latestFollowUpDate: card.latestFollowUpDate,
+              carStatusCode: card.carStatusCode,
+              location: card.location,
+            } ]
+          })
+        } else {
+          existing.tickets.push({
+            maintenanceId: card.maintenanceId,
+            issueTitle: card.issueTitle,
+            reportDate: card.reportDate,
+            incidentDate: card.incidentDate,
+            startDate: card.startDate,
+            finishDate: card.finishDate,
+            insuranceCode: card.insuranceCode,
+            claimNumber: card.claimNumber,
+            latestFollowUpDetail: card.latestFollowUpDetail,
+            latestFollowUpDate: card.latestFollowUpDate,
+            carStatusCode: card.carStatusCode,
+            location: card.location,
+          })
+          
+          // Keep the ticket with the highest maintenanceId or latest date as the primary ticket representation on the card
+          if (card.maintenanceId > existing.maintenanceId) {
+            existing.maintenanceId = card.maintenanceId
+            existing.issueTitle = card.issueTitle
+            existing.reportDate = card.reportDate
+            existing.incidentDate = card.incidentDate
+            existing.startDate = card.startDate
+            existing.finishDate = card.finishDate
+            existing.insuranceCode = card.insuranceCode
+            existing.claimNumber = card.claimNumber
+            existing.latestFollowUpDetail = card.latestFollowUpDetail
+            existing.latestFollowUpDate = card.latestFollowUpDate
+            existing.carStatusCode = card.carStatusCode
+          }
+        }
+      })
+      
+      return Array.from(groupedMap.values())
+    }
+
+    const finalColumn1 = groupColumnCards(column1)
+    const finalColumn2 = groupColumnCards(column2)
+    const finalColumn3 = groupColumnCards(column3)
+
     return NextResponse.json({
       board: {
         column1: {
           id: 'claims_queue',
           title: '📁 แจ้งเคส / รอคิวเข้าซ่อม (ICI Claims)',
-          cards: column1
+          cards: finalColumn1
         },
         column2: {
           id: 'workshop_repair',
           title: '📁 กำลังซ่อม & จัดหารถทดแทน (Workshop & Replacement)',
-          cards: column2
+          cards: finalColumn2
         },
         column3: {
           id: 'ready_pickup',
           title: '📁 ซ่อมเสร็จ รอส่งมอบคืน (EV7 Operations)',
-          cards: column3
+          cards: finalColumn3
         }
       }
     })

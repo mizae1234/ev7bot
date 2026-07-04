@@ -4,7 +4,6 @@ import useSWR from 'swr'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { CardData } from '@/components/custody/KanbanCard'
 import { KanbanColumn } from '@/components/custody/KanbanColumn'
-import { CustodyDrawer } from '@/components/custody/CustodyDrawer'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -25,7 +24,6 @@ interface KanbanResponse {
 export default function CustodyPage() {
   const { data, error, mutate, isValidating } = useSWR<KanbanResponse>('/api/vehicle-custody', fetcher)
   const [search, setSearch] = useState('')
-  const [selectedCard, setSelectedCard] = useState<CardData | null>(null)
 
   const board = data?.board
   const isLoading = !data && !error
@@ -42,8 +40,8 @@ export default function CustodyPage() {
     )
   }
 
-  const handleCardClick = (card: CardData) => {
-    setSelectedCard(card)
+  const handleRefresh = async () => {
+    await mutate()
   }
 
   return (
@@ -65,14 +63,14 @@ export default function CustodyPage() {
                 📋 บอร์ดติดตามงานซ่อมและการควบคุมรถทดแทน
               </h1>
               <p className="text-xs text-zinc-500">
-                กระดานแสดงภาระงานและการถือครองรถยนต์ในแต่ละฝ่ายปฏิบัติงานแบบเรียลไทม์
+                กระดานแสดงภาระงานและการถือครองรถยนต์ในแต่ละฝ่ายปฏิบัติงานแบบเรียลไทม์ (กดที่ตัวการ์ดเพื่อขยายดูรายละเอียดเพิ่มเติม)
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3 self-end sm:self-auto">
             <LoginProfile />
             <button
-              onClick={() => mutate()}
+              onClick={handleRefresh}
               disabled={isLoading || isValidating}
               className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
@@ -131,7 +129,7 @@ export default function CustodyPage() {
               accentColorClass="group-hover:text-rose-600 dark:group-hover:text-rose-400"
               hoverBorderClass="hover:border-rose-400/50 dark:hover:border-rose-500/50"
               icon="🚗"
-              onCardClick={handleCardClick}
+              onRefresh={handleRefresh}
             />
 
             <KanbanColumn
@@ -142,7 +140,7 @@ export default function CustodyPage() {
               accentColorClass="group-hover:text-amber-600 dark:group-hover:text-amber-400"
               hoverBorderClass="hover:border-amber-400/50 dark:hover:border-amber-500/50"
               icon="🛠️"
-              onCardClick={handleCardClick}
+              onRefresh={handleRefresh}
             />
 
             <KanbanColumn
@@ -153,17 +151,11 @@ export default function CustodyPage() {
               accentColorClass="group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
               hoverBorderClass="hover:border-emerald-400/50 dark:hover:border-emerald-500/50"
               icon="✅"
-              onCardClick={handleCardClick}
+              onRefresh={handleRefresh}
             />
           </div>
         ) : null}
       </main>
-
-      {/* DETAIL DRAWER / OVERLAY */}
-      <CustodyDrawer
-        card={selectedCard}
-        onClose={() => setSelectedCard(null)}
-      />
     </div>
   )
 }

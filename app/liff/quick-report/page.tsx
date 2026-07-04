@@ -394,6 +394,41 @@ export default function QuickReportPage() {
     }
   }
 
+  // Auto-fill car and tab from search parameters
+  useEffect(() => {
+    if (authChecking) return
+
+    const parseQueryParams = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const tab = params.get('tab')
+        const registerNo = params.get('registerNo')
+
+        if (tab === 'history') {
+          setActiveTab('history')
+        } else if (tab === 'report') {
+          setActiveTab('report')
+        }
+
+        if (registerNo) {
+          const res = await fetch(`/api/vehicles/search?q=${encodeURIComponent(registerNo)}`)
+          if (res.ok) {
+            const data = await res.json()
+            const cars = data.cars || []
+            const matchedCar = cars.find((c: any) => c.RegisterNo === registerNo) || cars[0]
+            if (matchedCar) {
+              await handleSelectCar(matchedCar)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing query params in quick-report:', err)
+      }
+    }
+
+    parseQueryParams()
+  }, [authChecking])
+
   // Quick Check-in Function
   const handleQuickCheckIn = async (maintId: number) => {
     if (!confirm('ยืนยันนำรถคันนี้เข้าซ่อมบำรุงใช่หรือไม่?\n(สถานะใบแจ้งซ่อมจะเปลี่ยนเป็น "อยู่ระหว่างการซ่อม")')) {
