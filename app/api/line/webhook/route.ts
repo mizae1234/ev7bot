@@ -147,7 +147,8 @@ export async function POST(req: NextRequest) {
 
     const { events }: { events: WebhookEvent[] } = JSON.parse(body)
 
-    await Promise.allSettled(events.map(event => {
+    // Process events in the background to prevent LINE webhook from timing out (5 seconds limit)
+    Promise.allSettled(events.map(event => {
       const isGroupOrRoom = event.source.type === 'group' || event.source.type === 'room'
       const targetSourceId = isGroupOrRoom
         ? ((event.source as any).groupId || (event.source as any).roomId || event.source.userId!)
@@ -162,7 +163,9 @@ export async function POST(req: NextRequest) {
         })
       }
       return handleEvent(event, appUrl)
-    }))
+    })).catch(err => {
+      console.error('[Background Webhook Error]', err)
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
