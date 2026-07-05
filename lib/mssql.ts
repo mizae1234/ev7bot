@@ -59,6 +59,12 @@ export async function getMSSQLWritePool(): Promise<sql.ConnectionPool | null> {
 
   console.log('[MSSQL Write Pool] Initializing write pool with user:', writeConfig.user)
   writePool = await sql.connect(writeConfig)
+  try {
+    const testRes = await writePool.request().query('SELECT CURRENT_USER AS dbUser, SYSTEM_USER AS loginUser')
+    console.log('[MSSQL Write Pool Connected] dbUser:', testRes.recordset[0].dbUser, 'loginUser:', testRes.recordset[0].loginUser)
+  } catch (testErr) {
+    console.error('[MSSQL Write Pool check error]', testErr)
+  }
   return writePool
 }
 
