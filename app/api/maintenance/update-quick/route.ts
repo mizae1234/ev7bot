@@ -163,10 +163,11 @@ export async function POST(req: NextRequest) {
       console.error('[User Log Fix Error]', fixErr)
     }
 
-    // ─── Update EV_InventoryItem Status and Replacement Car when entering maintenance (เข้าซ่อม) ───
-    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE') {
+    // ─── Update EV_InventoryItem Status and Replacement Car when entering maintenance (เข้าซ่อม / เริ่มซ่อม) ───
+    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE') {
       try {
-        // 0. Update Replacement Car Assignment
+        // 0. Update Replacement Car Assignment (only if explicitly provided in body)
+        if (hasReplacement !== undefined) {
         try {
           const existReplReq = pool.request()
           existReplReq.input('maintId', sql.Int, maintenanceId)
@@ -279,8 +280,9 @@ export async function POST(req: NextRequest) {
               console.log(`[Replacement Update] Ticket #${maintenanceId}: Removed replacement car ${existVin}`)
             }
           }
-        } catch (replErr) {
-          console.error('[Replacement update error in update-quick]', replErr)
+          } catch (replErr) {
+            console.error('[Replacement update error in update-quick]', replErr)
+          }
         }
 
         // 1. Get InventoryItemID from the maintenance item
@@ -301,8 +303,8 @@ export async function POST(req: NextRequest) {
           `)
 
           if (invRes.recordset.length > 0) {
-            const currentStatus = invRes.recordset[0].Status
-            const currentStatusType = invRes.recordset[0].StatusType
+            const currentStatus = (invRes.recordset[0].Status || '').toUpperCase().trim()
+            const currentStatusType = (invRes.recordset[0].StatusType || '').toUpperCase().trim()
             console.log(`[Inventory Check] InventoryItemID=${inventoryItemId}, Status='${currentStatus}', StatusType='${currentStatusType}'`)
 
             let newStatus: string | null = null
@@ -317,13 +319,10 @@ export async function POST(req: NextRequest) {
             } else if (currentStatusType === 'AVAILABLE_USE') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'USE_MAINTENANCE'
-            } else if (currentStatusType === 'AVAILABLE') {
+            } else if (currentStatus === 'AVAILABLE' || currentStatusType === 'AVAILABLE' || currentStatusType === 'AVAILABLE_NEW') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'NEW_MAINTENANCE'
-            } else if (currentStatusType === 'REPLACEMENT_CAR') {
-              newStatus = 'MAINTENANCE'
-              newStatusType = 'REPLACEMENT_MAINTENANCE'
-            } else if (currentStatusType === 'REPLACEMENT_AVAILABLE') {
+            } else if (currentStatus === 'REPLACEMENT' || currentStatusType === 'REPLACEMENT_CAR' || currentStatusType === 'REPLACEMENT_AVAILABLE') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'REPLACEMENT_MAINTENANCE'
             }

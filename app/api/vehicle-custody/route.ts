@@ -46,7 +46,9 @@ export async function GET(req: NextRequest) {
         i.UpdateDate,
         i.CreateDate,
         i.AvailableDate,
-        NULL AS ReturnItemDate
+        NULL AS ReturnItemDate,
+        mainCarInfo.MainVehicleRegisterNo,
+        mainCarInfo.MainVehicleVin
       FROM dbo.EV_MaintenanceItem m
       JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
@@ -69,6 +71,18 @@ export async function GET(req: NextRequest) {
           AND t.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
           AND t.MaintenanceReturnDate IS NULL
       ) tc
+      OUTER APPLY (
+        SELECT TOP 1 
+          mc.RegisterNo AS MainVehicleRegisterNo,
+          mc.VinNo AS MainVehicleVin
+        FROM dbo.EV_ReplacementItem activeRep
+        JOIN dbo.EV_MaintenanceItem am ON activeRep.MaintenanceItemID = am.MaintenanceItemID
+        JOIN dbo.EV_InventoryItem mc ON am.InventoryItemID = mc.InventoryItemID
+        WHERE activeRep.VinNo = i.VinNo 
+          AND activeRep.IsActive = 1 
+          AND activeRep.ReplacementReturnDate IS NULL
+          AND am.IsActive = 1
+      ) mainCarInfo
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
         AND m.MaintenanceReturnDate IS NULL
@@ -110,7 +124,9 @@ export async function GET(req: NextRequest) {
         i.UpdateDate,
         i.CreateDate,
         i.AvailableDate,
-        latestReturn.ReturnDate AS ReturnItemDate
+        latestReturn.ReturnDate AS ReturnItemDate,
+        mainCarInfo.MainVehicleRegisterNo,
+        mainCarInfo.MainVehicleVin
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsStatus msStatus ON i.Status = msStatus.StatusCode
@@ -126,6 +142,18 @@ export async function GET(req: NextRequest) {
         WHERE VinNo = i.VinNo AND IsActive = 1
         ORDER BY ReturnItemID DESC
       ) latestReturn
+      OUTER APPLY (
+        SELECT TOP 1 
+          mc.RegisterNo AS MainVehicleRegisterNo,
+          mc.VinNo AS MainVehicleVin
+        FROM dbo.EV_ReplacementItem activeRep
+        JOIN dbo.EV_MaintenanceItem am ON activeRep.MaintenanceItemID = am.MaintenanceItemID
+        JOIN dbo.EV_InventoryItem mc ON am.InventoryItemID = mc.InventoryItemID
+        WHERE activeRep.VinNo = i.VinNo 
+          AND activeRep.IsActive = 1 
+          AND activeRep.ReplacementReturnDate IS NULL
+          AND am.IsActive = 1
+      ) mainCarInfo
       WHERE i.Status = 'AVAILABLE' AND i.IsActive = 1
     `)
 
@@ -213,6 +241,8 @@ export async function GET(req: NextRequest) {
         ageingDays: ageingDays !== null && ageingDays >= 0 ? ageingDays : null,
         carStatusCode: rec.CarStatusCode,
         activeTicketsCount: rec.ActiveTicketsCount || 1,
+        mainVehicleRegisterNo: rec.MainVehicleRegisterNo || null,
+        mainVehicleVin: rec.MainVehicleVin || null,
       }
 
       // Categorize based on VehicleStatus first, then CarStatusCode

@@ -152,13 +152,10 @@ export async function POST(req: NextRequest) {
           } else if (currentStatusType === 'AVAILABLE_USE') {
             newStatus = 'MAINTENANCE'
             newStatusType = 'USE_MAINTENANCE'
-          } else if (currentStatusType === 'AVAILABLE') {
+          } else if (currentStatus === 'AVAILABLE' || currentStatusType === 'AVAILABLE' || currentStatusType === 'AVAILABLE_NEW') {
             newStatus = 'MAINTENANCE'
             newStatusType = 'NEW_MAINTENANCE'
-          } else if (currentStatusType === 'REPLACEMENT_CAR') {
-            newStatus = 'MAINTENANCE'
-            newStatusType = 'REPLACEMENT_MAINTENANCE'
-          } else if (currentStatusType === 'REPLACEMENT_AVAILABLE') {
+          } else if (currentStatus === 'REPLACEMENT' || currentStatusType === 'REPLACEMENT_CAR' || currentStatusType === 'REPLACEMENT_AVAILABLE') {
             newStatus = 'MAINTENANCE'
             newStatusType = 'REPLACEMENT_MAINTENANCE'
           }

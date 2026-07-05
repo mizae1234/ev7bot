@@ -23,6 +23,8 @@ interface CarInfo {
   IsActive: boolean
   StatusName?: string | null
   SubStatusName?: string | null
+  MainVehicleRegisterNo?: string | null
+  MainVehicleVin?: string | null
 }
 
 interface RentInfo {
@@ -249,6 +251,18 @@ function VehicleDetailContent() {
             <InfoCell label="สีภายนอก" value={car.Exterior_Color || '-'} />
             <InfoCell label="สีภายใน" value={car.Interior_Color || '-'} />
           </div>
+
+          {car.MainVehicleRegisterNo && (
+            <div className="bg-amber-50/50 dark:bg-amber-950/10 px-5 py-3.5 border-t border-zinc-200/60 dark:border-zinc-800/85 flex items-center justify-between text-xs animate-fade-in">
+              <span className="font-medium text-amber-800 dark:text-amber-300">🔄 เป็นรถทดแทนของคัน:</span>
+              <a 
+                href={`/vehicle/${car.MainVehicleRegisterNo}`}
+                className="font-bold text-amber-950 dark:text-amber-250 hover:underline flex items-center gap-1 bg-amber-100/50 dark:bg-amber-900/20 px-2.5 py-1 rounded-lg border border-amber-200/30 transition-all hover:bg-amber-100 dark:hover:bg-amber-900/30"
+              >
+                🚗 {car.MainVehicleRegisterNo} <span className="font-mono font-normal text-amber-800/80 dark:text-amber-400/80 text-[10.5px]">({car.MainVehicleVin})</span>
+              </a>
+            </div>
+          )}
         </div>
 
         {/* ── Current Rent ── */}

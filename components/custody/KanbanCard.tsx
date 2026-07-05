@@ -39,6 +39,8 @@ export interface CardData {
   customerPhone: string
   replacementVin: string | null
   replacementRegisterNo: string | null
+  mainVehicleRegisterNo?: string | null
+  mainVehicleVin?: string | null
   latestFollowUpDetail: string | null
   latestFollowUpDate: string | null
   ageingDays: number | null
@@ -232,7 +234,12 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
       </div>
 
       {/* REPLACEMENT STATUS OR CUSTODY HIGHLIGHT (Always Visible) */}
-      <div>
+      <div className="space-y-1">
+        {card.mainVehicleRegisterNo && (
+          <div className="bg-amber-50/70 border border-amber-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/20 dark:text-amber-300 font-semibold flex items-center gap-1">
+            🔄 เป็นรถทดแทนของคัน: <span className="font-extrabold underline">{card.mainVehicleRegisterNo}</span>
+          </div>
+        )}
         {card.vehicleStatus === 'AVAILABLE' ? null : card.finishDate ? (
           card.replacementVin && (
             <div className="bg-amber-50/70 border border-amber-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/20 dark:text-amber-300 font-medium">
@@ -273,6 +280,14 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
           
           {/* ข้อมูลทั่วไปเพิ่มเติม */}
           <div className="bg-zinc-50/70 border border-zinc-100 p-3 rounded-xl dark:bg-zinc-950/40 dark:border-zinc-850 space-y-1.5 text-[11px] text-zinc-500">
+            {card.mainVehicleRegisterNo && (
+              <div>
+                <span className="text-zinc-400">รถทดแทนของคัน:</span>{' '}
+                <span className="font-bold text-amber-700 dark:text-amber-400">
+                  {card.mainVehicleRegisterNo} ({card.mainVehicleVin})
+                </span>
+              </div>
+            )}
             <div>
               <span className="text-zinc-400">เลขตัวถัง (VIN):</span>{' '}
               <span className="font-mono text-zinc-700 dark:text-zinc-300 select-all">{card.vin}</span>

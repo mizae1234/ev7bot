@@ -173,6 +173,18 @@ export function CustodyDrawer({ card, onClose, onRefresh }: CustodyDrawerProps) 
                       <span className="text-zinc-400 block mb-0.5">เลขที่สัญญา:</span>
                       <span className="font-semibold text-zinc-800 dark:text-zinc-200">{card.contractNo}</span>
                     </div>
+                    {card.mainVehicleRegisterNo && (
+                      <div className="col-span-2 border-t border-zinc-150 dark:border-zinc-800/60 pt-2 mt-1">
+                        <span className="text-zinc-400 block mb-0.5">รถทดแทนของคัน:</span>
+                        <a 
+                          href={`/vehicle/${card.mainVehicleRegisterNo}`}
+                          target="_blank"
+                          className="font-bold text-amber-700 dark:text-amber-450 hover:underline inline-flex items-center gap-1"
+                        >
+                          🚗 {card.mainVehicleRegisterNo} <span className="font-mono text-[11px] font-normal text-zinc-500 dark:text-zinc-400">({card.mainVehicleVin})</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -1828,6 +1828,11 @@ export default function QuickReportPage() {
                             {selectedCarDetails.StatusType.replace(/_/g, ' ')}
                           </span>
                         )}
+                        {selectedCarDetails?.MainVehicleRegisterNo && (
+                          <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
+                            ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button

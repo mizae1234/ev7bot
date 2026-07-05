@@ -98,10 +98,24 @@ export async function GET(
         i.Project, i.ProjectType, i.Company, i.Status AS StatusCode, i.StatusType,
         i.Exterior_Color, i.Interior_Color, i.IsActive,
         s.DescriptionStatus AS StatusName,
-        sub.DescriptionStatus AS SubStatusName
+        sub.DescriptionStatus AS SubStatusName,
+        mainCarInfo.MainVehicleRegisterNo,
+        mainCarInfo.MainVehicleVin
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      OUTER APPLY (
+        SELECT TOP 1 
+          mc.RegisterNo AS MainVehicleRegisterNo,
+          mc.VinNo AS MainVehicleVin
+        FROM dbo.EV_ReplacementItem activeRep
+        JOIN dbo.EV_MaintenanceItem am ON activeRep.MaintenanceItemID = am.MaintenanceItemID
+        JOIN dbo.EV_InventoryItem mc ON am.InventoryItemID = mc.InventoryItemID
+        WHERE activeRep.VinNo = i.VinNo 
+          AND activeRep.IsActive = 1 
+          AND activeRep.ReplacementReturnDate IS NULL
+          AND am.IsActive = 1
+      ) mainCarInfo
       WHERE (
         REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') LIKE @cleanIdentifier
         OR REPLACE(REPLACE(i.VinNo, ' ', ''), '-', '') LIKE @cleanIdentifier
