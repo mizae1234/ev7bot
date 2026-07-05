@@ -2684,7 +2684,7 @@ async function trySendVehicleFlexMessage(
            m.MaintenanceItemID, 
            m.IssueTitle, 
            m.CarStatusCode, 
-           ISNULL(sub.StatusName, m.CarStatusCode) AS CarStatusName,
+           ISNULL(sub.DescriptionStatus, m.CarStatusCode) AS CarStatusName,
            m.ServiceLocationCode, 
            m.ReportDate, 
            m.CreateDate, 
@@ -2747,7 +2747,7 @@ async function trySendVehicleFlexMessage(
       }
 
       const displayStatusName = maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
-        ? 'พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
+        ? 'รถซ่อมเสร็จ รอลูกค้ามารับ'
         : (maint.CarStatusName || maint.CarStatusCode)
 
       const usageStatus = displayStatusName ? `${emoji} ${displayStatusName}` : '-'
