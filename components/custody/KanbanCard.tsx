@@ -182,9 +182,11 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
           )}
         </div>
         <div className="text-right flex flex-col items-end">
-          <span className="text-[10px] text-zinc-400">
-            {card.vehicleStatus === 'AVAILABLE' ? 'ว่างสะสม' : card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays !== null && card.ageingDays !== undefined && card.ageingDays >= 0 ? `${card.ageingDays} วัน` : 'ไม่มีข้อมูล'}
-          </span>
+          {card.vehicleStatus !== 'AVAILABLE' && (
+            <span className="text-[10px] text-zinc-400">
+              {card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays !== null && card.ageingDays !== undefined && card.ageingDays >= 0 ? `${card.ageingDays} วัน` : 'ไม่มีข้อมูล'}
+            </span>
+          )}
           <button
             type="button"
             className="mt-1 text-[11px] text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold flex items-center gap-0.5"
@@ -203,11 +205,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
         <div>
           <span className="font-semibold text-zinc-600 dark:text-zinc-400">รุ่น:</span> {card.model}
         </div>
-        {card.vehicleStatus === 'AVAILABLE' ? (
-          <div className="text-[11px] text-zinc-500 font-semibold mt-1">
-            📅 ว่างตั้งแต่วันที่: <span className="text-emerald-600 dark:text-emerald-450">{card.maintenanceReturnDate ? formatDateOnly(card.maintenanceReturnDate) : 'ไม่มีข้อมูล'}</span>
-          </div>
-        ) : card.finishDate ? (
+        {card.vehicleStatus === 'AVAILABLE' ? null : card.finishDate ? (
           <div>
             <span className="font-semibold text-zinc-600 dark:text-zinc-400">ลูกค้า:</span> {card.customerName}
           </div>

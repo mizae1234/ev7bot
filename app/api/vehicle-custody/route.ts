@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
         tc.ActiveTicketsCount,
         i.UpdateDate,
         i.CreateDate,
-        i.AvailableDate
+        i.AvailableDate,
+        NULL AS ReturnItemDate
       FROM dbo.EV_MaintenanceItem m
       JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
@@ -93,13 +94,8 @@ export async function GET(req: NextRequest) {
         NULL AS ReportDate,
         NULL AS IncidentDate,
         NULL AS MaintenanceStartDate,
-        NULL AS MaintenanceFinishDate,
-        (
-          SELECT TOP 1 MaintenanceReturnDate 
-          FROM dbo.EV_MaintenanceItem 
-          WHERE InventoryItemID = i.InventoryItemID AND IsActive = 1 AND MaintenanceReturnDate IS NOT NULL 
-          ORDER BY MaintenanceReturnDate DESC
-        ) AS MaintenanceReturnDate,
+        latestMaint.MaintenanceFinishDate AS MaintenanceFinishDate,
+        latestMaint.MaintenanceReturnDate AS MaintenanceReturnDate,
         NULL AS InsuranceCode,
         NULL AS ClaimNumber,
         NULL AS ContractNo,
@@ -113,10 +109,23 @@ export async function GET(req: NextRequest) {
         0 AS ActiveTicketsCount,
         i.UpdateDate,
         i.CreateDate,
-        i.AvailableDate
+        i.AvailableDate,
+        latestReturn.ReturnDate AS ReturnItemDate
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsStatus msStatus ON i.Status = msStatus.StatusCode
+      OUTER APPLY (
+        SELECT TOP 1 MaintenanceReturnDate, MaintenanceFinishDate
+        FROM dbo.EV_MaintenanceItem
+        WHERE InventoryItemID = i.InventoryItemID AND IsActive = 1
+        ORDER BY MaintenanceItemID DESC
+      ) latestMaint
+      OUTER APPLY (
+        SELECT TOP 1 ReturnDate
+        FROM dbo.EV_ReturnItem
+        WHERE VinNo = i.VinNo AND IsActive = 1
+        ORDER BY ReturnItemID DESC
+      ) latestReturn
       WHERE i.Status = 'AVAILABLE' AND i.IsActive = 1
     `)
 
@@ -141,10 +150,14 @@ export async function GET(req: NextRequest) {
       let displayReturnDate: string | null = null
 
       if (isAvailable) {
-        // Fallback sequence: 1. MaintenanceReturnDate, 2. AvailableDate, 3. null
+        // Fallback sequence: 1. MaintenanceReturnDate, 2. MaintenanceFinishDate, 3. ReturnItemDate, 4. AvailableDate, 5. null
         const availDate = rec.MaintenanceReturnDate 
           ? new Date(rec.MaintenanceReturnDate) 
-          : (rec.AvailableDate ? new Date(rec.AvailableDate) : null)
+          : (rec.MaintenanceFinishDate 
+              ? new Date(rec.MaintenanceFinishDate) 
+              : (rec.ReturnItemDate 
+                  ? new Date(rec.ReturnItemDate) 
+                  : (rec.AvailableDate ? new Date(rec.AvailableDate) : null)))
         
         if (availDate) {
           ageingDays = Math.floor((now.getTime() - availDate.getTime()) / (1000 * 60 * 60 * 24))
