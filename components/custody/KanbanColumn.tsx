@@ -11,6 +11,7 @@ interface KanbanColumnProps {
   hoverBorderClass: string
   icon: string
   onRefresh?: () => Promise<void>
+  isExpandable?: boolean
 }
 
 export function KanbanColumn({
@@ -22,6 +23,7 @@ export function KanbanColumn({
   hoverBorderClass,
   icon,
   onRefresh,
+  isExpandable = true,
 }: KanbanColumnProps) {
   return (
     <div className="flex flex-col rounded-2xl bg-zinc-100 p-4 dark:bg-zinc-900/40 min-h-[500px]">
@@ -43,6 +45,7 @@ export function KanbanColumn({
               hoverBorderClass={hoverBorderClass}
               icon={icon}
               onRefresh={onRefresh}
+              isExpandable={isExpandable}
             />
           ))
         )}

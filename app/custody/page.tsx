@@ -154,6 +154,7 @@ export default function CustodyPage() {
               hoverBorderClass="hover:border-emerald-400/50 dark:hover:border-emerald-500/50"
               icon="✅"
               onRefresh={handleRefresh}
+              isExpandable={false}
             />
 
             <KanbanColumn
@@ -165,6 +166,7 @@ export default function CustodyPage() {
               hoverBorderClass="hover:border-indigo-400/50 dark:hover:border-indigo-500/50"
               icon="✨"
               onRefresh={handleRefresh}
+              isExpandable={false}
             />
           </div>
         ) : null}

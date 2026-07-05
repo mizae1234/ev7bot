@@ -59,9 +59,10 @@ interface KanbanCardProps {
   hoverBorderClass: string
   icon: string
   onRefresh?: () => Promise<void>
+  isExpandable?: boolean
 }
 
-export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onRefresh }: KanbanCardProps) {
+export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onRefresh, isExpandable = true }: KanbanCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [followUpNotes, setFollowUpNotes] = useState<Record<number, string>>({})
   const [submittingIds, setSubmittingIds] = useState<Record<number, boolean>>({})
@@ -78,6 +79,10 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
       target.closest('button') ||
       target.closest('a')
     ) {
+      return
+    }
+    if (!isExpandable) {
+      window.open(`/vehicle/${card.registerNo}`, '_blank')
       return
     }
     setExpanded(!expanded)
@@ -165,10 +170,15 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
       {/* CARD HEADER (Always Visible) */}
       <div className="flex justify-between items-start">
         <div className="flex flex-col gap-1.5 items-start">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`text-sm font-bold text-zinc-800 dark:text-zinc-100 transition-colors ${accentColorClass}`}>
               {icon} {card.registerNo}
             </span>
+            {!isExpandable && (
+              <span className="text-[10px] font-mono font-semibold text-zinc-450 bg-zinc-50 border border-zinc-100 dark:bg-zinc-800/50 dark:border-zinc-700/30 dark:text-zinc-400 px-1.5 py-0.5 rounded">
+                {card.vin}
+              </span>
+            )}
             {tickets.length > 1 && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200/40 dark:bg-amber-950/40 dark:text-amber-300">
                 📋 {tickets.length} ใบงาน
@@ -187,12 +197,14 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
               {card.finishDate ? 'เสร็จแล้ว' : card.startDate ? 'ซ่อมสะสม' : 'SLA'}: {card.ageingDays !== null && card.ageingDays !== undefined && card.ageingDays >= 0 ? `${card.ageingDays} วัน` : 'ไม่มีข้อมูล'}
             </span>
           )}
-          <button
-            type="button"
-            className="mt-1 text-[11px] text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold flex items-center gap-0.5"
-          >
-            {expanded ? '▲ ย่อ' : '▼ ขยาย'}
-          </button>
+          {isExpandable && (
+            <button
+              type="button"
+              className="mt-1 text-[11px] text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold flex items-center gap-0.5"
+            >
+              {expanded ? '▲ ย่อ' : '▼ ขยาย'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,11 +233,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
 
       {/* REPLACEMENT STATUS OR CUSTODY HIGHLIGHT (Always Visible) */}
       <div>
-        {card.vehicleStatus === 'AVAILABLE' ? (
-          <div className="bg-emerald-50/70 border border-emerald-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/20 dark:text-emerald-300 font-semibold">
-            ✨ รถว่าง รอจัดหาลูกค้า / ฝ่ายขาย
-          </div>
-        ) : card.finishDate ? (
+        {card.vehicleStatus === 'AVAILABLE' ? null : card.finishDate ? (
           card.replacementVin && (
             <div className="bg-amber-50/70 border border-amber-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/20 dark:text-amber-300 font-medium">
               🔄 สลับรถคืน: {card.replacementRegisterNo || card.replacementVin}
@@ -245,13 +253,9 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
       </div>
 
       {/* COLLAPSED FOLLOW-UP PREVIEW (Visible when Collapsed) */}
-      {!expanded && (
+      {!expanded && card.vehicleStatus !== 'AVAILABLE' && (
         <div className="border-t pt-2 border-zinc-100 dark:border-zinc-800">
-          {card.vehicleStatus === 'AVAILABLE' ? (
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-450 font-medium italic">
-              📢 ฝ่ายขายดำเนินการต่อสัญญา / หาผู้เช่าใหม่
-            </div>
-          ) : card.latestFollowUpDetail ? (
+          {card.latestFollowUpDetail ? (
             <div className="text-[11px] text-zinc-500 line-clamp-1 italic">
               💬 {card.latestFollowUpDetail}
             </div>
@@ -307,7 +311,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
           </div>
 
           {/* รายการใบงานซ่อมทั้งหมด */}
-          {card.vehicleStatus !== 'AVAILABLE' ? (
+          {card.vehicleStatus !== 'AVAILABLE' && (
             <div className="space-y-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
                 📋 ใบงานซ่อม ({tickets.length || 1})
@@ -405,10 +409,6 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
               ) : (
                 <div className="text-[11px] text-zinc-400 italic">ไม่มีข้อมูลใบงานคงค้าง</div>
               )}
-            </div>
-          ) : (
-            <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl dark:bg-emerald-950/10 dark:border-emerald-900/20 text-xs text-emerald-800 dark:text-emerald-300">
-              ⭐ <strong>สถานะ:</strong> รถว่างพร้อมปล่อยหาลูกค้า (Sales) เรียบร้อยแล้วครับ
             </div>
           )}
 
