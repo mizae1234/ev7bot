@@ -1911,7 +1911,17 @@ export default function QuickReportPage() {
                         onClick={() => {
                           const nextType = bulkActionType === 'park' ? null : 'park'
                           setBulkActionType(nextType)
-                          setBulkLocation('')
+                          
+                          // Pre-select the location of the first selected ticket if available
+                          let initialLocation = ''
+                          if (nextType === 'park' && pendingTickets.length > 0) {
+                            const ticketWithLoc = pendingTickets.find(t => t.ServiceLocationCode)
+                            if (ticketWithLoc) {
+                              initialLocation = ticketWithLoc.ServiceLocationCode
+                            }
+                          }
+                          setBulkLocation(initialLocation)
+                          
                           setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
