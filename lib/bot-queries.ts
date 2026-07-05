@@ -367,34 +367,27 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       GROUP BY RentType
     `),
     pendingReq.query(`
-      SELECT 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.View_AccumarateReleaseCar prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.ReleaseDate IS NOT NULL
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END AS RentType,
-        COUNT(*) as cnt
-      FROM dbo.EV_RentItem r
-      LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-      WHERE r.IsActive = 1
-        AND r.ReleaseDate IS NULL
-        AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
-      GROUP BY 
-        CASE 
-          WHEN EXISTS (
-            SELECT 1 FROM dbo.View_AccumarateReleaseCar prev 
-            WHERE prev.InventoryItemID = r.InventoryItemID 
-              AND prev.ReleaseDate IS NOT NULL
-          ) THEN 'ONRENT_USE'
-          WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
-               OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
-          ELSE 'ONRENT_NEW'
-        END
+      WITH PreparedRentItems AS (
+        SELECT 
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM dbo.View_AccumarateReleaseCar prev 
+              WHERE prev.InventoryItemID = r.InventoryItemID 
+                AND prev.ReleaseDate IS NOT NULL
+            ) THEN 'ONRENT_USE'
+            WHEN i.StatusType IN ('AVAILABLE_USE', 'USE_MAINTENANCE', 'REPLACEMENT_AVAILABLE', 'REPLACEMENT_CAR') 
+                 OR i.Status = 'REPLACEMENT' THEN 'ONRENT_USE'
+            ELSE 'ONRENT_NEW'
+          END AS RentType
+        FROM dbo.EV_RentItem r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        WHERE r.IsActive = 1
+          AND r.ReleaseDate IS NULL
+          AND r.ExpectedReleaseDate >= @startDate AND r.ExpectedReleaseDate <= @endDate
+      )
+      SELECT RentType, COUNT(*) as cnt
+      FROM PreparedRentItems
+      GROUP BY RentType
     `),
     planBreakdownReq.query(`
       SELECT 
