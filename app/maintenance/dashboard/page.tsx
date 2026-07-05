@@ -315,7 +315,7 @@ function MaintenanceDashboardContent() {
               <div className="absolute -right-4 -bottom-4 text-7xl text-orange-500/5 font-bold select-none group-hover:scale-110 transition duration-300">
                 🟠
               </div>
-              <p className="text-xs text-orange-600 font-bold">🟠 รถซ่อมเสร็จ รอปล่อย</p>
+              <p className="text-xs text-orange-600 font-bold">🟠 รถซ่อมเสร็จ รอลูกค้ามารับ</p>
               <p className="text-3xl font-black text-orange-600 mt-1.5">
                 {stats.ready_pickup || 0} <span className="text-xs font-normal text-slate-500">คัน</span>
               </p>
@@ -393,9 +393,9 @@ function MaintenanceDashboardContent() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
                   <div>
                     <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🟠</span> รายการรถซ่อมเสร็จ รอปล่อย (Ready to Release)
+                      <span>🟠</span> รายการรถซ่อมเสร็จ รอลูกค้ามารับ (Ready to Release)
                     </h2>
-                    <p className="text-[10px] text-slate-500 mt-0.5">รถยนต์ที่ซ่อมเสร็จเรียบร้อยและอยู่ระหว่างติดตามส่งมอบคืนลูกค้า/ผู้เช่า</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">รถยนต์ที่ซ่อมเสร็จเรียบร้อยและอยู่ระหว่างติดตามส่งมอบคืนลูกค้า/ผู้เช่า (รถซ่อมเสร็จ รอลูกค้ามารับ)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -425,7 +425,7 @@ function MaintenanceDashboardContent() {
 
                             {/* Status */}
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-orange-100 border-orange-200 text-orange-700">
-                              {item.CarStatusName || 'ซ่อมเสร็จ รอปล่อย'}
+                              {item.CarStatusName || 'รถซ่อมเสร็จ รอลูกค้ามารับ'}
                             </span>
 
                             {/* Issue Title */}

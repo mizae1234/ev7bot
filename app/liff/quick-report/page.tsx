@@ -3202,7 +3202,7 @@ export default function QuickReportPage() {
                     {/* 3. ซ่อมเสร็จ รอปล่อย */}
                     <div className="bg-orange-50/60 border border-orange-200/60 rounded-3xl p-4 text-center shadow-sm">
                       <span className="text-2xl block">🟠</span>
-                      <span className="text-[11px] font-extrabold text-orange-850 block mt-1">ซ่อมเสร็จ รอปล่อย</span>
+                      <span className="text-[11px] font-extrabold text-orange-850 block mt-1">รถซ่อมเสร็จ รอลูกค้ามารับ</span>
                       <span className="text-xl font-black text-orange-900 block mt-0.5">
                         {mobileDashboardData.stats?.ready_pickup || 0} <span className="text-xs font-normal text-orange-700">คัน</span>
                       </span>

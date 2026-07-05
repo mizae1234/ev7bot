@@ -2916,7 +2916,7 @@ async function trySendVehicleFlexMessage(
       const isReadyPickup = maint.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
       const mainThemeColor = isReadyPickup ? '#ea580c' : '#dc2626'
       const subThemeColor = isReadyPickup ? '#ffedd5' : '#fee2e2'
-      const headerTitle = isReadyPickup ? '🟠 รถซ่อมเสร็จ รอปล่อย' : '🔧 ข้อมูลงานซ่อมรถ'
+      const headerTitle = isReadyPickup ? '🟠 รถซ่อมเสร็จ รอลูกค้ามารับ' : '🔧 ข้อมูลงานซ่อมรถ'
 
       maintBubble = {
         type: 'bubble',

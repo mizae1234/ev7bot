@@ -147,12 +147,12 @@ function buildReadyPickupFlex(item: any): any {
   const projectDisplay = (item.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (item.ProjectType || '-')
   const isComplete = item.CarStatusCode === 'COMPLETE'
   const accentColor = isComplete ? '#2E7D32' : '#E65100'
-  const titleText = isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอปล่อย'
+  const titleText = isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอลูกค้ามารับ'
   const nextToDoText = isComplete ? '📌 Next to do : รถซ่อมเสร็จ สแตนบายรอปล่อยงาน / รอสลับรถ' : '📌 Next to do : ติดตามลูกค้าเข้ารับรถ'
   const bannerBg = isComplete ? '#E8F5E9' : '#FFF3E0'
   const headerBg = isComplete ? '#c8e6c9' : '#ffe0b2'
-  const altText = `${isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอปล่อย'}: ${item.RegisterNo || item.VinNo}`
-  const usageStatus = isComplete ? '🟢 พร้อมใช้ (ซ่อมเสร็จ)' : '🟠 พร้อมรับรถ (ซ่อมเสร็จ รอปล่อย)'
+  const altText = `${isComplete ? '🟢 รถซ่อมเสร็จพร้อมใช้' : '🟠 รถซ่อมเสร็จ รอลูกค้ามารับ'}: ${item.RegisterNo || item.VinNo}`
+  const usageStatus = isComplete ? '🟢 พร้อมใช้ (ซ่อมเสร็จ)' : '🟠 รถซ่อมเสร็จ รอลูกค้ามารับ'
 
   return {
     type: 'flex',
