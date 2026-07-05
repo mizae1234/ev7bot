@@ -1917,7 +1917,7 @@ export default function QuickReportPage() {
                           if (nextType === 'park' && pendingTickets.length > 0) {
                             const ticketWithLoc = pendingTickets.find(t => t.ServiceLocationCode)
                             if (ticketWithLoc) {
-                              initialLocation = ticketWithLoc.ServiceLocationCode
+                              initialLocation = ticketWithLoc.ServiceLocationCode || ''
                             }
                           }
                           setBulkLocation(initialLocation)
@@ -1943,7 +1943,7 @@ export default function QuickReportPage() {
                           if (nextType === 'start' && pendingTickets.length > 0) {
                             const ticketWithLoc = pendingTickets.find(t => t.ServiceLocationCode)
                             if (ticketWithLoc) {
-                              initialLocation = ticketWithLoc.ServiceLocationCode
+                              initialLocation = ticketWithLoc.ServiceLocationCode || ''
                             }
                           }
                           setBulkLocation(initialLocation)
