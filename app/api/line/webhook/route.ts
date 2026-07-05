@@ -6,7 +6,7 @@ import { logChatToDb } from '@/lib/chat-log'
 import { env } from '@/lib/env'
 import { askButter } from '@/lib/gemini'
 import type { WebhookEvent } from '@line/bot-sdk'
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { getMSSQLReadOnlyPool as getMSSQLPool, sql } from '@/lib/mssql'
 
 export const dynamic = 'force-dynamic';
 

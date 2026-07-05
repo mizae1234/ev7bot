@@ -59,7 +59,7 @@ let pool: sql.ConnectionPool | null = null
 let writePool: sql.ConnectionPool | null = null
 let readOnlyPool: sql.ConnectionPool | null = null
 
-// getMSSQLPool now uses new sql.ConnectionPool to isolate from other pools
+// getMSSQLPool now uses new sql.ConnectionPool with writeConfig by default for dashboard-wide safety
 export async function getMSSQLPool(): Promise<sql.ConnectionPool | null> {
   if (env.MOCK_MODE) {
     console.log('[MSSQL] Running in Mock Mode - connection pool skipped.')
@@ -67,7 +67,7 @@ export async function getMSSQLPool(): Promise<sql.ConnectionPool | null> {
   }
   if (pool && pool.connected) return pool
   
-  pool = new sql.ConnectionPool(readConfig)
+  pool = new sql.ConnectionPool(writeConfig)
   await pool.connect()
   return pool
 }

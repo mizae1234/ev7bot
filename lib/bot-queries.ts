@@ -1,4 +1,4 @@
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { getMSSQLReadOnlyPool as getMSSQLPool, sql } from '@/lib/mssql'
 import { createTaskNote, getPendingTasks, completeTaskNote } from '@/lib/task-service'
 
 // ─── Helper: Get today's date range ────────────────────────────────
