@@ -2118,7 +2118,7 @@ export default function QuickReportPage() {
                   )}
                   <div className="space-y-2">
                     {/* Select All / Deselect All when bulk action is active */}
-                    {bulkActionType && pendingTickets.length > 1 && (
+                    {bulkActionType && bulkActionType !== 'park' && pendingTickets.length > 1 && (
                       <div className="flex items-center justify-between px-1 py-1">
                         <span className="text-[10px] font-bold text-slate-500">
                           เลือก {selectedBulkTicketIds.length}/{pendingTickets.length} รายการ
@@ -2167,6 +2167,7 @@ export default function QuickReportPage() {
                         onClick={() => {
                           if (bulkActionType) {
                             if (isUnselectable) return
+                            if (bulkActionType === 'park') return // park affects all tickets, no toggling
                             setSelectedBulkTicketIds(prev =>
                               isSelected
                                 ? prev.filter(id => id !== ticket.MaintenanceItemID)
@@ -2176,8 +2177,8 @@ export default function QuickReportPage() {
                         }}
                       >
                         <div className="flex items-start gap-2.5">
-                          {/* Checkbox when bulk action is active */}
-                          {bulkActionType && (
+                          {/* Checkbox when bulk action is active (except for park/เข้าซ่อม) */}
+                          {bulkActionType && bulkActionType !== 'park' && (
                             <div className="shrink-0 flex items-center justify-center pt-0.5">
                               {isUnselectable ? (
                                 <div className="w-5 h-5 rounded-md border border-slate-200 bg-slate-150 flex items-center justify-center text-slate-400 text-[10px] font-bold">
