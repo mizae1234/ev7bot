@@ -124,6 +124,18 @@ export default function CustodyPage() {
         ) : board ? (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
             <KanbanColumn
+              title={board.column4.title}
+              cards={filterCards(board.column4.cards)}
+              headerColorClass="text-indigo-700 dark:text-indigo-400"
+              badgeColorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400"
+              accentColorClass="group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
+              hoverBorderClass="hover:border-indigo-400/50 dark:hover:border-indigo-500/50"
+              icon="✨"
+              onRefresh={handleRefresh}
+              isExpandable={false}
+            />
+
+            <KanbanColumn
               title={board.column1.title}
               cards={filterCards(board.column1.cards)}
               headerColorClass="text-rose-700 dark:text-rose-400"
@@ -153,18 +165,6 @@ export default function CustodyPage() {
               accentColorClass="group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
               hoverBorderClass="hover:border-emerald-400/50 dark:hover:border-emerald-500/50"
               icon="✅"
-              onRefresh={handleRefresh}
-              isExpandable={false}
-            />
-
-            <KanbanColumn
-              title={board.column4.title}
-              cards={filterCards(board.column4.cards)}
-              headerColorClass="text-indigo-700 dark:text-indigo-400"
-              badgeColorClass="bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400"
-              accentColorClass="group-hover:text-indigo-600 dark:group-hover:text-indigo-400"
-              hoverBorderClass="hover:border-indigo-400/50 dark:hover:border-indigo-500/50"
-              icon="✨"
               onRefresh={handleRefresh}
               isExpandable={false}
             />
