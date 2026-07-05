@@ -57,6 +57,7 @@ export async function getMSSQLWritePool(): Promise<sql.ConnectionPool | null> {
     }
   }
 
+  console.log('[MSSQL Write Pool] Initializing write pool with user:', writeConfig.user)
   writePool = await sql.connect(writeConfig)
   return writePool
 }
