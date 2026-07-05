@@ -1927,7 +1927,17 @@ export default function QuickReportPage() {
                         onClick={() => {
                           const nextType = bulkActionType === 'start' ? null : 'start'
                           setBulkActionType(nextType)
-                          setBulkLocation('')
+                          
+                          // Pre-select the location of the first selected ticket if available
+                          let initialLocation = ''
+                          if (nextType === 'start' && pendingTickets.length > 0) {
+                            const ticketWithLoc = pendingTickets.find(t => t.ServiceLocationCode)
+                            if (ticketWithLoc) {
+                              initialLocation = ticketWithLoc.ServiceLocationCode
+                            }
+                          }
+                          setBulkLocation(initialLocation)
+                          
                           setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                           const now = new Date()
                           setBulkStartDate(now.toISOString().slice(0, 16))
