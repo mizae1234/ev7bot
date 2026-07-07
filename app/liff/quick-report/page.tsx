@@ -3117,12 +3117,24 @@ export default function QuickReportPage() {
           <div className="space-y-4 animate-fade-in-up">
             
             {/* Header section */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm text-center">
-              <span className="text-3xl">📊</span>
-              <h3 className="text-xs font-bold text-slate-600 mt-2">ภาพรวมระบบซ่อมบำรุง</h3>
-              <p className="text-xxs text-slate-500 mt-1">
-                สถิติคลังรถยนต์แจ้งซ่อม คิวยอดสะสม และไทม์ไลน์บันทึกล่าสุด
-              </p>
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm text-center space-y-3">
+              <div>
+                <span className="text-3xl">📊</span>
+                <h3 className="text-xs font-bold text-slate-600 mt-2">ภาพรวมระบบซ่อมบำรุง</h3>
+                <p className="text-xxs text-slate-500 mt-1">
+                  สถิติคลังรถยนต์แจ้งซ่อม คิวยอดสะสม และไทม์ไลน์บันทึกล่าสุด
+                </p>
+              </div>
+              <div className="pt-1">
+                <a
+                  href="/maintenance/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-4 py-2 rounded-2xl text-[10px] transition border border-indigo-200 shadow-sm"
+                >
+                  🖥️ ไปที่แดชบอร์ดหลัก (Dashboard)
+                </a>
+              </div>
             </div>
 
             {/* Car Search Block (REAL DB SEARCH) inside Tab 4 */}
