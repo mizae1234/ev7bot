@@ -96,6 +96,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE') {
+      if (!serviceLocationCode || !serviceLocationCode.trim()) {
+        return NextResponse.json({ error: 'กรุณาระบุสถานที่/อู่ที่ซ่อม' }, { status: 400 })
+      }
+    }
+
     // Convert datetime-local format (2026-07-03T02:43) to MSSQL-compatible (2026-07-03 02:43:00)
     const toMssqlDate = (d: string | null | undefined): string | null => {
       if (!d) return null

@@ -140,6 +140,14 @@ export default function NewMaintenancePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (statusCode === 'WAITING_FOR_MAINTENANCE' || statusCode === 'IN_MAINTENANCE') {
+      if (!serviceLocation || !serviceLocation.trim()) {
+        alert('กรุณาระบุสถานที่/อู่ที่ซ่อม')
+        return
+      }
+    }
+
     setSubmitting(true)
 
     try {

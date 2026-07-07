@@ -55,7 +55,11 @@ export async function POST(req: NextRequest) {
       }
 
     } else if (action === 'create') {
-      // --- CREATE NEW ACCOUNT ---
+      // --- CREATE NEW ACCOUNT (TEMPORARILY DISABLED) ---
+      return NextResponse.json({
+        error: 'ระบบปิดการลงทะเบียนผู้ใช้งานใหม่ชั่วคราว กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อสร้างบัญชีใหม่'
+      }, { status: 400 })
+
       if (!email || !password || !firstName || !lastName) {
         return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง' }, { status: 400 })
       }
@@ -63,7 +67,7 @@ export async function POST(req: NextRequest) {
       // Check if email already exists (Best effort)
       let emailExists = false
       try {
-        const checkReq = pool.request()
+        const checkReq = pool!.request()
         checkReq.input('email', sql.VarChar, email.trim())
         const checkRes = await checkReq.query(`
           SELECT UserID FROM dbo.EV_User WHERE UserEmail = @email
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
 
       // Insert new user to SQL Server
       try {
-        const insReq = pool.request()
+        const insReq = pool!.request()
         insReq.input('userName', sql.VarChar, email.trim())
         insReq.input('password', sql.VarChar, password)
         insReq.input('email', sql.VarChar, email.trim())

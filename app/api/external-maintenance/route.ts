@@ -70,6 +70,13 @@ export async function POST(req: NextRequest) {
     const carStatusCode = body.carStatusCode || body.statusCode || null
     const issueTitle = body.issueDescription || body.issueTitle || null
 
+    if (carStatusCode === 'WAITING_FOR_MAINTENANCE' || carStatusCode === 'IN_MAINTENANCE') {
+      const loc = body.serviceLocationCode || body.serviceLocation
+      if (!loc || !loc.trim()) {
+        return NextResponse.json({ error: 'กรุณาระบุสถานที่/อู่ที่ซ่อม' }, { status: 400 })
+      }
+    }
+
     const maintenanceObj = {
       inventoryItemId,
       registerNo: registerNo,

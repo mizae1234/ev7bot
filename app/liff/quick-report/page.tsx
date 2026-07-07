@@ -482,6 +482,13 @@ export default function QuickReportPage() {
       return
     }
 
+    if (type === 'park' || type === 'start') {
+      if (!bulkLocation || !bulkLocation.trim()) {
+        alert('กรุณาเลือกสถานที่/อู่ที่ซ่อม')
+        return
+      }
+    }
+
     setSubmittingBulk(true)
     try {
       const locName = locationOptions.find(o => o.code === bulkLocation)?.name || 'ไม่ระบุ / นอกสถานที่'
@@ -2014,7 +2021,7 @@ export default function QuickReportPage() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          disabled={submittingBulk || !bulkLocation}
+                          disabled={submittingBulk}
                           onClick={() => handleSaveBulkAction('park')}
                           className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xxs transition active:scale-98"
                         >
@@ -2075,7 +2082,7 @@ export default function QuickReportPage() {
                       <div className="flex gap-2 pt-1">
                         <button
                           type="button"
-                          disabled={submittingBulk || !bulkLocation}
+                          disabled={submittingBulk}
                           onClick={() => handleSaveBulkAction('start')}
                           className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xxs transition active:scale-98"
                         >

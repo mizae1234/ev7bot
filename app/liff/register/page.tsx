@@ -132,7 +132,8 @@ function RegisterContent() {
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (Commented out - only Link Account is allowed) */}
+        {/* 
         <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/40">
           <button
             type="button"
@@ -154,6 +155,18 @@ function RegisterContent() {
           >
             👤 ลงทะเบียนพนักงานใหม่
           </button>
+        </div>
+        */}
+
+        {/* Warning Banner for Contacting Admin */}
+        <div className="bg-amber-50/80 border border-amber-200/60 rounded-2xl p-4 text-left space-y-1">
+          <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+            <span>⚠️</span>
+            <span>ประกาศสำคัญ</span>
+          </div>
+          <p className="text-xs text-amber-800 leading-relaxed font-medium">
+            ระบบได้ปิดฟังก์ชันลงทะเบียนผู้ใช้ใหม่ หากท่านยังไม่มีบัญชีในระบบ <strong>EV7Tracking</strong> กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อทำการเพิ่มผู้ใช้งานให้นะคะ
+          </p>
         </div>
 
         {/* Error message */}
