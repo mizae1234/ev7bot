@@ -69,29 +69,8 @@ const isMaintComplete = (ticket: any): boolean => {
   return false
 }
 
-const locationOptions = [
-  { code: 'AION_GI_KANCHANAPISEK', name: 'Aion กาญจนาฯ' },
-  { code: 'AION_GI_RAMINTRA_EXPRESSWAY', name: 'Aion เลียบด่วนฯ' },
-  { code: 'AION_GI_PIBULSONGKRAM', name: 'Aion พิบูลฯ' },
-  { code: 'AION_GI_MINBURI', name: 'Aion มีนบุรี' },
-  { code: 'AION_GI_MAHACHAI', name: 'Aion มหาชัย' },
-  { code: 'AION_GI_SALAYA', name: 'Aion ศาลายา' },
-  { code: 'EV7_YARD_PRAPADAENG', name: 'EV7 Yard พระประแดง' },
-  { code: 'SMART_TAXI', name: 'สมาร์ทเแท็กซี่' },
-  { code: 'GARAGE_BUNGKHWANG', name: 'อู่ บึงขวาง' },
-  { code: 'GARAGE_TS', name: 'อู่ TS' },
-  { code: 'GARAGE_88_CAR', name: 'อู่ 88 คาร์' },
-  { code: 'GARAGE_CRN_PAKKRET', name: 'อู่ CRN ปากเกร็ด' },
-  { code: 'GARAGE_56_COLOR', name: 'อู่ 56 Color' },
-  { code: 'GARAGE_PRICHA', name: 'อู่ ปรีชา' },
-  { code: 'GARAGE_PERFECTCAR', name: 'อู่ เพอร์เฟคคาร์' },
-  { code: 'GARAGE_SAHACAR', name: 'อู่ สหาคาร์' },
-  { code: 'GARAGE_PREMIUMCAR', name: 'อู่ พรีเมี่ยมคาร์' },
-  { code: 'GARAGE_BESTCARPAINT', name: 'อู่ เบสท์คาร์เพ้นท์' },
-  { code: 'BRANCH_AYUTTHAYA', name: 'สาขา อยุธยา' },
-  { code: 'BB_CARPAINT', name: 'อู่ บีบี คาร์เพ้นท์' },
-  { code: 'AUTOHAUS', name: 'อู่ Autohaus' }
-]
+// locationOptions is now fetched dynamically from the /api/maintenance/locations API
+
 
 const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) => {
   const [previewUrl, setPreviewUrl] = useState<string>('')
@@ -162,6 +141,23 @@ export default function QuickReportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submittedData, setSubmittedData] = useState<any>(null)
+  const [locationOptions, setLocationOptions] = useState<{ code: string; name: string }[]>([])
+
+  // Fetch Location options from EV_MsSubStatus
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch('/api/maintenance/locations')
+        if (res.ok) {
+          const data = await res.json()
+          setLocationOptions(data.locations || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch locations:', err)
+      }
+    }
+    fetchLocations()
+  }, [])
 
   // Auth checking effect
   useEffect(() => {
@@ -208,6 +204,26 @@ export default function QuickReportPage() {
   // Selected Car Details (Real Database)
   const [vehicleHistory, setVehicleHistory] = useState<MaintenanceTicket[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+
+  // Sync selectedLocCode and locSearchTerm when locationOptions or vehicleHistory loads
+  useEffect(() => {
+    if (locationOptions.length > 0 && vehicleHistory.length > 0) {
+      const firstPending = vehicleHistory.find((t: any) => !isMaintComplete(t))
+      if (firstPending) {
+        const matchedLoc = locationOptions.find(o => o.code === firstPending.ServiceLocationCode || o.name === firstPending.ServiceLocation)
+        if (matchedLoc) {
+          setSelectedLocCode(matchedLoc.code)
+          setLocSearchTerm(matchedLoc.name)
+        }
+      } else if (vehicleHistory.length > 0) {
+        const matchedLoc = locationOptions.find(o => o.code === vehicleHistory[0].ServiceLocationCode || o.name === vehicleHistory[0].ServiceLocation)
+        if (matchedLoc) {
+          setSelectedLocCode(matchedLoc.code)
+          setLocSearchTerm(matchedLoc.name)
+        }
+      }
+    }
+  }, [locationOptions, vehicleHistory])
 
   // Inline update ticket states (Sub-page/SPA View)
   const [editingTicket, setEditingTicket] = useState<MaintenanceTicket | null>(null)
