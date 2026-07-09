@@ -96,7 +96,7 @@ export async function GET(
       SELECT TOP 1
         i.InventoryItemID, i.VinNo, i.MotorNo, i.RegisterNo, i.Model,
         i.Project, i.ProjectType, i.Company, i.Status AS StatusCode, i.StatusType,
-        i.Exterior_Color, i.Interior_Color, i.IsActive,
+        i.Exterior_Color, i.Interior_Color, i.IsActive, i.CurrentLocation,
         s.DescriptionStatus AS StatusName,
         sub.DescriptionStatus AS SubStatusName,
         mainCarInfo.MainVehicleRegisterNo,

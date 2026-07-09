@@ -21,19 +21,24 @@ export async function GET(req: NextRequest) {
 
     // Query top 15 matching active vehicles
     let sqlQuery = `
-      SELECT TOP 15 InventoryItemID, VinNo, RegisterNo, Model, Project
-      FROM dbo.EV_InventoryItem
-      WHERE IsActive = 1
+      SELECT TOP 15 
+        i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model, i.Project, i.Status, i.StatusType,
+        s.DescriptionStatus AS StatusName,
+        sub.DescriptionStatus AS SubStatusName
+      FROM dbo.EV_InventoryItem i
+      LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      WHERE i.IsActive = 1
     `
     if (isReplacement) {
-      sqlQuery += ` AND StatusType = 'REPLACEMENT_AVAILABLE' `
+      sqlQuery += ` AND i.StatusType = 'REPLACEMENT_AVAILABLE' `
     }
     sqlQuery += `
         AND (
-          REPLACE(REPLACE(RegisterNo, ' ', ''), '-', '') LIKE @cleanQuery
-          OR REPLACE(REPLACE(VinNo, ' ', ''), '-', '') LIKE @cleanQuery
+          REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') LIKE @cleanQuery
+          OR REPLACE(REPLACE(i.VinNo, ' ', ''), '-', '') LIKE @cleanQuery
         )
-      ORDER BY RegisterNo ASC
+      ORDER BY i.RegisterNo ASC
     `
 
     const result = await request.query(sqlQuery)

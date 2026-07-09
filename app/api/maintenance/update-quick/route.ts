@@ -7,10 +7,11 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = await req.json()
+    const body = await req.json()
+    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = body
 
-    if (!maintenanceId) {
-      return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
+    if (!maintenanceId && !bodyInventoryItemId) {
+      return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม หรือรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
     }
 
     if (env.MOCK_MODE) {
@@ -60,6 +61,33 @@ export async function POST(req: NextRequest) {
         console.error('[User check error]', checkErr)
         return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ผู้ใช้งาน: ' + checkErr.message }, { status: 500 })
       }
+    }
+
+    if (!maintenanceId && bodyInventoryItemId) {
+      if (env.MOCK_MODE) {
+        return NextResponse.json({
+          success: true,
+          message: 'อัปเดตสถานที่ปัจจุบันของรถยนต์สำเร็จ (จำลองสถานะ MOCK_MODE)'
+        })
+      }
+
+      const updateLocReq = pool.request()
+      updateLocReq.input('itemId', sql.Int, bodyInventoryItemId)
+      updateLocReq.input('locCode', sql.NVarChar, serviceLocationCode || '')
+      updateLocReq.input('userId', sql.Int, dbUserId)
+
+      await updateLocReq.query(`
+        UPDATE dbo.EV_InventoryItem
+        SET CurrentLocation = @locCode,
+            UpdateDate = GETDATE(),
+            UpdateUserID = @userId
+        WHERE InventoryItemID = @itemId
+      `)
+
+      return NextResponse.json({
+        success: true,
+        message: 'อัปเดตสถานที่ปัจจุบันของรถยนต์เรียบร้อยแล้ว'
+      })
     }
 
     // Resolve CarStatusCode
