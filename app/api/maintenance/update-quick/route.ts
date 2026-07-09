@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE') {
+    if (carStatusCode !== undefined && (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE')) {
       if (!serviceLocationCode || !serviceLocationCode.trim()) {
         return NextResponse.json({ error: 'กรุณาระบุสถานที่/อู่ที่ซ่อม' }, { status: 400 })
       }

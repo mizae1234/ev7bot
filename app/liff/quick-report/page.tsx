@@ -846,7 +846,8 @@ export default function QuickReportPage() {
       })
 
       if (!res.ok) {
-        throw new Error('ไม่สามารถอัปเดตสถานะได้')
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'ไม่สามารถอัปเดตสถานะได้')
       }
 
       // If there are files to upload, upload them now
@@ -958,7 +959,8 @@ export default function QuickReportPage() {
       })
 
       if (!res.ok) {
-        throw new Error('ไม่สามารถบันทึกการแก้ไขได้')
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'ไม่สามารถบันทึกการแก้ไขได้')
       }
 
       // Upload new attachments if any
