@@ -30,7 +30,7 @@ function TasksContent() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('PENDING')
   const [summary, setSummary] = useState({ pending: 0, completed: 0, total: 0 })
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<number | null>(null)

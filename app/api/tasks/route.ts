@@ -60,8 +60,6 @@ export async function GET(req: NextRequest) {
       prisma.taskNote.findMany({
         where,
         orderBy: [
-          { status: 'asc' }, // PENDING first
-          { dueDate: 'asc' },
           { createdAt: 'desc' }
         ],
         skip,
