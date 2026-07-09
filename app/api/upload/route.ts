@@ -94,12 +94,72 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Execute Stored Procedure passing attachments as a JSON array
-    await pool.request()
-      .input('MaintenanceItemID', sql.Int, parseInt(maintenanceId, 10))
-      .input('AttachmentsJson', sql.NVarChar(sql.MAX), JSON.stringify(uploadedUrls))
-      .input('CreateUserID', sql.Int, dbUserId)
-      .execute('dbo.sp_InsertMaintenanceAttachmentsJson')
+    const processType = (formData.get('processType') as string) || 'MAINTENANCE'
+
+    if (processType === 'MAINTENANCE_COMPLETED') {
+      for (const fileInfo of uploadedUrls) {
+        const insReq = pool.request()
+        insReq.input('FN', sql.NVarChar, fileInfo.fileName)
+        insReq.input('OFN', sql.NVarChar, fileInfo.originalFileName)
+        insReq.input('SK', sql.NVarChar, fileInfo.s3Key)
+        insReq.input('FS', sql.Int, fileInfo.fileSize)
+        insReq.input('FT', sql.NVarChar, fileInfo.fileType)
+        insReq.input('maintId', sql.Int, parseInt(maintenanceId, 10))
+        insReq.input('userId', sql.Int, dbUserId)
+        
+        await insReq.query(`
+          INSERT INTO dbo.FileAttachment (
+              FileName, 
+              OriginalFileName,
+              S3Key,
+              FileSize,
+              ContentType,
+              ReferenceID,
+              ReferenceType,
+              UploadDate,
+              CreatedBy,
+              CreatedDate
+          )
+          VALUES (
+              @FN, 
+              @OFN,
+              @SK,
+              @FS, 
+              @FT, 
+              @maintId,
+              'MAINTENANCE_COMPLETED',
+              GETDATE(),
+              @userId,
+              GETDATE()
+          );
+          DECLARE @NewFileID INT = SCOPE_IDENTITY();
+          
+          INSERT INTO dbo.EV_FileAttachmentMaintenanceItem (
+              MaintenanceItemID, 
+              FileAttachmentID, 
+              ProcessType,
+              IsActive, 
+              CreatedBy,
+              CreatedDate
+          )
+          VALUES (
+              @maintId, 
+              @NewFileID, 
+              'MAINTENANCE_COMPLETED',
+              1, 
+              @userId,
+              GETDATE()
+          );
+        `)
+      }
+    } else {
+      // Execute Stored Procedure passing attachments as a JSON array
+      await pool.request()
+        .input('MaintenanceItemID', sql.Int, parseInt(maintenanceId, 10))
+        .input('AttachmentsJson', sql.NVarChar(sql.MAX), JSON.stringify(uploadedUrls))
+        .input('CreateUserID', sql.Int, dbUserId)
+        .execute('dbo.sp_InsertMaintenanceAttachmentsJson')
+    }
 
     return NextResponse.json({
       success: true,

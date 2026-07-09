@@ -905,7 +905,33 @@ const toMssqlDate = (d: string | null | undefined): string | null => {
   * ระบบจะทำการ **อัปเดตใบเก่าให้เป็น `COMPLETE` โดยอัตโนมัติ** (เนื่องจากถือว่ากระบวนการซ่อมของรอบก่อนหน้านั้นเสร็จสิ้นอย่างเป็นทางการแล้ว และกำลังเริ่มจอดซ่อมรอบใหม่)
   * ระบบจะอัปเดตเฉพาะสถานะ `CarStatusCode` และวันเวลาอัปเดต โดยจะ **ไม่ทับค่า `MaintenanceFinishDate`** ที่เป็นวันเสร็จงานเดิม พร้อมทั้งบันทึก Log การติดตามผล (Follow-Up) ระบุเหตุผลปิดงานอัตโนมัติไว้
 
-### 14.4 เวลาในฐานข้อมูล SQL Server เป็นเวลาไทย (UTC+7) อยู่แล้ว
+### 14.4 การปิดเคสแจ้งซ่อม (Close Case) และการคืนค่าสถานะรถบำรุง
+เมื่อผู้ใช้ที่มีสิทธิ์ระดับ `ADMIN` หรือ `SUPER_ADMIN` กดปุ่ม **"ปิดเคส"** บนระบบ LIFF:
+1. **การอัปเดตใบงานแจ้งซ่อม (`EV_MaintenanceItem`)**:
+   - อัปเดต `CarStatusCode` = `'COMPLETE'`
+   - อัปเดต `MaintenanceFinishDate` = วันซ่อมเสร็จ (ที่ระบุ)
+   - อัปเดต `MaintenanceReturnDate` = วันรับรถกลับ (ที่ระบุ)
+   - อัปเดต `RootCauseFound` = สรุปสาเหตุที่พบ (ถ้ามี)
+   - อัปเดต `FixAction` = สรุปการแก้ไข (ถ้ามี)
+2. **การอัปเดตไฟล์แนบ**:
+   - รูปภาพ/ไฟล์แนบปิดเคสจะถูกลงทะเบียนใน `dbo.FileAttachment` และ `dbo.EV_FileAttachmentMaintenanceItem` โดยใช้ `ReferenceType = 'MAINTENANCE_COMPLETED'` และ `ProcessType = 'MAINTENANCE_COMPLETED'`
+3. **การคืนค่าข้อมูลรถทดแทน (`EV_ReplacementItem`)**:
+   - หากใบแจ้งซ่อมนั้นมีรถทดแทนที่ใช้งานอยู่ (`IsActive = 1` และ `ReplacementReturnDate IS NULL`) ระบบจะทำการบันทึกคืนรถทดแทน โดยอัปเดต:
+     - `ReplacementReturnDate` = วันที่คืนรถทดแทน
+     - `Location` = จุดคืนรถทดแทน
+4. **การอัปเดตสถานที่ปัจจุบันของรถ (`EV_InventoryItem`)**:
+   - ทุกครั้งที่มีการบันทึกสถานที่หรือเปลี่ยนพิกัดรถ (ทั้งในขั้นตอน **เข้าซ่อม / Park**, **เริ่มซ่อม / Start** หรือ **ปิดเคส / Complete**) ระบบจะทำการอัปเดตฟิลด์ `CurrentLocation` ในตาราง `dbo.EV_InventoryItem` ให้เป็นสถานที่/พิกัดล่าสุดที่เลือกมาเสมอ
+5. **การคืนค่าสถานะตัวรถ (`EV_InventoryItem`)**:
+   - หากตรวจเช็คแล้วไม่มีใบงานอื่นค้างซ่อมบำรุงอยู่เลย (`CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')`) ระบบจะคืนค่าสถานะของตัวรถใน `dbo.EV_InventoryItem` (ฟิลด์ `Status` และ `StatusType`) ตามตาราง Mapping ด้านล่างนี้:
+
+| `StatusType` ปัจจุบันของรถ | การคืนค่าสถานะตัวรถ (`EV_InventoryItem`) |
+|---|---|
+| **`NEW_MAINTENANCE`** | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE'` |
+| **`USE_MAINTENANCE`** | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE_USE'` |
+| **`ON_RENT_MAINTENANCE`** | ปรับ `Status` = `'ON_RENT'` และ `StatusType` = `NULL` |
+| **`REPLACEMENT_MAINTENANCE`** | ปรับ `Status` = `'REPLACEMENT'` และ `StatusType` = `'REPLACEMENT_AVAILABLE'` |
+
+### 14.5 เวลาในฐานข้อมูล SQL Server เป็นเวลาไทย (UTC+7) อยู่แล้ว
 * SQL Server ใช้ `GETDATE()` ซึ่งคืนค่าเวลาท้องถิ่นของเครื่อง Server (ตั้งเป็น Bangkok time UTC+7 แล้ว)
 * **ห้ามแปลง timezone ซ้ำ** เมื่อนำมาแสดงผลฝั่ง Frontend — ถ้าใช้ `toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })` จะทำให้เวลาเร็วไป 7 ชั่วโมง (บวก +7 ซ้ำ)
 * **วิธีที่ถูกต้อง**: ใช้ `getUTC*()` methods ของ JavaScript `Date` object เพื่ออ่านค่าวันเวลาตรง ๆ ตามที่ SQL Server ส่งมา โดยไม่ต้องแปลง timezone เพิ่ม

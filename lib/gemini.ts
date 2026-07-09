@@ -136,6 +136,7 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 
 ### การจัดการงาน/โน้ตค้าง (Task & Note Tracking)
 - จดโน้ตใหม่: เรียกใช้ 'createTaskNote' โดยระบุรายละเอียดงาน คนทำ (ถ้ามี) และวันส่งมอบ (แปลงเวลาเช่น "วันศุกร์นี้" หรือ "พรุ่งนี้" เป็นวันที่จริง เช่น 2026-06-19) เมื่อบันทึกงานสำเร็จ คุณต้องพิมพ์ระบุรหัสงานในรูปแบบ ID #X (เช่น ID #5) ในข้อความตอบกลับเสมอเพื่อให้ระบบแสดงผลการ์ดชิ้นเดียวได้ถูกต้อง
+- **กฎเหล็กการจดโน้ตใหม่ (Task Tracking)**: เมื่อมีคำสั่งให้จดโน้ตหรือบันทึกงานใหม่ คุณต้องทำการบันทึกข้อมูลรายละเอียดทั้งหมดที่ผู้ใช้ป้อนเข้ามาเป็น **"Task เดียวชิ้นเดียวเท่านั้น"** ห้ามแยกเรียกใช้เครื่องมือหลายครั้ง และห้ามแบ่งข้อความออกเป็นหลาย Task เด็ดขาด โดยในฟิลด์ 'taskDetail' คุณต้องบันทึกรายละเอียดเนื้อหาทุกบรรทัด ทุกคำ และทุกตัวอักษรแบบครบถ้วนสมบูรณ์ ห้ามทำการสรุปย่อหรือตัดทอนข้อความออกเด็ดขาด
 - ดูรายการงานค้าง: เรียกใช้ 'listTaskNotes' (สถานะงานดีฟอลต์เป็น PENDING) กรองตามเลขทะเบียนรถ/VIN ได้
 - ปิดงานที่ทำเสร็จแล้ว: เรียกใช้ 'completeTaskNote' โดยใส่รหัส ID งาน (กรุณาเรียก 'listTaskNotes' ก่อนเพื่อตรวจสอบ ID เสมอ) เมื่อปิดงานสำเร็จ คุณต้องพิมพ์ระบุรหัสงานในรูปแบบ ID #X (เช่น ID #12) ในข้อความตอบกลับเสมอเพื่อให้ระบบแสดงสถานะอัปเดตของการ์ดชิ้นนั้นได้ถูกต้อง
 
@@ -272,7 +273,7 @@ const functionDeclarations: FunctionDeclaration[] = [
       properties: {
         taskDetail: {
           type: SchemaType.STRING,
-          description: 'รายละเอียดงาน เช่น ส่งเอกสารสิทธิ์, ซ่อมแผงไฟ',
+          description: 'รายละเอียดงานทั้งหมดแบบครบถ้วนทุกบรรทัดทุกตัวอักษร ห้ามสรุปย่อหรือตัดทอนข้อความ และห้ามแบ่งเป็นหลาย Task เด็ดขาด',
         },
         assigneeName: {
           type: SchemaType.STRING,
@@ -474,6 +475,23 @@ async function _askButterOnce(
             } else if (uc.chatSourceType === 'user') {
               args.alertTarget = 'PERSONAL'
               args.assigneeLineUserId = uc.chatSourceId || userContext.userId
+            }
+
+            // Always save the raw text in taskDetail, preserving all characters
+            let rawText = userMessage.trim()
+            const lines = rawText.split('\n')
+            if (lines.length > 1 && /^(butter\s+)?(task|จดโน้ต|จดงาน|บันทึกงาน|โน้ต)/i.test(lines[0])) {
+              const firstLine = lines[0].trim()
+              const isCommandOnly = !firstLine.replace(/^(butter\s+)?(task|จดโน้ต|จดงาน|บันทึกงาน|โน้ต)/i, '').replace(/@[a-zA-Z0-9_°\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+/g, '').trim()
+              if (isCommandOnly) {
+                rawText = lines.slice(1).join('\n').trim()
+              }
+            }
+            if (rawText === userMessage.trim()) {
+              rawText = rawText.replace(/^(butter\s+)?(task|จดโน้ต|จดงาน|บันทึกงาน|โน้ต)\s*(?:@[a-zA-Z0-9_°\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+\s*)*\s*/i, '')
+            }
+            if (rawText) {
+              args.taskDetail = rawText
             }
           }
           result = await fn(args)

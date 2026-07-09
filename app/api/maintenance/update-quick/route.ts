@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate } = await req.json()
+    const { maintenanceId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = await req.json()
 
     if (!maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
@@ -387,17 +387,88 @@ export async function POST(req: NextRequest) {
         finishReq.input('statusCode', sql.NVarChar, resolvedCarStatusCode)
         finishReq.input('finishDate', sql.NVarChar, toMssqlDate(finishDate) || new Date().toISOString().replace('T', ' ').slice(0, 19))
         finishReq.input('userId', sql.Int, dbUserId)
-        await finishReq.query(`
+
+        let updateFields = [
+          'CarStatusCode = @statusCode',
+          'MaintenanceFinishDate = @finishDate',
+          'UpdateUserID = @userId',
+          'UpdateDate = GETDATE()'
+        ]
+
+        if (returnDate !== undefined) {
+          finishReq.input('returnDate', sql.NVarChar, toMssqlDate(returnDate))
+          updateFields.push('MaintenanceReturnDate = @returnDate')
+        }
+        if (rootCause !== undefined) {
+          finishReq.input('rootCause', sql.NVarChar, rootCause || null)
+          updateFields.push('RootCauseFound = @rootCause')
+        }
+        if (fixAction !== undefined) {
+          finishReq.input('fixAction', sql.NVarChar, fixAction || null)
+          updateFields.push('FixAction = @fixAction')
+        }
+
+        const query = `
           UPDATE dbo.EV_MaintenanceItem
-          SET CarStatusCode = @statusCode,
-              MaintenanceFinishDate = @finishDate,
-              UpdateUserID = @userId,
-              UpdateDate = GETDATE()
+          SET ${updateFields.join(', ')}
           WHERE MaintenanceItemID = @maintId
-        `)
+        `
+        await finishReq.query(query)
         console.log(`[Finish Maintenance] MaintenanceItemID=${maintenanceId}: set ${resolvedCarStatusCode}, FinishDate=${finishDate}`)
       } catch (finishErr) {
         console.error('[Finish Maintenance Update Error]', finishErr)
+      }
+    }
+
+    // ─── Update EV_InventoryItem CurrentLocation ───
+    const locationToUpdate = currentLocation || serviceLocationCode
+    if (locationToUpdate && inventoryItemId) {
+      try {
+        const locReq = pool.request()
+        locReq.input('currentLocation', sql.NVarChar, locationToUpdate)
+        locReq.input('invId', sql.Int, inventoryItemId)
+        await locReq.query(`
+          UPDATE dbo.EV_InventoryItem
+          SET CurrentLocation = @currentLocation
+          WHERE InventoryItemID = @invId
+        `)
+        console.log(`[Inventory CurrentLocation Update] InventoryItemID=${inventoryItemId}: set CurrentLocation=${locationToUpdate}`)
+      } catch (locErr) {
+        console.error('[Inventory CurrentLocation Update Error]', locErr)
+      }
+    }
+
+    // ─── Update EV_ReplacementItem Return Details ───
+    if ((replacementReturnDate || replacementLocation) && maintenanceId) {
+      try {
+        const repCheckReq = pool.request()
+        repCheckReq.input('maintId', sql.Int, maintenanceId)
+        const repCheckRes = await repCheckReq.query(`
+          SELECT ReplacementItemID 
+          FROM dbo.EV_ReplacementItem 
+          WHERE MaintenanceItemID = @maintId 
+            AND IsActive = 1 
+            AND ReplacementReturnDate IS NULL
+        `)
+        if (repCheckRes.recordset.length > 0) {
+          const repId = repCheckRes.recordset[0].ReplacementItemID
+          const repUpdReq = pool.request()
+          repUpdReq.input('repId', sql.BigInt, repId)
+          repUpdReq.input('retDate', sql.Date, replacementReturnDate ? toMssqlDate(replacementReturnDate) : null)
+          repUpdReq.input('loc', sql.NVarChar, replacementLocation || null)
+          repUpdReq.input('userId', sql.Int, dbUserId)
+          await repUpdReq.query(`
+            UPDATE dbo.EV_ReplacementItem
+            SET ReplacementReturnDate = COALESCE(@retDate, ReplacementReturnDate),
+                Location = COALESCE(@loc, Location),
+                UpdateUserID = @userId,
+                UpdateDate = GETDATE()
+            WHERE ReplacementItemID = @repId
+          `)
+          console.log(`[Replacement Return Update] ReplacementItemID=${repId}: ReturnDate=${replacementReturnDate}, Location=${replacementLocation}`)
+        }
+      } catch (repErr) {
+        console.error('[Replacement Return Update Error]', repErr)
       }
     }
 
@@ -411,7 +482,7 @@ export async function POST(req: NextRequest) {
           SELECT COUNT(*) AS PendingCount 
           FROM dbo.EV_MaintenanceItem 
           WHERE InventoryItemID = @invId 
-            AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE')
+            AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
             AND IsActive = 1
         `)
         const pendingCount = countRes.recordset[0]?.PendingCount || 0
@@ -420,25 +491,27 @@ export async function POST(req: NextRequest) {
         if (isLastPending || pendingCount === 0) {
           let newStatus: string | null = null
           let newStatusType: string | null = null
+          let shouldUpdate = false
 
           if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
-            // Rule 1: Do nothing
-            console.log(`[Inventory Update Skipped] vehicleStatusType is ON_RENT_MAINTENANCE`)
+            newStatus = 'ON_RENT'
+            newStatusType = null
+            shouldUpdate = true
           } else if (vehicleStatusType === 'USE_MAINTENANCE') {
-            // Rule 2: Status = AVAILABLE, StatusType = AVAILABLE_USE
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE_USE'
+            shouldUpdate = true
           } else if (vehicleStatusType === 'NEW_MAINTENANCE') {
-            // Rule 3: Status = AVAILABLE, StatusType = AVAILABLE
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE'
+            shouldUpdate = true
           } else if (vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
-            // Rule 4: Status = REPLACEMENT, StatusType = REPLACEMENT_AVAILABLE
             newStatus = 'REPLACEMENT'
             newStatusType = 'REPLACEMENT_AVAILABLE'
+            shouldUpdate = true
           }
 
-          if (newStatus && newStatusType) {
+          if (shouldUpdate && newStatus) {
             const updReq = pool.request()
             updReq.input('newStatus', sql.NVarChar, newStatus)
             updReq.input('newStatusType', sql.NVarChar, newStatusType)

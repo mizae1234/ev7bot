@@ -107,6 +107,7 @@ export default function QuickReportPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard' | 'guide'>('report')
   const [authChecking, setAuthChecking] = useState(true)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   // Search and selection
   const [searchTerm, setSearchTerm] = useState('')
@@ -189,6 +190,7 @@ export default function QuickReportPage() {
         }
 
         // Auth passed!
+        setUserRole(data.role || 'USER')
         setAuthChecking(false)
       } catch (err) {
         console.error('[Quick Report Auth Error]', err)
@@ -306,7 +308,7 @@ export default function QuickReportPage() {
   const [showAddIncidentForm, setShowAddIncidentForm] = useState(false)
 
   // Bulk Action States
-  const [bulkActionType, setBulkActionType] = useState<'park' | 'start' | 'complete' | null>(null)
+  const [bulkActionType, setBulkActionType] = useState<'park' | 'start' | 'complete' | 'close_case' | null>(null)
   const [bulkLocation, setBulkLocation] = useState('')
   const [bulkStartDate, setBulkStartDate] = useState(() => {
     const now = new Date()
@@ -318,6 +320,21 @@ export default function QuickReportPage() {
   })
   const [submittingBulk, setSubmittingBulk] = useState(false)
   const [selectedBulkTicketIds, setSelectedBulkTicketIds] = useState<number[]>([])
+
+  // Close Case Field States
+  const [closeFinishDate, setCloseFinishDate] = useState(() => {
+    const now = new Date()
+    return now.toISOString().slice(0, 10) // yyyy-MM-dd
+  })
+  const [closeFormSubmitted, setCloseFormSubmitted] = useState(false)
+  const [closeReturnDate, setCloseReturnDate] = useState('')
+  const [closeRootCause, setCloseRootCause] = useState('')
+  const [closeFixAction, setCloseFixAction] = useState('')
+  const [closeRemark, setCloseRemark] = useState('')
+  const [closeAttachments, setCloseAttachments] = useState<File[]>([])
+  const [closeCurrentLocation, setCloseCurrentLocation] = useState('')
+  const [closeReplacementReturnDate, setCloseReplacementReturnDate] = useState('')
+  const [closeReplacementLocation, setCloseReplacementLocation] = useState('')
 
   // Fetch cars on mount or when typing (Debounced)
   useEffect(() => {
@@ -486,9 +503,9 @@ export default function QuickReportPage() {
   }
 
   // Bulk Action Save Handler
-  const handleSaveBulkAction = async (type: 'park' | 'start' | 'complete') => {
+  const handleSaveBulkAction = async (type: 'park' | 'start' | 'complete' | 'close_case') => {
     // For 'park' (เข้าซ่อม): update ALL pending tickets
-    // For 'start'/'complete': update only selected tickets
+    // For 'start'/'complete'/'close_case': update only selected tickets
     const ticketsToProcess = type === 'park' 
       ? pendingTickets 
       : pendingTickets.filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID))
@@ -505,11 +522,42 @@ export default function QuickReportPage() {
       }
     }
 
+    if (type === 'close_case') {
+      setCloseFormSubmitted(true)
+      if (!closeFinishDate) {
+        alert('กรุณาระบุวันที่รถซ่อมเสร็จ')
+        return
+      }
+      if (!closeReturnDate) {
+        alert('กรุณาระบุวันที่รับรถกลับ')
+        return
+      }
+      if (!closeCurrentLocation) {
+        alert('กรุณาระบุสถานที่ปัจจุบัน')
+        return
+      }
+
+      const hasActiveReplacement = ticketsToProcess
+        .flatMap(t => t.replacements || [])
+        .some(r => r.IsActive && !r.ReplacementReturnDate)
+
+      if (hasActiveReplacement) {
+        if (!closeReplacementReturnDate) {
+          alert('กรุณาระบุวันที่คืนรถทดแทน')
+          return
+        }
+        if (!closeReplacementLocation) {
+          alert('กรุณาระบุจุดคืนรถทดแทน')
+          return
+        }
+      }
+    }
+
     setSubmittingBulk(true)
     try {
       const locName = locationOptions.find(o => o.code === bulkLocation)?.name || 'ไม่ระบุ / นอกสถานที่'
       
-      const promises = ticketsToProcess.map(ticket => {
+      const promises = ticketsToProcess.map(async (ticket) => {
         const payload: any = {
           maintenanceId: ticket.MaintenanceItemID,
           lineUserId: getLineUserId()
@@ -531,26 +579,63 @@ export default function QuickReportPage() {
           payload.finishDate = bulkFinishDate
           payload.followUpDetail = `ระบบอัพเดต : ซ่อมเสร็จสิ้น เมื่อวันที่: ${formatLiffTime(bulkFinishDate)}`
           payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
+        } else if (type === 'close_case') {
+          payload.carStatusCode = 'COMPLETE'
+          payload.finishDate = closeFinishDate
+          payload.returnDate = closeReturnDate
+          payload.rootCause = closeRootCause
+          payload.fixAction = closeFixAction
+          payload.followUpDetail = closeRemark ? `หมายเหตุปิดเคส: ${closeRemark}` : `ระบบอัพเดต : ปิดเคสซ่อมเสร็จเรียบร้อย`
+          payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
+          payload.currentLocation = closeCurrentLocation
+          payload.replacementReturnDate = closeReplacementReturnDate
+          payload.replacementLocation = closeReplacementLocation
         }
 
-        return fetch('/api/maintenance/update-quick', {
+        const res = await fetch('/api/maintenance/update-quick', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         })
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || `อัปเดตใบงาน #${ticket.MaintenanceItemID} ไม่สำเร็จ`)
+        }
+
+        // Upload attachments if close_case
+        if (type === 'close_case' && closeAttachments.length > 0) {
+          const formData = new FormData()
+          closeAttachments.forEach((file) => {
+            formData.append('files', file)
+          })
+          formData.append('maintenanceId', String(ticket.MaintenanceItemID))
+          formData.append('lineUserId', getLineUserId() || '')
+          formData.append('processType', 'MAINTENANCE_COMPLETED')
+
+          const uploadRes = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
+
+          if (!uploadRes.ok) {
+            const uploadErr = await uploadRes.json()
+            throw new Error(`ไม่สามารถอัปโหลดรูปภาพปิดเคสสำหรับใบงาน #${ticket.MaintenanceItemID} ได้: ${uploadErr.error || ''}`)
+          }
+        }
       })
 
-      const responses = await Promise.all(promises)
-      const failed = responses.filter(r => !r.ok)
-
-      if (failed.length > 0) {
-        throw new Error(`อัปเดตไม่สำเร็จจำนวน ${failed.length} รายการ`)
-      }
+      await Promise.all(promises)
 
       alert('บันทึกอัปเดตข้อมูลเรียบร้อยแล้ว')
       setBulkActionType(null)
       setBulkLocation('')
       setSelectedBulkTicketIds([])
+      setCloseReturnDate('')
+      setCloseRootCause('')
+      setCloseFixAction('')
+      setCloseRemark('')
+      setCloseAttachments([])
       
       // Refresh current vehicle data
       if (selectedCar) {
@@ -2003,6 +2088,38 @@ export default function QuickReportPage() {
                       >
                         ซ่อมเสร็จ
                       </button>
+                      {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextType = bulkActionType === 'close_case' ? null : 'close_case'
+                            setBulkActionType(nextType)
+                            setBulkLocation('')
+                            const closeableIds = pendingTickets
+                              .filter(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                              .map(t => t.MaintenanceItemID)
+                            setSelectedBulkTicketIds(nextType ? closeableIds : [])
+                            const now = new Date()
+                            setCloseFormSubmitted(false)
+                            setCloseFinishDate(now.toISOString().slice(0, 10))
+                            setCloseReturnDate('')
+                            setCloseRootCause('')
+                            setCloseFixAction('')
+                            setCloseRemark('')
+                            setCloseAttachments([])
+                            setCloseCurrentLocation('')
+                            setCloseReplacementReturnDate('')
+                            setCloseReplacementLocation('')
+                          }}
+                          className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
+                            bulkActionType === 'close_case'
+                              ? 'bg-purple-100 border-purple-300 text-purple-800'
+                              : 'bg-purple-50 hover:bg-purple-100 border-purple-250 text-purple-700'
+                          }`}
+                        >
+                          ปิดเคส
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2161,6 +2278,268 @@ export default function QuickReportPage() {
                       </div>
                     </div>
                   )}
+                  {bulkActionType === 'close_case' && (() => {
+                    const activeReplacement = pendingTickets
+                      .filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID))
+                      .flatMap(t => t.replacements || [])
+                      .find(r => r.IsActive && !r.ReplacementReturnDate)
+
+                    return (
+                      <div className="bg-purple-50/50 border border-purple-200 rounded-2xl p-4 space-y-3.5 mb-3 animate-fade-in text-slate-700">
+                        <div className="flex items-center justify-between border-b border-purple-150 pb-1.5">
+                          <span className="text-xs font-bold text-purple-800">🔮 ระบุรายละเอียด: ปิดเคส</span>
+                          <button
+                            type="button"
+                            onClick={() => setBulkActionType(null)}
+                            className="text-[10px] font-bold text-slate-400 hover:text-slate-600"
+                          >
+                            ปิด x
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                              <span className="text-rose-500">*</span> วันที่รถซ่อมเสร็จ
+                            </label>
+                            <input
+                              type="date"
+                              value={closeFinishDate}
+                              required
+                              onChange={(e) => setCloseFinishDate(e.target.value)}
+                              className={`w-full bg-white border rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold ${
+                                closeFormSubmitted && !closeFinishDate
+                                  ? 'border-rose-500 bg-rose-50/10 focus:border-rose-500'
+                                  : 'border-slate-200 focus:border-purple-500'
+                              }`}
+                            />
+                            {closeFormSubmitted && !closeFinishDate && (
+                              <span className="text-[9px] text-rose-500 font-bold mt-0.5 block">กรุณาระบุวันที่รถซ่อมเสร็จ</span>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                              <span className="text-rose-500">*</span> วันที่รับรถกลับ
+                            </label>
+                            <input
+                              type="date"
+                              value={closeReturnDate}
+                              required
+                              onChange={(e) => setCloseReturnDate(e.target.value)}
+                              className={`w-full bg-white border rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold ${
+                                closeFormSubmitted && !closeReturnDate
+                                  ? 'border-rose-500 bg-rose-50/10 focus:border-rose-500'
+                                  : 'border-slate-200 focus:border-purple-500'
+                              }`}
+                            />
+                            {closeFormSubmitted && !closeReturnDate && (
+                              <span className="text-[9px] text-rose-500 font-bold mt-0.5 block">กรุณาระบุวันที่รับรถกลับ</span>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                              <span className="text-rose-500">*</span> สถานะใบแจ้งซ่อม
+                            </label>
+                            <select
+                              disabled
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold"
+                            >
+                              <option value="COMPLETE">ปิดเคส</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                              <span className="text-rose-500">*</span> สถานที่ปัจจุบัน
+                            </label>
+                            <select
+                              value={closeCurrentLocation}
+                              onChange={(e) => setCloseCurrentLocation(e.target.value)}
+                              className={`w-full bg-white border rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold ${
+                                closeFormSubmitted && !closeCurrentLocation
+                                  ? 'border-rose-500 bg-rose-50/10 focus:border-rose-500'
+                                  : 'border-slate-200 focus:border-purple-500'
+                              }`}
+                            >
+                              <option value="">-- เลือกสถานที่ปัจจุบัน --</option>
+                              {locationOptions.map((opt) => (
+                                <option key={opt.code} value={opt.code}>
+                                  {opt.name}
+                                </option>
+                              ))}
+                            </select>
+                            {closeFormSubmitted && !closeCurrentLocation && (
+                              <span className="text-[9px] text-rose-500 font-bold mt-0.5 block">กรุณาเลือกสถานที่ปัจจุบัน</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {activeReplacement && (
+                          <div className="bg-slate-100/80 border border-slate-200 rounded-2xl p-4 space-y-3 mt-2 animate-fade-in">
+                            <h4 className="text-xs font-bold text-slate-700 border-b border-slate-200 pb-1 text-center">
+                              รายละเอียดรถทดแทน
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-slate-700">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">รถทดแทน</label>
+                                <input
+                                  type="text"
+                                  disabled
+                                  value={activeReplacement.VinNo || ''}
+                                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-400 font-bold focus:outline-none cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">วันที่ขอรถทดแทน</label>
+                                <input
+                                  type="text"
+                                  disabled
+                                  value={activeReplacement.ReplacementStartDate ? activeReplacement.ReplacementStartDate.slice(0, 10) : ''}
+                                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-400 font-bold focus:outline-none cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                                  <span className="text-rose-500">*</span> วันที่คืนรถทดแทน
+                                </label>
+                                <input
+                                  type="date"
+                                  value={closeReplacementReturnDate}
+                                  onChange={(e) => setCloseReplacementReturnDate(e.target.value)}
+                                  className={`w-full bg-white border rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold ${
+                                    closeFormSubmitted && !closeReplacementReturnDate
+                                      ? 'border-rose-500 bg-rose-50/10 focus:border-rose-500'
+                                      : 'border-slate-200 focus:border-purple-500'
+                                  }`}
+                                />
+                                {closeFormSubmitted && !closeReplacementReturnDate && (
+                                  <span className="text-[9px] text-rose-500 font-bold mt-0.5 block">กรุณาระบุวันที่คืนรถทดแทน</span>
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-500 block mb-1">
+                                  <span className="text-rose-500">*</span> จุดคืนรถทดแทน
+                                </label>
+                                <select
+                                  value={closeReplacementLocation}
+                                  onChange={(e) => setCloseReplacementLocation(e.target.value)}
+                                  className={`w-full bg-white border rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none font-bold ${
+                                    closeFormSubmitted && !closeReplacementLocation
+                                      ? 'border-rose-500 bg-rose-50/10 focus:border-rose-500'
+                                      : 'border-slate-200 focus:border-purple-500'
+                                  }`}
+                                >
+                                  <option value="">-- เลือกจุดคืนรถทดแทน --</option>
+                                  {locationOptions.map((opt) => (
+                                    <option key={opt.code} value={opt.code}>
+                                      {opt.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                {closeFormSubmitted && !closeReplacementLocation && (
+                                  <span className="text-[9px] text-rose-500 font-bold mt-0.5 block">กรุณาเลือกจุดคืนรถทดแทน</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">สรุปสาเหตุที่พบ (ภาพรวม)</label>
+                          <textarea
+                            rows={3}
+                            value={closeRootCause}
+                            onChange={(e) => setCloseRootCause(e.target.value)}
+                            placeholder="สรุปสาเหตุภาพรวมจากทุกรายการแจ้งซ่อม"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-purple-500 resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">สรุปการแก้ไข (ภาพรวม)</label>
+                          <textarea
+                            rows={3}
+                            value={closeFixAction}
+                            onChange={(e) => setCloseFixAction(e.target.value)}
+                            placeholder="สรุปการแก้ไข (ภาพรวม)"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-purple-500 resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">แนบรูปภาพ/ไฟล์</label>
+                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-slate-50 transition relative">
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              onChange={(e) => {
+                                if (e.target.files) {
+                                  setCloseAttachments(Array.from(e.target.files))
+                                }
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <span className="text-2xl text-blue-500">☁️</span>
+                              <p className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์มาวางเพื่ออัปโหลด</p>
+                              <p className="text-[9px] text-slate-400">รองรับการอัปโหลดหลายไฟล์ ทั้งรูปภาพและไฟล์เอกสาร</p>
+                            </div>
+                          </div>
+                          {closeAttachments.length > 0 && (
+                            <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
+                              <span>📸 เลือกรูปภาพแล้ว {closeAttachments.length} รูป:</span>
+                              <div className="grid grid-cols-3 gap-2">
+                                {closeAttachments.map((f, i) => (
+                                  <ImagePreview
+                                    key={i}
+                                    file={f}
+                                    onRemove={() => {
+                                      setCloseAttachments(prev => prev.filter((_, idx) => idx !== i))
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Remark</label>
+                          <textarea
+                            rows={2}
+                            value={closeRemark}
+                            onChange={(e) => setCloseRemark(e.target.value)}
+                            placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)"
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-purple-500 resize-none"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setBulkActionType(null)}
+                            className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-655 font-semibold px-4 py-2.5 rounded-xl text-xs transition active:scale-95 flex items-center gap-1.5"
+                          >
+                            ✕ ยกเลิก
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submittingBulk}
+                            onClick={() => handleSaveBulkAction('close_case')}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition active:scale-98 flex items-center gap-1.5"
+                          >
+                            {submittingBulk ? '⏳ กำลังบันทึก...' : '💾 บันทึกและปิดงาน'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
                   <div className="space-y-2">
                     {/* Select All / Deselect All when bulk action is active */}
                     {bulkActionType && bulkActionType !== 'park' && pendingTickets.length > 1 && (
@@ -2172,7 +2551,12 @@ export default function QuickReportPage() {
                           type="button"
                           onClick={() => {
                             const selectableIds = pendingTickets
-                              .filter(t => !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                              .filter(t => {
+                                const isUnsel = bulkActionType === 'close_case'
+                                  ? !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || '')
+                                  : ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || '')
+                                return !isUnsel
+                              })
                               .map(t => t.MaintenanceItemID)
                             
                             const allSelectableSelected = selectableIds.length > 0 && selectableIds.every(id => selectedBulkTicketIds.includes(id))
@@ -2196,7 +2580,9 @@ export default function QuickReportPage() {
                     )}
                     {pendingTickets.map((ticket) => {
                       const isSelected = selectedBulkTicketIds.includes(ticket.MaintenanceItemID)
-                      const isUnselectable = ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(ticket.CarStatusCode || '')
+                      const isUnselectable = bulkActionType === 'close_case'
+                        ? !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(ticket.CarStatusCode || '')
+                        : ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(ticket.CarStatusCode || '')
                       return (
                       <div
                         key={ticket.MaintenanceItemID}
