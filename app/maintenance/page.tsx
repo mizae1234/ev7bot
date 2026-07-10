@@ -48,6 +48,7 @@ interface MaintenanceData {
   summary: { total: number; in_maintenance: number; complete: number; waiting: number }
   locations: string[]
   locationSummary: { Location: string; Count: number }[]
+  problemTypes: { code: string; name: string }[]
   fetchedAt: string
 }
 
@@ -96,6 +97,7 @@ function MaintenanceContent() {
   const searchParams = useSearchParams()
   const [statusFilter, setStatusFilter] = useState('all')
   const [locationFilter, setLocationFilter] = useState('all')
+  const [problemTypeFilter, setProblemTypeFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -117,6 +119,7 @@ function MaintenanceContent() {
   )
 
   const filteredItems = (data?.items || []).filter(item => {
+    if (problemTypeFilter !== 'all' && item.problem_type !== problemTypeFilter) return false
     if (!search) return true
     const s = search.toLowerCase()
     return (
@@ -148,9 +151,10 @@ function MaintenanceContent() {
   const handleExport = () => {
     const statusLabel = statusFilter === 'all' ? 'ทั้งหมด' : statusFilter
     const locLabel = locationFilter === 'all' ? 'ทุกอู่' : formatLocation(locationFilter)
+    const typeLabel = problemTypeFilter === 'all' ? 'ทุกประเภท' : problemTypeFilter
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
-      periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel}`,
+      periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel} | ประเภท: ${typeLabel}`,
       headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
@@ -287,6 +291,16 @@ function MaintenanceContent() {
               <option value="ไม่ระบุ">📍 ไม่ระบุพื้นที่/อู่</option>
             </select>
           )}
+          <select
+            value={problemTypeFilter}
+            onChange={(e) => setProblemTypeFilter(e.target.value)}
+            className="px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white/50 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-200"
+          >
+            <option value="all">🏷️ ประเภททั้งหมด</option>
+            {(data?.problemTypes || []).map(pt => (
+              <option key={pt.code} value={pt.name}>{pt.name}</option>
+            ))}
+          </select>
           <ExportButton onClick={handleExport} />
         </div>
 
@@ -307,7 +321,7 @@ function MaintenanceContent() {
           <div className="rounded-2xl border border-zinc-200/80 bg-white/70 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-hidden">
             <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">
-                แสดง {filteredItems.length} รายการ {statusFilter !== 'all' ? `(สถานะ: ${statusFilter})` : ''} {locationFilter !== 'all' ? `(อู่: ${formatLocation(locationFilter)})` : ''}
+                แสดง {filteredItems.length} รายการ {statusFilter !== 'all' ? `(สถานะ: ${statusFilter})` : ''} {locationFilter !== 'all' ? `(อู่: ${formatLocation(locationFilter)})` : ''} {problemTypeFilter !== 'all' ? `(ประเภท: ${problemTypeFilter})` : ''}
               </p>
             </div>
 

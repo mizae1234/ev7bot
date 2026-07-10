@@ -119,6 +119,9 @@ export async function GET(req: NextRequest) {
       repairByLocReq.input('statusFilter', sql.NVarChar, statusFilter)
     }
 
+    // Problem types from master table
+    const problemTypeReq = pool.request()
+
     // Maintenance items (active only, optionally filtered)
     const itemReq = pool.request()
     if (statusFilter && statusFilter !== 'all') {
@@ -133,7 +136,8 @@ export async function GET(req: NextRequest) {
       summaryResult,
       locResult,
       repairByLocResult,
-      itemResult
+      itemResult,
+      problemTypeResult
     ] = await Promise.all([
       summaryReq.query(`
         WITH LatestTickets AS (
@@ -227,8 +231,16 @@ export async function GET(req: NextRequest) {
         ORDER BY 
           CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
           m.ReportDate DESC
+      `),
+      problemTypeReq.query(`
+        SELECT StatusCode, StatusName, DescriptionStatus
+        FROM dbo.EV_MsSubStatus
+        WHERE Type = 'PROBLEM_TYPE' AND IsActive = 1
+        ORDER BY StatusCode
       `)
     ])
+
+
 
     // Get replacement cars for items
     const maintIds = itemResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)
@@ -297,6 +309,10 @@ export async function GET(req: NextRequest) {
       summary: summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 },
       locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
       locationSummary: repairByLocResult.recordset || [],
+      problemTypes: problemTypeResult.recordset.map((r: any) => ({
+        code: r.StatusCode,
+        name: r.StatusName || r.DescriptionStatus || r.StatusCode,
+      })),
       fetchedAt: new Date().toISOString(),
     })
   } catch (error) {

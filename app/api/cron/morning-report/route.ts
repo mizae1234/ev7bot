@@ -231,6 +231,15 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     timeZone: 'Asia/Bangkok',
   })
 
+  const reportDateShort = (() => {
+    try {
+      const d = new Date(dateStr)
+      const day = d.getUTCDate()
+      const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+      return `${day} ${months[d.getUTCMonth()]}`
+    } catch { return dateStr }
+  })()
+
   const newDeliverySummary = delivery?.newVehicles?.summary || { total: 0, completed: 0, pending: 0 }
   const usedDeliverySummary = delivery?.usedVehicles?.summary || { total: 0, completed: 0, pending: 0 }
 
@@ -391,8 +400,8 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
               { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan?.newCompleted ?? 0), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, (monthlyPlan?.newPlanTotal ?? 0) - (monthlyPlan?.newCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
@@ -412,8 +421,8 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
               { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan?.usedCompleted ?? 0), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, (monthlyPlan?.usedPlanTotal ?? 0) - (monthlyPlan?.usedCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },

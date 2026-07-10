@@ -742,9 +742,21 @@ Sub-status สำหรับ GI (Good Inspect)
 เก็บประวัติการรับรถกลับเข้าระบบ
 * **คอลัมน์สำคัญ**: `ReturnItemID` (PK), `VinNo`, `CustomerName`, `Model`, `ContractNo`, `ReceiveDate`, `ReturnDate`, `Mileage` (เลขไมล์ตอนรับคืน), `ParkLocation` (สถานที่จอดเก็บรถ), `CreateUserID` (ID ผู้บันทึกข้อมูล)
 
-### 11.6 ตาราง: `dbo.EV_DeliveryPlan` (แผนการส่งมอบรถยนต์)
-เก็บข้อมูลแผนการส่งมอบรถประจำวัน แยกตามประเภทโครงการและรุ่นรถยนต์
+### 11.6 ตาราง: `dbo.EV_DeliveryPlan` (เป้าการส่งมอบรถยนต์ประจำเดือน)
+เก็บข้อมูลเป้าการส่งมอบรถ (เป้าประจำเดือน) แยกตามประเภทโครงการและรุ่นรถยนต์
 * **คอลัมน์สำคัญ**: `PlanID` (PK, bigint), `PlanDate` (date, วันที่ในแผนการส่งมอบ), `ProjectType` (varchar(20), ประเภทโครงการ เช่น EV7, Grab, Line Man), `ES_Count` (int, จำนวนแผนส่งมอบของรุ่น MG ES), `Y490_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 490), `Y410_Count` (int, จำนวนแผนส่งมอบของรุ่น GAC AION Y Plus 410)
+* **สำคัญ: การดึงข้อมูลต้องเป็นรายเดือนเสมอ** โดยใช้ `WHERE YEAR(PlanDate) = @targetYear AND MONTH(PlanDate) = @targetMonth` แล้ว SUM ยอดรวม (ห้ามดึงรายวัน `WHERE PlanDate = @date`)
+* **คำที่ใช้เรียก**: ยอดจาก EV_DeliveryPlan เรียกว่า **"เป้าประจำเดือน"** (ห้ามเรียกว่า "แผนทั้งหมด" หรือ "แผนรายวัน")
+* **Query ตัวอย่าง** (ดึงเป้ารายเดือนรวมทุกโครงการ):
+```sql
+SELECT ProjectType,
+  SUM(ISNULL(ES_Count, 0)) AS ES_Count,
+  SUM(ISNULL(Y490_Count, 0)) AS Y490_Count,
+  SUM(ISNULL(Y410_Count, 0)) AS Y410_Count
+FROM dbo.EV_DeliveryPlan
+WHERE YEAR(PlanDate) = @targetYear AND MONTH(PlanDate) = @targetMonth
+GROUP BY ProjectType
+```
 
 ### 11.7 ตาราง: `dbo.EV_MsStatus` (มาสเตอร์สถานะรถยนต์)
 เก็บข้อมูลคำแปลและรายละเอียดของสถานะหลักรถยนต์

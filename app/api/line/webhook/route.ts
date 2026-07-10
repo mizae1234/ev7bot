@@ -1688,8 +1688,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan.newCompleted), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDate})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, monthlyPlan.newPlanTotal - monthlyPlan.newCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
@@ -1707,8 +1707,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan.usedCompleted), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDate})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, monthlyPlan.usedPlanTotal - monthlyPlan.usedCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },

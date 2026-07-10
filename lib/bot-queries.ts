@@ -619,31 +619,28 @@ export async function getMonthlyPlanAndCompleted(params: { date: string }) {
   const pool = await getMSSQLPool()
   if (!pool) return { newPlanTotal: 0, usedPlanTotal: 0, newCompleted: 0, usedCompleted: 0 }
 
-  // Derive month range from the given date
   const d = new Date(params.date)
-  const y = d.getUTCFullYear()
-  const m = d.getUTCMonth() // 0-indexed
-  const monthStart = new Date(y, m, 1)
-  const monthEnd = new Date(y, m + 1, 0, 23, 59, 59, 999)
+  const targetYear = d.getUTCFullYear()
+  const targetMonth = d.getUTCMonth() + 1 // 1-indexed
 
   try {
     const [planRes, completedRes] = await Promise.all([
       pool.request()
-        .input('startDate', sql.DateTime, monthStart)
-        .input('endDate', sql.DateTime, monthEnd)
+        .input('targetYear', sql.Int, targetYear)
+        .input('targetMonth', sql.Int, targetMonth)
         .query(`
           SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
           FROM dbo.EV_DeliveryPlan
-          WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+          WHERE YEAR(PlanDate) = @targetYear AND MONTH(PlanDate) = @targetMonth
         `),
       pool.request()
-        .input('startDate', sql.DateTime, monthStart)
-        .input('endDate', sql.DateTime, monthEnd)
+        .input('targetYear', sql.Int, targetYear)
+        .input('targetMonth', sql.Int, targetMonth)
         .query(`
           SELECT RentType, COUNT(*) as cnt
           FROM dbo.View_AccumarateReleaseCar
           WHERE IsActive = 1
-            AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+            AND YEAR(ReleaseDate) = @targetYear AND MONTH(ReleaseDate) = @targetMonth
             AND ReleaseDate IS NOT NULL
           GROUP BY RentType
         `)
@@ -669,24 +666,31 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
-  const { start, end } = getDateRange(params.date)
+  const d = new Date(params.date)
+  const targetYear = d.getUTCFullYear()
+  const targetMonth = d.getUTCMonth() + 1 // 1-indexed
 
   try {
-    // 1. Fetch Plan
+    // 1. Fetch Plan (monthly sum by ProjectType)
     const planReq = pool.request()
-    planReq.input('targetDate', sql.Date, params.date)
+    planReq.input('targetYear', sql.Int, targetYear)
+    planReq.input('targetMonth', sql.Int, targetMonth)
 
-    // 2. Fetch Actuals
+    // 2. Fetch Actuals (monthly sum)
     const actualReq = pool.request()
-    actualReq.input('startDate', sql.DateTime, start)
-    actualReq.input('endDate', sql.DateTime, end)
+    actualReq.input('targetYear', sql.Int, targetYear)
+    actualReq.input('targetMonth', sql.Int, targetMonth)
 
-    // Run plan query and actual query concurrently for high performance
     const [planResult, actualResult] = await Promise.all([
       planReq.query(`
-        SELECT ProjectType, ES_Count, Y490_Count, Y410_Count
+        SELECT 
+          ProjectType, 
+          SUM(ISNULL(ES_Count, 0)) AS ES_Count, 
+          SUM(ISNULL(Y490_Count, 0)) AS Y490_Count, 
+          SUM(ISNULL(Y410_Count, 0)) AS Y410_Count
         FROM dbo.EV_DeliveryPlan
-        WHERE PlanDate = @targetDate
+        WHERE YEAR(PlanDate) = @targetYear AND MONTH(PlanDate) = @targetMonth
+        GROUP BY ProjectType
       `),
       actualReq.query(`
         SELECT 
@@ -697,7 +701,7 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
         FROM dbo.View_AccumarateReleaseCar r
         LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
         WHERE r.IsActive = 1
-          AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+          AND YEAR(r.ReleaseDate) = @targetYear AND MONTH(r.ReleaseDate) = @targetMonth
           AND r.ReleaseDate IS NOT NULL
         GROUP BY 
           i.ProjectType, 
