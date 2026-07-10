@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/lib/env'
-import { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual } from '@/lib/bot-queries'
+import { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual, getMonthlyPlanAndCompleted } from '@/lib/bot-queries'
 import { prisma } from '@/lib/prisma'
 import * as line from '@line/bot-sdk'
 
@@ -222,7 +222,7 @@ function buildBreakdownBox(headerText: string, breakdown: any[]): any {
   }
 }
 
-function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any, deliveryPlanData?: any): any {
+function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repairDaily: any, deliveryPlanData?: any, monthlyPlan?: any): any {
   const todayFormatted = new Date().toLocaleDateString('th-TH', {
     weekday: 'long',
     year: 'numeric',
@@ -387,16 +387,16 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.newPlanTotal ?? 0), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.newCompleted ?? 0), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(Math.max(0, (monthlyPlan?.newPlanTotal ?? 0) - (monthlyPlan?.newCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
@@ -408,16 +408,16 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.usedPlanTotal ?? 0), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.usedCompleted ?? 0), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(Math.max(0, (monthlyPlan?.usedPlanTotal ?? 0) - (monthlyPlan?.usedCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
@@ -498,11 +498,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch all data in parallel
-    const [portfolio, delivery, repair, deliveryPlanData] = await Promise.all([
+    const [portfolio, delivery, repair, deliveryPlanData, monthlyPlan] = await Promise.all([
       getPortfolioSummary(),
       getDeliveryByDate({ date: yesterdayStr }),
       getRepairDailySummary(yesterdayStr),
       getDeliveryPlanAndActual({ date: yesterdayStr }),
+      getMonthlyPlanAndCompleted({ date: yesterdayStr }),
     ])
 
     if ('error' in portfolio) {
@@ -513,7 +514,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Build Flex Message (carousel: portfolio + daily activity)
-    const flexMessage = buildFlexMessage(yesterdayStr, portfolio, delivery, repair, deliveryPlanData)
+    const flexMessage = buildFlexMessage(yesterdayStr, portfolio, delivery, repair, deliveryPlanData, monthlyPlan)
 
     // Send to groups
     const results: { groupId: string; groupName: string | null; success: boolean; error?: string }[] = []

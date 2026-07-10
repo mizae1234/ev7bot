@@ -614,6 +614,56 @@ export async function getPortfolioSummary() {
   }
 }
 
+// ─── Function: getMonthlyPlanAndCompleted ─────────────────────────
+export async function getMonthlyPlanAndCompleted(params: { date: string }) {
+  const pool = await getMSSQLPool()
+  if (!pool) return { newPlanTotal: 0, usedPlanTotal: 0, newCompleted: 0, usedCompleted: 0 }
+
+  // Derive month range from the given date
+  const d = new Date(params.date)
+  const y = d.getUTCFullYear()
+  const m = d.getUTCMonth() // 0-indexed
+  const monthStart = new Date(y, m, 1)
+  const monthEnd = new Date(y, m + 1, 0, 23, 59, 59, 999)
+
+  try {
+    const [planRes, completedRes] = await Promise.all([
+      pool.request()
+        .input('startDate', sql.DateTime, monthStart)
+        .input('endDate', sql.DateTime, monthEnd)
+        .query(`
+          SELECT SUM(ISNULL(ES_Count, 0) + ISNULL(Y490_Count, 0) + ISNULL(Y410_Count, 0)) AS planTotal
+          FROM dbo.EV_DeliveryPlan
+          WHERE PlanDate >= @startDate AND PlanDate <= @endDate
+        `),
+      pool.request()
+        .input('startDate', sql.DateTime, monthStart)
+        .input('endDate', sql.DateTime, monthEnd)
+        .query(`
+          SELECT RentType, COUNT(*) as cnt
+          FROM dbo.View_AccumarateReleaseCar
+          WHERE IsActive = 1
+            AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
+            AND ReleaseDate IS NOT NULL
+          GROUP BY RentType
+        `)
+    ])
+
+    const newPlanTotal = planRes.recordset[0]?.planTotal || 0
+    let newCompleted = 0
+    let usedCompleted = 0
+    for (const r of completedRes.recordset) {
+      if (r.RentType === 'ONRENT_NEW') newCompleted = r.cnt
+      else if (r.RentType === 'ONRENT_USE') usedCompleted = r.cnt
+    }
+
+    return { newPlanTotal, usedPlanTotal: 0, newCompleted, usedCompleted }
+  } catch (err) {
+    console.error('[getMonthlyPlanAndCompleted] Error:', err)
+    return { newPlanTotal: 0, usedPlanTotal: 0, newCompleted: 0, usedCompleted: 0 }
+  }
+}
+
 // ─── Function: getDeliveryPlanAndActual ───────────────────────────
 export async function getDeliveryPlanAndActual(params: { date: string }) {
   const pool = await getMSSQLPool()

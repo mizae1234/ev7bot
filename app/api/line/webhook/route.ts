@@ -1352,12 +1352,13 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         reportDate = bangkokFormatter.format(new Date())
       }
 
-      const { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual } = await import('@/lib/bot-queries')
-      const [portfolio, delivery, repairDaily, deliveryPlanData] = await Promise.all([
+      const { getPortfolioSummary, getDeliveryByDate, getRepairDailySummary, getDeliveryPlanAndActual, getMonthlyPlanAndCompleted } = await import('@/lib/bot-queries')
+      const [portfolio, delivery, repairDaily, deliveryPlanData, monthlyPlan] = await Promise.all([
         getPortfolioSummary(),
         getDeliveryByDate({ date: reportDate }),
         getRepairDailySummary(reportDate),
         getDeliveryPlanAndActual({ date: reportDate }),
+        getMonthlyPlanAndCompleted({ date: reportDate }),
       ])
 
       if ('error' in portfolio) {
@@ -1683,16 +1684,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'text', text: '🚛 ส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.newPlanTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.newCompleted), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(newDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(Math.max(0, monthlyPlan.newPlanTotal - monthlyPlan.newCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
           ...(newComparisonBox ? [newComparisonBox] : []),
@@ -1702,16 +1703,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'text', text: '🚗 ปล่อยรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.total), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.usedPlanTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.usedCompleted), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: 'สำเร็จ', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(usedDeliverySummary.pending), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(Math.max(0, monthlyPlan.usedPlanTotal - monthlyPlan.usedCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
           ...(usedComparisonBox ? [usedComparisonBox] : []),
@@ -1918,7 +1919,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(newVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                      { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   },
@@ -1945,7 +1946,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(newVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                      { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   }
@@ -1971,7 +1972,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(usedVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                      { type: 'text', text: 'แผนทั้งหมด', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   },
@@ -1998,7 +1999,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     layout: 'vertical',
                     contents: [
                       { type: 'text', text: String(usedVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                      { type: 'text', text: 'ตามเป้า', size: 'xxs', color: '#888888', align: 'center' }
+                      { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
                     ],
                     flex: 1
                   }
