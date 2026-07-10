@@ -413,15 +413,18 @@ export async function POST(req: NextRequest) {
         const finishReq = pool.request()
         finishReq.input('maintId', sql.Int, maintenanceId)
         finishReq.input('statusCode', sql.NVarChar, resolvedCarStatusCode)
-        finishReq.input('finishDate', sql.NVarChar, toMssqlDate(finishDate) || new Date().toISOString().replace('T', ' ').slice(0, 19))
         finishReq.input('userId', sql.Int, dbUserId)
 
         let updateFields = [
           'CarStatusCode = @statusCode',
-          'MaintenanceFinishDate = @finishDate',
           'UpdateUserID = @userId',
           'UpdateDate = GETDATE()'
         ]
+
+        if (finishDate) {
+          finishReq.input('finishDate', sql.NVarChar, toMssqlDate(finishDate))
+          updateFields.push('MaintenanceFinishDate = @finishDate')
+        }
 
         if (returnDate !== undefined) {
           finishReq.input('returnDate', sql.NVarChar, toMssqlDate(returnDate))

@@ -578,7 +578,6 @@ export default function QuickReportPage() {
           payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
         } else if (type === 'close_case') {
           payload.carStatusCode = 'COMPLETE'
-          payload.finishDate = closeFinishDate
           payload.returnDate = closeReturnDate
           payload.rootCause = closeRootCause
           payload.fixAction = closeFixAction
