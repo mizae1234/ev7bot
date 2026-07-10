@@ -2028,6 +2028,7 @@ export default function QuickReportPage() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
+                        disabled={pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))}
                         onClick={() => {
                           const nextType = bulkActionType === 'park' ? null : 'park'
                           setBulkActionType(nextType)
@@ -2045,15 +2046,18 @@ export default function QuickReportPage() {
                           setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
-                          bulkActionType === 'park'
-                            ? 'bg-amber-100 border-amber-300 text-amber-800'
-                            : 'bg-amber-50 hover:bg-amber-100 border-amber-250 text-amber-700'
+                          pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                            ? 'opacity-40 cursor-not-allowed bg-amber-50 border-slate-200 text-slate-400'
+                            : (bulkActionType === 'park'
+                                ? 'bg-amber-100 border-amber-300 text-amber-800'
+                                : 'bg-amber-50 hover:bg-amber-100 border-amber-250 text-amber-700')
                         }`}
                       >
                         เข้าซ่อม
                       </button>
                       <button
                         type="button"
+                        disabled={pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))}
                         onClick={() => {
                           const nextType = bulkActionType === 'start' ? null : 'start'
                           setBulkActionType(nextType)
@@ -2073,15 +2077,18 @@ export default function QuickReportPage() {
                           setBulkStartDate(now.toISOString().slice(0, 16))
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
-                          bulkActionType === 'start'
-                            ? 'bg-rose-100 border-rose-300 text-rose-800'
-                            : 'bg-rose-50 hover:bg-rose-100 border-rose-250 text-rose-700'
+                          pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                            ? 'opacity-40 cursor-not-allowed bg-rose-50 border-slate-200 text-slate-400'
+                            : (bulkActionType === 'start'
+                                ? 'bg-rose-100 border-rose-300 text-rose-800'
+                                : 'bg-rose-50 hover:bg-rose-100 border-rose-250 text-rose-700')
                         }`}
                       >
                         เริ่มซ่อม
                       </button>
                       <button
                         type="button"
+                        disabled={pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))}
                         onClick={() => {
                           const nextType = bulkActionType === 'complete' ? null : 'complete'
                           setBulkActionType(nextType)
@@ -2091,9 +2098,11 @@ export default function QuickReportPage() {
                           setBulkFinishDate(now.toISOString().slice(0, 16))
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
-                          bulkActionType === 'complete'
-                            ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
-                            : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-250 text-emerald-700'
+                          pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                            ? 'opacity-40 cursor-not-allowed bg-emerald-50 border-slate-200 text-slate-400'
+                            : (bulkActionType === 'complete'
+                                ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                                : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-250 text-emerald-700')
                         }`}
                       >
                         ซ่อมเสร็จ
