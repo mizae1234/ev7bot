@@ -461,8 +461,8 @@ async function _askButterOnce(
           const args: any = { ...fc.args }
           if (fc.name === 'createTaskNote' || fc.name === 'completeTaskNote') {
             const role = userContext?.userRole
-            if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
-              throw new Error('คุณไม่มีสิทธิ์จัดการภารกิจค่ะ (ต้องการสิทธิ์ Admin หรือ Super Admin) 💛')
+            if (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'USER') {
+              throw new Error('คุณไม่มีสิทธิ์จัดการภารกิจค่ะ 💛')
             }
           }
 
