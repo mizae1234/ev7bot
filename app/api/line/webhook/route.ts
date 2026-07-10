@@ -1517,7 +1517,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         }
       }
 
-      const buildBreakdownBox = (headerText: string, breakdown: any[]): any => {
+      const buildBreakdownBox = (headerText: string, breakdown: any[], dailyOnly = false): any => {
         if (!breakdown || breakdown.length === 0) return null
 
         const rows: any[] = []
@@ -1544,7 +1544,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               },
               {
                 type: 'text',
-                text: `${item.completed}/${item.total}`,
+                text: dailyOnly ? `${item.completed}` : `${item.completed}/${item.total}`,
                 size: 'xs',
                 weight: 'bold',
                 color: valColor,
@@ -1560,6 +1560,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           layout: 'vertical',
           spacing: 'xs',
           margin: 'md',
+          paddingStart: 'md',
           contents: [
             {
               type: 'text',
@@ -1582,7 +1583,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         const newDailyActuals = dailyActuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
 
         newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newDailyActuals, true)
-        usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', (delivery as any)?.usedVehicles?.breakdown)
+        usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', (delivery as any)?.usedVehicles?.breakdown, true)
       }
 
       // Short date format: d/M

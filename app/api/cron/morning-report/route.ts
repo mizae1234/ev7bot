@@ -166,7 +166,7 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
   }
 }
 
-function buildBreakdownBox(headerText: string, breakdown: any[]): any {
+function buildBreakdownBox(headerText: string, breakdown: any[], dailyOnly = false): any {
   if (!breakdown || breakdown.length === 0) return null
 
   const rows: any[] = []
@@ -193,7 +193,7 @@ function buildBreakdownBox(headerText: string, breakdown: any[]): any {
         },
         {
           type: 'text',
-          text: `${item.completed}/${item.total}`,
+          text: dailyOnly ? `${item.completed}` : `${item.completed}/${item.total}`,
           size: 'xs',
           weight: 'bold',
           color: valColor,
@@ -209,6 +209,7 @@ function buildBreakdownBox(headerText: string, breakdown: any[]): any {
     layout: 'vertical',
     spacing: 'xs',
     margin: 'md',
+    paddingStart: 'md',
     contents: [
       {
         type: 'text',
@@ -260,7 +261,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     const newDailyActuals = dailyActuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
 
     newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newDailyActuals, true)
-    usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', delivery?.usedVehicles?.breakdown)
+    usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', delivery?.usedVehicles?.breakdown, true)
   }
 
   // Bubble 1: Portfolio
