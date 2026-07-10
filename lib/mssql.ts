@@ -59,46 +59,64 @@ let pool: sql.ConnectionPool | null = null
 let writePool: sql.ConnectionPool | null = null
 let readOnlyPool: sql.ConnectionPool | null = null
 
+let poolPromise: Promise<sql.ConnectionPool | null> | null = null
+let writePoolPromise: Promise<sql.ConnectionPool | null> | null = null
+let readOnlyPoolPromise: Promise<sql.ConnectionPool | null> | null = null
+
 // getMSSQLPool now uses new sql.ConnectionPool with writeConfig by default for dashboard-wide safety
 export async function getMSSQLPool(): Promise<sql.ConnectionPool | null> {
   if (env.MOCK_MODE) {
-    console.log('[MSSQL] Running in Mock Mode - connection pool skipped.')
     return null
   }
   if (pool && pool.connected) return pool
   
-  pool = new sql.ConnectionPool(writeConfig)
-  await pool.connect()
-  return pool
+  if (!poolPromise) {
+    poolPromise = (async () => {
+      const p = new sql.ConnectionPool(writeConfig)
+      await p.connect()
+      pool = p
+      return p
+    })()
+  }
+  return poolPromise
 }
 
 // getMSSQLWritePool now uses new sql.ConnectionPool to ensure app_butter credentials are used
 export async function getMSSQLWritePool(): Promise<sql.ConnectionPool | null> {
   if (env.MOCK_MODE) {
-    console.log('[MSSQL] Running in Mock Mode - write connection pool skipped.')
     return null
   }
   if (writePool && writePool.connected) return writePool
 
-  console.log('[MSSQL Write Pool] Initializing write pool with user:', writeConfig.user)
-  writePool = new sql.ConnectionPool(writeConfig)
-  await writePool.connect()
-  
-  return writePool
+  if (!writePoolPromise) {
+    writePoolPromise = (async () => {
+      console.log('[MSSQL Write Pool] Initializing write pool with user:', writeConfig.user)
+      const p = new sql.ConnectionPool(writeConfig)
+      await p.connect()
+      writePool = p
+      return p
+    })()
+  }
+  return writePoolPromise
 }
 
 // getMSSQLReadOnlyPool now uses new sql.ConnectionPool specifically for Gemini Bot/Line Webhook
 export async function getMSSQLReadOnlyPool(): Promise<sql.ConnectionPool | null> {
   if (env.MOCK_MODE) {
-    console.log('[MSSQL] Running in Mock Mode - read-only connection pool skipped.')
     return null
   }
   if (readOnlyPool && readOnlyPool.connected) return readOnlyPool
 
-  console.log('[MSSQL Read-Only Pool] Initializing read-only pool with user:', readOnlyConfig.user)
-  readOnlyPool = new sql.ConnectionPool(readOnlyConfig)
-  await readOnlyPool.connect()
-  return readOnlyPool
+  if (!readOnlyPoolPromise) {
+    readOnlyPoolPromise = (async () => {
+      console.log('[MSSQL Read-Only Pool] Initializing read-only pool with user:', readOnlyConfig.user)
+      const p = new sql.ConnectionPool(readOnlyConfig)
+      await p.connect()
+      readOnlyPool = p
+      return p
+    })()
+  }
+  return readOnlyPoolPromise
 }
 
 export { sql }
