@@ -17,7 +17,7 @@ function fmt(n: number): string {
 
 // ─── Build Flex Message (carousel: portfolio + daily activity) ─────
 // ─── Build Flex Message (carousel: portfolio + daily activity) ─────
-function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): any {
+function buildComparisonBox(headerText: string, plans: any[], actuals: any[], dailyOnly = false): any {
   const comparison: Record<string, {
     ES: { plan: number; actual: number };
     Y490: { plan: number; actual: number };
@@ -95,7 +95,7 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): a
           },
           {
             type: 'text',
-            text: `${totalActual}/${totalPlan}`,
+            text: dailyOnly ? `${totalActual}` : `${totalActual}/${totalPlan}`,
             size: 'xs',
             weight: 'bold',
             color: totalColor,
@@ -131,7 +131,7 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[]): a
               },
               {
                 type: 'text',
-                text: `${actual}/${plan}`,
+                text: dailyOnly ? `${actual}` : `${actual}/${plan}`,
                 size: 'xs',
                 color: valColor,
                 align: 'end',
@@ -234,9 +234,7 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
   const reportDateShort = (() => {
     try {
       const d = new Date(dateStr)
-      const day = d.getUTCDate()
-      const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
-      return `${day} ${months[d.getUTCMonth()]}`
+      return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`
     } catch { return dateStr }
   })()
 
@@ -261,8 +259,8 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
     const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
 
-    newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
-    usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง (สำเร็จ/แผน)', delivery?.usedVehicles?.breakdown)
+    newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newActuals, true)
+    usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', delivery?.usedVehicles?.breakdown)
   }
 
   // Bubble 1: Portfolio

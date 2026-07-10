@@ -1368,7 +1368,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
       const fmt = (n: number) => n.toLocaleString('en-US')
 
-      const buildComparisonBox = (headerText: string, plans: any[], actuals: any[]): any => {
+      const buildComparisonBox = (headerText: string, plans: any[], actuals: any[], dailyOnly = false): any => {
         const comparison: Record<string, {
           ES: { plan: number; actual: number };
           Y490: { plan: number; actual: number };
@@ -1446,7 +1446,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 },
                 {
                   type: 'text',
-                  text: `${totalActual}/${totalPlan}`,
+                  text: dailyOnly ? `${totalActual}` : `${totalActual}/${totalPlan}`,
                   size: 'xs',
                   weight: 'bold',
                   color: totalColor,
@@ -1482,7 +1482,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     },
                     {
                       type: 'text',
-                      text: `${actual}/${plan}`,
+                      text: dailyOnly ? `${actual}` : `${actual}/${plan}`,
                       size: 'xs',
                       color: valColor,
                       align: 'end',
@@ -1580,9 +1580,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         const { plans = [], actuals = [] } = deliveryPlanData as any
         const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
 
-        newComparisonBox = buildComparisonBox('📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', plans, newActuals)
-        usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง (สำเร็จ/แผน)', (delivery as any)?.usedVehicles?.breakdown)
+        newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newActuals, true)
+        usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', (delivery as any)?.usedVehicles?.breakdown)
       }
+
+      // Short date format: d/M
+      const reportDateShort = (() => {
+        const parts = (reportDate || '').split('-')
+        if (parts.length === 3) return `${parseInt(parts[2])}/${parseInt(parts[1])}`
+        return reportDate || ''
+      })()
 
       const todayFormatted = new Date().toLocaleDateString('th-TH', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok',
@@ -1689,7 +1696,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: `ส่งมอบ (${reportDate})`, size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, monthlyPlan.newPlanTotal - monthlyPlan.newCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
@@ -1708,7 +1715,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-              { type: 'text', text: `ส่งมอบ (${reportDate})`, size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(Math.max(0, monthlyPlan.usedPlanTotal - monthlyPlan.usedCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
