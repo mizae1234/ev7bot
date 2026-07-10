@@ -582,7 +582,8 @@ export default function QuickReportPage() {
           payload.returnDate = closeReturnDate
           payload.rootCause = closeRootCause
           payload.fixAction = closeFixAction
-          payload.followUpDetail = closeRemark ? `หมายเหตุปิดเคส: ${closeRemark}` : `ระบบอัพเดต : ปิดเคสซ่อมเสร็จเรียบร้อย`
+          const closeDateText = formatLiffTime(closeReturnDate || closeFinishDate)
+          payload.followUpDetail = `ระบบอัพเดต : ปิดเคส เมื่อวันที่: ${closeDateText}${closeRemark ? ` | หมายเหตุ: ${closeRemark}` : ''}`
           payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
           payload.currentLocation = closeCurrentLocation
           payload.replacementReturnDate = closeReplacementReturnDate
