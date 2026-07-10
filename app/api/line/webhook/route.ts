@@ -1502,6 +1502,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           layout: 'vertical',
           spacing: 'xs',
           margin: 'md',
+          paddingStart: 'md',
           contents: [
             {
               type: 'text',
@@ -1699,8 +1700,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(Math.max(0, monthlyPlan.newPlanTotal - monthlyPlan.newCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.newCompleted), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'สะสมประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
           ...(newComparisonBox ? [newComparisonBox] : []),
@@ -1718,8 +1719,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(Math.max(0, monthlyPlan.usedPlanTotal - monthlyPlan.usedCompleted)), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan.usedCompleted), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'สะสมประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ]},
           ...(usedComparisonBox ? [usedComparisonBox] : []),

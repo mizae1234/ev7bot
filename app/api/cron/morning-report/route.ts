@@ -151,6 +151,7 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
     layout: 'vertical',
     spacing: 'xs',
     margin: 'md',
+    paddingStart: 'md',
     contents: [
       {
         type: 'text',
@@ -401,8 +402,8 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(Math.max(0, (monthlyPlan?.newPlanTotal ?? 0) - (monthlyPlan?.newCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.newCompleted ?? 0), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'สะสมประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
@@ -422,8 +423,8 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(Math.max(0, (monthlyPlan?.usedPlanTotal ?? 0) - (monthlyPlan?.usedCompleted ?? 0))), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
-              { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' },
+              { type: 'text', text: String(monthlyPlan?.usedCompleted ?? 0), size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+              { type: 'text', text: 'สะสมประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
           ],
         },
