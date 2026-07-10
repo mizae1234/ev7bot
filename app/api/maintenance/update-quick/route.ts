@@ -430,9 +430,7 @@ export async function POST(req: NextRequest) {
           finishReq.input('returnDate', sql.NVarChar, toMssqlDate(returnDate))
           updateFields.push('MaintenanceReturnDate = @returnDate')
           // Close case: stamp CompleteDate when returnDate is provided (ปิดเคส)
-          if (!finishDate) {
-            updateFields.push('CompleteDate = GETDATE()')
-          }
+          updateFields.push('CompleteDate = GETDATE()')
         }
         if (rootCause !== undefined) {
           finishReq.input('rootCause', sql.NVarChar, rootCause || null)
