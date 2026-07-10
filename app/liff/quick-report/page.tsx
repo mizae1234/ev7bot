@@ -2121,7 +2121,9 @@ export default function QuickReportPage() {
                             setSelectedBulkTicketIds(nextType ? closeableIds : [])
                             const now = new Date()
                             setCloseFormSubmitted(false)
-                            setCloseFinishDate(now.toISOString().slice(0, 10))
+                            // Pre-populate วันที่รถซ่อมเสร็จ from existing ticket data if available
+                            const firstCloseable = pendingTickets.find(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                            setCloseFinishDate(firstCloseable?.MaintenanceFinishDate ? firstCloseable.MaintenanceFinishDate.slice(0, 10) : now.toISOString().slice(0, 10))
                             setCloseReturnDate('')
                             setCloseRootCause('')
                             setCloseFixAction('')
