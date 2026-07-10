@@ -2088,7 +2088,7 @@ export default function QuickReportPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))}
+                        disabled={pendingTickets.every(t => t.CarStatusCode === 'READY_PICKUP_MAINTENANCE')}
                         onClick={() => {
                           const nextType = bulkActionType === 'complete' ? null : 'complete'
                           setBulkActionType(nextType)
@@ -2098,7 +2098,7 @@ export default function QuickReportPage() {
                           setBulkFinishDate(now.toISOString().slice(0, 16))
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
-                          pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                          pendingTickets.every(t => t.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
                             ? 'opacity-40 cursor-not-allowed bg-emerald-50 border-slate-200 text-slate-400'
                             : (bulkActionType === 'complete'
                                 ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
