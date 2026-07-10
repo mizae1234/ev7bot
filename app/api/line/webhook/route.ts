@@ -1577,10 +1577,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       let usedComparisonBox: any = null
 
       if (deliveryPlanData && !('error' in deliveryPlanData)) {
-        const { plans = [], actuals = [] } = deliveryPlanData as any
-        const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
+        const { plans = [], dailyActuals = [] } = deliveryPlanData as any
+        const newDailyActuals = dailyActuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
 
-        newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newActuals, true)
+        newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newDailyActuals, true)
         usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', (delivery as any)?.usedVehicles?.breakdown)
       }
 

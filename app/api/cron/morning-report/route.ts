@@ -253,13 +253,12 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
   let usedComparisonBox: any = null
 
   if (deliveryPlanData && !('error' in deliveryPlanData)) {
-    const { plans = [], actuals = [] } = deliveryPlanData
+    const { plans = [], dailyActuals = [] } = deliveryPlanData
     
-    // Partition actuals by RentType
-    const newActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
-    const usedActuals = actuals.filter((a: any) => a.RentType === 'ONRENT_USE')
+    // Partition daily actuals by RentType
+    const newDailyActuals = dailyActuals.filter((a: any) => a.RentType === 'ONRENT_NEW')
 
-    newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newActuals, true)
+    newComparisonBox = buildComparisonBox('📋 ส่งมอบรถใหม่ แยกตามโปรเจค', plans, newDailyActuals, true)
     usedComparisonBox = buildBreakdownBox('📋 รายละเอียดส่งมอบ รถมือสอง', delivery?.usedVehicles?.breakdown)
   }
 

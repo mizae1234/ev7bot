@@ -669,6 +669,7 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
   const d = new Date(params.date)
   const targetYear = d.getUTCFullYear()
   const targetMonth = d.getUTCMonth() + 1 // 1-indexed
+  const { start, end } = getDateRange(params.date)
 
   try {
     // 1. Fetch Plan (monthly sum by ProjectType)
@@ -676,12 +677,17 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
     planReq.input('targetYear', sql.Int, targetYear)
     planReq.input('targetMonth', sql.Int, targetMonth)
 
-    // 2. Fetch Actuals (monthly sum)
+    // 2. Fetch Monthly Actuals
     const actualReq = pool.request()
     actualReq.input('targetYear', sql.Int, targetYear)
     actualReq.input('targetMonth', sql.Int, targetMonth)
 
-    const [planResult, actualResult] = await Promise.all([
+    // 3. Fetch Daily Actuals (for daily card detail)
+    const dailyActualReq = pool.request()
+    dailyActualReq.input('startDate', sql.DateTime, start)
+    dailyActualReq.input('endDate', sql.DateTime, end)
+
+    const [planResult, actualResult, dailyActualResult] = await Promise.all([
       planReq.query(`
         SELECT 
           ProjectType, 
@@ -707,12 +713,29 @@ export async function getDeliveryPlanAndActual(params: { date: string }) {
           i.ProjectType, 
           i.Model,
           r.RentType
+      `),
+      dailyActualReq.query(`
+        SELECT 
+          ISNULL(i.ProjectType, 'ไม่ระบุ') AS ProjectType,
+          ISNULL(i.Model, 'ไม่ระบุ') AS Model,
+          r.RentType,
+          COUNT(*) AS Count
+        FROM dbo.View_AccumarateReleaseCar r
+        LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+        WHERE r.IsActive = 1
+          AND r.ReleaseDate >= @startDate AND r.ReleaseDate <= @endDate
+          AND r.ReleaseDate IS NOT NULL
+        GROUP BY 
+          i.ProjectType, 
+          i.Model,
+          r.RentType
       `)
     ])
 
     return {
       plans: planResult.recordset,
       actuals: actualResult.recordset,
+      dailyActuals: dailyActualResult.recordset,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
