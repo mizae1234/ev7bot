@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (resolvedCarStatusCode === 'COMPLETE') {
-      if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
+      if (vehicleStatusType === 'ON_RENT_MAINTENANCE' && !returnDate) {
         resolvedCarStatusCode = 'READY_PICKUP_MAINTENANCE'
       }
     }
@@ -527,9 +527,13 @@ export async function POST(req: NextRequest) {
           let shouldUpdate = false
 
           if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
-            newStatus = 'ON_RENT'
-            newStatusType = null
-            shouldUpdate = true
+            if (resolvedCarStatusCode === 'COMPLETE') {
+              newStatus = 'ON_RENT'
+              newStatusType = null
+              shouldUpdate = true
+            } else {
+              shouldUpdate = false
+            }
           } else if (vehicleStatusType === 'USE_MAINTENANCE') {
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE_USE'
