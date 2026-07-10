@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
       problemTypeReq.query(`
         SELECT StatusCode, StatusName, DescriptionStatus
         FROM dbo.EV_MsSubStatus
-        WHERE Type = 'PROBLEM_TYPE' AND IsActive = 1
+        WHERE Type = 'MAINTENANCE_PROBLEM_TYPE' AND IsActive = 1
         ORDER BY StatusCode
       `)
     ])

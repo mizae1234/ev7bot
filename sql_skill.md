@@ -970,7 +970,7 @@ new Date(isoString).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
 | `STATUS_TYPE_MAINTENANCE` | สถานะย่อยของรถซ่อม | `NEW_MAINTENANCE`, `USE_MAINTENANCE` |
 | `MAINTENANCE_CAR_STATUS` | สถานะงานซ่อมบำรุง | `IN_MAINTENANCE`, `STILL_WORK`, `WAITING_FOR_MAINTENANCE` |
 | `INSURANCE` | รายชื่อบริษัทประกันภัย | `ICARE_INSURANCE`, `MUANGTHAI_INSURANCE`, `NO_INSURANCE` |
-| `PROBLEM_TYPE` | ประเภทปัญหา | `PRODUCT`, `ACCIDENT` |
+| `MAINTENANCE_PROBLEM_TYPE` | ประเภทปัญหา (งานซ่อม) | `PRODUCT`, `ACCIDENT` |
 | `FAULT_PARTY` | ฝ่ายที่ผิด | `DRIVER`, `COUNTERPART` |
 | `CAR_CASE` | เคสงานซ่อม | (เบา/หนัก) |
 
