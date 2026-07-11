@@ -36,6 +36,12 @@ const pendingLogs = new Map<string, {
   sourceType: string
   sourceId: string | null
   userMessage: string
+  tokenData?: {
+    inputTokens?: number
+    outputTokens?: number
+    modelName?: string
+    responseTimeMs?: number
+  }
 }>()
 
 async function logReplyToDb(replyToken: string, replyMessageText: string) {
@@ -50,8 +56,7 @@ async function logReplyToDb(replyToken: string, replyMessageText: string) {
     }
   } catch { /* ignore */ }
   
-  await logChatToDb(ctx.sourceType, ctx.sourceId, userName, ctx.userMessage, replyMessageText)
-  // Note: token data for AI chats is logged directly at the askButter call site
+  await logChatToDb(ctx.sourceType, ctx.sourceId, userName, ctx.userMessage, replyMessageText, ctx.tokenData)
 }
 
 const originalReplyMessage = lineClient.replyMessage.bind(lineClient)
@@ -2402,13 +2407,16 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     const responseTimeMs = Date.now() - startTime
     console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..." (tokens: in=${butterResult.inputTokens} out=${butterResult.outputTokens} time=${responseTimeMs}ms)`)
 
-    // Log chat with token data
-    logChatToDb(chatSourceType, chatSourceId, userName, text, aiResponse, {
-      inputTokens: butterResult.inputTokens,
-      outputTokens: butterResult.outputTokens,
-      modelName: butterResult.modelName,
-      responseTimeMs,
-    })
+    // Attach token data to pendingLogs so logReplyToDb saves it
+    const pending = pendingLogs.get(replyToken)
+    if (pending) {
+      pending.tokenData = {
+        inputTokens: butterResult.inputTokens,
+        outputTokens: butterResult.outputTokens,
+        modelName: butterResult.modelName,
+        responseTimeMs,
+      }
+    }
 
     // ─── Try to detect task list or vehicle identifier for Flex Message ───
     let flexSent = false
