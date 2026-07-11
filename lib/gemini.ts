@@ -397,7 +397,51 @@ export interface ButterResponse {
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
-const GEMINI_MODEL_NAME = 'gemini-3.5-flash'
+const GEMINI_MODEL_FULL = 'gemini-3.5-flash'
+const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
+
+// Classify whether a question needs the full model or the lite model
+function selectModel(userMessage: string): string {
+  const msg = userMessage.toLowerCase().trim()
+
+  // Keywords that indicate analytical/complex questions → use full model
+  const analyticalKeywords = [
+    'วิเคราะห์', 'เปรียบเทียบ', 'สรุป', 'ทำไม', 'เหตุผล', 'แนวโน้ม',
+    'ค่าเฉลี่ย', 'เฉลี่ย', 'สถิติ', 'รายงาน', 'report',
+    'cycle time', 'production time', 'เวลาเฉลี่ย', 'กี่วัน',
+    'สรุปรายงาน', 'รายงานประจำวัน', 'ภาพรวม', 'portfolio',
+    'ประวัติ', 'ย้อนหลัง', 'trend', 'กราฟ',
+    'ทั้งหมด', 'รวม', 'ยอด', 'เดือนนี้', 'เดือนที่แล้ว',
+    'คำนวณ', 'หาค่า', 'predict', 'forecast',
+    'เปรียบ', 'ต่างกัน', 'มากกว่า', 'น้อยกว่า',
+    'follow', 'ติดตาม', 'อัปเดต',
+  ]
+
+  // Keywords that indicate simple/status lookups → use lite model
+  const simpleKeywords = [
+    'สถานะ', 'ดูรถ', 'ทะเบียน', 'เช็ค',
+    'สวัสดี', 'ขอบคุณ', 'หวัดดี', 'ดีค่ะ', 'ดีครับ',
+    'มีกี่คัน', 'จำนวน',
+    'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน',
+    'vin', 'เลขตัวถัง',
+  ]
+
+  // Check analytical first (takes priority)
+  for (const kw of analyticalKeywords) {
+    if (msg.includes(kw)) return GEMINI_MODEL_FULL
+  }
+
+  // Check simple keywords
+  for (const kw of simpleKeywords) {
+    if (msg.includes(kw)) return GEMINI_MODEL_LITE
+  }
+
+  // Message length heuristic: short messages tend to be simple
+  if (msg.length <= 30) return GEMINI_MODEL_LITE
+
+  // Default to full model for safety
+  return GEMINI_MODEL_FULL
+}
 
 export async function askButter(
   userMessage: string,
@@ -431,13 +475,13 @@ export async function askButter(
   const message = lastError instanceof Error ? lastError.message : String(lastError)
 
   if (message.includes('API key') || message.includes('API_KEY_INVALID')) {
-    return { text: 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
+    return { text: 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_FULL }
   }
   if (message.includes('quota') || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
-    return { text: 'ขออภัยค่ะ 🧈 ตอนนี้ Butter ใช้ Token เกินโควต้าที่กำหนดไว้แล้วค่ะ กรุณารอสักครู่แล้วลองถามใหม่อีกครั้งนะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
+    return { text: 'ขออภัยค่ะ 🧈 ตอนนี้ Butter ใช้ Token เกินโควต้าที่กำหนดไว้แล้วค่ะ กรุณารอสักครู่แล้วลองถามใหม่อีกครั้งนะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_FULL }
   }
 
-  return { text: 'ขออภัยค่ะ 🧈 Butter มีปัญหาเล็กน้อย กรุณาลองใหม่อีกสักครู่นะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
+  return { text: 'ขออภัยค่ะ 🧈 Butter มีปัญหาเล็กน้อย กรุณาลองใหม่อีกสักครู่นะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_FULL }
 }
 
 // ─── Single attempt ────────────────────────────────────────────────
@@ -477,8 +521,11 @@ async function _askButterOnce(
 
 เมื่อผู้ใช้งานพูดกำหนดเวลา เช่น "พรุ่งนี้", "วันศุกร์นี้", "อาทิตย์หน้า" หรือวันที่ระบุใดๆ ให้คุณคำนวณหาวันที่ ค.ศ. (ในรูปแบบ YYYY-MM-DD) โดยอ้างอิงและคำนวณจากวันที่ปัจจุบัน ค.ศ. ${bkkDateStr} ด้านบนนี้เสมอ และส่งไปให้เครื่องมือ createTaskNote เสมอ (ตัวอย่างเช่น ถ้าวันนี้คือ วันจันทร์ ค.ศ. 2026-06-15 คำสั่ง "พรุ่งนี้" จะถูกแปลงเป็น "2026-06-16")`
 
+  const selectedModel = selectModel(userMessage)
+  console.log(`[askButter] Model selected: ${selectedModel} for message: "${userMessage.substring(0, 50)}"`) 
+
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
+    model: selectedModel,
     systemInstruction: dynamicSystemInstruction,
     tools: [{ functionDeclarations }],
   })
@@ -620,7 +667,7 @@ async function _askButterOnce(
 
   console.log(`[askButter] Final text response (${iterations} iterations): "${text.substring(0, 200)}"`)
   const finalText = text || 'ขออภัยค่ะ 🧈 Butter ดึงข้อมูลมาแล้วแต่ยังสรุปไม่ได้ค่ะ ลองถามใหม่แบบเจาะจงขึ้นนะคะ เช่น "ซ่อมค้างกี่คัน" หรือ "สถานะรถ ทอ-3791" 💛'
-  return { text: finalText, inputTokens, outputTokens, modelName: GEMINI_MODEL_NAME }
+  return { text: finalText, inputTokens, outputTokens, modelName: selectedModel }
 }
 
 export async function analyzeClaimMessage(message: string): Promise<{

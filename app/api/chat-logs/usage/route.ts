@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 // Pricing per 1M tokens (USD)
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'gemini-3.5-flash': { input: 1.50, output: 9.00 },
+  'gemini-3.1-flash-lite': { input: 0.25, output: 1.50 },
   'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
   'gemini-2.5-flash': { input: 0.15, output: 3.50 },
 }
