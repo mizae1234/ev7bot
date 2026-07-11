@@ -424,9 +424,10 @@ function selectModel(userMessage: string): string {
     'มีกี่คัน', 'จำนวน',
     'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน',
     'vin', 'เลขตัวถัง',
+    'รถคัน', 'ค้นหา', 'หารถ',
   ]
 
-  // Check analytical first (takes priority)
+  // Check analytical first (takes priority over simple)
   for (const kw of analyticalKeywords) {
     if (msg.includes(kw)) return GEMINI_MODEL_FULL
   }
@@ -435,6 +436,13 @@ function selectModel(userMessage: string): string {
   for (const kw of simpleKeywords) {
     if (msg.includes(kw)) return GEMINI_MODEL_LITE
   }
+
+  // Pattern-based detection: Thai license plate prefix (ทอ, กข, ษร, etc.) or 3-4 digit numbers
+  // These are almost always vehicle lookups → lite model
+  if (/[ก-ฮ]{2}[\s\-]?\d{3,4}/.test(msg)) return GEMINI_MODEL_LITE   // ทอ-3791, กข1234
+  if (/^\d{3,4}$/.test(msg.trim())) return GEMINI_MODEL_LITE            // just "3791"
+  if (/^[ก-ฮ]{2}/.test(msg.trim()) && msg.length <= 15) return GEMINI_MODEL_LITE  // "ทอ 3791" or just "ทอ"
+  if (/^L[A-Z0-9]{10,16}$/i.test(msg.trim())) return GEMINI_MODEL_LITE  // VIN starting with L
 
   // Message length heuristic: short messages tend to be simple
   if (msg.length <= 30) return GEMINI_MODEL_LITE
