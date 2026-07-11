@@ -401,35 +401,27 @@ const GEMINI_MODEL_FULL = 'gemini-3.5-flash'
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
 
 // Classify whether a question needs the full model or the lite model
-// IMPORTANT: lite model hallucinates data (e.g. wrong car model) during function calling,
-// so it should ONLY be used for casual chat / greetings / task notes — NOT for data queries.
+// Full model only for analytical/complex reasoning — lite handles everything else fine
 function selectModel(userMessage: string): string {
   const msg = userMessage.toLowerCase().trim()
 
-  // ─── Lite model: ONLY for non-data queries ─────
-  // These don't require function calling or interpreting database results
-  const liteKeywords = [
-    // Greetings & casual
-    'สวัสดี', 'ขอบคุณ', 'หวัดดี', 'ดีค่ะ', 'ดีครับ', 'บาย',
-    'เหนื่อย', 'เหงา', 'ลาก่อน', 'ไงจ๊ะ', 'หวัดดีค่ะ',
-    // Task notes (simple CRUD, no data interpretation)
-    'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน', 'งานค้าง', 'ดูงาน',
-    'ลบโน้ต', 'ลบงาน', 'task', 'โน้ต',
+  // ─── Full model: ONLY for analytical / complex reasoning ─────
+  const analyticalKeywords = [
+    'วิเคราะห์', 'เปรียบเทียบ', 'สรุป', 'ทำไม', 'เหตุผล', 'แนวโน้ม',
+    'ค่าเฉลี่ย', 'เฉลี่ย', 'สถิติ', 'report',
+    'cycle time', 'production time', 'เวลาเฉลี่ย',
+    'ภาพรวม', 'portfolio',
+    'trend', 'กราฟ',
+    'คำนวณ', 'หาค่า', 'predict', 'forecast',
+    'เปรียบ', 'ต่างกัน', 'มากกว่า', 'น้อยกว่า',
   ]
 
-  for (const kw of liteKeywords) {
-    if (msg.includes(kw)) return GEMINI_MODEL_LITE
+  for (const kw of analyticalKeywords) {
+    if (msg.includes(kw)) return GEMINI_MODEL_FULL
   }
 
-  // Very short casual messages without data intent (e.g. "butter", "โอเค")
-  if (msg.length <= 10 && !/\d/.test(msg) && !/[ก-ฮ]{2}/.test(msg)) {
-    return GEMINI_MODEL_LITE
-  }
-
-  // ─── Everything else → full model ─────
-  // Vehicle lookups, status checks, reports, history, analytics
-  // All require function calling + accurate data interpretation
-  return GEMINI_MODEL_FULL
+  // ─── Everything else → lite model ─────
+  return GEMINI_MODEL_LITE
 }
 
 export async function askButter(
