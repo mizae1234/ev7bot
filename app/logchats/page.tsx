@@ -393,12 +393,50 @@ function LogChatsContent() {
                   </div>
                 </div>
 
+                {/* Model Breakdown (This Month) */}
+                {usageData.thisMonth.modelBreakdown && Object.keys(usageData.thisMonth.modelBreakdown).length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Object.entries(usageData.thisMonth.modelBreakdown).map(([model, data]: [string, any]) => {
+                      const pricing = usageData.pricing?.models?.[model]
+                      const isLite = model.includes('lite')
+                      return (
+                        <div key={model} className={`rounded-xl border ${isLite ? 'border-emerald-500/20' : 'border-purple-500/20'} bg-zinc-900/40 p-3`}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${isLite ? 'bg-emerald-500/15 text-emerald-400' : 'bg-purple-500/15 text-purple-400'}`}>
+                              {model}
+                            </span>
+                            <span className="text-[9px] text-zinc-600">{data.count} คำถาม</span>
+                          </div>
+                          <div className="flex items-baseline gap-3">
+                            <span className={`text-sm font-bold ${isLite ? 'text-emerald-400' : 'text-purple-400'}`}>
+                              ฿{(data.costUSD * (usageData.pricing?.exchangeRate || 34)).toFixed(2)}
+                            </span>
+                            <span className="text-[9px] text-zinc-600">
+                              ${data.costUSD.toFixed(6)}
+                            </span>
+                          </div>
+                          {pricing && (
+                            <p className="text-[8px] text-zinc-600 mt-1">
+                              rate: in ${pricing.input}/1M · out ${pricing.output}/1M
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Pricing Info */}
                 <div className="flex flex-wrap items-center gap-3 text-[10px] text-zinc-500 px-1">
                   <span className="text-amber-500/70">⚡</span>
-                  <span>อัตราราคา: <span className="text-zinc-400 font-semibold">input ${usageData.pricing?.inputPer1M}/1M</span> · <span className="text-zinc-400 font-semibold">output ${usageData.pricing?.outputPer1M}/1M</span> · <span className="text-zinc-400 font-semibold">{usageData.pricing?.exchangeRate} บาท/USD</span></span>
+                  {usageData.pricing?.models && Object.entries(usageData.pricing.models).slice(0, 2).map(([model, p]: [string, any]) => (
+                    <span key={model} className="text-zinc-500">
+                      <span className="text-zinc-400 font-mono text-[9px]">{model.replace('gemini-', '')}</span>
+                      {' '}in ${p.input} · out ${p.output}
+                    </span>
+                  ))}
                   <span className="text-zinc-700">|</span>
-                  <span>Model: <span className="text-zinc-400 font-mono font-semibold">{usageData.pricing?.currentModel}</span></span>
+                  <span><span className="text-zinc-400 font-semibold">{usageData.pricing?.exchangeRate} บาท/USD</span></span>
                   <button onClick={fetchUsage} className="ml-auto text-[10px] text-zinc-600 hover:text-emerald-400 transition">🔄 รีเฟรช</button>
                 </div>
 
@@ -415,8 +453,10 @@ function LogChatsContent() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-[10px] font-bold text-zinc-400">{log.userName || 'Unknown'}</span>
-                              {log.modelName && log.modelName !== 'gemini-3.5-flash' && (
-                                <span className="text-[8px] text-zinc-600 font-mono bg-zinc-800 px-1 rounded">{log.modelName}</span>
+                              {log.modelName && (
+                                <span className={`text-[8px] font-mono px-1 rounded ${
+                                  log.modelName.includes('lite') ? 'bg-emerald-500/15 text-emerald-500' : 'bg-purple-500/15 text-purple-400'
+                                }`}>{log.modelName.replace('gemini-', '')}</span>
                               )}
                             </div>
                             <p className="text-[11px] text-zinc-400 truncate">{log.userMessage}</p>

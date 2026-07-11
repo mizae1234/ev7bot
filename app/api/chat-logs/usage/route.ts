@@ -25,13 +25,24 @@ function aggregate(logs: { inputTokens: number | null; outputTokens: number | nu
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let totalCost = 0
+  const modelBreakdown: Record<string, { count: number; inputTokens: number; outputTokens: number; costUSD: number }> = {}
 
   for (const log of logs) {
     const inT = log.inputTokens || 0
     const outT = log.outputTokens || 0
+    const cost = calculateCost(inT, outT, log.modelName)
     totalInputTokens += inT
     totalOutputTokens += outT
-    totalCost += calculateCost(inT, outT, log.modelName)
+    totalCost += cost
+
+    const model = log.modelName || 'unknown'
+    if (!modelBreakdown[model]) {
+      modelBreakdown[model] = { count: 0, inputTokens: 0, outputTokens: 0, costUSD: 0 }
+    }
+    modelBreakdown[model].count++
+    modelBreakdown[model].inputTokens += inT
+    modelBreakdown[model].outputTokens += outT
+    modelBreakdown[model].costUSD += cost
   }
 
   return {
@@ -40,6 +51,7 @@ function aggregate(logs: { inputTokens: number | null; outputTokens: number | nu
     totalTokens: totalInputTokens + totalOutputTokens,
     totalCost: Math.round(totalCost * 1_000_000) / 1_000_000,
     totalCostTHB: Math.round(totalCost * EXCHANGE_RATE * 100) / 100,
+    modelBreakdown,
   }
 }
 
@@ -196,9 +208,7 @@ export async function GET(req: NextRequest) {
       },
       recentLogs: formattedRecent,
       pricing: {
-        currentModel: 'gemini-3.5-flash',
-        inputPer1M: 1.50,
-        outputPer1M: 9.00,
+        models: MODEL_PRICING,
         exchangeRate: EXCHANGE_RATE,
       },
     })
