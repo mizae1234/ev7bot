@@ -138,10 +138,10 @@ export default function CustodyPage() {
             <KanbanColumn
               title={board.column1.title}
               cards={filterCards(board.column1.cards)}
-              headerColorClass="text-rose-700 dark:text-rose-400"
-              badgeColorClass="bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
-              accentColorClass="group-hover:text-rose-600 dark:group-hover:text-rose-400"
-              hoverBorderClass="hover:border-rose-400/50 dark:hover:border-rose-500/50"
+              headerColorClass="text-blue-700 dark:text-blue-400"
+              badgeColorClass="bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+              accentColorClass="group-hover:text-blue-600 dark:group-hover:text-blue-400"
+              hoverBorderClass="hover:border-blue-400/50 dark:hover:border-blue-500/50"
               icon="🚗"
               onRefresh={handleRefresh}
             />

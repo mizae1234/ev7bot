@@ -160,8 +160,8 @@ export async function GET(req: NextRequest) {
     const records = result.recordset
 
     // Classify into columns
-    const column1: any[] = [] // แจ้งเคส / รอคิวเข้าซ่อม (ICI Claims)
-    const column2: any[] = [] // กำลังซ่อม & จัดหารถทดแทน (Workshop & Replacement)
+    const column1: any[] = [] // แจ้งเคสยังขับได้ (STILL_WORK)
+    const column2: any[] = [] // กำลังซ่อม (อู่) - WAITING_FOR_MAINTENANCE + IN_MAINTENANCE + COMPLETE
     const column3: any[] = [] // ซ่อมเสร็จ รอส่งมอบคืน (EV7 Operations)
     const column4: any[] = [] // รถว่าง รอจัดหาลูกค้า (EV7 & Sales)
 
@@ -250,11 +250,11 @@ export async function GET(req: NextRequest) {
         column4.push(formattedRecord)
       } else if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
         column3.push(formattedRecord)
-      } else if (status === 'IN_MAINTENANCE' || status === 'COMPLETE') {
-        column2.push(formattedRecord)
-      } else {
-        // WAITING_FOR_MAINTENANCE, STILL_WORK, etc.
+      } else if (status === 'STILL_WORK') {
         column1.push(formattedRecord)
+      } else {
+        // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, COMPLETE, etc.
+        column2.push(formattedRecord)
       }
     })
 
@@ -328,18 +328,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       board: {
         column1: {
-          id: 'claims_queue',
-          title: '📁 แจ้งเคส / รอคิวเข้าซ่อม (ICI Claims)',
+          id: 'still_work',
+          title: '📁 แจ้งเคสยังขับได้',
           cards: finalColumn1
         },
         column2: {
           id: 'workshop_repair',
-          title: '📁 กำลังซ่อม & จัดหารถทดแทน (Workshop & Replacement)',
+          title: '📁 กำลังซ่อม (อู่)',
           cards: finalColumn2
         },
         column3: {
           id: 'ready_pickup',
-          title: '📁 ซ่อมเสร็จ รอส่งมอบคืน (EV7 Operations)',
+          title: '📁 ซ่อมเสร็จ รอส่งมอบคืน (EV7)',
           cards: finalColumn3
         },
         column4: {
