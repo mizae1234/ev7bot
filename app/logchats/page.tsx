@@ -409,16 +409,20 @@ function LogChatsContent() {
                     {Object.entries(usageData.thisMonth.modelBreakdown).map(([model, data]: [string, any]) => {
                       const pricing = usageData.pricing?.models?.[model]
                       const isLite = model.includes('lite')
+                      const isPreview = model.includes('preview')
+                      const borderColor = isLite ? 'border-emerald-500/20' : isPreview ? 'border-sky-500/20' : 'border-purple-500/20'
+                      const badgeColor = isLite ? 'bg-emerald-500/15 text-emerald-400' : isPreview ? 'bg-sky-500/15 text-sky-400' : 'bg-purple-500/15 text-purple-400'
+                      const textColor = isLite ? 'text-emerald-400' : isPreview ? 'text-sky-400' : 'text-purple-400'
                       return (
-                        <div key={model} className={`rounded-xl border ${isLite ? 'border-emerald-500/20' : 'border-purple-500/20'} bg-zinc-900/40 p-3`}>
+                        <div key={model} className={`rounded-xl border ${borderColor} bg-zinc-900/40 p-3`}>
                           <div className="flex items-center gap-2 mb-1.5">
-                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${isLite ? 'bg-emerald-500/15 text-emerald-400' : 'bg-purple-500/15 text-purple-400'}`}>
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${badgeColor}`}>
                               {model}
                             </span>
                             <span className="text-[9px] text-zinc-600">{data.count} คำถาม</span>
                           </div>
                           <div className="flex items-baseline gap-3">
-                            <span className={`text-sm font-bold ${isLite ? 'text-emerald-400' : 'text-purple-400'}`}>
+                            <span className={`text-sm font-bold ${textColor}`}>
                               ฿{(data.costUSD * (usageData.pricing?.exchangeRate || 34)).toFixed(2)}
                             </span>
                             <span className="text-[9px] text-zinc-600">
@@ -465,7 +469,9 @@ function LogChatsContent() {
                               <span className="text-[10px] font-bold text-zinc-400">{log.userName || 'Unknown'}</span>
                               {log.modelName && (
                                 <span className={`text-[8px] font-mono px-1 rounded ${
-                                  log.modelName.includes('lite') ? 'bg-emerald-500/15 text-emerald-500' : 'bg-purple-500/15 text-purple-400'
+                                  log.modelName.includes('lite') ? 'bg-emerald-500/15 text-emerald-500' 
+                                  : log.modelName.includes('preview') ? 'bg-sky-500/15 text-sky-400'
+                                  : 'bg-purple-500/15 text-purple-400'
                                 }`}>{log.modelName.replace('gemini-', '')}</span>
                               )}
                             </div>

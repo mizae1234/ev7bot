@@ -11,7 +11,7 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'gemini-2.5-flash': { input: 0.15, output: 3.50 },
 }
 
-const DEFAULT_PRICING = { input: 1.50, output: 9.00 } // fallback to gemini-3.5-flash
+const DEFAULT_PRICING = { input: 0.50, output: 3.00 } // fallback to gemini-3-flash-preview
 const EXCHANGE_RATE = 34 // THB per USD
 
 function calculateCost(inputTokens: number, outputTokens: number, modelName?: string | null): number {
