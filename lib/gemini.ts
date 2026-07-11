@@ -671,7 +671,7 @@ export async function analyzeClaimMessage(message: string): Promise<{
 }> {
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: GEMINI_MODEL_LITE,
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: {
