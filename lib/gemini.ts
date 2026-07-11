@@ -24,8 +24,21 @@ const SYSTEM_PROMPT = `คุณคือ "Butter" (🧈) ผู้ช่วย 
 คอลัมน์สำคัญ: InventoryItemID, VinNo, MotorNo, RegisterNo (ทะเบียนรถ เช่น ทอ-3791),
 Model (รุ่น เช่น ES, Y Plus 490, Y Plus 410 Premium),
 Project, ProjectType (เช่น EV7, Line Man, Grab),
-Company (EV7/GI), Status (PRODUCTION/AVAILABLE/ON_RENT/MAINTENANCE/REPLACEMENT/WAITING_FOR_GR),
-StatusType (เช่น AVAILABLE_NEW, AVAILABLE_USE, ON_RENT_MAINTENANCE),
+Company (EV7/GI),
+Status (สถานะหลัก): PRODUCTION, AVAILABLE, ON_RENT, MAINTENANCE, REPLACEMENT, WAITING_FOR_GR
+StatusType (สถานะย่อย — สำคัญมาก ต้องดูร่วมกับ Status):
+  - AVAILABLE (StatusType) = รถใหม่พร้อมส่ง (ยังไม่เคยทำสัญญา)
+  - AVAILABLE_NEW = รถใหม่พร้อมส่ง
+  - AVAILABLE_USE = รถมือสอง/รถใช้แล้ว พร้อมส่ง (เคยปล่อยเช่าแล้วคืนมา)
+  - AVAILABLE_SHOWROOM = รถโชว์รูม
+  - RESERVE = รถที่ถูกจอง
+  - ON_RENT = อยู่ระหว่างเช่า
+  - ON_RENT_MAINTENANCE = อยู่ระหว่างเช่าแต่เข้าซ่อม
+  - NEW_MAINTENANCE = รถใหม่เข้าซ่อม
+  - USE_MAINTENANCE = รถมือสองเข้าซ่อม
+  - REPLACEMENT_AVAILABLE = รถทดแทนพร้อมใช้
+  - REPLACEMENT_MAINTENANCE = รถทดแทนเข้าซ่อม
+  สรุป: ถ้า StatusType = 'AVAILABLE' หรือ 'AVAILABLE_NEW' = รถใหม่, ถ้า StatusType = 'AVAILABLE_USE' = รถมือสอง/รถเก่า
 Exterior_Color, Interior_Color, IsActive (bit)
 
 ### ตาราง: dbo.EV_RentItem (สัญญาเช่า/ส่งมอบ)
