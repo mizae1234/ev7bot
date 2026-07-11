@@ -314,6 +314,29 @@ function VehicleDetailContent() {
                   ● {getRepairStatusInfo(activeMaint.CarStatusCode).label}
                 </span>
               </div>
+              {(() => {
+                let nextToDo = ''
+                let bgColor = ''
+                let textColor = ''
+                if (activeMaint.CarStatusCode === 'WAITING_FOR_MAINTENANCE' || activeMaint.CarStatusCode === 'IN_MAINTENANCE') {
+                  nextToDo = '📌 Next to do : อู่เร่งซ่อมรถ , EV7 ติดตามการซ่อมรถ'
+                  bgColor = 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
+                  textColor = 'text-amber-700 dark:text-amber-400'
+                } else if (activeMaint.CarStatusCode === 'STILL_WORK') {
+                  nextToDo = '📌 Next to do : EV7/ICI ติดตามลูกค้าเข้าซ่อม'
+                  bgColor = 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40'
+                  textColor = 'text-blue-700 dark:text-blue-400'
+                } else if (activeMaint.CarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+                  nextToDo = '📌 Next to do : EV7 ติดตามลูกค้าเข้ารับรถ'
+                  bgColor = 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/40'
+                  textColor = 'text-orange-700 dark:text-orange-400'
+                }
+                return nextToDo ? (
+                  <div className={`rounded-lg border px-3 py-2 ${bgColor}`}>
+                    <p className={`text-xs font-bold ${textColor}`}>{nextToDo}</p>
+                  </div>
+                ) : null
+              })()}
               <div className="grid grid-cols-2 gap-3">
                 <InfoItem label="วันที่เกิดเหตุ" value={formatDate(activeMaint.IncidentDate)} />
                 <InfoItem label="วันที่รับแจ้ง" value={formatDate(activeMaint.ReportDate)} />
