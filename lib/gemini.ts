@@ -405,20 +405,32 @@ const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
 function selectModel(userMessage: string): string {
   const msg = userMessage.toLowerCase().trim()
 
-  // ─── Full model: ONLY for analytical / complex reasoning ─────
+  // ─── Full model: analytical / complex reasoning ─────
   const analyticalKeywords = [
+    // Analysis & comparison
     'วิเคราะห์', 'เปรียบเทียบ', 'สรุป', 'ทำไม', 'เหตุผล', 'แนวโน้ม',
     'ค่าเฉลี่ย', 'เฉลี่ย', 'สถิติ', 'report',
+    // Forecasting & planning
+    'forecast', 'forcast', 'predict', 'พยากรณ์',
+    'เป้า', 'ตามเป้า', 'รองรับ', 'วางแผน', 'plan',
+    'ประมาณ', 'ประมาน', 'คาดการณ์',
+    // Metrics & calculations
     'cycle time', 'production time', 'เวลาเฉลี่ย',
-    'ภาพรวม', 'portfolio',
-    'trend', 'กราฟ',
-    'คำนวณ', 'หาค่า', 'predict', 'forecast',
+    'ภาพรวม', 'portfolio', 'trend', 'กราฟ',
+    'คำนวณ', 'หาค่า', 'กี่คัน', 'กี่วัน',
+    // Comparison
     'เปรียบ', 'ต่างกัน', 'มากกว่า', 'น้อยกว่า',
+    // Period-based analysis
+    'เดือนนี้', 'เดือนที่แล้ว', 'ปีนี้', 'ไตรมาส',
+    'ย้อนหลัง', 'ทั้งหมด', 'รวม', 'ยอด',
   ]
 
   for (const kw of analyticalKeywords) {
     if (msg.includes(kw)) return GEMINI_MODEL_FULL
   }
+
+  // Long complex questions (>80 chars) are likely analytical
+  if (msg.length > 80) return GEMINI_MODEL_FULL
 
   // ─── Everything else → lite model ─────
   return GEMINI_MODEL_LITE
