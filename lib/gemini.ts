@@ -132,7 +132,17 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - EXEC GetEV_CarInMaintenance_NotInYard → รถซ่อมที่ยังวิ่งอยู่
 - EXEC GetEV_Report_ReplacementHistory → ประวัติรถทดแทน
 - EXEC GetEV_Report_WaitingForGr → รถรอ GR
+- EXEC GetEV_Report_ProductionCar → รายงานรถในสายการผลิตทั้งหมด (มี StartDate, FinishDate, ProductionCompleteDate, ProcedureName, VendorName, ProductionStatusLabel)
+- EXEC GetEV_CarFinishedProduction @BeginDate, @EndDate → รถที่ผลิตเสร็จตามช่วงวัน
 - EXEC GetEV_CarInfo @RegisterNo → ข้อมูลรถ 1 คัน
+
+### การคำนวณ Production Cycle Time (เวลาเฉลี่ยในการผลิตรถ)
+- ข้อมูลอยู่ใน SP GetEV_Report_ProductionCar ซึ่งมี StartDate (วันเริ่มกระบวนการ) และ ProductionCompleteDate (วันผลิตเสร็จ)
+- วิธีที่ 1: ใช้ runCustomQuery ตรงกับตาราง production plan:
+  SELECT AVG(DATEDIFF(DAY, StartDate, ProductionCompleteDate)) as AvgProductionDays, COUNT(DISTINCT VinNo) as TotalCars FROM (SELECT p.VinNo, MIN(p.StartDate) as StartDate, i.ProductionCompleteDate FROM EV_ProductionPlan p JOIN EV_InventoryItem i ON p.InventoryItemID = i.InventoryItemID WHERE i.ProductionCompleteDate IS NOT NULL AND p.StartDate IS NOT NULL AND p.IsActive = 1 GROUP BY p.VinNo, i.ProductionCompleteDate) sub
+- วิธีที่ 2: ถ้า query ข้างต้น error ให้ลองใช้ตาราง EV_InventoryItem โดยตรง:
+  SELECT AVG(DATEDIFF(DAY, CreatedDate, ProductionCompleteDate)) as AvgDays FROM EV_InventoryItem WHERE ProductionCompleteDate IS NOT NULL AND CreatedDate IS NOT NULL AND IsActive = 1
+- วิธีที่ 3: ถ้ายังไม่ได้ผลให้ลองรัน: EXEC GetEV_Report_ProductionCar แล้วดูว่ามีคอลัมน์อะไรบ้าง และนำ StartDate กับ ProductionCompleteDate มาคำนวณ DATEDIFF
 
 ### การจัดการงาน/โน้ตค้าง (Task & Note Tracking)
 - จดโน้ตใหม่: เรียกใช้ 'createTaskNote' โดยระบุรายละเอียดงาน คนทำ (ถ้ามี) และวันส่งมอบ (แปลงเวลาเช่น "วันศุกร์นี้" หรือ "พรุ่งนี้" เป็นวันที่จริง เช่น 2026-06-19) เมื่อบันทึกงานสำเร็จ คุณต้องพิมพ์ระบุรหัสงานในรูปแบบ ID #X (เช่น ID #5) ในข้อความตอบกลับเสมอเพื่อให้ระบบแสดงผลการ์ดชิ้นเดียวได้ถูกต้อง
