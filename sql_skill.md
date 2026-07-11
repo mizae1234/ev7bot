@@ -944,9 +944,13 @@ const toMssqlDate = (d: string | null | undefined): string | null => {
 | **`ON_RENT_MAINTENANCE`** | ปรับ `Status` = `'ON_RENT'` และ `StatusType` = `NULL` |
 | **`REPLACEMENT_MAINTENANCE`** | ปรับ `Status` = `'REPLACEMENT'` และ `StatusType` = `'REPLACEMENT_AVAILABLE'` |
 
-### 14.5 เวลาในฐานข้อมูล SQL Server เป็นเวลาไทย (UTC+7) อยู่แล้ว
-* SQL Server ใช้ `GETDATE()` ซึ่งคืนค่าเวลาท้องถิ่นของเครื่อง Server (ตั้งเป็น Bangkok time UTC+7 แล้ว)
-* **ห้ามแปลง timezone ซ้ำ** เมื่อนำมาแสดงผลฝั่ง Frontend — ถ้าใช้ `toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })` จะทำให้เวลาเร็วไป 7 ชั่วโมง (บวก +7 ซ้ำ)
+### 14.5 เวลาในฐานข้อมูล — SQL Server vs PostgreSQL (Prisma)
+* **SQL Server (MSSQL)**: ใช้ `GETDATE()` ซึ่งคืนค่า **เวลาไทย (UTC+7)** โดยตรง (เครื่อง Server ตั้ง timezone เป็น Bangkok)
+* **PostgreSQL (Prisma)**: เก็บ timestamp เป็น **UTC** เสมอ — Prisma จะแปลง `new Date()` เป็น UTC ก่อนบันทึก
+* **ห้ามใช้ logic เดียวกัน** ในการอ่านเวลาจากทั้งสองฐานข้อมูล:
+  - ข้อมูลจาก SQL Server → ใช้ `getUTC*()` อ่านตรง ๆ (เพราะค่าในฐานข้อมูลเป็นเวลาไทยอยู่แล้ว)
+  - ข้อมูลจาก PostgreSQL/Prisma → ใช้ `toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })` หรือ local getters ปกติ (เพราะค่าเป็น UTC ต้องแปลงเป็นเวลาไทย)
+* **ห้ามแปลง timezone ซ้ำ** กับข้อมูลจาก SQL Server — ถ้าใช้ `toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })` จะทำให้เวลาเร็วไป 7 ชั่วโมง (บวก +7 ซ้ำ)
 * **วิธีที่ถูกต้อง**: ใช้ `getUTC*()` methods ของ JavaScript `Date` object เพื่ออ่านค่าวันเวลาตรง ๆ ตามที่ SQL Server ส่งมา โดยไม่ต้องแปลง timezone เพิ่ม
 ```typescript
 // ✅ ถูกต้อง — อ่านค่าตรง ๆ จาก SQL Server (เวลาไทยอยู่แล้ว)
@@ -955,6 +959,19 @@ const hour = d.getUTCHours()  // ไม่แปลง timezone ซ้ำ
 
 // ❌ ผิด — แปลง timezone ซ้ำ ทำให้เร็วไป 7 ชม.
 new Date(isoString).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+```
+* **⚠️ ข้อควรระวัง: การสร้างเวลาปัจจุบันฝั่ง Client (Browser)**
+  - `formatLiffTime()` ใช้ `getUTC*()` ซึ่งออกแบบมาสำหรับข้อมูลจาก SQL Server (เวลาไทยอยู่แล้ว) เท่านั้น
+  - **ห้ามใช้** `new Date().toISOString()` กับ `formatLiffTime()` เพราะ `toISOString()` คืนค่า UTC → `getUTCHours()` จะได้เวลาช้าไป 7 ชม.
+  - **วิธีที่ถูกต้อง**: ถ้าต้องการแสดง "เวลาตอนนี้" เป็นภาษาไทย ให้ใช้ local getters ตรง ๆ
+```typescript
+// ✅ ถูกต้อง — สร้างเวลาปัจจุบัน (เวลาไทยจาก browser)
+const now = new Date()
+const day = now.getDate()         // ใช้ getDate() ไม่ใช่ getUTCDate()
+const hour = now.getHours()       // ใช้ getHours() ไม่ใช่ getUTCHours()
+
+// ❌ ผิด — toISOString() เป็น UTC แล้วเอาไปใช้กับ getUTC* จะได้เวลา UTC ไม่ใช่เวลาไทย
+const closeDateText = formatLiffTime(new Date().toISOString())
 ```
 
 ### 14.5 สิทธิ์การเชื่อมต่อฐานข้อมูล (Database Connection Users)

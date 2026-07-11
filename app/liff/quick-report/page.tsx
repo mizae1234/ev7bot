@@ -583,7 +583,8 @@ export default function QuickReportPage() {
           payload.rootCause = closeRootCause
           payload.fixAction = closeFixAction
           const now = new Date()
-          const closeDateText = formatLiffTime(now.toISOString())
+          const thMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+          const closeDateText = `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
           payload.followUpDetail = `ระบบอัพเดต : ปิดเคส เมื่อวันที่: ${closeDateText}${closeRemark ? ` | หมายเหตุ: ${closeRemark}` : ''}`
           payload.isLastPending = selectedBulkTicketIds.length === pendingTickets.length
           payload.currentLocation = closeCurrentLocation
