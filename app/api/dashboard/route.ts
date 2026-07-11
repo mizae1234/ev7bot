@@ -60,6 +60,7 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
         status: isComplete ? 'complete' : 'pending',
         delivered_at: releasedAt,
         project: project,
+        rent_type: null,
         expected_release_date: `${dateStr}T09:00:00.000Z`,
         release_date: releasedAt,
         create_date: `${dateStr}T09:00:00.000Z`,
