@@ -29,6 +29,7 @@ export interface DeliveryRecord {
   status: 'pending' | 'in_progress' | 'complete' | 'delivered'
   delivered_at: string | null
   project: string | null
+  rent_type: string | null
   expected_release_date: string | null
   release_date: string | null
   create_date: string | null
