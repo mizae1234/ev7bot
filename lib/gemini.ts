@@ -411,10 +411,12 @@ const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
 const GEMINI_MODEL_FULL = 'gemini-3.5-flash'
-const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
+const GEMINI_MODEL_DEFAULT = 'gemini-3-flash-preview'  // สนทนาปกติ
+const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'      // autoclaim only
 
-// Classify whether a question needs the full model or the lite model
-// Full model only for analytical/complex reasoning — lite handles everything else fine
+// Classify whether a question needs the full model or the default model
+// Full = analytical/complex, Default (3-flash-preview) = everything else
+// Lite is NOT used for chat — only for autoclaim
 function selectModel(userMessage: string): string {
   const msg = userMessage.toLowerCase().trim()
 
@@ -445,8 +447,8 @@ function selectModel(userMessage: string): string {
   // Long complex questions (>80 chars) are likely analytical
   if (msg.length > 80) return GEMINI_MODEL_FULL
 
-  // ─── Everything else → lite model ─────
-  return GEMINI_MODEL_LITE
+  // ─── Everything else → gemini-3-flash-preview ─────
+  return GEMINI_MODEL_DEFAULT
 }
 
 export async function askButter(
