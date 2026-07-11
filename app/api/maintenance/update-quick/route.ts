@@ -471,13 +471,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Update EV_ReplacementItem Return Details ───
+    // ─── Update EV_ReplacementItem Return Details & Revert Replacement Car Status ───
     if ((replacementReturnDate || replacementLocation) && maintenanceId) {
       try {
         const repCheckReq = pool.request()
         repCheckReq.input('maintId', sql.Int, maintenanceId)
         const repCheckRes = await repCheckReq.query(`
-          SELECT ReplacementItemID 
+          SELECT ReplacementItemID, VinNo 
           FROM dbo.EV_ReplacementItem 
           WHERE MaintenanceItemID = @maintId 
             AND IsActive = 1 
@@ -485,6 +485,7 @@ export async function POST(req: NextRequest) {
         `)
         if (repCheckRes.recordset.length > 0) {
           const repId = repCheckRes.recordset[0].ReplacementItemID
+          const repVinNo = repCheckRes.recordset[0].VinNo
           const repUpdReq = pool.request()
           repUpdReq.input('repId', sql.BigInt, repId)
           repUpdReq.input('retDate', sql.Date, replacementReturnDate ? toMssqlDate(replacementReturnDate) : null)
@@ -499,6 +500,23 @@ export async function POST(req: NextRequest) {
             WHERE ReplacementItemID = @repId
           `)
           console.log(`[Replacement Return Update] ReplacementItemID=${repId}: ReturnDate=${replacementReturnDate}, Location=${replacementLocation}`)
+
+          // Revert replacement car InventoryItem status to REPLACEMENT_AVAILABLE
+          if (repVinNo && replacementReturnDate) {
+            try {
+              const revertRepCarReq = pool.request()
+              revertRepCarReq.input('repVin', sql.VarChar, repVinNo)
+              revertRepCarReq.input('userId', sql.Int, dbUserId)
+              await revertRepCarReq.query(`
+                UPDATE dbo.EV_InventoryItem
+                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_AVAILABLE', UpdateUserID = @userId, UpdateDate = GETDATE()
+                WHERE VinNo = @repVin AND IsActive = 1
+              `)
+              console.log(`[Replacement Car Status Revert] VinNo=${repVinNo}: set Status=REPLACEMENT, StatusType=REPLACEMENT_AVAILABLE`)
+            } catch (revertErr) {
+              console.error('[Replacement Car Status Revert Error]', revertErr)
+            }
+          }
         }
       } catch (repErr) {
         console.error('[Replacement Return Update Error]', repErr)

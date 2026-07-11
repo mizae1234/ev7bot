@@ -927,10 +927,11 @@ const toMssqlDate = (d: string | null | undefined): string | null => {
    - อัปเดต `FixAction` = สรุปการแก้ไข (ถ้ามี)
 2. **การอัปเดตไฟล์แนบ**:
    - รูปภาพ/ไฟล์แนบปิดเคสจะถูกลงทะเบียนใน `dbo.FileAttachment` และ `dbo.EV_FileAttachmentMaintenanceItem` โดยใช้ `ReferenceType = 'MAINTENANCE_COMPLETED'` และ `ProcessType = 'MAINTENANCE_COMPLETED'`
-3. **การคืนค่าข้อมูลรถทดแทน (`EV_ReplacementItem`)**:
+3. **การคืนค่าข้อมูลรถทดแทน (`EV_ReplacementItem`) และคืนสถานะรถทดแทน (`EV_InventoryItem`)**:
    - หากใบแจ้งซ่อมนั้นมีรถทดแทนที่ใช้งานอยู่ (`IsActive = 1` และ `ReplacementReturnDate IS NULL`) ระบบจะทำการบันทึกคืนรถทดแทน โดยอัปเดต:
      - `ReplacementReturnDate` = วันที่คืนรถทดแทน
      - `Location` = จุดคืนรถทดแทน
+   - **เมื่อระบุวันคืนรถทดแทนแล้ว** ระบบจะอัปเดตสถานะของรถทดแทนคันนั้นใน `dbo.EV_InventoryItem` ให้กลับไปเป็น `Status = 'REPLACEMENT'` และ `StatusType = 'REPLACEMENT_AVAILABLE'` อัตโนมัติ เพื่อให้รถทดแทนพร้อมใช้งานสำหรับเคสอื่นต่อไป
 4. **การอัปเดตสถานที่ปัจจุบันของรถ (`EV_InventoryItem`)**:
    - ทุกครั้งที่มีการบันทึกสถานที่หรือเปลี่ยนพิกัดรถ (ทั้งในขั้นตอน **เข้าซ่อม / Park**, **เริ่มซ่อม / Start** หรือ **ปิดเคส / Complete**) ระบบจะทำการอัปเดตฟิลด์ `CurrentLocation` ในตาราง `dbo.EV_InventoryItem` ให้เป็นสถานที่/พิกัดล่าสุดที่เลือกมาเสมอ
 5. **การคืนค่าสถานะตัวรถ (`EV_InventoryItem`)**:
