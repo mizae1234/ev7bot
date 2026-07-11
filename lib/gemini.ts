@@ -419,7 +419,7 @@ async function _askButterOnce(
 เมื่อผู้ใช้งานพูดกำหนดเวลา เช่น "พรุ่งนี้", "วันศุกร์นี้", "อาทิตย์หน้า" หรือวันที่ระบุใดๆ ให้คุณคำนวณหาวันที่ ค.ศ. (ในรูปแบบ YYYY-MM-DD) โดยอ้างอิงและคำนวณจากวันที่ปัจจุบัน ค.ศ. ${bkkDateStr} ด้านบนนี้เสมอ และส่งไปให้เครื่องมือ createTaskNote เสมอ (ตัวอย่างเช่น ถ้าวันนี้คือ วันจันทร์ ค.ศ. 2026-06-15 คำสั่ง "พรุ่งนี้" จะถูกแปลงเป็น "2026-06-16")`
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     systemInstruction: dynamicSystemInstruction,
     tools: [{ functionDeclarations }],
   })
@@ -565,7 +565,7 @@ export async function analyzeClaimMessage(message: string): Promise<{
 }> {
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: {
