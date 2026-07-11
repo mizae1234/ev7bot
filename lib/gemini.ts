@@ -118,23 +118,61 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
   SELECT i.RegisterNo, i.Model, r.FirstName, r.LastName, r.ContractNo FROM EV_RentItem r JOIN EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID WHERE CAST(r.ReleaseDate AS DATE) = CAST(GETDATE() AS DATE) AND r.IsActive = 1
 
 ## Stored Procedures ที่ใช้ได้ (EXEC)
-- EXEC GetEV_HeadlineDashboard @DateBegin, @DateEnd → สรุปภาพรวมรถทั้งระบบ
-- EXEC GetEV_DeliveryCalendar @BeginDate, @EndDate → ปฏิทินส่งมอบ (Date, Project, Model, CarCount)
-- EXEC GetEv_MsModel → รายการรุ่นรถทั้งหมด
-- EXEC GetEv_MsColor → รายการสีรถ
-- EXEC GetEV_MsStatus → สถานะหลัก 7 สถานะ
+
+### Dashboard & Summary
+- EXEC GetEV_HeadlineDashboard @DateBegin, @DateEnd → สรุปภาพรวมรถทั้งระบบ (Total, OnRent, Available, Production, Maintenance, Replacement)
+- EXEC GetEV_DashboardSummary @DateBegin, @DateEnd → สรุป Dashboard หลักตามช่วงวัน
+- EXEC GetEV_DashboardSummaryStatus @DateBegin, @DateEnd → สรุปสถานะ Dashboard ตามช่วงวัน
+- EXEC GetEV_DashboardSummaryStatus_Production @DateBegin, @DateEnd → สรุปสถานะ Dashboard เฉพาะส่วน Production
 - EXEC GetEV_LocationSummary → จำนวนรถแยกตาม Location/Model/Status
-- EXEC GetEV_Report_OnRentCar → รถปล่อยเช่าทั้งหมด
-- EXEC GetEV_Report_AvailableCar → รถพร้อมส่ง
-- EXEC GetEV_Report_AllCarMaintenance → งานซ่อมทั้งหมด
+
+### Delivery & Calendar
+- EXEC GetEV_DeliveryCalendar @BeginDate, @EndDate → ปฏิทินส่งมอบ (Date, Project, Model, CarCount)
+- EXEC GetTaxiDeliverySchedule → ตารางส่งมอบแท็กซี่
+
+### Master Data
+- EXEC GetEv_MsModel → รายการรุ่นรถทั้งหมด (9 รุ่น)
+- EXEC GetEv_MsColor → รายการสีรถ (33 สี)
+- EXEC GetEV_MsStatus → สถานะหลัก 7 สถานะ (PRODUCTION, AVAILABLE, ON_RENT, MAINTENANCE, REPLACEMENT, WAITING_FOR_GR ฯลฯ)
+- EXEC GetEVMsSubStatus @Type → Sub-status ของรถ
+
+### Inventory & Vehicle
+- EXEC GetEV_CarInfo @RegisterNo → ข้อมูลรถ 1 คัน
+- EXEC GetEV_InventoryMonitor → ข้อมูล monitor รถ
+- EXEC GetEVItemTrackList @RegisterNo, @Model, @Status, @ProcessStatus, @Page, @PerPage → ติดตามสถานะรถ (pagination)
+
+### Rent & Release
+- EXEC GetEV_Report_OnRentCar → รถปล่อยเช่าทั้งหมด (มี ContractNo, FirstName, LastName, ReleaseDate, Location)
+- EXEC GetEV_Report_AvailableCar → รถพร้อมส่ง (มี AvailableDate)
+- EXEC GetEV_Report_PendingCar → รถ Pending ที่รอดำเนินการ (มี PurchaseOrder, PoReceiveDate, ImportToEV7)
+- EXEC GetEV_TerminateContract → สัญญาที่ถูกยกเลิก (มี ContractNo, TerminateDate)
+- EXEC GetEV_ReturnCarHistoryList @RegisterNo, @Model, @BeginDate, @EndDate, @Page, @PerPage → ประวัติการรับคืนรถ
+
+### Maintenance
+- EXEC GetEV_Report_AllCarMaintenance → งานซ่อมทั้งหมด (มี IncidentDate, ReportDate, MaintenanceStartDate, MaintenanceFinishDate, WaitingForRepairDays, ServiceLocation)
 - EXEC GetEV_Report_CompleteCarMaintenance → ซ่อมเสร็จแล้ว
 - EXEC GetEV_CarInMaintenance_InYard → รถซ่อมที่จอดใน Yard
 - EXEC GetEV_CarInMaintenance_NotInYard → รถซ่อมที่ยังวิ่งอยู่
-- EXEC GetEV_Report_ReplacementHistory → ประวัติรถทดแทน
-- EXEC GetEV_Report_WaitingForGr → รถรอ GR
+- EXEC GetEV_CarInMaintenance_StillWork → รถซ่อมที่ยังใช้งานได้อยู่
+- EXEC GetEV_CarInMaintenance_NotStillWork → รถซ่อมที่ใช้งานไม่ได้แล้ว
+- EXEC GetEV_HistoryMaintenance @TextSearch, @Model, @Status, @Page, @PerPage → ประวัติการซ่อมบำรุง (pagination)
+- EXEC GetEV_AvailableCarForMaintenance @TextSearch, @Model, @Status, @Page, @PerPage → รถที่พร้อมส่งซ่อม
+
+### Replacement
+- EXEC GetEV_Report_ReplacementHistory → ประวัติรถทดแทน (มี ReplacementStartDate, ReplacementReturnDate, ReplacementStatus)
+- EXEC GetEV_CarForReplacement @TextSearch, @Model, @Status, @Page, @PerPage → รถที่พร้อมใช้เป็นรถทดแทน
+- EXEC GetEv_ReplacementCarDropDown → dropdown รถทดแทน (InventoryItemID, VinNo, DisplayText)
+
+### Production
 - EXEC GetEV_Report_ProductionCar → รายงานรถในสายการผลิตทั้งหมด (มี StartDate, FinishDate, ProductionCompleteDate, ProcedureName, VendorName, ProductionStatusLabel)
 - EXEC GetEV_CarFinishedProduction @BeginDate, @EndDate → รถที่ผลิตเสร็จตามช่วงวัน
-- EXEC GetEV_CarInfo @RegisterNo → ข้อมูลรถ 1 คัน
+- EXEC GetEV_Report_WaitingForGr → รถรอ GR (Goods Receipt)
+- EXEC GetEV_WaitingForGr @RegisterNo, @Model, @StatusType, @BeginDate, @EndDate, @Page, @PerPage → รถรอ GR (pagination)
+
+### GI (Good Inspect)
+- EXEC GetGI_InventoryItemList @RegisterNo, @Model, @BeginDate, @EndDate, @Page, @PerPage → รายการรถ GI
+- EXEC GetGI_CompleteInventoryItemList → รายการรถ GI ที่เสร็จแล้ว
+- EXEC GetGI_CarProcedurePlanList @GroupID, @SubGroupID, @TextSearch, @PlanBeginDate, @PlanEndDate, @Page, @PerPage, @RegisterNo, @Model, @ProcedureStatusID → แผนงาน Procedure ของรถ GI
 
 ### การคำนวณ Production Cycle Time (เวลาเฉลี่ยในการผลิตรถ)
 - ข้อมูลอยู่ใน SP GetEV_Report_ProductionCar ซึ่งมี StartDate (วันเริ่มกระบวนการ) และ ProductionCompleteDate (วันผลิตเสร็จ)

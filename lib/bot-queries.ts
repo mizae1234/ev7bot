@@ -524,20 +524,40 @@ export async function runCustomQuery(params: { sqlQuery: string }) {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
-  // Safety: only allow SELECT and EXEC Get* statements
-  const trimmed = params.sqlQuery.trim().toUpperCase()
-  const forbidden = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE', 'MERGE']
+  // Safety: STRICTLY read-only — only allow SELECT and EXEC Get* statements
+  // Step 1: Strip SQL comments to prevent bypass via comment injection
+  const stripped = params.sqlQuery
+    .replace(/--[^\n]*/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .trim()
+  const upper = stripped.toUpperCase()
+
+  // Step 2: Block ALL dangerous keywords anywhere in the query
+  const forbidden = [
+    'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'TRUNCATE',
+    'GRANT', 'REVOKE', 'MERGE', 'BULK', 'OPENROWSET', 'OPENDATASOURCE',
+    'DBCC', 'SHUTDOWN', 'BACKUP', 'RESTORE', 'INTO',
+  ]
   for (const word of forbidden) {
-    const regex = new RegExp(`\\b${word}\\b`, 'i')
-    if (regex.test(trimmed)) {
-      return { error: `ไม่อนุญาตให้ใช้คำสั่ง ${word} — อนุญาตเฉพาะ SELECT หรือ EXEC Get* เท่านั้น` }
+    if (new RegExp('\\b' + word + '\\b', 'i').test(upper)) {
+      return { error: `⛔ ไม่อนุญาตให้ใช้คำสั่ง ${word} — อนุญาตเฉพาะ SELECT หรือ EXEC Get* เท่านั้น` }
     }
   }
+  // Block system stored procedures (sp_, xp_)
+  if (/\b(SP_|XP_)/i.test(upper)) {
+    return { error: '⛔ ไม่อนุญาตให้เรียก system stored procedures (sp_, xp_)' }
+  }
 
-  const isSelect = trimmed.startsWith('SELECT')
-  const isExecGet = (trimmed.startsWith('EXEC ') || trimmed.startsWith('EXECUTE ')) && /EXEC(?:UTE)?\s+GET/i.test(trimmed)
+  // Step 3: Must start with SELECT or EXEC Get*
+  const isSelect = upper.startsWith('SELECT')
+  const isExecGet = (upper.startsWith('EXEC ') || upper.startsWith('EXECUTE ')) && /EXEC(?:UTE)?\s+GET/i.test(upper)
   if (!isSelect && !isExecGet) {
-    return { error: 'อนุญาตเฉพาะ SELECT หรือ EXEC Get* (Stored Procedures ขึ้นต้นด้วย Get) เท่านั้น' }
+    return { error: '⛔ อนุญาตเฉพาะ SELECT หรือ EXEC Get* (Stored Procedures ขึ้นต้นด้วย Get) เท่านั้น' }
+  }
+
+  // Step 4: Block multiple statements (semicolons) to prevent chained attacks
+  if (stripped.includes(';')) {
+    return { error: '⛔ ไม่อนุญาตให้รัน SQL หลายคำสั่งพร้อมกัน (ห้ามใช้ ;)' }
   }
 
   try {
