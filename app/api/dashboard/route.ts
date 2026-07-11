@@ -483,6 +483,7 @@ export async function GET(req: NextRequest) {
           r.VinNo AS vin,
           i.Model AS model,
           i.ProjectType AS project,
+          r.RentType AS rent_type,
           CASE WHEN r.ReleaseDate IS NOT NULL THEN 'complete' ELSE 'pending' END AS status,
           r.ExpectedReleaseDate AS expected_release_date,
           r.ReleaseDate AS release_date,
