@@ -1169,6 +1169,11 @@ export default function QuickReportPage() {
       return
     }
 
+    if (!selectedLocCode || !selectedLocCode.trim()) {
+      alert('กรุณาเลือกสถานที่ / อู่')
+      return
+    }
+
     setUpdatingLocation(true)
     try {
       const locName = locationOptions.find(o => o.code === selectedLocCode)?.name || 'ไม่ระบุ / นอกสถานที่'
