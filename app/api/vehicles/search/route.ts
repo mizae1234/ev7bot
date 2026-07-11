@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     // Query top 15 matching active vehicles
     let sqlQuery = `
       SELECT TOP 15 
-        i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model, i.Project, i.Status, i.StatusType,
+        i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model, i.Project, i.Status, i.StatusType, i.CurrentLocation,
         s.DescriptionStatus AS StatusName,
         sub.DescriptionStatus AS SubStatusName
       FROM dbo.EV_InventoryItem i

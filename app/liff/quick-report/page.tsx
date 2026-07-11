@@ -1990,6 +1990,14 @@ export default function QuickReportPage() {
                           </span>
                         )}
                       </div>
+                      {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                        <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
+                          <span>📍 สถานที่ปัจจุบัน:</span>
+                          <span className="font-bold text-slate-800">
+                            {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -3193,6 +3201,14 @@ export default function QuickReportPage() {
                     <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
+                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
+                        <span>📍 สถานที่ปัจจุบัน:</span>
+                        <span className="font-bold text-slate-800">
+                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -3439,6 +3455,14 @@ export default function QuickReportPage() {
                         </span>
                       )}
                     </div>
+                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
+                        <span>📍 สถานที่ปัจจุบัน:</span>
+                        <span className="font-bold text-slate-800">
+                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
