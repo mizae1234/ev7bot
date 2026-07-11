@@ -159,7 +159,7 @@ export async function GET(
         SELECT
           m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
           m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
-          m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode,
+          m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode, m.IsActive,
           m.InsuranceCode, m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode, m.ClaimNumber,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
