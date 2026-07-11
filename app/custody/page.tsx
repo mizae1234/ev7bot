@@ -155,6 +155,7 @@ export default function CustodyPage() {
               hoverBorderClass="hover:border-amber-400/50 dark:hover:border-amber-500/50"
               icon="🛠️"
               onRefresh={handleRefresh}
+              showReplacementFilter={true}
             />
 
             <KanbanColumn
