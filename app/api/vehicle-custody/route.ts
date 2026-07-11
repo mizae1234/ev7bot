@@ -255,8 +255,10 @@ export async function GET(req: NextRequest) {
       } else if (status === 'STILL_WORK' && rec.VehicleStatus === 'ON_RENT') {
         column1.push(formattedRecord)
       } else {
-        // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, etc.
-        column2.push(formattedRecord)
+        // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, STILL_WORK (ไม่ใช่ ON_RENT) etc.
+        if (rec.VehicleStatus === 'MAINTENANCE') {
+          column2.push(formattedRecord)
+        }
       }
     })
 
