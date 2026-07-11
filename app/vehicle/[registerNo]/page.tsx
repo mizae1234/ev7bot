@@ -373,30 +373,6 @@ function VehicleDetailContent() {
           </SectionCard>
         )}
 
-        {/* ── All Follow-up Timeline ── */}
-        {allFollowUps.length > 0 && (
-          <SectionCard title={`📋 บันทึกติดตามงานซ่อมบำรุงสะสม (${allFollowUps.length} รายการ)`} color="amber">
-            <div className="space-y-4 pl-3.5 border-l-2 border-slate-200 dark:border-slate-800 ml-1 py-1.5 max-h-[500px] overflow-y-auto pr-1">
-              {allFollowUps.map((log, idx) => (
-                <div key={idx} className="relative text-xs">
-                  <span className="absolute -left-[19.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border border-white dark:border-zinc-900 shadow-sm" />
-                  <div className="flex justify-between text-zinc-550 dark:text-zinc-400 font-semibold mb-1">
-                    <span className="font-mono">{formatDate(log.FollowUpDate || log.CreateDate)}</span>
-                    <span>โดย {log.CreateUserName || `User ${log.CreateUserID || '-'}`}</span>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5">
-                    <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-450 mb-1">
-                      🔧 ใบสั่งซ่อม ID: <span className="font-mono text-zinc-700 dark:text-zinc-300 font-extrabold">#{log.maintId}</span> ({log.issueTitle || 'ไม่ระบุอาการ'})
-                    </p>
-                    <p className="text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed whitespace-pre-line">
-                      {log.FollowUpDetail}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        )}
 
         {/* ── Maintenance History ── */}
         {maintenance.length > 0 && (
@@ -412,6 +388,29 @@ function VehicleDetailContent() {
                       </span>
                       <span className={`text-xs font-bold ${repairStatus.color}`}>{repairStatus.label}</span>
                     </div>
+                    {m.IsActive && m.CarStatusCode !== 'COMPLETE' && (() => {
+                      let nextToDo = ''
+                      let bgColor = ''
+                      let textColor = ''
+                      if (m.CarStatusCode === 'WAITING_FOR_MAINTENANCE' || m.CarStatusCode === 'IN_MAINTENANCE') {
+                        nextToDo = '📌 Next to do : อู่เร่งซ่อมรถ , EV7 ติดตามการซ่อมรถ'
+                        bgColor = 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40'
+                        textColor = 'text-amber-700 dark:text-amber-400'
+                      } else if (m.CarStatusCode === 'STILL_WORK') {
+                        nextToDo = '📌 Next to do : EV7/ICI ติดตามลูกค้าเข้าซ่อม'
+                        bgColor = 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40'
+                        textColor = 'text-blue-700 dark:text-blue-400'
+                      } else if (m.CarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+                        nextToDo = '📌 Next to do : EV7 ติดตามลูกค้าเข้ารับรถ'
+                        bgColor = 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800/40'
+                        textColor = 'text-orange-700 dark:text-orange-400'
+                      }
+                      return nextToDo ? (
+                        <div className={`rounded-lg border px-3 py-2 mb-1 ${bgColor}`}>
+                          <p className={`text-xs font-bold ${textColor}`}>{nextToDo}</p>
+                        </div>
+                      ) : null
+                    })()}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                       <span className="text-zinc-500 dark:text-zinc-400 font-normal">วันเกิดเหตุ: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.IncidentDate)}</span></span>
                       <span className="text-zinc-500 dark:text-zinc-400 font-normal">วันแจ้ง: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.ReportDate)}</span></span>
