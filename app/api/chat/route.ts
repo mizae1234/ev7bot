@@ -18,11 +18,19 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[Chat API] User (${displayName || 'Guest'} / ${userId || 'No ID'}): "${trimmed}"`)
-    const reply = await askButter(trimmed)
-    console.log(`[Chat API] Butter: "${reply.substring(0, 100)}..."`)
+    const startTime = Date.now()
+    const butterResult = await askButter(trimmed)
+    const responseTimeMs = Date.now() - startTime
+    const reply = butterResult.text
+    console.log(`[Chat API] Butter: "${reply.substring(0, 100)}..." (tokens: in=${butterResult.inputTokens} out=${butterResult.outputTokens} time=${responseTimeMs}ms)`)
 
-    // Log web chat to database
-    logChatToDb('web', userId || null, displayName || undefined, trimmed, reply)
+    // Log web chat to database with token data
+    logChatToDb('web', userId || null, displayName || undefined, trimmed, reply, {
+      inputTokens: butterResult.inputTokens,
+      outputTokens: butterResult.outputTokens,
+      modelName: butterResult.modelName,
+      responseTimeMs,
+    })
       .catch((err: any) => console.error('[Chat API logChat Error]', err))
 
     return NextResponse.json({ reply })

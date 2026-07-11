@@ -51,6 +51,7 @@ async function logReplyToDb(replyToken: string, replyMessageText: string) {
   } catch { /* ignore */ }
   
   await logChatToDb(ctx.sourceType, ctx.sourceId, userName, ctx.userMessage, replyMessageText)
+  // Note: token data for AI chats is logged directly at the askButter call site
 }
 
 const originalReplyMessage = lineClient.replyMessage.bind(lineClient)
@@ -2395,8 +2396,19 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       completedTaskId?: number
     } = { userId, userName, userRole, chatSourceType, chatSourceId }
 
-    const aiResponse = await askButter(text, history, userContext)
-    console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..."`)
+    const startTime = Date.now()
+    const butterResult = await askButter(text, history, userContext)
+    const aiResponse = butterResult.text
+    const responseTimeMs = Date.now() - startTime
+    console.log(`[${BOT_NAME} AI] Response: "${aiResponse.substring(0, 200)}..." (tokens: in=${butterResult.inputTokens} out=${butterResult.outputTokens} time=${responseTimeMs}ms)`)
+
+    // Log chat with token data
+    logChatToDb(chatSourceType, chatSourceId, userName, text, aiResponse, {
+      inputTokens: butterResult.inputTokens,
+      outputTokens: butterResult.outputTokens,
+      modelName: butterResult.modelName,
+      responseTimeMs,
+    })
 
     // ─── Try to detect task list or vehicle identifier for Flex Message ───
     let flexSent = false

@@ -28,6 +28,9 @@ function LogChatsContent() {
   const [selectedUser, setSelectedUser] = useState('all')
   const [loading, setLoading] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
+  const [usageData, setUsageData] = useState<any>(null)
+  const [usageLoading, setUsageLoading] = useState(false)
+  const [activeView, setActiveView] = useState<'logs' | 'costs'>('costs')
 
   // Auth / Role States
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -109,6 +112,29 @@ function LogChatsContent() {
     }, refreshInterval * 1000)
     return () => clearInterval(interval)
   }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser, liffUserId, userRole])
+
+  // Fetch usage/cost data
+  useEffect(() => {
+    if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
+      fetchUsage()
+    }
+  }, [isAuthenticated, passcode, liffUserId, userRole])
+
+  const fetchUsage = async () => {
+    setUsageLoading(true)
+    try {
+      const params = new URLSearchParams({ passcode, userId: liffUserId || '' })
+      const res = await fetch(`/api/chat-logs/usage?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUsageData(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch usage', err)
+    } finally {
+      setUsageLoading(false)
+    }
+  }
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -305,6 +331,143 @@ function LogChatsContent() {
           </div>
         </div>
 
+        {/* Tab Toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveView('costs')}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeView === 'costs'
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900'
+            }`}
+          >
+            💰 AI Cost Tracking
+          </button>
+          <button
+            onClick={() => setActiveView('logs')}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeView === 'logs'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900'
+            }`}
+          >
+            💬 Chat Logs
+          </button>
+        </div>
+
+        {/* ═══════ AI Cost Tracking Dashboard ═══════ */}
+        {activeView === 'costs' && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Summary Cards */}
+            {usageData ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* This Month */}
+                  <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-zinc-900 to-zinc-900/50 p-5 shadow-lg">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">ค่าใช้จ่ายเดือนนี้</p>
+                    <p className="text-2xl font-extrabold text-amber-400">฿{usageData.thisMonth.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.thisMonth.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.thisMonth.questions || 0} คำถาม
+                    </p>
+                    <p className="text-[9px] text-zinc-600 mt-0.5">≈ ${usageData.thisMonth.totalCost?.toFixed(4) || '0.0000'} USD</p>
+                  </div>
+
+                  {/* Today */}
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">วันนี้</p>
+                    <p className="text-2xl font-extrabold text-emerald-400">฿{usageData.today.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.today.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.today.questions || 0} คำถาม
+                    </p>
+                    <p className="text-[9px] text-zinc-600 mt-0.5">≈ ${usageData.today.totalCost?.toFixed(4) || '0.0000'} USD</p>
+                  </div>
+
+                  {/* Last 7 Days */}
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">7 วันที่ผ่านมา</p>
+                    <p className="text-2xl font-extrabold text-sky-400">฿{usageData.last7Days.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.last7Days.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.last7Days.questions || 0} คำถาม
+                    </p>
+                    <p className="text-[9px] text-zinc-600 mt-0.5">≈ ${usageData.last7Days.totalCost?.toFixed(4) || '0.0000'} USD</p>
+                  </div>
+                </div>
+
+                {/* Pricing Info */}
+                <div className="flex flex-wrap items-center gap-3 text-[10px] text-zinc-500 px-1">
+                  <span className="text-amber-500/70">⚡</span>
+                  <span>อัตราราคา: <span className="text-zinc-400 font-semibold">input ${usageData.pricing?.inputPer1M}/1M</span> · <span className="text-zinc-400 font-semibold">output ${usageData.pricing?.outputPer1M}/1M</span> · <span className="text-zinc-400 font-semibold">{usageData.pricing?.exchangeRate} บาท/USD</span></span>
+                  <span className="text-zinc-700">|</span>
+                  <span>Model: <span className="text-zinc-400 font-mono font-semibold">{usageData.pricing?.currentModel}</span></span>
+                  <button onClick={fetchUsage} className="ml-auto text-[10px] text-zinc-600 hover:text-emerald-400 transition">🔄 รีเฟรช</button>
+                </div>
+
+                {/* Recent Logs Table */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-zinc-300">📊 คำถามล่าสุด {usageData.recentLogs?.length || 0} รายการ</h3>
+                    <span className="text-[10px] text-zinc-600">เฉพาะที่มีข้อมูล Token</span>
+                  </div>
+                  <div className="divide-y divide-zinc-800/50 max-h-[600px] overflow-y-auto">
+                    {usageData.recentLogs?.length > 0 ? (
+                      usageData.recentLogs.map((log: any) => (
+                        <div key={log.id} className="px-4 py-3 hover:bg-zinc-800/30 transition flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-bold text-zinc-400">{log.userName || 'Unknown'}</span>
+                              {log.modelName && log.modelName !== 'gemini-3.5-flash' && (
+                                <span className="text-[8px] text-zinc-600 font-mono bg-zinc-800 px-1 rounded">{log.modelName}</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-zinc-400 truncate">{log.userMessage}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span className="text-[9px] text-zinc-600">
+                                in {(log.inputTokens || 0).toLocaleString()} · out {(log.outputTokens || 0).toLocaleString()} · {(log.totalTokens || 0).toLocaleString()} tokens
+                              </span>
+                              {log.responseTimeMs && (
+                                <span className="text-[9px] text-zinc-700">{log.responseTimeMs}ms</span>
+                              )}
+                              <span className="text-[9px] text-zinc-600">
+                                {new Date(log.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className={`text-xs font-bold ${
+                              (log.costTHB || 0) > 0.5 ? 'text-rose-400' :
+                              (log.costTHB || 0) > 0.1 ? 'text-amber-400' :
+                              'text-emerald-400'
+                            }`}>
+                              ฿{(log.costTHB || 0).toFixed(4)}
+                            </span>
+                            <p className="text-[8px] text-zinc-600">${(log.costUSD || 0).toFixed(6)}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-xs text-zinc-600">ยังไม่มีข้อมูล Token — ข้อมูลจะเริ่มปรากฏหลังจาก DB schema ถูกอัปเดต</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : usageLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-xs text-zinc-600">ไม่สามารถโหลดข้อมูลค่าใช้จ่ายได้</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeView === 'logs' && (
+        <>
+        {/* ═══════ Original Chat Logs Section ═══════ */}
+
         {/* Filter Controls */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
           <div>
@@ -463,6 +626,8 @@ function LogChatsContent() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   )

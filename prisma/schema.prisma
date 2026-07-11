@@ -74,13 +74,17 @@ model ClaimLog {
 }
 
 model ChatLog {
-  id          Int      @id @default(autoincrement())
-  sourceType  String   @map("source_type") @db.VarChar(20)
-  sourceId    String?  @map("source_id") @db.VarChar(50)
-  userName    String?  @map("user_name") @db.VarChar(255)
-  userMessage String   @map("user_message") @db.Text
-  botReply    String   @map("bot_reply") @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             Int      @id @default(autoincrement())
+  sourceType     String   @map("source_type") @db.VarChar(20)
+  sourceId       String?  @map("source_id") @db.VarChar(50)
+  userName       String?  @map("user_name") @db.VarChar(255)
+  userMessage    String   @map("user_message") @db.Text
+  botReply       String   @map("bot_reply") @db.Text
+  inputTokens    Int?     @map("input_tokens")
+  outputTokens   Int?     @map("output_tokens")
+  modelName      String?  @map("model_name") @db.VarChar(50)
+  responseTimeMs Int?     @map("response_time_ms")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("chat_logs")
 }

@@ -335,16 +335,27 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// ─── Response type ─────────────────────────────────────────────────
+
+export interface ButterResponse {
+  text: string
+  inputTokens: number
+  outputTokens: number
+  modelName: string
+}
+
 // ─── Main Chat Function (with retry) ──────────────────────────────
 
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
+const GEMINI_MODEL_NAME = 'gemini-3.5-flash'
+
 export async function askButter(
   userMessage: string,
   history: any[] = [],
   userContext?: { userId?: string; userName?: string; userRole?: string }
-): Promise<string> {
+): Promise<ButterResponse> {
   let lastError: unknown = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -372,13 +383,13 @@ export async function askButter(
   const message = lastError instanceof Error ? lastError.message : String(lastError)
 
   if (message.includes('API key') || message.includes('API_KEY_INVALID')) {
-    return 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑'
+    return { text: 'Butter ยังไม่พร้อมใช้งาน AI ค่ะ — กรุณาตรวจสอบ Gemini API Key 🔑', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
   }
   if (message.includes('quota') || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
-    return 'ขออภัยค่ะ 🧈 ตอนนี้ Butter ใช้ Token เกินโควต้าที่กำหนดไว้แล้วค่ะ กรุณารอสักครู่แล้วลองถามใหม่อีกครั้งนะคะ 💛'
+    return { text: 'ขออภัยค่ะ 🧈 ตอนนี้ Butter ใช้ Token เกินโควต้าที่กำหนดไว้แล้วค่ะ กรุณารอสักครู่แล้วลองถามใหม่อีกครั้งนะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
   }
 
-  return 'ขออภัยค่ะ 🧈 Butter มีปัญหาเล็กน้อย กรุณาลองใหม่อีกสักครู่นะคะ 💛'
+  return { text: 'ขออภัยค่ะ 🧈 Butter มีปัญหาเล็กน้อย กรุณาลองใหม่อีกสักครู่นะคะ 💛', inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_NAME }
 }
 
 // ─── Single attempt ────────────────────────────────────────────────
@@ -387,7 +398,7 @@ async function _askButterOnce(
   userMessage: string,
   history: any[] = [],
   userContext?: { userId?: string; userName?: string; userRole?: string }
-): Promise<string> {
+): Promise<ButterResponse> {
   const now = new Date()
   const bkkDateStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Bangkok',
@@ -540,6 +551,12 @@ async function _askButterOnce(
     console.warn(`[askButter] Hit max iterations (${maxIterations}), forcing text extraction`)
   }
 
+  // Extract token usage metadata
+  const usage = response.response.usageMetadata
+  const inputTokens = usage?.promptTokenCount || 0
+  const outputTokens = usage?.candidatesTokenCount || 0
+  console.log(`[askButter] Token usage — input: ${inputTokens}, output: ${outputTokens}, total: ${inputTokens + outputTokens}`)
+
   // Extract text response (with fallback)
   let text = ''
   try {
@@ -554,7 +571,8 @@ async function _askButterOnce(
   }
 
   console.log(`[askButter] Final text response (${iterations} iterations): "${text.substring(0, 200)}"`)
-  return text || 'ขออภัยค่ะ 🧈 Butter ดึงข้อมูลมาแล้วแต่ยังสรุปไม่ได้ค่ะ ลองถามใหม่แบบเจาะจงขึ้นนะคะ เช่น "ซ่อมค้างกี่คัน" หรือ "สถานะรถ ทอ-3791" 💛'
+  const finalText = text || 'ขออภัยค่ะ 🧈 Butter ดึงข้อมูลมาแล้วแต่ยังสรุปไม่ได้ค่ะ ลองถามใหม่แบบเจาะจงขึ้นนะคะ เช่น "ซ่อมค้างกี่คัน" หรือ "สถานะรถ ทอ-3791" 💛'
+  return { text: finalText, inputTokens, outputTokens, modelName: GEMINI_MODEL_NAME }
 }
 
 export async function analyzeClaimMessage(message: string): Promise<{
