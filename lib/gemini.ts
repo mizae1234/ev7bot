@@ -401,56 +401,35 @@ const GEMINI_MODEL_FULL = 'gemini-3.5-flash'
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
 
 // Classify whether a question needs the full model or the lite model
+// IMPORTANT: lite model hallucinates data (e.g. wrong car model) during function calling,
+// so it should ONLY be used for casual chat / greetings / task notes — NOT for data queries.
 function selectModel(userMessage: string): string {
   const msg = userMessage.toLowerCase().trim()
 
-  // ─── Step 1: Vehicle pattern detection (HIGHEST PRIORITY) ─────
-  // If the message contains a license plate or VIN, it's a vehicle lookup → lite model
-  const hasVehicleId = /[ก-ฮ]{2}[\s\-]?\d{3,4}/.test(msg)          // ทอ-3791, กข1234
-    || /^\d{3,4}$/.test(msg.trim())                                    // just "3791"
-    || (/^[ก-ฮ]{2}/.test(msg.trim()) && msg.length <= 15)             // "ทอ 3791"
-    || /L[A-Z0-9]{10,16}/i.test(msg)                                   // VIN like LSJA24U...
-
-  if (hasVehicleId) return GEMINI_MODEL_LITE
-
-  // ─── Step 2: Analytical keywords → full model ─────
-  const analyticalKeywords = [
-    'วิเคราะห์', 'เปรียบเทียบ', 'สรุป', 'ทำไม', 'เหตุผล', 'แนวโน้ม',
-    'ค่าเฉลี่ย', 'เฉลี่ย', 'สถิติ', 'รายงาน', 'report',
-    'cycle time', 'production time', 'เวลาเฉลี่ย', 'กี่วัน',
-    'สรุปรายงาน', 'รายงานประจำวัน', 'ภาพรวม', 'portfolio',
-    'ย้อนหลัง', 'trend', 'กราฟ',
-    'ทั้งหมด', 'รวม', 'ยอด', 'เดือนนี้', 'เดือนที่แล้ว',
-    'คำนวณ', 'หาค่า', 'predict', 'forecast',
-    'เปรียบ', 'ต่างกัน', 'มากกว่า', 'น้อยกว่า',
-    'follow', 'ติดตาม', 'อัปเดต',
+  // ─── Lite model: ONLY for non-data queries ─────
+  // These don't require function calling or interpreting database results
+  const liteKeywords = [
+    // Greetings & casual
+    'สวัสดี', 'ขอบคุณ', 'หวัดดี', 'ดีค่ะ', 'ดีครับ', 'บาย',
+    'เหนื่อย', 'เหงา', 'ลาก่อน', 'ไงจ๊ะ', 'หวัดดีค่ะ',
+    // Task notes (simple CRUD, no data interpretation)
+    'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน', 'งานค้าง', 'ดูงาน',
+    'ลบโน้ต', 'ลบงาน', 'task', 'โน้ต',
   ]
 
-  for (const kw of analyticalKeywords) {
-    if (msg.includes(kw)) return GEMINI_MODEL_FULL
-  }
-
-  // ─── Step 3: Simple keywords → lite model ─────
-  const simpleKeywords = [
-    'สถานะ', 'ดูรถ', 'ทะเบียน', 'เช็ค',
-    'สวัสดี', 'ขอบคุณ', 'หวัดดี', 'ดีค่ะ', 'ดีครับ',
-    'มีกี่คัน', 'จำนวน',
-    'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน',
-    'vin', 'เลขตัวถัง',
-    'รถคัน', 'ค้นหา', 'หารถ',
-    'ประวัติ', 'ปล่อยเช่า', 'ซ่อม', 'ส่งมอบ',
-  ]
-
-  for (const kw of simpleKeywords) {
+  for (const kw of liteKeywords) {
     if (msg.includes(kw)) return GEMINI_MODEL_LITE
   }
 
-  // ─── Step 4: Length heuristic ─────
-  if (msg.length <= 30) return GEMINI_MODEL_LITE
+  // Very short casual messages without data intent (e.g. "butter", "โอเค")
+  if (msg.length <= 10 && !/\d/.test(msg) && !/[ก-ฮ]{2}/.test(msg)) {
+    return GEMINI_MODEL_LITE
+  }
 
-  // Default to lite — analysis shows 97.8% of messages are classified,
-  // and the 2.2% unmatched are casual/chat messages that lite handles well
-  return GEMINI_MODEL_LITE
+  // ─── Everything else → full model ─────
+  // Vehicle lookups, status checks, reports, history, analytics
+  // All require function calling + accurate data interpretation
+  return GEMINI_MODEL_FULL
 }
 
 export async function askButter(
