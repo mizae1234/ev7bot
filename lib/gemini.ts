@@ -404,20 +404,33 @@ const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'
 function selectModel(userMessage: string): string {
   const msg = userMessage.toLowerCase().trim()
 
-  // Keywords that indicate analytical/complex questions → use full model
+  // ─── Step 1: Vehicle pattern detection (HIGHEST PRIORITY) ─────
+  // If the message contains a license plate or VIN, it's a vehicle lookup → lite model
+  const hasVehicleId = /[ก-ฮ]{2}[\s\-]?\d{3,4}/.test(msg)          // ทอ-3791, กข1234
+    || /^\d{3,4}$/.test(msg.trim())                                    // just "3791"
+    || (/^[ก-ฮ]{2}/.test(msg.trim()) && msg.length <= 15)             // "ทอ 3791"
+    || /L[A-Z0-9]{10,16}/i.test(msg)                                   // VIN like LSJA24U...
+
+  if (hasVehicleId) return GEMINI_MODEL_LITE
+
+  // ─── Step 2: Analytical keywords → full model ─────
   const analyticalKeywords = [
     'วิเคราะห์', 'เปรียบเทียบ', 'สรุป', 'ทำไม', 'เหตุผล', 'แนวโน้ม',
     'ค่าเฉลี่ย', 'เฉลี่ย', 'สถิติ', 'รายงาน', 'report',
     'cycle time', 'production time', 'เวลาเฉลี่ย', 'กี่วัน',
     'สรุปรายงาน', 'รายงานประจำวัน', 'ภาพรวม', 'portfolio',
-    'ประวัติ', 'ย้อนหลัง', 'trend', 'กราฟ',
+    'ย้อนหลัง', 'trend', 'กราฟ',
     'ทั้งหมด', 'รวม', 'ยอด', 'เดือนนี้', 'เดือนที่แล้ว',
     'คำนวณ', 'หาค่า', 'predict', 'forecast',
     'เปรียบ', 'ต่างกัน', 'มากกว่า', 'น้อยกว่า',
     'follow', 'ติดตาม', 'อัปเดต',
   ]
 
-  // Keywords that indicate simple/status lookups → use lite model
+  for (const kw of analyticalKeywords) {
+    if (msg.includes(kw)) return GEMINI_MODEL_FULL
+  }
+
+  // ─── Step 3: Simple keywords → lite model ─────
   const simpleKeywords = [
     'สถานะ', 'ดูรถ', 'ทะเบียน', 'เช็ค',
     'สวัสดี', 'ขอบคุณ', 'หวัดดี', 'ดีค่ะ', 'ดีครับ',
@@ -425,26 +438,14 @@ function selectModel(userMessage: string): string {
     'จดโน้ต', 'จดงาน', 'บันทึก', 'ปิดงาน',
     'vin', 'เลขตัวถัง',
     'รถคัน', 'ค้นหา', 'หารถ',
+    'ประวัติ', 'ปล่อยเช่า', 'ซ่อม', 'ส่งมอบ',
   ]
 
-  // Check analytical first (takes priority over simple)
-  for (const kw of analyticalKeywords) {
-    if (msg.includes(kw)) return GEMINI_MODEL_FULL
-  }
-
-  // Check simple keywords
   for (const kw of simpleKeywords) {
     if (msg.includes(kw)) return GEMINI_MODEL_LITE
   }
 
-  // Pattern-based detection: Thai license plate prefix (ทอ, กข, ษร, etc.) or 3-4 digit numbers
-  // These are almost always vehicle lookups → lite model
-  if (/[ก-ฮ]{2}[\s\-]?\d{3,4}/.test(msg)) return GEMINI_MODEL_LITE   // ทอ-3791, กข1234
-  if (/^\d{3,4}$/.test(msg.trim())) return GEMINI_MODEL_LITE            // just "3791"
-  if (/^[ก-ฮ]{2}/.test(msg.trim()) && msg.length <= 15) return GEMINI_MODEL_LITE  // "ทอ 3791" or just "ทอ"
-  if (/^L[A-Z0-9]{10,16}$/i.test(msg.trim())) return GEMINI_MODEL_LITE  // VIN starting with L
-
-  // Message length heuristic: short messages tend to be simple
+  // ─── Step 4: Length heuristic ─────
   if (msg.length <= 30) return GEMINI_MODEL_LITE
 
   // Default to full model for safety
