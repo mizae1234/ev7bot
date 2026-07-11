@@ -243,12 +243,12 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
         {card.vehicleStatus === 'AVAILABLE' ? null : card.finishDate ? (
           card.replacementVin && (
             <div className="bg-amber-50/70 border border-amber-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/20 dark:text-amber-300 font-medium">
-              🔄 สลับรถคืน: {card.replacementRegisterNo || card.replacementVin}
+              🟢 มีรถทดแทน: {card.replacementRegisterNo || card.replacementVin}{card.replacementVin && card.replacementRegisterNo ? ` (${card.replacementVin})` : ''}
             </div>
           )
         ) : card.replacementVin ? (
           <div className="bg-emerald-50/70 border border-emerald-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/20 dark:text-emerald-300 font-medium">
-            🟢 มีรถทดแทน: {card.replacementRegisterNo || card.replacementVin}
+            🟢 มีรถทดแทน: {card.replacementRegisterNo || card.replacementVin}{card.replacementVin && card.replacementRegisterNo ? ` (${card.replacementVin})` : ''}
           </div>
         ) : (
           !['STILL_WORK', 'COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(card.carStatusCode || '') && card.vehicleStatus !== 'ON_RENT' && (
