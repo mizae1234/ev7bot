@@ -202,7 +202,7 @@ export function CustodyDrawer({ card, onClose, onRefresh }: CustodyDrawerProps) 
                   ) : !['STILL_WORK', 'COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(card.carStatusCode || '') && card.vehicleStatus !== 'ON_RENT' ? (
                     <div className="flex items-center justify-between text-xs bg-rose-50/50 text-rose-800 p-4 rounded-2xl border border-rose-100/30 dark:bg-rose-950/20 dark:text-rose-300">
                       <div>
-                        <span className="block font-bold text-rose-600 dark:text-rose-400 mb-0.5">⚠️ ต้องการรถทดแทนด่วน</span>
+                        <span className="block font-bold text-rose-600 dark:text-rose-400 mb-0.5">⚠️ ไม่มีรถทดแทน</span>
                         <span>สัญญาลูกค้าจอดซ่อมสะสมยังไม่มีรถทดแทน</span>
                       </div>
                       <Badge variant="danger">ขอรถทดแทน</Badge>

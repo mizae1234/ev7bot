@@ -253,7 +253,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
         ) : (
           !['STILL_WORK', 'COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(card.carStatusCode || '') && card.vehicleStatus !== 'ON_RENT' && (
             <div className="bg-rose-50/70 border border-rose-100/50 px-2.5 py-1.5 rounded-lg text-[11px] text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/20 dark:text-rose-300 font-bold animate-pulse">
-              ⚠️ ต้องการรถทดแทนด่วน!
+              ⚠️ ไม่มีรถทดแทน
             </div>
           )
         )}
@@ -311,7 +311,7 @@ export function KanbanCard({ card, accentColorClass, hoverBorderClass, icon, onR
                   {card.replacementVin ? (
                     <span className="font-semibold text-emerald-700 dark:text-emerald-450">มี ({card.replacementRegisterNo || card.replacementVin})</span>
                   ) : !['STILL_WORK', 'COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(card.carStatusCode || '') && card.vehicleStatus !== 'ON_RENT' ? (
-                    <span className="font-bold text-rose-600 dark:text-rose-400">⚠️ ต้องการด่วน!</span>
+                    <span className="font-bold text-rose-600 dark:text-rose-400">⚠️ ไม่มีรถทดแทน</span>
                   ) : (
                     <span className="text-zinc-400">ไม่ต้องใช้ (รถขับปกติ)</span>
                   )}
