@@ -252,7 +252,7 @@ export async function GET(req: NextRequest) {
         // ปิดเคสแล้ว ไม่ต้องแสดงในบอร์ด
       } else if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
         column3.push(formattedRecord)
-      } else if (status === 'STILL_WORK') {
+      } else if (status === 'STILL_WORK' && rec.VehicleStatus === 'ON_RENT') {
         column1.push(formattedRecord)
       } else {
         // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, etc.
