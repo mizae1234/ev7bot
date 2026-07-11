@@ -248,12 +248,14 @@ export async function GET(req: NextRequest) {
       // Categorize based on VehicleStatus first, then CarStatusCode
       if (isAvailable) {
         column4.push(formattedRecord)
+      } else if (status === 'COMPLETE') {
+        // ปิดเคสแล้ว ไม่ต้องแสดงในบอร์ด
       } else if (status === 'READY_PICKUP_MAINTENANCE' && rec.VehicleStatus === 'MAINTENANCE') {
         column3.push(formattedRecord)
       } else if (status === 'STILL_WORK') {
         column1.push(formattedRecord)
       } else {
-        // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, COMPLETE, etc.
+        // WAITING_FOR_MAINTENANCE, IN_MAINTENANCE, etc.
         column2.push(formattedRecord)
       }
     })
