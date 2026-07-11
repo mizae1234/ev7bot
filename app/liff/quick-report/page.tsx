@@ -272,6 +272,31 @@ export default function QuickReportPage() {
   const [editDetailDeletedPhotoIds, setEditDetailDeletedPhotoIds] = useState<number[]>([])
   const [savingDetailEdit, setSavingDetailEdit] = useState(false)
 
+  // Beautiful Custom Alert Modal State & Function override
+  const [alertConfig, setAlertConfig] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'warning' | 'info'; title: string } | null>(null)
+
+  const alert = (message: string) => {
+    let type: 'success' | 'error' | 'warning' | 'info' = 'warning'
+    let title = 'คำแนะนำ'
+
+    const msgLower = message.toLowerCase()
+    if (msgLower.includes('สำเร็จ') || msgLower.includes('เรียบร้อย')) {
+      type = 'success'
+      title = 'สำเร็จ'
+    } else if (msgLower.includes('ไม่สำเร็จ') || msgLower.includes('เกิดข้อผิดพลาด') || msgLower.includes('ไม่พบ') || msgLower.includes('ล้มเหลว') || msgLower.includes('ไม่มี') || msgLower.includes('ผิด')) {
+      type = 'error'
+      title = 'ข้อผิดพลาด'
+    } else if (msgLower.includes('กรุณา') || msgLower.includes('ต้อง')) {
+      type = 'warning'
+      title = 'คำแนะนำ'
+    } else {
+      type = 'info'
+      title = 'แจ้งเตือน'
+    }
+
+    setAlertConfig({ show: true, message, type, title })
+  }
+
   // Tab 2 Quick Follow-up States
   const [quickLogs, setQuickLogs] = useState<Record<number, string>>({})
   const [savingQuickLogId, setSavingQuickLogId] = useState<number | null>(null)
@@ -531,6 +556,10 @@ export default function QuickReportPage() {
       }
       if (!closeCurrentLocation) {
         alert('กรุณาระบุสถานที่ปัจจุบัน')
+        return
+      }
+      if (closeAttachments.length === 0) {
+        alert('กรุณาแนบหลักฐานการรับรถ หรือหลักฐานการปิดงาน อย่างน้อย 1 ภาพ')
         return
       }
 
@@ -2498,8 +2527,12 @@ export default function QuickReportPage() {
                         </div>
 
                         <div>
-                          <label className="text-[10px] font-bold text-slate-500 block mb-1">แนบรูปภาพ/ไฟล์</label>
-                          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center cursor-pointer hover:bg-slate-50 transition relative">
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">แนบรูปภาพ/ไฟล์ <span className="text-rose-500">*</span></label>
+                          <div className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer hover:bg-slate-50 transition relative ${
+                            closeFormSubmitted && closeAttachments.length === 0
+                              ? 'border-rose-500 bg-rose-50/10'
+                              : 'border-slate-200'
+                          }`}>
                             <input
                               type="file"
                               multiple
@@ -2517,6 +2550,9 @@ export default function QuickReportPage() {
                               <p className="text-[9px] text-slate-400">รองรับการอัปโหลดหลายไฟล์ ทั้งรูปภาพและไฟล์เอกสาร</p>
                             </div>
                           </div>
+                          {closeFormSubmitted && closeAttachments.length === 0 && (
+                            <span className="text-[9px] text-rose-500 font-bold mt-1.5 block text-left">กรุณาแนบหลักฐานการรับรถ หรือหลักฐานการปิดงาน อย่างน้อย 1 ภาพ</span>
+                          )}
                           {closeAttachments.length > 0 && (
                             <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
                               <span>📸 เลือกรูปภาพแล้ว {closeAttachments.length} รูป:</span>
@@ -3461,19 +3497,51 @@ export default function QuickReportPage() {
 
             {selectedCar && (
               <form onSubmit={handleUpdateLocation} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4 animate-fade-in-up">
-                {/* Select Maintenance Ticket */}
+                {/* Select Update Mode */}
                 {pendingTickets.length > 0 && (
-                  <div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 block">🎯 รูปแบบการอัปเดตสถานที่</label>
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (pendingTickets.length > 0) {
+                            setSelectedMaintId(pendingTickets[0].MaintenanceItemID)
+                          }
+                        }}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                          selectedMaintId !== 0
+                            ? 'bg-white text-indigo-650 shadow-sm border border-slate-200/50'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        <span>📝 อัปเดตในใบงานซ่อม</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMaintId(0)
+                        }}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                          selectedMaintId === 0
+                            ? 'bg-white text-indigo-650 shadow-sm border border-slate-200/50'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        <span>🚗 อัปเดตตัวรถโดยตรง</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Select Maintenance Ticket */}
+                {pendingTickets.length > 0 && selectedMaintId !== 0 && (
+                  <div className="animate-fade-in">
                     <label className="text-xs font-bold text-slate-600 block mb-1.5">📝 เลือกงานซ่อมที่ต้องการเปลี่ยนสถานที่</label>
                     <select
-                      value={selectedMaintId || 'direct_inventory'}
+                      value={selectedMaintId}
                       onChange={(e) => {
-                        const val = e.target.value
-                        if (val === 'direct_inventory') {
-                          setSelectedMaintId(0)
-                        } else {
-                          setSelectedMaintId(Number(val))
-                        }
+                        setSelectedMaintId(Number(e.target.value))
                       }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-3 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 transition font-bold"
                     >
@@ -3482,8 +3550,17 @@ export default function QuickReportPage() {
                           [{t.CarStatusDescription}] {t.IssueTitle.slice(0, 30)}... (#{t.MaintenanceItemID})
                         </option>
                       ))}
-                      <option value="direct_inventory">📍 เปลี่ยนสถานที่ปัจจุบันของตัวรถ (ไม่อิงงานซ่อม)</option>
                     </select>
+                  </div>
+                )}
+
+                {/* Direct Update Note */}
+                {pendingTickets.length > 0 && selectedMaintId === 0 && (
+                  <div className="bg-amber-50/50 border border-amber-200/70 rounded-2xl p-3 text-xxs text-amber-800 flex items-start gap-2 animate-fade-in">
+                    <span className="text-sm leading-none">💡</span>
+                    <span>
+                      <strong>อัปเดตสถานที่ตัวรถโดยตรง:</strong> การอัปเดตนี้จะมีผลกับสถานที่ปัจจุบันของตัวรถเท่านั้น โดยจะไม่เชื่อมโยงหรือเปลี่ยนแปลงสถานที่ใดๆ ในใบงานซ่อม
+                    </span>
                   </div>
                 )}
 
@@ -3944,6 +4021,43 @@ export default function QuickReportPage() {
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">คู่มือ</span>
         </button>
       </nav>
+
+      {/* Custom Alert Modal */}
+      {alertConfig?.show && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-100 animate-scale-up space-y-4 text-center">
+            <div className="flex justify-center">
+              {alertConfig.type === 'success' && (
+                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-3xl border border-emerald-100 text-emerald-600">✅</div>
+              )}
+              {alertConfig.type === 'error' && (
+                <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center text-3xl border border-rose-100 text-rose-600">❌</div>
+              )}
+              {alertConfig.type === 'warning' && (
+                <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-3xl border border-amber-100 text-amber-600">⚠️</div>
+              )}
+              {alertConfig.type === 'info' && (
+                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-3xl border border-indigo-100 text-indigo-650">ℹ️</div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-base font-bold text-slate-800">
+                {alertConfig.title}
+              </h4>
+              <p className="text-xs font-semibold text-slate-500 leading-relaxed whitespace-pre-line">
+                {alertConfig.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAlertConfig(prev => prev ? { ...prev, show: false } : null)}
+              className="w-full bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white font-bold py-3 px-6 rounded-2xl transition text-xs shadow-sm"
+            >
+              ตกลง
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tailwind Animation utilities injected locally */}
       <style jsx global>{`
