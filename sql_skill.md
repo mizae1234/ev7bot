@@ -487,6 +487,49 @@ EXEC GetEV_DeliveryCalendar @BeginDate='2026-06-01', @EndDate='2026-06-30'
 
 ---
 
+### Production Cycle Time (เวลาเฉลี่ยในการผลิตรถ)
+
+**วิธีคำนวณ**: ดูจาก `StartDate` (วันเริ่มกระบวนการผลิตชิ้นแรก) ถึง `ProductionCompleteDate` (วันผลิตเสร็จสมบูรณ์)
+
+**วิธีที่ 1 — จาก EV_ProductionPlan + EV_InventoryItem:**
+```sql
+SELECT 
+  AVG(DATEDIFF(DAY, StartDate, ProductionCompleteDate)) as AvgProductionDays,
+  COUNT(DISTINCT VinNo) as TotalCars
+FROM (
+  SELECT p.VinNo, MIN(p.StartDate) as StartDate, i.ProductionCompleteDate
+  FROM EV_ProductionPlan p
+  JOIN EV_InventoryItem i ON p.InventoryItemID = i.InventoryItemID
+  WHERE i.ProductionCompleteDate IS NOT NULL 
+    AND p.StartDate IS NOT NULL 
+    AND p.IsActive = 1
+  GROUP BY p.VinNo, i.ProductionCompleteDate
+) sub
+```
+
+**วิธีที่ 2 — จาก EV_InventoryItem โดยตรง (fallback):**
+```sql
+SELECT 
+  AVG(DATEDIFF(DAY, CreatedDate, ProductionCompleteDate)) as AvgDays
+FROM EV_InventoryItem 
+WHERE ProductionCompleteDate IS NOT NULL 
+  AND CreatedDate IS NOT NULL 
+  AND IsActive = 1
+```
+
+**วิธีที่ 3 — รัน SP แล้วดูข้อมูลดิบ:**
+```sql
+EXEC GetEV_Report_ProductionCar
+```
+ผลลัพธ์จะมี `StartDate`, `FinishDate`, `ProductionCompleteDate` ของแต่ละขั้นตอน (ProcedureName) สามารถนำมาคำนวณ DATEDIFF ได้
+
+**หมายเหตุ:**
+- `ProductionCompleteDate` = วันที่รถผลิตเสร็จสมบูรณ์ทุกขั้นตอน
+- `StartDate` / `FinishDate` = วันเริ่ม/สิ้นสุดของแต่ละ Procedure (ขั้นตอน)
+- `ProcedureName` = ชื่อขั้นตอนการผลิต เช่น ตรวจรถ, ติดฟิล์ม, ติดตั้ง GPS
+- `VendorName` = ผู้รับเหมาแต่ละขั้นตอน
+
+---
 ## 9. Reports
 
 ### `GetEV_Report_OnRentCar` ⭐
