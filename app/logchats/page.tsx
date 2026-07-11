@@ -30,7 +30,7 @@ function LogChatsContent() {
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
   const [usageData, setUsageData] = useState<any>(null)
   const [usageLoading, setUsageLoading] = useState(false)
-  const [activeView, setActiveView] = useState<'logs' | 'costs'>('costs')
+  const [activeView, setActiveView] = useState<'logs' | 'costs' | 'autoclaim'>('costs')
 
   // Auth / Role States
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -341,7 +341,17 @@ function LogChatsContent() {
                 : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900'
             }`}
           >
-            💰 AI Cost Tracking
+            💰 AI Cost
+          </button>
+          <button
+            onClick={() => setActiveView('autoclaim')}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeView === 'autoclaim'
+                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900'
+            }`}
+          >
+            🔍 AutoClaim Cost
           </button>
           <button
             onClick={() => setActiveView('logs')}
@@ -499,6 +509,90 @@ function LogChatsContent() {
             ) : (
               <div className="text-center py-12">
                 <p className="text-xs text-zinc-600">ไม่สามารถโหลดข้อมูลค่าใช้จ่ายได้</p>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ═══════ AutoClaim Cost Tab ═══════ */}
+        {activeView === 'autoclaim' && (
+          <div className="space-y-4 animate-fade-in">
+            {usageData?.autoclaim ? (
+              <>
+                {/* AutoClaim Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-2xl border border-rose-500/20 bg-gradient-to-br from-zinc-900 to-zinc-900/50 p-5 shadow-lg">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">AutoClaim เดือนนี้</p>
+                    <p className="text-2xl font-extrabold text-rose-400">฿{usageData.autoclaim.thisMonth.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.autoclaim.thisMonth.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.autoclaim.thisMonth.calls || 0} ครั้ง
+                    </p>
+                    <p className="text-[9px] text-zinc-600 mt-0.5">≈ ${usageData.autoclaim.thisMonth.totalCost?.toFixed(6) || '0.000000'} USD</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">วันนี้</p>
+                    <p className="text-2xl font-extrabold text-rose-300">฿{usageData.autoclaim.today.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.autoclaim.today.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.autoclaim.today.calls || 0} ครั้ง
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                    <p className="text-[11px] text-zinc-500 font-semibold mb-1">7 วันที่ผ่านมา</p>
+                    <p className="text-2xl font-extrabold text-rose-300">฿{usageData.autoclaim.last7Days.totalCostTHB?.toFixed(2) || '0.00'}</p>
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      {((usageData.autoclaim.last7Days.totalTokens || 0) / 1000).toFixed(1)}K tokens · {usageData.autoclaim.last7Days.calls || 0} ครั้ง
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pricing note */}
+                <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-1">
+                  <span className="text-rose-500/70">🔍</span>
+                  <span>Model: <span className="text-zinc-400 font-mono">gemini-3.1-flash-lite</span> · in $0.25/1M · out $1.50/1M</span>
+                  <button onClick={fetchUsage} className="ml-auto text-[10px] text-zinc-600 hover:text-rose-400 transition">🔄 รีเฟรช</button>
+                </div>
+
+                {/* AutoClaim Recent Logs */}
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-800">
+                    <h3 className="text-xs font-bold text-zinc-300">📋 AutoClaim ล่าสุด {usageData.autoclaim.recentLogs?.length || 0} รายการ</h3>
+                  </div>
+                  <div className="divide-y divide-zinc-800/50 max-h-[500px] overflow-y-auto">
+                    {usageData.autoclaim.recentLogs?.length > 0 ? (
+                      usageData.autoclaim.recentLogs.map((log: any) => (
+                        <div key={log.id} className="px-4 py-3 hover:bg-zinc-800/30 transition flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-zinc-400 truncate">{log.userMessage}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[9px] text-zinc-600">
+                                in {(log.inputTokens || 0).toLocaleString()} · out {(log.outputTokens || 0).toLocaleString()}
+                              </span>
+                              <span className="text-[9px] text-zinc-600">
+                                {new Date(log.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-rose-400 shrink-0">
+                            ฿{(log.costTHB || 0).toFixed(4)}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-xs text-zinc-600">ยังไม่มีข้อมูล AutoClaim — จะเริ่มปรากฏเมื่อมีการแจ้งซ่อมในกลุ่ม</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : usageLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-3 border-rose-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-xs text-zinc-600">ไม่สามารถโหลดข้อมูล AutoClaim ได้</p>
               </div>
             )}
           </div>

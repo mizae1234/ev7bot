@@ -95,6 +95,8 @@ export async function GET(req: NextRequest) {
 
     // Only count records that have token data (non-null)
     const tokenFilter = { inputTokens: { not: null } }
+    const chatFilter = { ...tokenFilter, sourceType: { not: 'autoclaim' } }
+    const autoclaimFilter = { ...tokenFilter, sourceType: 'autoclaim' }
 
     // Fetch all aggregations in parallel
     const [
@@ -102,12 +104,17 @@ export async function GET(req: NextRequest) {
       todayLogs,
       last7DaysLogs,
       recentLogs,
+      // Autoclaim separate
+      thisMonthAutoclaim,
+      todayAutoclaim,
+      last7DaysAutoclaim,
+      recentAutoclaimLogs,
     ] = await Promise.all([
-      // This month
+      // This month (chat only)
       prisma.chatLog.findMany({
         where: {
           createdAt: { gte: monthStart },
-          ...tokenFilter,
+          ...chatFilter,
         },
         select: {
           inputTokens: true,
@@ -115,11 +122,11 @@ export async function GET(req: NextRequest) {
           modelName: true,
         },
       }),
-      // Today
+      // Today (chat only)
       prisma.chatLog.findMany({
         where: {
           createdAt: { gte: todayStart, lte: todayEnd },
-          ...tokenFilter,
+          ...chatFilter,
         },
         select: {
           inputTokens: true,
@@ -127,11 +134,11 @@ export async function GET(req: NextRequest) {
           modelName: true,
         },
       }),
-      // Last 7 days
+      // Last 7 days (chat only)
       prisma.chatLog.findMany({
         where: {
           createdAt: { gte: sevenDaysAgo },
-          ...tokenFilter,
+          ...chatFilter,
         },
         select: {
           inputTokens: true,
@@ -139,9 +146,9 @@ export async function GET(req: NextRequest) {
           modelName: true,
         },
       }),
-      // Recent logs with full detail (last 30)
+      // Recent logs with full detail (last 30, chat only)
       prisma.chatLog.findMany({
-        where: tokenFilter,
+        where: chatFilter,
         orderBy: { createdAt: 'desc' },
         take: 30,
         select: {
@@ -155,13 +162,43 @@ export async function GET(req: NextRequest) {
           createdAt: true,
         },
       }),
+      // Autoclaim: this month
+      prisma.chatLog.findMany({
+        where: { createdAt: { gte: monthStart }, ...autoclaimFilter },
+        select: { inputTokens: true, outputTokens: true, modelName: true },
+      }),
+      // Autoclaim: today
+      prisma.chatLog.findMany({
+        where: { createdAt: { gte: todayStart, lte: todayEnd }, ...autoclaimFilter },
+        select: { inputTokens: true, outputTokens: true, modelName: true },
+      }),
+      // Autoclaim: last 7 days
+      prisma.chatLog.findMany({
+        where: { createdAt: { gte: sevenDaysAgo }, ...autoclaimFilter },
+        select: { inputTokens: true, outputTokens: true, modelName: true },
+      }),
+      // Autoclaim: recent 20
+      prisma.chatLog.findMany({
+        where: autoclaimFilter,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          userName: true,
+          userMessage: true,
+          inputTokens: true,
+          outputTokens: true,
+          modelName: true,
+          createdAt: true,
+        },
+      }),
     ])
 
     // Also count total questions (including those without token data)
     const [thisMonthTotal, todayTotal, last7DaysTotal] = await Promise.all([
-      prisma.chatLog.count({ where: { createdAt: { gte: monthStart } } }),
-      prisma.chatLog.count({ where: { createdAt: { gte: todayStart, lte: todayEnd } } }),
-      prisma.chatLog.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.chatLog.count({ where: { createdAt: { gte: monthStart }, sourceType: { not: 'autoclaim' } } }),
+      prisma.chatLog.count({ where: { createdAt: { gte: todayStart, lte: todayEnd }, sourceType: { not: 'autoclaim' } } }),
+      prisma.chatLog.count({ where: { createdAt: { gte: sevenDaysAgo }, sourceType: { not: 'autoclaim' } } }),
     ])
 
 
@@ -169,6 +206,11 @@ export async function GET(req: NextRequest) {
     const thisMonthAgg = aggregate(thisMonthLogs)
     const todayAgg = aggregate(todayLogs)
     const last7DaysAgg = aggregate(last7DaysLogs)
+
+    // Autoclaim aggregations
+    const autoclaimThisMonth = aggregate(thisMonthAutoclaim)
+    const autoclaimToday = aggregate(todayAutoclaim)
+    const autoclaimLast7Days = aggregate(last7DaysAutoclaim)
 
     // Format recent logs
     const formattedRecent = recentLogs.map(log => {
@@ -190,6 +232,22 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // Format autoclaim recent
+    const formattedAutoclaim = recentAutoclaimLogs.map(log => {
+      const inT = log.inputTokens || 0
+      const outT = log.outputTokens || 0
+      const cost = calculateCost(inT, outT, log.modelName)
+      return {
+        id: log.id,
+        userMessage: log.userMessage.substring(0, 100),
+        inputTokens: inT,
+        outputTokens: outT,
+        costTHB: Math.round(cost * EXCHANGE_RATE * 10_000) / 10_000,
+        modelName: log.modelName,
+        createdAt: log.createdAt,
+      }
+    })
+
     return NextResponse.json({
       thisMonth: {
         ...thisMonthAgg,
@@ -205,6 +263,12 @@ export async function GET(req: NextRequest) {
         ...last7DaysAgg,
         questions: last7DaysTotal,
         trackedQuestions: last7DaysLogs.length,
+      },
+      autoclaim: {
+        thisMonth: { ...autoclaimThisMonth, calls: thisMonthAutoclaim.length },
+        today: { ...autoclaimToday, calls: todayAutoclaim.length },
+        last7Days: { ...autoclaimLast7Days, calls: last7DaysAutoclaim.length },
+        recentLogs: formattedAutoclaim,
       },
       recentLogs: formattedRecent,
       pricing: {

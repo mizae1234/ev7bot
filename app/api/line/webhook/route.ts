@@ -279,6 +279,27 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               if (hasKeyword && hasVehicleNumber) {
                 const { analyzeClaimMessage } = await import('@/lib/gemini')
                 const claimAnalysis = await analyzeClaimMessage(rawText)
+
+                // Log autoclaim token usage
+                if (claimAnalysis.inputTokens > 0) {
+                  try {
+                    await prisma.chatLog.create({
+                      data: {
+                        sourceType: 'autoclaim',
+                        sourceId: event.source.userId || gid || null,
+                        userName: 'AutoClaim',
+                        userMessage: rawText.substring(0, 500),
+                        botReply: claimAnalysis.isClaim ? `isClaim=true, ref=${claimAnalysis.vehicleRef || 'N/A'}` : 'isClaim=false',
+                        inputTokens: claimAnalysis.inputTokens,
+                        outputTokens: claimAnalysis.outputTokens,
+                        modelName: claimAnalysis.modelName,
+                      }
+                    })
+                  } catch (logErr) {
+                    console.error('[AutoClaim Token Log Error]', logErr)
+                  }
+                }
+
                 if (claimAnalysis.isClaim) {
                   // ถ้าตรงคีเวิร์ดแต่ไม่มีทะเบียน/VIN → ไม่บันทึก เพราะไม่รู้ว่ารถคันไหน
                   if (!claimAnalysis.vehicleRef || claimAnalysis.vehicleRef.trim() === '') {

@@ -681,6 +681,9 @@ export async function analyzeClaimMessage(message: string): Promise<{
   vehicleRef?: string
   claimDetail?: string
   location?: string
+  inputTokens: number
+  outputTokens: number
+  modelName: string
 }> {
   try {
     const model = genAI.getGenerativeModel({
@@ -732,6 +735,11 @@ export async function analyzeClaimMessage(message: string): Promise<{
     const result = await model.generateContent(message)
     const text = result.response.text()
     console.log('[analyzeClaimMessage] Gemini response text:', text)
+
+    const usage = result.response.usageMetadata
+    const inputTokens = usage?.promptTokenCount || 0
+    const outputTokens = usage?.candidatesTokenCount || 0
+
     const data = JSON.parse(text)
     
     return {
@@ -739,10 +747,13 @@ export async function analyzeClaimMessage(message: string): Promise<{
       vehicleRef: data.vehicleRef || undefined,
       claimDetail: data.claimDetail || undefined,
       location: data.location || undefined,
+      inputTokens,
+      outputTokens,
+      modelName: GEMINI_MODEL_LITE,
     }
   } catch (error) {
     console.error('[analyzeClaimMessage Error]', error)
-    return { isClaim: false }
+    return { isClaim: false, inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_LITE }
   }
 }
 
