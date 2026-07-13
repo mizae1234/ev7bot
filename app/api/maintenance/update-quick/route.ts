@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
                 // Same car, just update Location and StartDate if changed
                 const updReplRecReq = pool.request()
                 updReplRecReq.input('maintId', sql.Int, maintenanceId)
-                updReplRecReq.input('startDate', sql.Date, replacementStartDate ? new Date(replacementStartDate) : new Date())
+                updReplRecReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
                 updReplRecReq.input('location', sql.VarChar, replacementLocation || null)
                 updReplRecReq.input('userId', sql.Int, dbUserId)
                 await updReplRecReq.query(`
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
               const insReplReq = pool.request()
               insReplReq.input('maintId', sql.Int, maintenanceId)
               insReplReq.input('vin', sql.VarChar, replacementVin)
-              insReplReq.input('startDate', sql.Date, replacementStartDate ? new Date(replacementStartDate) : new Date())
+              insReplReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
               insReplReq.input('location', sql.VarChar, replacementLocation || null)
               insReplReq.input('userId', sql.Int, dbUserId)
               await insReplReq.query(`

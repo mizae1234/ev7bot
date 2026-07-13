@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
           const insReplReq = pool.request()
           insReplReq.input('maintId', sql.Int, newMaintenanceId)
           insReplReq.input('vin', sql.VarChar, body.replacementVin)
-          insReplReq.input('startDate', sql.Date, body.replacementStartDate ? new Date(body.replacementStartDate) : new Date())
+          insReplReq.input('startDate', sql.Date, body.replacementStartDate ? body.replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
           insReplReq.input('location', sql.VarChar, body.replacementLocation || null)
           insReplReq.input('userId', sql.Int, dbUserId)
           await insReplReq.query(`
