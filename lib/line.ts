@@ -101,12 +101,141 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
         console.log(`[LINE Mention] Sending notification to ${name} (LINE ID: ${targetLineUserId}) for Ticket #${ticketId}`)
         
         const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}/quick-report?registerNo=${encodeURIComponent(registerNo)}&maintId=${ticketId}&tab=history`
-        const messageText = `🔔 คุณถูกกล่าวถึงโดยคุณ ${senderName} ในใบงาน #${ticketId} (ทะเบียน: ${registerNo}):\n"${text}"\n\n🔗 กดดูรายละเอียด/ตอบกลับ:\n${liffUrl}`
         
-        await lineClient.pushMessage(targetLineUserId, {
-          type: 'text',
-          text: messageText
-        }).catch(err => {
+        const flexMessage: any = {
+          type: 'flex',
+          altText: `🔔 คุณถูกกล่าวถึงโดยคุณ ${senderName} ในใบงาน #${ticketId}`,
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              backgroundColor: '#FFF9E6',
+              paddingAll: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: '🔔 คุณถูกกล่าวถึงในบันทึกติดตามงาน',
+                  weight: 'bold',
+                  size: 'sm',
+                  color: '#B27A00'
+                }
+              ]
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'box',
+                      layout: 'vertical',
+                      flex: 3,
+                      contents: [
+                        {
+                          type: 'text',
+                          text: 'ผู้ส่ง',
+                          size: 'xs',
+                          color: '#8C8C8C',
+                          bold: true
+                        },
+                        {
+                          type: 'text',
+                          text: 'ทะเบียน',
+                          size: 'xs',
+                          color: '#8C8C8C',
+                          bold: true,
+                          margin: 'sm'
+                        },
+                        {
+                          type: 'text',
+                          text: 'ใบงาน',
+                          size: 'xs',
+                          color: '#8C8C8C',
+                          bold: true,
+                          margin: 'sm'
+                        }
+                      ]
+                    },
+                    {
+                      type: 'box',
+                      layout: 'vertical',
+                      flex: 7,
+                      contents: [
+                        {
+                          type: 'text',
+                          text: senderName,
+                          size: 'xs',
+                          color: '#333333'
+                        },
+                        {
+                          type: 'text',
+                          text: registerNo,
+                          size: 'xs',
+                          color: '#333333',
+                          weight: 'bold',
+                          margin: 'sm'
+                        },
+                        {
+                          type: 'text',
+                          text: `#${ticketId}`,
+                          size: 'xs',
+                          color: '#111111',
+                          weight: 'bold',
+                          margin: 'sm'
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  type: 'separator',
+                  margin: 'md'
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  backgroundColor: '#F8F9FA',
+                  paddingAll: 'md',
+                  cornerRadius: 'md',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: text,
+                      size: 'xs',
+                      color: '#444444',
+                      wrap: true
+                    }
+                  ]
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#00B900',
+                  action: {
+                    type: 'uri',
+                    label: '💬 ดูรายละเอียด / ตอบกลับ',
+                    uri: liffUrl
+                  }
+                }
+              ]
+            }
+          }
+        }
+
+        await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
           console.error(`[LINE Mention Error] Failed to send push message to ${targetLineUserId}:`, err)
         })
       } else {
