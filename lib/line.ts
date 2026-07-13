@@ -142,14 +142,14 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
                           text: 'ผู้ส่ง',
                           size: 'xs',
                           color: '#8C8C8C',
-                          bold: true
+                          weight: 'bold'
                         },
                         {
                           type: 'text',
                           text: 'ทะเบียน',
                           size: 'xs',
                           color: '#8C8C8C',
-                          bold: true,
+                          weight: 'bold',
                           margin: 'sm'
                         },
                         {
@@ -157,7 +157,7 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
                           text: 'ใบงาน',
                           size: 'xs',
                           color: '#8C8C8C',
-                          bold: true,
+                          weight: 'bold',
                           margin: 'sm'
                         }
                       ]
