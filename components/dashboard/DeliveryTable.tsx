@@ -95,13 +95,14 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
     exportToExcel({
       reportName: 'รายการปล่อยรถ',
       periodLabel: periodLabel || '-',
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'ประเภทสัญญา', 'วันที่คาดว่าจะปล่อย', 'วันที่ปล่อยจริง', 'สถานะ', 'วันที่สร้าง', 'ผู้สร้าง', 'วันที่แก้ไข', 'ผู้แก้ไข'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'ประเภทสัญญา', 'เลขที่สัญญา', 'วันที่คาดว่าจะปล่อย', 'วันที่ปล่อยจริง', 'สถานะ', 'วันที่สร้าง', 'ผู้สร้าง', 'วันที่แก้ไข', 'ผู้แก้ไข'],
       rows: filteredRecords.map(rec => [
         rec.vehicle_id,
         rec.vin,
         rec.model,
         rec.project || '-',
         rec.rent_type || '-',
+        rec.contract_no || '-',
         formatDateForExcel(rec.expected_release_date),
         formatDateForExcel(rec.release_date || rec.delivered_at),
         getStatusText(rec.status),
@@ -153,6 +154,7 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
               <th className="pb-3 pr-2">เลขตัวถัง (VIN)</th>
               <th className="pb-3 pr-2">รุ่น</th>
               <th className="pb-3 pr-2">ประเภทสัญญา</th>
+              <th className="pb-3 pr-2">เลขที่สัญญา</th>
               <th className="pb-3 pr-2">วันที่คาดว่าจะปล่อย</th>
               <th className="pb-3 pr-2">วันที่ปล่อยจริง</th>
               <th className="pb-3 text-right">สถานะ</th>
@@ -166,6 +168,7 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
                   <td className="py-3.5 pr-2 font-mono text-zinc-500 dark:text-zinc-400">{rec.vin}</td>
                   <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{rec.model}</td>
                   <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{rec.rent_type || '-'}</td>
+                  <td className="py-3.5 pr-2 font-mono text-zinc-600 dark:text-zinc-400">{rec.contract_no || '-'}</td>
                   <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{formatDateTimeTh(rec.expected_release_date)}</td>
                   <td className="py-3.5 pr-2 text-zinc-650 dark:text-zinc-350">{formatDateTimeTh(rec.release_date || rec.delivered_at)}</td>
                   <td className="py-3.5 text-right">{getStatusBadge(rec.status)}</td>
@@ -173,7 +176,7 @@ export function DeliveryTable({ records = [], periodLabel = '' }: DeliveryTableP
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-zinc-400 dark:text-zinc-500 font-medium">
+                <td colSpan={8} className="py-10 text-center text-zinc-400 dark:text-zinc-500 font-medium">
                   ไม่พบข้อมูลรายการส่งมอบ
                 </td>
               </tr>

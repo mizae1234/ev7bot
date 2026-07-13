@@ -1,0 +1,53 @@
+-- =====================================================
+-- BACKUP: View_AccumarateReleaseCar
+-- Date: 2026-07-12
+-- Purpose: Original view before modification
+-- =====================================================
+
+CREATE VIEW dbo.View_AccumarateReleaseCar AS
+SELECT
+    RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo,
+    CopyContractCancellationID, ExpectedReleaseDate, ReleaseDate,
+    ContractCancellationDate, IsActive, CreateDate, CreateUserID,
+    UpdateDate, UpdateUserID, ContractSignDate, RemarkWaitingForRelease,
+    RemarkReleased, FirstName, LastName, PhoneNo, Location,
+    RegisterNo, ContractType,
+    CASE WHEN ReleaseSeqInSegment = 1 THEN 'ONRENT_NEW' ELSE 'ONRENT_USE' END AS RentType
+FROM (
+    SELECT
+        r.RentItemID, r.InventoryItemID, r.RentStatusID, r.VinNo, r.ContractNo,
+        r.CopyContractCancellationID, r.ExpectedReleaseDate, r.ReleaseDate,
+        r.ContractCancellationDate, r.IsActive, r.CreateDate, r.CreateUserID,
+        r.UpdateDate, r.UpdateUserID, r.ContractSignDate, r.RemarkWaitingForRelease,
+        r.RemarkReleased, r.FirstName, r.LastName, r.PhoneNo, r.Location,
+        r.RegisterNo, r.ContractType,
+        ROW_NUMBER() OVER (
+            PARTITION BY r.VinNo
+            ORDER BY r.ReleaseDate, r.RentItemID
+        ) AS ReleaseSeqInSegment
+    FROM (
+        -- 1. สัญญาเช่าหลักในปัจจุบัน
+        SELECT 
+            RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo,
+            CopyContractCancellationID, ExpectedReleaseDate, ReleaseDate,
+            ContractCancellationDate, IsActive, CreateDate, CreateUserID,
+            UpdateDate, UpdateUserID, ContractSignDate, RemarkWaitingForRelease,
+            RemarkReleased, FirstName, LastName, PhoneNo, Location,
+            RegisterNo, ContractType
+        FROM dbo.EV_RentItem
+        WHERE ReleaseDate IS NOT NULL AND RentStatusID IN (0, 2)
+
+        UNION ALL
+
+        -- 2. ประวัติสัญญาของรถโครงการ Line Man (รถวน)
+        SELECT 
+            RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo,
+            NULL AS CopyContractCancellationID, ExpectedReleaseDate, ReleaseDate,
+            ReturnDate AS ContractCancellationDate, CAST(0 AS BIT) AS IsActive, CreateDate, CreateUserID,
+            NULL AS UpdateDate, NULL AS UpdateUserID, ContractSignDate, RemarkWaitingForRelease,
+            RemarkReleased, FirstName, LastName, PhoneNo, Location,
+            RegisterNo, ContractType
+        FROM dbo.EV_RentItemLinemanHistory
+        WHERE ReleaseDate IS NOT NULL AND RentStatusID IN (0, 2)
+    ) AS r
+) AS x;

@@ -30,6 +30,7 @@ export interface DeliveryRecord {
   delivered_at: string | null
   project: string | null
   rent_type: string | null
+  contract_no: string | null
   expected_release_date: string | null
   release_date: string | null
   create_date: string | null
