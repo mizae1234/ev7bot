@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     const processType = (formData.get('processType') as string) || 'MAINTENANCE'
 
-    if (processType === 'MAINTENANCE_COMPLETED') {
+    if (processType === 'MAINTENANCE_COMPLETED' || processType === 'MAINTENANCE_COMPLETE') {
       for (const fileInfo of uploadedUrls) {
         const insReq = pool.request()
         insReq.input('FN', sql.NVarChar, fileInfo.fileName)
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
               @FS, 
               @FT, 
               @maintId,
-              'MAINTENANCE_COMPLETED',
+              'MAINTENANCE_COMPLETE',
               GETDATE(),
               @userId,
               GETDATE()
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
           VALUES (
               @maintId, 
               @NewFileID, 
-              'MAINTENANCE_COMPLETED',
+              'MAINTENANCE_COMPLETE',
               1, 
               @userId,
               GETDATE()

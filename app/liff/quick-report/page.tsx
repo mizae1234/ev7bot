@@ -640,7 +640,7 @@ export default function QuickReportPage() {
           })
           formData.append('maintenanceId', String(ticket.MaintenanceItemID))
           formData.append('lineUserId', getLineUserId() || '')
-          formData.append('processType', 'MAINTENANCE_COMPLETED')
+          formData.append('processType', 'MAINTENANCE_COMPLETE')
 
           const uploadRes = await fetch('/api/upload', {
             method: 'POST',
