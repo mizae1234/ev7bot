@@ -1387,19 +1387,20 @@ export default function QuickReportPage() {
               >
                 {(dbCarStatuses.length > 0 ? dbCarStatuses : [
                   { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
-                  { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
+                  { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
+                  { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' }
                 ])
-                  .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
+                  .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK' || st.StatusCode === 'IN_MAINTENANCE')
                   .map((st) => (
                     <option key={st.StatusCode} value={st.StatusCode}>
-                      {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
+                      {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : st.StatusCode === 'IN_MAINTENANCE' ? '🟠' : '🔵'} {st.StatusName}
                     </option>
                   ))}
               </select>
             </div>
 
             {/* Replacement Car Assignment */}
-            {editDetailFields.carStatusCode === 'WAITING_FOR_MAINTENANCE' && (
+            {(editDetailFields.carStatusCode === 'WAITING_FOR_MAINTENANCE' || editDetailFields.carStatusCode === 'IN_MAINTENANCE') && (
               <div className="space-y-4 pt-2 border-t border-slate-100 animate-fade-in-up">
                 <div className="flex items-center gap-2.5 bg-slate-50/50 p-3 rounded-2xl border border-slate-150">
                   <input
@@ -2840,12 +2841,13 @@ export default function QuickReportPage() {
                         <option value="" disabled>เลือกสถานะใบแจ้งซ่อม</option>
                         {(dbCarStatuses.length > 0 ? dbCarStatuses : [
                           { StatusCode: 'WAITING_FOR_MAINTENANCE', StatusName: 'รถจอดรอซ่อม' },
-                          { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' }
+                          { StatusCode: 'STILL_WORK', StatusName: 'รถยังขับใช้งานได้อยู่' },
+                          { StatusCode: 'IN_MAINTENANCE', StatusName: 'รถอยู่ระหว่างซ่อม' }
                         ])
-                          .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK')
+                          .filter((st) => st.StatusCode === 'WAITING_FOR_MAINTENANCE' || st.StatusCode === 'STILL_WORK' || st.StatusCode === 'IN_MAINTENANCE')
                           .map((st) => (
                             <option key={st.StatusCode} value={st.StatusCode}>
-                              {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : '🔵'} {st.StatusName}
+                              {st.StatusCode === 'WAITING_FOR_MAINTENANCE' ? '🟡' : st.StatusCode === 'IN_MAINTENANCE' ? '🟠' : '🔵'} {st.StatusName}
                             </option>
                           ))
                         }
@@ -2853,7 +2855,7 @@ export default function QuickReportPage() {
                     </div>
 
                     {/* Replacement Car Assignment */}
-                    {initialCarStatus === 'WAITING_FOR_MAINTENANCE' && (
+                    {(initialCarStatus === 'WAITING_FOR_MAINTENANCE' || initialCarStatus === 'IN_MAINTENANCE') && (
                       <div className="col-span-2 space-y-4 pt-2 border-t border-slate-100 animate-fade-in-up">
                         <div className="flex items-center gap-2.5 bg-slate-50/50 p-3 rounded-2xl border border-slate-150">
                           <input
