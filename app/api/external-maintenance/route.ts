@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
+import { sendMentionNotifications } from '@/lib/line'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,16 +54,39 @@ export async function POST(req: NextRequest) {
 
     // 2. Resolve ev7UserId from lineUserId
     let dbUserId = 1 // Default to 1 (System / LIFF User)
+    let senderName = 'ผู้ใช้ LINE'
     if (body.lineUserId) {
       try {
         const reg = await prisma.lineRegistration.findUnique({
           where: { lineUserId: body.lineUserId }
         })
-        if (reg && reg.ev7UserId !== null) {
-          dbUserId = reg.ev7UserId
+        if (reg) {
+          if (reg.ev7UserId !== null) {
+            dbUserId = reg.ev7UserId
+          }
+          if (reg.displayName) {
+            senderName = reg.displayName
+          }
         }
       } catch (e) {
         console.error('[Prisma read ev7UserId Error]', e)
+      }
+    }
+
+    // Verify if dbUserId exists in SQL Server EV_User table to resolve senderName
+    if (dbUserId < 10000) {
+      try {
+        const userCheckRes = await pool.request()
+          .input('userId', sql.Int, dbUserId)
+          .query(`
+            SELECT FirstName, LastName FROM dbo.EV_User WHERE UserID = @userId AND IsActive = 1
+          `)
+        if (userCheckRes.recordset.length > 0) {
+          const userRow = userCheckRes.recordset[0]
+          senderName = `${userRow.FirstName} ${userRow.LastName || ''}`.trim()
+        }
+      } catch (userErr) {
+        console.error('[User name check error]', userErr)
       }
     }
 
@@ -289,6 +313,13 @@ export async function POST(req: NextRequest) {
       } catch (bulkErr) {
         console.error('[New Ticket Bulk Action Error]', bulkErr)
       }
+    }
+
+    // Send LINE Mention Notification if issueTitle contains @mentions
+    if (issueTitle && issueTitle.trim() && newMaintenanceId) {
+      sendMentionNotifications(issueTitle, Number(newMaintenanceId), senderName).catch((err) => {
+        console.error('[LINE Mention Error]', err)
+      })
     }
 
     return NextResponse.json({

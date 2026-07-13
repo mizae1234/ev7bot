@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import GuideTab from './GuideTab'
 
@@ -122,6 +122,10 @@ export default function QuickReportPage() {
   const [dbCars, setDbCars] = useState<DbCar[]>([])
   const [loadingCars, setLoadingCars] = useState(false)
 
+  // Refs for focusing back on inputs after selecting mentions
+  const editFollowUpRef = useRef<HTMLTextAreaElement>(null)
+  const quickLogRefs = useRef<Record<number, HTMLInputElement | null>>({})
+
   // Form Fields
   const [contractorName, setContractorName] = useState('')
   const [driverName, setDriverName] = useState('')
@@ -148,6 +152,30 @@ export default function QuickReportPage() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submittedData, setSubmittedData] = useState<any>(null)
   const [locationOptions, setLocationOptions] = useState<{ code: string; name: string }[]>([])
+
+  // Mentions
+  const [mentionUsers, setMentionUsers] = useState<{ id: any; name: string; fullName: string }[]>([])
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false)
+  const [mentionSearch, setMentionSearch] = useState('')
+  const [mentionCursorPos, setMentionCursorPos] = useState(0)
+  const [activeMentionField, setActiveMentionField] = useState<'followUp' | 'quickLog'>('followUp')
+  const [activeQuickLogId, setActiveQuickLogId] = useState<number | null>(null)
+
+  // Fetch mention list on mount
+  useEffect(() => {
+    const fetchMentions = async () => {
+      try {
+        const res = await fetch('/api/users/mention-list')
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data)) setMentionUsers(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch mention users:', err)
+      }
+    }
+    fetchMentions()
+  }, [])
 
   // Fetch Location options from EV_MsSubStatus
   useEffect(() => {
@@ -401,6 +429,83 @@ export default function QuickReportPage() {
     }
   }
 
+  // Mentions event handlers
+  const handleMentionTextChange = (
+    text: string,
+    selectionStart: number | null,
+    field: 'followUp' | 'quickLog',
+    ticketId?: number
+  ) => {
+    if (field === 'followUp') {
+      setEditFollowUp(text)
+    } else if (field === 'quickLog' && ticketId) {
+      setQuickLogs(prev => ({
+        ...prev,
+        [ticketId]: text
+      }))
+    }
+    
+    const selStart = selectionStart ?? text.length
+    // Find last '@' before cursor
+    const textBeforeCursor = text.slice(0, selStart)
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIdx + 1)
+      // Check if no whitespace and no other '@' exists between '@' and cursor
+      if (!/\s/.test(textAfterAt) && !/@/.test(textAfterAt)) {
+        setMentionSearch(textAfterAt)
+        setMentionCursorPos(lastAtIdx)
+        setShowMentionDropdown(true)
+        setActiveMentionField(field)
+        if (ticketId) setActiveQuickLogId(ticketId)
+        return
+      }
+    }
+    setShowMentionDropdown(false)
+  }
+
+  const handleSelectMention = (name: string) => {
+    let currentText = ''
+    if (activeMentionField === 'followUp') {
+      currentText = editFollowUp
+    } else if (activeMentionField === 'quickLog' && activeQuickLogId !== null) {
+      currentText = quickLogs[activeQuickLogId] || ''
+    }
+
+    const beforeAt = currentText.slice(0, mentionCursorPos)
+    const afterCursor = currentText.slice(mentionCursorPos + 1 + mentionSearch.length)
+    const newText = `${beforeAt}@${name} ${afterCursor}`
+    
+    if (activeMentionField === 'followUp') {
+      setEditFollowUp(newText)
+    } else if (activeMentionField === 'quickLog' && activeQuickLogId !== null) {
+      const qid = activeQuickLogId
+      setQuickLogs(prev => ({
+        ...prev,
+        [qid]: newText
+      }))
+    }
+    setShowMentionDropdown(false)
+
+    // Calculate cursor position (1 for '@', length of name, and 1 for space)
+    const newCursorPos = mentionCursorPos + 1 + name.length + 1
+
+    // Return focus to the input and set selection range
+    setTimeout(() => {
+      if (activeMentionField === 'followUp' && editFollowUpRef.current) {
+        editFollowUpRef.current.focus()
+        editFollowUpRef.current.setSelectionRange(newCursorPos, newCursorPos)
+      } else if (activeMentionField === 'quickLog' && activeQuickLogId !== null && quickLogRefs.current[activeQuickLogId]) {
+        const el = quickLogRefs.current[activeQuickLogId]
+        if (el) {
+          el.focus()
+          el.setSelectionRange(newCursorPos, newCursorPos)
+        }
+      }
+    }, 50)
+  }
+
   // Fetch real details (active driver, history) when selectedCar changes
   const handleSelectCar = async (car: DbCar) => {
     setSelectedCar(car)
@@ -458,6 +563,7 @@ export default function QuickReportPage() {
         const params = new URLSearchParams(window.location.search)
         const tab = params.get('tab')
         const registerNo = params.get('registerNo')
+        const maintId = params.get('maintId')
 
         if (tab === 'history') {
           setActiveTab('history')
@@ -469,10 +575,65 @@ export default function QuickReportPage() {
           const res = await fetch(`/api/vehicles/search?q=${encodeURIComponent(registerNo)}`)
           if (res.ok) {
             const data = await res.json()
-            const cars = data.cars || []
+            const cars = (Array.isArray(data) ? data : data.cars) || []
             const matchedCar = cars.find((c: any) => c.RegisterNo === registerNo) || cars[0]
             if (matchedCar) {
-              await handleSelectCar(matchedCar)
+              setSelectedCar(matchedCar)
+              setShowCarDropdown(false)
+              setLoadingHistory(true)
+              setVehicleHistory([])
+              setShowAddIncidentForm(false)
+
+              // Load history and setup details directly
+              const historyRes = await fetch(`/api/vehicle/${encodeURIComponent(matchedCar.RegisterNo)}`)
+              if (historyRes.ok) {
+                const historyData = await historyRes.json()
+                setDbCarStatuses(historyData.carStatuses || [])
+                setDbInsuranceOptions(historyData.insuranceOptions || [])
+                setDbProblemTypes(historyData.problemTypes || [])
+                if (historyData.car) {
+                  setSelectedCarDetails(historyData.car)
+                }
+
+                const historyList = historyData.maintenance || []
+                setVehicleHistory(historyList)
+
+                if (historyData.currentRent) {
+                  const name = `${historyData.currentRent.FirstName} ${historyData.currentRent.LastName}`.trim()
+                  setContractorName(name)
+                  setDriverName(name)
+                } else {
+                  setContractorName('')
+                  setDriverName('')
+                }
+
+                // If maintId query parameter is provided, auto-open the edit ticket modal
+                if (maintId) {
+                  const targetTicket = historyList.find((t: any) => t.MaintenanceItemID === Number(maintId))
+                  if (targetTicket) {
+                    setEditingTicket(targetTicket)
+                    setEditDetailTicket(targetTicket)
+                    setEditFollowUp('')
+                    setEditDetailFields({
+                      carStatusCode: targetTicket.CarStatusCode || '',
+                      serviceLocationCode: targetTicket.ServiceLocationCode || '',
+                      driverName: targetTicket.DriverName || '',
+                      incidentDate: targetTicket.IncidentDate ? targetTicket.IncidentDate.slice(0, 16) : '',
+                      issueTitle: targetTicket.IssueTitle || '',
+                      problemType: targetTicket.ProblemTypeCode || '',
+                      faultParty: targetTicket.FaultPartyCode || '',
+                      carCase: targetTicket.CarCaseCode || '',
+                      insurance: targetTicket.InsuranceCode || '',
+                      claimNumber: targetTicket.ClaimNumber || '',
+                      hasReplacement: targetTicket.replacements && targetTicket.replacements.length > 0 && targetTicket.replacements.some((r: any) => r.IsActive),
+                      replacementVin: targetTicket.replacements && targetTicket.replacements.length > 0 ? targetTicket.replacements[0].VinNo : '',
+                      replacementLocation: targetTicket.replacements && targetTicket.replacements.length > 0 ? targetTicket.replacements[0].Location : '',
+                      replacementStartDate: targetTicket.replacements && targetTicket.replacements.length > 0 && targetTicket.replacements[0].ReplacementStartDate ? targetTicket.replacements[0].ReplacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                    })
+                  }
+                }
+              }
+              setLoadingHistory(false)
             }
           }
         }
@@ -1774,13 +1935,46 @@ export default function QuickReportPage() {
             {/* Follow-up Note Textarea */}
             <div>
               <label className="text-xs font-bold text-slate-600 block mb-1.5">💬 เพิ่มบันทึกการติดตาม / ดำเนินการล่าสุด</label>
-              <textarea
-                rows={4}
-                value={editFollowUp}
-                onChange={(e) => setEditFollowUp(e.target.value)}
-                placeholder="ระบุรายละเอียด เช่น รถเข้าอู่ทำสีแล้ว, ช่างกำลังถอดชิ้นส่วนตรวจสอบ, หรืออะไหล่มาถึงพร้อมซ่อม..."
-                className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition resize-none"
-              />
+              <div className="relative">
+                <textarea
+                  ref={editFollowUpRef}
+                  rows={4}
+                  value={editFollowUp}
+                  onChange={(e) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'followUp')}
+                  onKeyUp={(e: any) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'followUp')}
+                  onClick={(e: any) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'followUp')}
+                  placeholder="ระบุรายละเอียด เช่น รถเข้าอู่ทำสีแล้ว, ช่างกำลังถอดชิ้นส่วนตรวจสอบ, หรืออะไหล่มาถึงพร้อมซ่อม..."
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none placeholder-slate-400 transition resize-none"
+                />
+                
+                {/* Mention Suggestion Dropdown */}
+                {showMentionDropdown && activeMentionField === 'followUp' && (() => {
+                  const filteredUsers = mentionUsers.filter(u => 
+                    u.name.toLowerCase().includes(mentionSearch.toLowerCase()) || 
+                    u.fullName.toLowerCase().includes(mentionSearch.toLowerCase())
+                  )
+                  if (filteredUsers.length === 0) return null
+                  
+                  return (
+                    <div className="absolute left-0 bottom-full mb-2 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] py-1">
+                      <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 border-b border-slate-100 bg-slate-50/50">
+                        👥 แนะนำรายชื่อเพื่อพูดคุย (Mention)
+                      </div>
+                      {filteredUsers.map(user => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => handleSelectMention(user.name)}
+                          className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex justify-between items-center transition"
+                        >
+                          <span className="text-indigo-600 font-bold">@{user.name}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">{user.fullName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
 
             {/* Existing Attachments / Photos */}
@@ -3370,14 +3564,14 @@ export default function QuickReportPage() {
 
                         {/* Inline Quick Add Follow-up Form - hide for completed */}
                         {!isMaintComplete(ticket) && (
-                        <div className="mt-3 border-t border-slate-100 pt-3.5 flex gap-2">
+                        <div className="mt-3 border-t border-slate-100 pt-3.5 flex gap-2 relative">
                           <input
+                            ref={el => { quickLogRefs.current[ticket.MaintenanceItemID] = el }}
                             type="text"
                             value={quickLogs[ticket.MaintenanceItemID] || ''}
-                            onChange={(e) => setQuickLogs(prev => ({
-                              ...prev,
-                              [ticket.MaintenanceItemID]: e.target.value
-                            }))}
+                            onChange={(e) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'quickLog', ticket.MaintenanceItemID)}
+                            onKeyUp={(e: any) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'quickLog', ticket.MaintenanceItemID)}
+                            onClick={(e: any) => handleMentionTextChange(e.target.value, e.target.selectionStart, 'quickLog', ticket.MaintenanceItemID)}
                             placeholder="พิมพ์บันทึกการติดตามความคืบหน้าเพิ่ม..."
                             className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 transition"
                           />
@@ -3389,6 +3583,34 @@ export default function QuickReportPage() {
                           >
                             {savingQuickLogId === ticket.MaintenanceItemID ? '⏳ บันทึก...' : '💾 บันทึก'}
                           </button>
+
+                          {/* Mention Suggestion Dropdown for Quick Log */}
+                          {showMentionDropdown && activeMentionField === 'quickLog' && activeQuickLogId === ticket.MaintenanceItemID && (() => {
+                            const filteredUsers = mentionUsers.filter(u => 
+                              u.name.toLowerCase().includes(mentionSearch.toLowerCase()) || 
+                              u.fullName.toLowerCase().includes(mentionSearch.toLowerCase())
+                            )
+                            if (filteredUsers.length === 0) return null
+                            
+                            return (
+                              <div className="absolute left-0 bottom-full mb-2 w-full max-h-40 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] py-1">
+                                <div className="px-3 py-1 text-[9px] font-bold text-slate-400 border-b border-slate-100 bg-slate-50/50">
+                                  👥 แนะนำรายชื่อเพื่อพูดคุย (Mention)
+                                </div>
+                                {filteredUsers.map(user => (
+                                  <button
+                                    key={user.id}
+                                    type="button"
+                                    onClick={() => handleSelectMention(user.name)}
+                                    className="w-full text-left px-3 py-2 text-xxs font-semibold text-slate-700 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex justify-between items-center transition"
+                                  >
+                                    <span className="text-indigo-600 font-bold">@{user.name}</span>
+                                    <span className="text-[9px] text-slate-450 font-normal">{user.fullName}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </div>
                         )}
                       </div>

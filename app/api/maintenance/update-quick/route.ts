@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
+import { sendMentionNotifications } from '@/lib/line'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
 
     // Resolve ev7UserId from lineUserId
     let dbUserId = 1 // Default to 1 (System / LIFF User)
+    let senderName = 'ผู้ใช้ LINE'
     if (lineUserId) {
       try {
         const reg = await prisma.lineRegistration.findUnique({
@@ -38,6 +40,9 @@ export async function POST(req: NextRequest) {
           dbUserId = reg.ev7UserId
         } else {
           return NextResponse.json({ error: 'กรุณาทำการลงทะเบียน/ผูกบัญชีเพื่อเปิดสิทธิ์การใช้งานก่อนทำรายการ' }, { status: 400 })
+        }
+        if (reg?.displayName) {
+          senderName = reg.displayName
         }
       } catch (prismaErr) {
         console.error('[Prisma read ev7UserId Error]', prismaErr)
@@ -50,13 +55,15 @@ export async function POST(req: NextRequest) {
         const userCheckReq = pool.request()
         userCheckReq.input('userId', sql.Int, dbUserId)
         const userCheckRes = await userCheckReq.query(`
-          SELECT UserID FROM dbo.EV_User WHERE UserID = @userId AND IsActive = 1
+          SELECT UserID, FirstName, LastName FROM dbo.EV_User WHERE UserID = @userId AND IsActive = 1
         `)
         if (userCheckRes.recordset.length === 0) {
           return NextResponse.json({
             error: 'บัญชีผู้ใช้งานของคุณไม่มีอยู่ในตาราง EV_User หรือถูกระงับการใช้งาน กรุณาผูกบัญชีผู้ใช้จริงก่อนทำรายการ'
           }, { status: 400 })
         }
+        const userRow = userCheckRes.recordset[0]
+        senderName = `${userRow.FirstName} ${userRow.LastName || ''}`.trim()
       } catch (checkErr: any) {
         console.error('[User check error]', checkErr)
         return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ผู้ใช้งาน: ' + checkErr.message }, { status: 500 })
@@ -585,6 +592,13 @@ export async function POST(req: NextRequest) {
       } catch (invErr) {
         console.error('[Inventory Status Update Error]', invErr)
       }
+    }
+
+    // Send LINE Mention Notification if followUpDetail contains @mentions
+    if (followUpDetail && followUpDetail.trim() && maintenanceId) {
+      sendMentionNotifications(followUpDetail, Number(maintenanceId), senderName).catch((err) => {
+        console.error('[LINE Mention Error]', err)
+      })
     }
 
     return NextResponse.json({

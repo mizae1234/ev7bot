@@ -37,6 +37,16 @@ function maskDriverName(driverName?: string): string {
   }
 }
 
+// Helper to adjust timezone for local SQL Server datetime values
+function adjustTimezone(date: Date | string | null | undefined): string | null {
+  if (!date) return null
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return null
+  // Deduct 7 hours to offset the browser timezone addition
+  d.setHours(d.getHours() - 7)
+  return d.toISOString()
+}
+
 // Mock data generator matching user's screenshot exactly for June 2026
 function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum: number): DashboardData {
   const start = new Date(startDateStr)
@@ -707,24 +717,46 @@ export async function GET(req: NextRequest) {
       trend,
       deliveryList: (deliveryListResult.recordset || []).map((row: any) => ({
         ...row,
+        expected_release_date: adjustTimezone(row.expected_release_date),
+        release_date: adjustTimezone(row.release_date),
+        create_date: adjustTimezone(row.create_date),
+        update_date: adjustTimezone(row.update_date),
         customer_name: row.customer_first_name ? `${row.customer_first_name} ${row.customer_last_name || ''}`.trim() : null,
         create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
         update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
       })),
       repairList: (repairListResult.recordset || []).map((row: any) => ({
         ...row,
+        report_date: adjustTimezone(row.report_date),
+        start_date: adjustTimezone(row.start_date),
+        finish_date: adjustTimezone(row.finish_date),
+        incident_date: adjustTimezone(row.incident_date),
+        last_follow_up_date: adjustTimezone(row.last_follow_up_date),
+        create_date: adjustTimezone(row.create_date),
+        update_date: adjustTimezone(row.update_date),
         driver_name: maskDriverName(row.driver_name),
-        replacements: replacements[row.order_id] || [],
+        replacements: (replacements[row.order_id] || []).map((repl: any) => ({
+          ...repl,
+          start_date: adjustTimezone(repl.start_date)
+        })),
         create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
         update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
       })),
       replacementList: (replacementListResult.recordset || []).map((row: any) => ({
         ...row,
+        start_date: adjustTimezone(row.start_date),
+        return_date: adjustTimezone(row.return_date),
+        create_date: adjustTimezone(row.create_date),
+        update_date: adjustTimezone(row.update_date),
         create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
         update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
       })),
       returnList: (returnListResult.recordset || []).map((row: any) => ({
         ...row,
+        return_date: adjustTimezone(row.return_date),
+        receive_date: adjustTimezone(row.receive_date),
+        create_date: adjustTimezone(row.create_date),
+        update_date: adjustTimezone(row.update_date),
         create_user_name: row.CreateUserFirstName ? `${row.CreateUserFirstName} ${row.CreateUserLastName || ''}`.trim() : null,
         update_user_name: row.UpdateUserFirstName ? `${row.UpdateUserFirstName} ${row.UpdateUserLastName || ''}`.trim() : null,
       })),
