@@ -367,21 +367,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(getMockDashboardData(startDate, endDate, year))
     }
 
-    const startDateTime = new Date(`${startDate}T00:00:00.000Z`)
-    const endDateTime = new Date(`${endDate}T23:59:59.999Z`)
+    const startDateTimeStr = `${startDate} 00:00:00`
+    const endDateTimeStr = `${endDate} 23:59:59`
 
     // Prepare all requests in parallel
     const planRequest = pool.request()
-    planRequest.input('startDate', sql.DateTime, startDateTime)
-    planRequest.input('endDate', sql.DateTime, endDateTime)
+    planRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    planRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const deliverySummaryRequest = pool.request()
-    deliverySummaryRequest.input('startDate', sql.DateTime, startDateTime)
-    deliverySummaryRequest.input('endDate', sql.DateTime, endDateTime)
+    deliverySummaryRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    deliverySummaryRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const repairSummaryRequest = pool.request()
-    repairSummaryRequest.input('startDate', sql.DateTime, startDateTime)
-    repairSummaryRequest.input('endDate', sql.DateTime, endDateTime)
+    repairSummaryRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    repairSummaryRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const planTrendRequest = pool.request()
     planTrendRequest.input('year', sql.Int, year)
@@ -396,20 +396,20 @@ export async function GET(req: NextRequest) {
     repairClosedTrendRequest.input('year', sql.Int, year)
 
     const deliveryListRequest = pool.request()
-    deliveryListRequest.input('startDate', sql.DateTime, startDateTime)
-    deliveryListRequest.input('endDate', sql.DateTime, endDateTime)
+    deliveryListRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    deliveryListRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const repairListRequest = pool.request()
-    repairListRequest.input('startDate', sql.DateTime, startDateTime)
-    repairListRequest.input('endDate', sql.DateTime, endDateTime)
+    repairListRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    repairListRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const replacementListRequest = pool.request()
-    replacementListRequest.input('startDate', sql.DateTime, startDateTime)
-    replacementListRequest.input('endDate', sql.DateTime, endDateTime)
+    replacementListRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    replacementListRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     const returnListRequest = pool.request()
-    returnListRequest.input('startDate', sql.DateTime, startDateTime)
-    returnListRequest.input('endDate', sql.DateTime, endDateTime)
+    returnListRequest.input('startDate', sql.VarChar, startDateTimeStr)
+    returnListRequest.input('endDate', sql.VarChar, endDateTimeStr)
 
     // Execute all queries in parallel for high performance!
     const [
