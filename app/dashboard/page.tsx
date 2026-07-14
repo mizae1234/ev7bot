@@ -48,9 +48,9 @@ function toLocalDateStr(dateInput: Date | string | null | undefined): string | n
 }
 
 function DashboardContent() {
-  // Navigation calendar state (June 2026 matches user data)
-  const [selectedYear, setSelectedYear] = useState<number>(2026)
-  const [selectedMonth, setSelectedMonth] = useState<number>(5) // 0-indexed, 5 = June
+  // Navigation calendar state - default to current year and month
+  const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth())
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   
   // Custom date range state
