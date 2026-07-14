@@ -19,6 +19,11 @@ interface RegisteredUser {
 }
 
 function UserManagementContent() {
+  const [activeMainTab, setActiveMainTab] = useState<'users' | 'requests'>('users')
+  const [pendingRequests, setPendingRequests] = useState<any[]>([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [approvalActionLoading, setApprovalActionLoading] = useState<number | null>(null)
+
   const [passcode, setPasscode] = useState('')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [error, setError] = useState('')
@@ -102,9 +107,13 @@ function UserManagementContent() {
   // 3. Fetch users and recipients when authenticated
   useEffect(() => {
     if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
-      fetchUsers()
+      if (activeMainTab === 'users') {
+        fetchUsers()
+      } else {
+        fetchPendingRequests()
+      }
     }
-  }, [isAuthenticated, page, roleFilter, statusFilter, liffUserId, userRole])
+  }, [isAuthenticated, page, roleFilter, statusFilter, liffUserId, userRole, activeMainTab])
 
   useEffect(() => {
     if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
@@ -159,6 +168,60 @@ function UserManagementContent() {
       setError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPendingRequests = async () => {
+    setPendingLoading(true)
+    try {
+      const params = new URLSearchParams({
+        passcode,
+        userId: liffUserId || '',
+      })
+      const res = await fetch(`/api/admin/users/pending?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPendingRequests(data.requests || [])
+      } else {
+        const data = await res.json()
+        console.error('Failed to fetch pending requests:', data.error)
+      }
+    } catch (err) {
+      console.error('Error fetching pending requests:', err)
+    } finally {
+      setPendingLoading(false)
+    }
+  }
+
+  const handleApproveReject = async (requestId: number, action: 'approve' | 'reject') => {
+    if (!window.confirm(`คุณแน่ใจหรือไม่ที่จะทำการ ${action === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ'} คำขอลงทะเบียนพนักงานนี้?`)) {
+      return
+    }
+
+    setApprovalActionLoading(requestId)
+    try {
+      const res = await fetch('/api/admin/users/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          action,
+          passcode,
+          userId: liffUserId
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        alert(data.message)
+        fetchPendingRequests()
+      } else {
+        alert(data.error || 'ดำเนินการล้มเหลว')
+      }
+    } catch (err: any) {
+      alert(`เกิดข้อผิดพลาด: ${err.message}`)
+    } finally {
+      setApprovalActionLoading(null)
     }
   }
 
@@ -620,178 +683,287 @@ function UserManagementContent() {
           </form>
         </div>
 
-        {/* Filter Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
-          <div className="md:col-span-2">
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาผู้ใช้งาน</label>
-            <input
-              type="text"
-              placeholder="ค้นหาชื่อผู้ใช้ หรือ LINE User ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สิทธิ์</label>
-            <select
-              value={roleFilter}
-              onChange={(e) => {
-                setPage(1)
-                setRoleFilter(e.target.value)
-              }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="SUPER_ADMIN">Super Admin</option>
-              <option value="ADMIN">Admin</option>
-              <option value="USER">User</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สถานะ</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setPage(1)
-                setStatusFilter(e.target.value)
-              }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="active">เปิดใช้งาน</option>
-              <option value="inactive">ระงับการใช้งาน</option>
-            </select>
-          </div>
+        {/* Main Tabs */}
+        <div className="flex border-b border-zinc-800">
+          <button
+            onClick={() => setActiveMainTab('users')}
+            className={`py-3 px-6 text-sm font-bold border-b-2 transition-all ${
+              activeMainTab === 'users'
+                ? 'border-emerald-500 text-emerald-400 font-extrabold'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            👥 บัญชีใช้งานในระบบ ({summary.total})
+          </button>
+          <button
+            onClick={() => setActiveMainTab('requests')}
+            className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+              activeMainTab === 'requests'
+                ? 'border-emerald-500 text-emerald-400 font-extrabold'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            ⏳ คำขออนุมัติใช้งาน
+            {pendingRequests.length > 0 && (
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-zinc-950 rounded-full">
+                {pendingRequests.length}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Users List */}
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent" />
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 text-rose-500 text-sm font-medium">{error}</div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-zinc-850 rounded-2xl text-zinc-500 text-sm">
-            ไม่พบรายชื่อผู้ใช้งานใดๆ ในขณะนี้
-          </div>
-        ) : (
+        {/* Tab 1: Active Users List */}
+        {activeMainTab === 'users' && (
           <div className="space-y-4">
-            {users.map((user) => (
-              <div 
-                key={user.id}
-                className={`bg-zinc-900/20 border ${user.isActive ? 'border-zinc-900 hover:border-zinc-800/80' : 'border-rose-950/40 opacity-70'} rounded-2xl p-5 md:p-6 transition-all duration-200 backdrop-blur-sm shadow-sm`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {/* User Profile */}
-                  <div className="flex items-center gap-4">
-                    {user.pictureUrl ? (
-                      <img 
-                        src={user.pictureUrl} 
-                        alt={user.displayName || 'LINE User'} 
-                        className="w-12 h-12 rounded-full object-cover border border-zinc-800"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150'
-                        }}
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-zinc-700">
-                        {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : 'LN'}
+            {/* Filter Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
+              <div className="md:col-span-2">
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาผู้ใช้งาน</label>
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อผู้ใช้ หรือ LINE User ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สิทธิ์</label>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setRoleFilter(e.target.value)
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="USER">User</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">สถานะ</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setPage(1)
+                    setStatusFilter(e.target.value)
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="active">เปิดใช้งาน</option>
+                  <option value="inactive">ระงับการใช้งาน</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Users List */}
+            {loading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent" />
+              </div>
+            ) : error ? (
+              <div className="text-center py-12 text-rose-500 text-sm font-medium">{error}</div>
+            ) : users.length === 0 ? (
+              <div className="text-center py-16 border border-dashed border-zinc-850 rounded-2xl text-zinc-500 text-sm">
+                ไม่พบรายชื่อผู้ใช้งานใดๆ ในขณะนี้
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {users.map((user) => (
+                  <div 
+                    key={user.id}
+                    className={`bg-zinc-900/20 border ${user.isActive ? 'border-zinc-900 hover:border-zinc-800/80' : 'border-rose-950/40 opacity-70'} rounded-2xl p-5 md:p-6 transition-all duration-200 backdrop-blur-sm shadow-sm`}
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* User Profile */}
+                      <div className="flex items-center gap-4">
+                        {user.pictureUrl ? (
+                          <img 
+                            src={user.pictureUrl} 
+                            alt={user.displayName || 'LINE User'} 
+                            className="w-12 h-12 rounded-full object-cover border border-zinc-800"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150'
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold border border-zinc-700">
+                            {user.displayName ? user.displayName.substring(0, 2).toUpperCase() : 'LN'}
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold text-zinc-100 text-base">{user.displayName || 'ผู้ใช้ LINE'}</span>
+                            {getRoleBadge(user.role)}
+                            {!user.isActive && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/25">
+                                🚫 ระงับการใช้
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
+                            <span className="truncate max-w-[200px] md:max-w-xs">{user.lineUserId}</span>
+                            <button
+                              onClick={() => handleCopyId(user.lineUserId)}
+                              className="text-[10px] bg-zinc-950/45 px-1.5 py-0.5 rounded border border-zinc-850 hover:bg-zinc-900 hover:text-zinc-300 active:scale-95 transition-all"
+                            >
+                              {copiedId === user.lineUserId ? 'คัดลอกแล้ว! ✅' : 'คัดลอก 📋'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions Area */}
+                      <div className="flex flex-wrap items-center gap-4 justify-between md:justify-end border-t border-zinc-900/60 md:border-none pt-4 md:pt-0">
+                        <div className="text-[11px] text-zinc-500">
+                          📅 ลงทะเบียนเมื่อ: <span className="text-zinc-400 font-medium">{formatDateTime(user.registeredAt)}</span>
+                        </div>
+
+                         <div className="flex items-center gap-2.5">
+                           {/* EV7 ID input */}
+                           <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1">
+                             <span className="text-[10px] text-zinc-500 font-bold">EV7 ID:</span>
+                             <input
+                               type="number"
+                               value={user.ev7UserId !== null && user.ev7UserId !== undefined ? user.ev7UserId : ''}
+                               placeholder="ยังไม่ผูก"
+                               disabled={actionLoading === user.lineUserId}
+                               onChange={(e) => handleEv7UserIdChange(user.lineUserId, e.target.value)}
+                               className="w-14 bg-transparent border-0 text-center text-xs text-zinc-300 focus:outline-none focus:ring-0 p-0 font-mono disabled:opacity-50"
+                             />
+                           </div>
+
+                           {/* Role drop-down */}
+                           <select
+                             value={user.role}
+                             disabled={actionLoading === user.lineUserId}
+                             onChange={(e) => handleRoleChange(user.lineUserId, e.target.value)}
+                             className="px-2.5 py-1.5 text-xs rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer font-bold disabled:opacity-50"
+                           >
+                             <option value="USER">User</option>
+                             <option value="ADMIN">Admin</option>
+                             <option value="SUPER_ADMIN">Super Admin</option>
+                           </select>
+
+                           {/* Active toggle */}
+                           <button
+                             onClick={() => handleStatusToggle(user.lineUserId, user.isActive)}
+                             disabled={actionLoading === user.lineUserId}
+                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-95 ${
+                               user.isActive
+                                 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                                 : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                             }`}
+                           >
+                             {user.isActive ? 'ระงับการใช้งาน 🚫' : 'เปิดการใช้งาน 🟢'}
+                           </button>
+                         </div>
+                      </div>
+                    </div>
+
+                    {user.statusMessage && (
+                      <div className="mt-3.5 text-xs text-zinc-500 bg-zinc-950/20 px-3 py-2 rounded-xl border border-zinc-950 max-w-2xl italic">
+                        💬 {user.statusMessage}
                       </div>
                     )}
+                  </div>
+                ))}
 
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-bold text-zinc-100 text-base">{user.displayName || 'ผู้ใช้ LINE'}</span>
-                        {getRoleBadge(user.role)}
-                        {!user.isActive && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/25">
-                            🚫 ระงับการใช้
-                          </span>
-                        )}
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="pt-4">
+                    <Pagination
+                      currentPage={page}
+                      totalPages={totalPages}
+                      onPageChange={(p) => setPage(p)}
+                      totalItems={total}
+                      itemsPerPage={20}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: Pending Approval Requests List */}
+        {activeMainTab === 'requests' && (
+          <div className="space-y-4">
+            {pendingLoading ? (
+              <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent" />
+              </div>
+            ) : pendingRequests.length === 0 ? (
+              <div className="text-center py-16 border border-dashed border-zinc-850 rounded-2xl text-zinc-500 text-sm">
+                ไม่มีคำขออนุมัติลงทะเบียนพนักงานใหม่ในขณะนี้
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="bg-zinc-900/20 border border-zinc-900 hover:border-zinc-800/80 rounded-2xl p-5 md:p-6 transition-all duration-200 backdrop-blur-sm shadow-sm"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Request Profile */}
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-zinc-850 border border-zinc-800 flex items-center justify-center text-zinc-400 font-black">
+                          {req.displayName ? req.displayName.substring(0, 2).toUpperCase() : 'RQ'}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold text-zinc-100 text-base">
+                              {req.firstName} {req.lastName}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase">
+                              รอดำเนินการ
+                            </span>
+                          </div>
+                          <div className="text-xs text-zinc-400">
+                            📧 อีเมล: <span className="font-semibold text-zinc-300">{req.email}</span>
+                          </div>
+                          <div className="text-xs text-zinc-400">
+                            📍 สังกัดสาขา: <span className="font-bold text-emerald-400">{req.branchCode}</span>
+                          </div>
+                          <div className="text-[11px] text-zinc-500 font-mono">
+                            LINE Profile: {req.displayName || 'ไม่มี'} ({req.lineUserId})
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
-                        <span className="truncate max-w-[200px] md:max-w-xs">{user.lineUserId}</span>
+                      {/* Actions */}
+                      <div className="flex flex-wrap items-center gap-2.5 justify-end border-t border-zinc-900/60 md:border-none pt-4 md:pt-0">
+                        <div className="text-[11px] text-zinc-500 mr-2">
+                          ส่งเมื่อ: {formatDateTime(req.createdAt)}
+                        </div>
+
                         <button
-                          onClick={() => handleCopyId(user.lineUserId)}
-                          className="text-[10px] bg-zinc-950/45 px-1.5 py-0.5 rounded border border-zinc-850 hover:bg-zinc-900 hover:text-zinc-300 active:scale-95 transition-all"
+                          onClick={() => handleApproveReject(req.id, 'approve')}
+                          disabled={approvalActionLoading === req.id}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1"
                         >
-                          {copiedId === user.lineUserId ? 'คัดลอกแล้ว! ✅' : 'คัดลอก 📋'}
+                          {approvalActionLoading === req.id ? '⏳ กำลังอนุมัติ...' : '✔️ อนุมัติ (Approve)'}
+                        </button>
+                        <button
+                          onClick={() => handleApproveReject(req.id, 'reject')}
+                          disabled={approvalActionLoading === req.id}
+                          className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-bold text-xs shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
+                        >
+                          ❌ ปฏิเสธ (Reject)
                         </button>
                       </div>
                     </div>
                   </div>
-
-                  {/* Actions Area */}
-                  <div className="flex flex-wrap items-center gap-4 justify-between md:justify-end border-t border-zinc-900/60 md:border-none pt-4 md:pt-0">
-                    <div className="text-[11px] text-zinc-500">
-                      📅 ลงทะเบียนเมื่อ: <span className="text-zinc-400 font-medium">{formatDateTime(user.registeredAt)}</span>
-                    </div>
-
-                     <div className="flex items-center gap-2.5">
-                       {/* EV7 ID input */}
-                       <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1">
-                         <span className="text-[10px] text-zinc-500 font-bold">EV7 ID:</span>
-                         <input
-                           type="number"
-                           value={user.ev7UserId !== null && user.ev7UserId !== undefined ? user.ev7UserId : ''}
-                           placeholder="ยังไม่ผูก"
-                           disabled={actionLoading === user.lineUserId}
-                           onChange={(e) => handleEv7UserIdChange(user.lineUserId, e.target.value)}
-                           className="w-14 bg-transparent border-0 text-center text-xs text-zinc-300 focus:outline-none focus:ring-0 p-0 font-mono disabled:opacity-50"
-                         />
-                       </div>
-
-                       {/* Role drop-down */}
-                       <select
-                         value={user.role}
-                         disabled={actionLoading === user.lineUserId}
-                         onChange={(e) => handleRoleChange(user.lineUserId, e.target.value)}
-                         className="px-2.5 py-1.5 text-xs rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all cursor-pointer font-bold disabled:opacity-50"
-                       >
-                         <option value="USER">User</option>
-                         <option value="ADMIN">Admin</option>
-                         <option value="SUPER_ADMIN">Super Admin</option>
-                       </select>
-
-                       {/* Active toggle */}
-                       <button
-                         onClick={() => handleStatusToggle(user.lineUserId, user.isActive)}
-                         disabled={actionLoading === user.lineUserId}
-                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 active:scale-95 ${
-                           user.isActive
-                             ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
-                             : 'bg-emerald-600 text-white hover:bg-emerald-500'
-                         }`}
-                       >
-                         {user.isActive ? 'ระงับการใช้งาน 🚫' : 'เปิดการใช้งาน 🟢'}
-                       </button>
-                     </div>
-                  </div>
-                </div>
-
-                {user.statusMessage && (
-                  <div className="mt-3.5 text-xs text-zinc-500 bg-zinc-950/20 px-3 py-2 rounded-xl border border-zinc-950 max-w-2xl italic">
-                    💬 {user.statusMessage}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pt-4">
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  onPageChange={(p) => setPage(p)}
-                  totalItems={total}
-                  itemsPerPage={20}
-                />
+                ))}
               </div>
             )}
           </div>

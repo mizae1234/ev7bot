@@ -11,6 +11,7 @@ function RegisterContent() {
   const [lineProfile, setLineProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Fields for Linking
@@ -22,6 +23,8 @@ function RegisterContent() {
   const [regLastName, setRegLastName] = useState('')
   const [regEmail, setRegEmail] = useState('')
   const [regPassword, setRegPassword] = useState('')
+  const [branches, setBranches] = useState<{ code: string; name: string }[]>([])
+  const [selectedBranch, setSelectedBranch] = useState('')
 
   useEffect(() => {
     // Get profile from localStorage
@@ -33,7 +36,23 @@ function RegisterContent() {
         console.error('Failed to parse cached profile', e)
       }
     }
-    setLoading(false)
+    
+    // Fetch branch locations
+    const fetchBranches = async () => {
+      try {
+        const res = await fetch('/api/liff/locations')
+        if (res.ok) {
+          const data = await res.json()
+          setBranches(data)
+          if (data.length > 0) setSelectedBranch(data[0].code)
+        }
+      } catch (err) {
+        console.error('Failed to fetch branches', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchBranches()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,13 +66,16 @@ function RegisterContent() {
     setError(null)
 
     try {
+      const isCreate = activeTab === 'create'
+      const endpoint = isCreate ? '/api/liff/register-request' : '/api/liff/associate'
+      
       const payload: any = {
-        action: activeTab,
         userId: lineProfile.userId,
         displayName: lineProfile.displayName,
       }
 
-      if (activeTab === 'link') {
+      if (!isCreate) {
+        payload.action = 'link'
         payload.email = email
         payload.password = password
       } else {
@@ -61,9 +83,10 @@ function RegisterContent() {
         payload.lastName = regLastName
         payload.email = regEmail
         payload.password = regPassword
+        payload.branchCode = selectedBranch
       }
 
-      const res = await fetch('/api/liff/associate', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -76,15 +99,19 @@ function RegisterContent() {
 
       alert(data.message)
       
-      // Update local profile cache with registered state
-      localStorage.setItem('liff_profile', JSON.stringify({
-        ...lineProfile,
-        ev7UserId: data.registration.ev7UserId
-      }))
+      if (!isCreate) {
+        // Update local profile cache with registered state
+        localStorage.setItem('liff_profile', JSON.stringify({
+          ...lineProfile,
+          ev7UserId: data.registration.ev7UserId
+        }))
 
-      // Redirect to original page
-      const redirectPath = searchParams.get('path') || '/dashboard'
-      router.replace(redirectPath)
+        // Redirect to original page
+        const redirectPath = searchParams.get('path') || '/dashboard'
+        router.replace(redirectPath)
+      } else {
+        setSubmitSuccess(true)
+      }
 
     } catch (err: any) {
       setError(err.message || 'บันทึกข้อมูลล้มเหลว')
@@ -98,6 +125,27 @@ function RegisterContent() {
       <div className="text-center space-y-4">
         <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
         <p className="text-sm text-slate-500 font-medium">กำลังเตรียมโหลดข้อมูล...</p>
+      </div>
+    )
+  }
+
+  if (submitSuccess) {
+    return (
+      <div className="w-full max-w-md px-4 py-8 animate-fade-in text-center">
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-slate-200/50 shadow-xl space-y-6">
+          <div className="text-6xl animate-bounce">🎉</div>
+          <h1 className="text-xl font-black text-slate-800">ส่งคำขอลงทะเบียนสำเร็จ!</h1>
+          <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+            ระบบได้รับข้อมูลคำขอสมัครสมาชิกพนักงานใหม่ของท่านเรียบร้อยแล้วค่ะ กรุณารอ Super Admin ตรวจสอบและอนุมัติสิทธิ์เข้าใช้งานระบบก่อนนะคะ
+          </p>
+          <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl text-left space-y-1.5">
+            <p className="text-[10px] font-bold text-slate-400">ข้อมูลผู้ลงทะเบียน:</p>
+            <p className="text-xs font-bold text-slate-700">ชื่อ-สกุล: <span className="font-semibold text-slate-650">{regFirstName} {regLastName}</span></p>
+            <p className="text-xs font-bold text-slate-700">อีเมล: <span className="font-semibold text-slate-650">{regEmail}</span></p>
+            <p className="text-xs font-bold text-slate-700">สังกัดสาขา: <span className="font-semibold text-slate-650">{branches.find(b => b.code === selectedBranch)?.name || selectedBranch}</span></p>
+          </div>
+          <p className="text-[10px] text-amber-600 font-black">🔔 เมื่อคำขอได้รับการอนุมัติเรียบร้อย ระบบจะส่งข้อความแจ้งเตือนหาท่านผ่านแชท LINE นี้ทันทีค่ะ</p>
+        </div>
       </div>
     )
   }
@@ -132,8 +180,7 @@ function RegisterContent() {
           </div>
         )}
 
-        {/* Navigation Tabs (Commented out - only Link Account is allowed) */}
-        {/* 
+        {/* Navigation Tabs */}
         <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/40">
           <button
             type="button"
@@ -156,22 +203,24 @@ function RegisterContent() {
             👤 ลงทะเบียนพนักงานใหม่
           </button>
         </div>
-        */}
 
-        {/* Warning Banner for Contacting Admin */}
-        <div className="bg-amber-50/80 border border-amber-200/60 rounded-2xl p-4 text-left space-y-1">
-          <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-            <span>⚠️</span>
-            <span>ประกาศสำคัญ</span>
+        {/* Info Banner */}
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-left space-y-1">
+          <div className="flex items-center gap-2 text-indigo-800 font-bold text-xs">
+            <span>ℹ️</span>
+            <span>แนะนำขั้นตอน</span>
           </div>
-          <p className="text-xs text-amber-800 leading-relaxed font-medium">
-            ระบบได้ปิดฟังก์ชันลงทะเบียนผู้ใช้ใหม่ หากท่านยังไม่มีบัญชีในระบบ <strong>EV7Tracking</strong> กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อทำการเพิ่มผู้ใช้งานให้นะคะ
+          <p className="text-[11px] text-indigo-800 leading-relaxed font-semibold">
+            {activeTab === 'link' 
+              ? 'การผูกบัญชีจะช่วยให้คุณสามารถใช้งานระบบและพูดคุยติดตามงานกับพนักงานคนอื่นๆ ได้ทันทีโดยใช้สิทธิ์เดิม'
+              : 'คำขอสมัครสมาชิกใหม่จะเข้าสู่กระบวนการพิจารณาตรวจสอบสิทธิ์พนักงานของระบบ เมื่อ Super Admin อนุมัติสิทธิ์แล้ว ระบบจะส่งแชทแจ้งเตือนเปิดการใช้งานให้คุณโดยอัตโนมัติค่ะ'
+            }
           </p>
         </div>
 
         {/* Error message */}
         {error && (
-          <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold p-3 rounded-2xl animate-shake">
+          <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold p-3 rounded-2xl animate-shake animate-duration-300">
             ⚠️ {error}
           </div>
         )}
@@ -253,6 +302,25 @@ function RegisterContent() {
                   className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-xs text-slate-800 focus:outline-none transition"
                 />
               </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1">สังกัดสาขา (Branch Location)</label>
+                <select
+                  required
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-xs text-slate-800 focus:outline-none transition font-semibold"
+                >
+                  {branches.length > 0 ? (
+                    branches.map((b) => (
+                      <option key={b.code} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">⏳ กำลังโหลดข้อมูลสาขา...</option>
+                  )}
+                </select>
+              </div>
             </div>
           )}
 
@@ -262,7 +330,7 @@ function RegisterContent() {
             disabled={submitting}
             className="w-full mt-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:from-slate-450 disabled:to-slate-500 text-white font-bold py-4 rounded-2xl shadow-lg transition active:scale-[0.98]"
           >
-            {submitting ? '⏳ กำลังบันทึกข้อมูล...' : activeTab === 'link' ? '🔗 ยืนยันการผูกบัญชีเดิม' : '✅ ลงทะเบียนและเริ่มใช้งาน'}
+            {submitting ? '⏳ กำลังส่งข้อมูล...' : activeTab === 'link' ? '🔗 ยืนยันการผูกบัญชีเดิม' : '✅ ส่งคำขอลงทะเบียนพนักงานใหม่'}
           </button>
         </form>
       </div>

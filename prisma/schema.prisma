@@ -131,3 +131,19 @@ model TaskNote {
 
   @@map("task_notes")
 }
+
+model RegistrationRequest {
+  id           Int      @id @default(autoincrement())
+  lineUserId   String   @unique @map("line_user_id") @db.VarChar(50)
+  displayName  String?  @map("display_name") @db.VarChar(255)
+  firstName    String   @map("first_name") @db.VarChar(100)
+  lastName     String   @map("last_name") @db.VarChar(100)
+  email        String   @unique @map("email") @db.VarChar(100)
+  password     String   @map("password") @db.VarChar(100)
+  branchCode   String   @map("branch_code") @db.VarChar(100)
+  status       String   @default("PENDING") @map("status") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("registration_requests")
+}
