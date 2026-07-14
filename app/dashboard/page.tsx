@@ -36,6 +36,17 @@ function formatThaiDate(dateStr: string, options: Intl.DateTimeFormatOptions): s
   return localDate.toLocaleDateString('th-TH', options)
 }
 
+function toLocalDateStr(dateInput: Date | string | null | undefined): string | null {
+  if (!dateInput) return null
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) return null
+  
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const date = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${date}`
+}
+
 function DashboardContent() {
   // Navigation calendar state (June 2026 matches user data)
   const [selectedYear, setSelectedYear] = useState<number>(2026)
@@ -109,7 +120,7 @@ function DashboardContent() {
     if (!selectedDate || filterMode !== 'month') return data.deliveryList
     return data.deliveryList.filter(d => {
       const dt = d.release_date || d.expected_release_date
-      return dt && dt.startsWith(selectedDate)
+      return dt && toLocalDateStr(dt) === selectedDate
     })
   }
 
@@ -118,9 +129,9 @@ function DashboardContent() {
     if (!selectedDate || filterMode !== 'month') return data.repairList
     return data.repairList.filter(r => {
       return (
-        (r.report_date && r.report_date.startsWith(selectedDate)) ||
-        (r.start_date && r.start_date.startsWith(selectedDate)) ||
-        (r.finish_date && r.finish_date.startsWith(selectedDate))
+        (r.report_date && toLocalDateStr(r.report_date) === selectedDate) ||
+        (r.start_date && toLocalDateStr(r.start_date) === selectedDate) ||
+        (r.finish_date && toLocalDateStr(r.finish_date) === selectedDate)
       )
     })
   }
@@ -130,8 +141,8 @@ function DashboardContent() {
     if (!selectedDate || filterMode !== 'month') return data.replacementList
     return data.replacementList.filter(r => {
       return (
-        (r.start_date && r.start_date.startsWith(selectedDate)) ||
-        (r.return_date && r.return_date.startsWith(selectedDate)) ||
+        (r.start_date && toLocalDateStr(r.start_date) === selectedDate) ||
+        (r.return_date && toLocalDateStr(r.return_date) === selectedDate) ||
         !r.return_date
       )
     })
@@ -142,8 +153,8 @@ function DashboardContent() {
     if (!selectedDate || filterMode !== 'month') return data.returnList
     return data.returnList.filter(r => {
       return (
-        (r.receive_date && r.receive_date.startsWith(selectedDate)) ||
-        (r.return_date && r.return_date.startsWith(selectedDate))
+        (r.receive_date && toLocalDateStr(r.receive_date) === selectedDate) ||
+        (r.return_date && toLocalDateStr(r.return_date) === selectedDate)
       )
     })
   }

@@ -35,6 +35,17 @@ function formatThaiDate(dateStr: string, options: Intl.DateTimeFormatOptions): s
   return localDate.toLocaleDateString('th-TH', options)
 }
 
+function toLocalDateStr(dateInput: Date | string | null | undefined): string | null {
+  if (!dateInput) return null
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) return null
+  
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const date = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${date}`
+}
+
 export function DeliveryCalendar({
   deliveries = [],
   repairs = [],
@@ -54,7 +65,7 @@ export function DeliveryCalendar({
   const selectedDateDeliveries = selectedDate
     ? deliveries.filter(d => {
         const dateVal = d.release_date || d.expected_release_date
-        return dateVal && dateVal.startsWith(selectedDate)
+        return dateVal && toLocalDateStr(dateVal) === selectedDate
       })
     : []
 
@@ -68,10 +79,10 @@ export function DeliveryCalendar({
   })
 
   const selectedDateRepairsReported = selectedDate
-    ? repairs.filter(r => r.report_date && r.report_date.startsWith(selectedDate))
+    ? repairs.filter(r => r.report_date && toLocalDateStr(r.report_date) === selectedDate)
     : []
   const selectedDateRepairsFinished = selectedDate
-    ? repairs.filter(r => r.finish_date && r.finish_date.startsWith(selectedDate))
+    ? repairs.filter(r => r.finish_date && toLocalDateStr(r.finish_date) === selectedDate)
     : []
 
   if (!isMounted) {
@@ -158,7 +169,7 @@ export function DeliveryCalendar({
           // Get day deliveries data
           const dayDeliveries = deliveries.filter(d => {
             const dateVal = d.release_date || d.expected_release_date
-            return dateVal && dateVal.startsWith(cellDateStr)
+            return dateVal && toLocalDateStr(dateVal) === cellDateStr
           })
 
           // Group deliveries by project
@@ -172,8 +183,8 @@ export function DeliveryCalendar({
           })
 
           // Get day repairs data
-          const dayRepairsReported = repairs.filter(r => r.report_date && r.report_date.startsWith(cellDateStr))
-          const dayRepairsFinished = repairs.filter(r => r.finish_date && r.finish_date.startsWith(cellDateStr))
+          const dayRepairsReported = repairs.filter(r => r.report_date && toLocalDateStr(r.report_date) === cellDateStr)
+          const dayRepairsFinished = repairs.filter(r => r.finish_date && toLocalDateStr(r.finish_date) === cellDateStr)
 
           return (
             <div
