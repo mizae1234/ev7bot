@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'ลงทะเบียนสำเร็จ! กรุณารอ Super Admin ตรวจสอบและอนุมัติสิทธิ์การเข้าใช้งานระบบนะคะ',
+      message: 'ลงทะเบียนสำเร็จ! กรุณารอผู้ดูแลระบบตรวจสอบและอนุมัติสิทธิ์การเข้าใช้งานระบบนะคะ',
       request
     })
 
