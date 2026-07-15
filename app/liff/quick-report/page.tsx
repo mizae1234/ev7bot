@@ -3399,7 +3399,40 @@ export default function QuickReportPage() {
                   <div>
                     <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
+                      {selectedCarDetails?.StatusName && (() => {
+                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
+                        const statusType = selectedCarDetails.StatusType || ''
+                        let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
+                        if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
+                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        } else if (name.includes('ใช้งาน')) {
+                          badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
+                        } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
+                          badgeClass = 'bg-amber-50 border-amber-200 text-amber-700'
+                        } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
+                          badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
+                        } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
+                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        }
+                        return (
+                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
+                            {name}
+                          </span>
+                        )
+                      })()}
+                      {selectedCarDetails?.StatusType && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
+                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {selectedCarDetails?.MainVehicleRegisterNo && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
+                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
+                        </span>
+                      )}
+                    </div>
                     {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
                       <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                         <span>📍 สถานที่ปัจจุบัน:</span>
@@ -3413,6 +3446,8 @@ export default function QuickReportPage() {
                     type="button"
                     onClick={() => {
                       setSelectedCar(null)
+                      setSelectedCarDetails(null)
+                      setContractorName('')
                       setVehicleHistory([])
                     }}
                     className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
@@ -3649,7 +3684,40 @@ export default function QuickReportPage() {
                   <div>
                     <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
+                      {selectedCarDetails?.StatusName && (() => {
+                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
+                        const statusType = selectedCarDetails.StatusType || ''
+                        let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
+                        if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
+                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        } else if (name.includes('ใช้งาน')) {
+                          badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
+                        } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
+                          badgeClass = 'bg-amber-50 border-amber-205 text-amber-700'
+                        } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
+                          badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
+                        } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
+                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        }
+                        return (
+                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
+                            {name}
+                          </span>
+                        )
+                      })()}
+                      {selectedCarDetails?.StatusType && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
+                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {selectedCarDetails?.MainVehicleRegisterNo && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
+                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
+                        </span>
+                      )}
+                    </div>
                     {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
                       <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                         <span>📍 สถานที่ปัจจุบัน:</span>
@@ -3663,6 +3731,8 @@ export default function QuickReportPage() {
                     type="button"
                     onClick={() => {
                       setSelectedCar(null)
+                      setSelectedCarDetails(null)
+                      setContractorName('')
                       setVehicleHistory([])
                     }}
                     className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
@@ -3752,8 +3822,9 @@ export default function QuickReportPage() {
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                      {selectedCar?.StatusName && (() => {
-                        const name = selectedCar.SubStatusName || selectedCar.StatusName
+                      {selectedCarDetails?.StatusName && (() => {
+                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
+                        const statusType = selectedCarDetails.StatusType || ''
                         let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
                         if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
                           badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
@@ -3772,9 +3843,14 @@ export default function QuickReportPage() {
                           </span>
                         )
                       })()}
-                      {selectedCar?.Status && (
+                      {selectedCarDetails?.StatusType && (
                         <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                          {selectedCar.Status}
+                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {selectedCarDetails?.MainVehicleRegisterNo && (
+                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
+                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
                         </span>
                       )}
                     </div>
@@ -3791,6 +3867,8 @@ export default function QuickReportPage() {
                     type="button"
                     onClick={() => {
                       setSelectedCar(null)
+                      setSelectedCarDetails(null)
+                      setContractorName('')
                       setVehicleHistory([])
                     }}
                     className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
