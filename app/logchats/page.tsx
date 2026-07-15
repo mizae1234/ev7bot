@@ -30,7 +30,7 @@ function LogChatsContent() {
   const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
   const [usageData, setUsageData] = useState<any>(null)
   const [usageLoading, setUsageLoading] = useState(false)
-  const [activeView, setActiveView] = useState<'logs' | 'costs' | 'autoclaim'>('costs')
+  const [activeView, setActiveView] = useState<'logs' | 'costs' | 'autoclaim' | 'autoclaim_logs'>('costs')
 
   // Auth / Role States
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -92,7 +92,7 @@ function LogChatsContent() {
     if (isAuthenticated && passcode && liffUserId && userRole === 'SUPER_ADMIN') {
       fetchLogs()
     }
-  }, [isAuthenticated, page, sourceType, selectedUser, liffUserId, userRole])
+  }, [isAuthenticated, page, sourceType, selectedUser, liffUserId, userRole, activeView])
 
   // Debounced search trigger
   useEffect(() => {
@@ -111,7 +111,7 @@ function LogChatsContent() {
       fetchLogs()
     }, refreshInterval * 1000)
     return () => clearInterval(interval)
-  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser, liffUserId, userRole])
+  }, [isAuthenticated, passcode, refreshInterval, page, search, sourceType, selectedUser, liffUserId, userRole, activeView])
 
   // Fetch usage/cost data
   useEffect(() => {
@@ -139,13 +139,15 @@ function LogChatsContent() {
   const fetchLogs = async () => {
     setLoading(true)
     try {
+      const isAutoclaimLogs = activeView === 'autoclaim_logs'
       const params = new URLSearchParams({
         passcode,
         userId: liffUserId || '',
         page: String(page),
         limit: '20',
         search,
-        sourceType,
+        sourceType: isAutoclaimLogs ? 'autoclaim' : sourceType,
+        excludeAutoclaim: isAutoclaimLogs ? 'false' : 'true',
         user: selectedUser !== 'all' ? selectedUser : '',
       })
       const res = await fetch(`/api/chat-logs?${params.toString()}`)
@@ -354,7 +356,13 @@ function LogChatsContent() {
             🔍 AutoClaim Cost
           </button>
           <button
-            onClick={() => setActiveView('logs')}
+            onClick={() => {
+              setPage(1)
+              setSearch('')
+              setSelectedUser('all')
+              setSourceType('all')
+              setActiveView('logs')
+            }}
             className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
               activeView === 'logs'
                 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
@@ -362,6 +370,22 @@ function LogChatsContent() {
             }`}
           >
             💬 Chat Logs
+          </button>
+          <button
+            onClick={() => {
+              setPage(1)
+              setSearch('')
+              setSelectedUser('all')
+              setSourceType('all')
+              setActiveView('autoclaim_logs')
+            }}
+            className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+              activeView === 'autoclaim_logs'
+                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                : 'text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-900'
+            }`}
+          >
+            📋 AutoClaim Logs
           </button>
         </div>
 
@@ -568,14 +592,11 @@ function LogChatsContent() {
                     {usageData.autoclaim.recentLogs?.length > 0 ? (
                       usageData.autoclaim.recentLogs.map((log: any) => (
                         <div key={log.id} className="px-4 py-3 hover:bg-zinc-800/30 transition flex items-start gap-3">
-                          <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0">
                             <p className="text-[11px] text-zinc-400 truncate">{log.userMessage}</p>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-[9px] text-zinc-600">
                                 in {(log.inputTokens || 0).toLocaleString()} · out {(log.outputTokens || 0).toLocaleString()}
-                              </span>
-                              <span className="text-[9px] text-zinc-600">
-                                {new Date(log.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}
                               </span>
                             </div>
                           </div>
@@ -604,12 +625,11 @@ function LogChatsContent() {
           </div>
         )}
 
-        {activeView === 'logs' && (
+        {(activeView === 'logs' || activeView === 'autoclaim_logs') && (
         <>
-        {/* ═══════ Original Chat Logs Section ═══════ */}
-
+        {/* ═══════ Chat Logs Section ═══════ */}
         {/* Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-${activeView === 'autoclaim_logs' ? '3' : '4'} gap-3 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-900`}>
           <div>
             <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ค้นหาคำสำคัญ</label>
             <input
@@ -617,7 +637,7 @@ function LogChatsContent() {
               placeholder="ค้นหาชื่อผู้ใช้, ข้อความ, คำตอบ..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+              className={`w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 ${activeView === 'autoclaim_logs' ? 'focus:ring-rose-500/15 focus:border-rose-500' : 'focus:ring-emerald-500/15 focus:border-emerald-500'} transition-all`}
             />
           </div>
 
@@ -629,7 +649,7 @@ function LogChatsContent() {
                 setPage(1)
                 setSelectedUser(e.target.value)
               }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+              className={`w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 ${activeView === 'autoclaim_logs' ? 'focus:ring-rose-500/15 focus:border-rose-500' : 'focus:ring-emerald-500/15 focus:border-emerald-500'} transition-all`}
             >
               <option value="all">ทั้งหมด</option>
               {users.map((u, idx) => {
@@ -646,21 +666,23 @@ function LogChatsContent() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ช่องทางการถาม</label>
-            <select
-              value={sourceType}
-              onChange={(e) => {
-                setPage(1)
-                setSourceType(e.target.value)
-              }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
-            >
-              <option value="all">ทั้งหมด</option>
-              <option value="line">LINE Bot</option>
-              <option value="web">Web Chat</option>
-            </select>
-          </div>
+          {activeView !== 'autoclaim_logs' && (
+            <div>
+              <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">ช่องทางการถาม</label>
+              <select
+                value={sourceType}
+                onChange={(e) => {
+                  setPage(1)
+                  setSourceType(e.target.value)
+                }}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+              >
+                <option value="all">ทั้งหมด</option>
+                <option value="line">LINE Bot</option>
+                <option value="web">Web Chat</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">รีเฟรชอัตโนมัติ</label>
@@ -670,7 +692,7 @@ function LogChatsContent() {
                 const val = e.target.value
                 setRefreshInterval(val === 'none' ? null : parseInt(val))
               }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all"
+              className={`w-full px-3 py-2 text-xs rounded-xl border border-zinc-800 bg-zinc-950/70 text-zinc-300 focus:outline-none focus:ring-2 ${activeView === 'autoclaim_logs' ? 'focus:ring-rose-500/15 focus:border-rose-500' : 'focus:ring-emerald-500/15 focus:border-emerald-500'} transition-all`}
             >
               <option value="none">ปิดการใช้งาน</option>
               <option value="5">ทุกๆ 5 วินาที</option>
@@ -690,7 +712,7 @@ function LogChatsContent() {
 
           {loading && logs.length === 0 ? (
             <div className="text-center py-12 space-y-3">
-              <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className={`w-8 h-8 border-2 ${activeView === 'autoclaim_logs' ? 'border-rose-500' : 'border-emerald-500'} border-t-transparent rounded-full animate-spin mx-auto`} />
               <p className="text-xs text-zinc-500">กำลังดึงข้อมูลประวัติการคุย...</p>
             </div>
           ) : logs.length === 0 ? (
@@ -712,7 +734,9 @@ function LogChatsContent() {
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                           : log.sourceType.endsWith('broadcast')
                             ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                            : log.sourceType === 'autoclaim'
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
                       }`}>
                         {log.sourceType.toUpperCase()}
                       </span>
@@ -743,7 +767,7 @@ function LogChatsContent() {
                     {/* Bot reply */}
                     <div className="space-y-1">
                       <span className="block text-[9px] text-zinc-500 font-bold uppercase tracking-wider">คำตอบจาก Butter 🧈</span>
-                      <div className="p-3.5 rounded-2xl bg-emerald-950/10 border border-emerald-900/15 text-xs text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                      <div className={`p-3.5 rounded-2xl ${log.sourceType === 'autoclaim' ? 'bg-rose-950/10 border border-rose-900/15 text-rose-200' : 'bg-emerald-950/10 border border-emerald-900/15 text-zinc-300'} text-xs whitespace-pre-wrap leading-relaxed`}>
                         {log.botReply}
                       </div>
                     </div>

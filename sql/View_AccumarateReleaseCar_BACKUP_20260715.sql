@@ -1,19 +1,10 @@
 -- =====================================================
--- ALTER VIEW: View_AccumarateReleaseCar
--- Date: 2026-07-12
--- Change: ถ้า RentStatusID = 2 (ปล่อยจริง) → IsActive = 1 เสมอ
---         ไม่ว่าสัญญาจะถูกยกเลิก/คืนรถแล้วหรือไม่
--- 
--- ผลกระทบ:
---   ✅ ทอ-8193 (คืนรถ): IsActive 0 → 1 (นับว่าปล่อยแล้ว)
---   ✅ ทอ-7112 (ยกเลิกสัญญา): IsActive 0 → 1 (นับว่าปล่อยแล้ว)
---   ⚠️ VIN ที่มี 2 สัญญา (NEW→USE): ทั้ง 2 records จะเป็น IsActive=1
---      → Dashboard query ต้อง deduplicate ด้วย ROW_NUMBER
---
--- Backup: sql/View_AccumarateReleaseCar_BACKUP_20260712.sql
+-- BACKUP: View_AccumarateReleaseCar
+-- Date: 2026-07-15
+-- Purpose: Original view definition using RentStatusID IN (0, 2) before modification
 -- =====================================================
 
-ALTER VIEW dbo.View_AccumarateReleaseCar AS
+CREATE VIEW dbo.View_AccumarateReleaseCar AS
 SELECT
     RentItemID, InventoryItemID, RentStatusID, VinNo, ContractNo,
     CopyContractCancellationID, ExpectedReleaseDate, ReleaseDate,
@@ -50,7 +41,7 @@ FROM (
             RemarkReleased, FirstName, LastName, PhoneNo, Location,
             RegisterNo, ContractType
         FROM dbo.EV_RentItem
-        WHERE ReleaseDate IS NOT NULL AND RentStatusID = 2
+        WHERE ReleaseDate IS NOT NULL AND RentStatusID IN (0, 2)
 
         UNION ALL
 
@@ -63,6 +54,6 @@ FROM (
             RemarkReleased, FirstName, LastName, PhoneNo, Location,
             RegisterNo, ContractType
         FROM dbo.EV_RentItemLinemanHistory
-        WHERE ReleaseDate IS NOT NULL AND RentStatusID = 2
+        WHERE ReleaseDate IS NOT NULL AND RentStatusID IN (0, 2)
     ) AS r
 ) AS x;

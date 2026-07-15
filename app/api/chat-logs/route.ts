@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || ''
     const sourceType = searchParams.get('sourceType') || 'all'
     const filterUser = searchParams.get('user') || ''
+    const excludeAutoclaim = searchParams.get('excludeAutoclaim') === 'true'
 
     const skip = (page - 1) * limit
 
@@ -38,6 +39,8 @@ export async function GET(req: NextRequest) {
 
     if (sourceType !== 'all') {
       where.sourceType = sourceType
+    } else if (excludeAutoclaim) {
+      where.sourceType = { not: 'autoclaim' }
     }
 
     const conditions: any[] = []
