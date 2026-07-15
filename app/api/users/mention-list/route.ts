@@ -12,13 +12,36 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. ดึงผู้ใช้ LINE ที่ลงทะเบียนสำเร็จและมีการผูก ev7UserId (ไม่เป็น null)
-    const lineUsers = await prisma.lineRegistration.findMany({
-      where: { 
-        isActive: true,
-        ev7UserId: { not: null }
-      },
-      select: { ev7UserId: true, displayName: true }
-    })
+    let lineUsers: Array<{ ev7UserId: number | null; displayName: string | null }> = []
+    let isPgAvailable = true
+    try {
+      lineUsers = await prisma.lineRegistration.findMany({
+        where: { 
+          isActive: true,
+          ev7UserId: { not: null }
+        },
+        select: { ev7UserId: true, displayName: true }
+      })
+    } catch (pgErr) {
+      console.warn('[Mention List] PostgreSQL not reachable, fetching all active users from SQL Server instead:', pgErr)
+      isPgAvailable = false
+    }
+
+    if (!isPgAvailable) {
+      // Fallback: ดึงข้อมูลรายชื่อจาก SQL Server EV_User ทั้งหมดที่ยังทำงานอยู่
+      const usersRes = await pool.request().query(`
+        SELECT UserID, FirstName, LastName 
+        FROM dbo.EV_User 
+        WHERE IsActive = 1
+      `)
+      const finalUsers = usersRes.recordset.map((u: any) => ({
+        id: u.UserID,
+        name: u.FirstName, // ใช้ FirstName เป็นชื่อเรียกสำหรับการ @mention
+        fullName: `${u.FirstName} ${u.LastName || ''}`.trim()
+      }))
+      finalUsers.sort((a, b) => a.name.localeCompare(b.name, 'th'))
+      return NextResponse.json(finalUsers)
+    }
 
     if (lineUsers.length === 0) {
       return NextResponse.json([])

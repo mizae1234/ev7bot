@@ -141,9 +141,11 @@ export async function GET(
     const carStatusesReq = pool.request()
     const insuranceReq = pool.request()
     const problemTypesReq = pool.request()
+    const notesReq = pool.request()
+    notesReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
 
     // Execute rent history, maintenance records, return history, car sub-statuses, and insurance options concurrently
-    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult, problemTypesResult] = await Promise.all([
+    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult, problemTypesResult, notesResult] = await Promise.all([
       rentReq.query(`
         SELECT
           RentItemID, ContractNo, ContractType,
@@ -199,6 +201,20 @@ export async function GET(
         FROM dbo.EV_MsSubStatus
         WHERE Type = 'MAINTENANCE_PROBLEM_TYPE' AND IsActive = 1
         ORDER BY StatusCode
+      `),
+      notesReq.query(`
+        SELECT
+          n.VehicleNoteID,
+          n.InventoryItemID,
+          n.NoteDetail,
+          n.CreateDate,
+          n.CreateUserID,
+          n.IsActive,
+          ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreateUserName
+        FROM dbo.EV_VehicleNote n
+        LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
+        WHERE n.InventoryItemID = @inventoryItemId AND n.IsActive = 1
+        ORDER BY n.CreateDate DESC
       `)
     ])
 
@@ -207,6 +223,21 @@ export async function GET(
     let replacements: Record<number, unknown[]> = {}
     let followUps: Record<number, unknown[]> = {}
     let attachments: Record<number, unknown[]> = {}
+
+    // Resolve names from lineRegistration in Postgres for any mock/custom UserIDs
+    let regMap = new Map<number, string>()
+    try {
+      const registrations = await prisma.lineRegistration.findMany({
+        select: { ev7UserId: true, displayName: true }
+      })
+      for (const reg of registrations) {
+        if (reg.ev7UserId && reg.displayName) {
+          regMap.set(Number(reg.ev7UserId), reg.displayName)
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[Vehicle API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
+    }
 
     if (maintIds.length > 0) {
       const replReq = pool.request()
@@ -258,21 +289,6 @@ export async function GET(
           replacements[r.MaintenanceItemID] = []
         }
         replacements[r.MaintenanceItemID].push(r)
-      }
-
-      // Resolve names from lineRegistration in Postgres for any mock/custom UserIDs
-      let regMap = new Map<number, string>()
-      try {
-        const registrations = await prisma.lineRegistration.findMany({
-          select: { ev7UserId: true, displayName: true }
-        })
-        for (const reg of registrations) {
-          if (reg.ev7UserId && reg.displayName) {
-            regMap.set(Number(reg.ev7UserId), reg.displayName)
-          }
-        }
-      } catch (pgErr) {
-        console.warn('[Vehicle API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
       }
 
       for (const f of followUpResult.recordset) {
@@ -337,8 +353,9 @@ export async function GET(
         }
 
         if (!attachments[a.MaintenanceItemID]) {
-          attachments[a.MaintenanceItemID] = []
+          attachments[a.attachments] = []
         }
+        attachments[a.MaintenanceItemID] = attachments[a.MaintenanceItemID] || []
         attachments[a.MaintenanceItemID].push(attachmentObj)
       }
 
@@ -372,6 +389,37 @@ export async function GET(
         }
       }
     }
+
+    // Process Vehicle Notes
+    const vehicleNotes = (notesResult?.recordset || []).map((n: any) => {
+      const originalName = (n.CreateUserName || '').trim();
+      const lineDisplayName = n.CreateUserID ? regMap.get(Number(n.CreateUserID)) : null;
+
+      let creatorName = '-';
+      if (originalName && lineDisplayName) {
+        if (originalName.includes('@')) {
+          creatorName = lineDisplayName;
+        } else if (originalName !== lineDisplayName) {
+          creatorName = `${originalName} (${lineDisplayName})`;
+        } else {
+          creatorName = originalName;
+        }
+      } else if (lineDisplayName) {
+        creatorName = lineDisplayName;
+      } else if (originalName) {
+        creatorName = originalName;
+      }
+
+      return {
+        VehicleNoteID: n.VehicleNoteID,
+        InventoryItemID: n.InventoryItemID,
+        NoteDetail: n.NoteDetail,
+        CreateDate: n.CreateDate,
+        CreateUserID: n.CreateUserID,
+        CreateUserName: creatorName,
+        IsActive: n.IsActive
+      }
+    })
 
     // ─── Apply Data Masking ────────────────────────────────────
     const maskedCar = stripSensitiveFields(car)
@@ -453,7 +501,8 @@ export async function GET(
       returns: maskedReturns,
       carStatuses: carStatusesResult.recordset,
       insuranceOptions: insuranceResult.recordset,
-      problemTypes: problemTypesResult.recordset
+      problemTypes: problemTypesResult.recordset,
+      vehicleNotes
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)

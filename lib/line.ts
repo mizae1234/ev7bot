@@ -246,3 +246,203 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
     console.error('[LINE Mention Notification Error]', err)
   }
 }
+
+/**
+ * ค้นหาผู้ใช้ที่ถูกกล่าวถึงในข้อความโน้ตรถ แล้วส่ง LINE Push Message แจ้งเตือนไปยังผู้นั้น
+ */
+export async function sendVehicleNoteMentionNotifications(text: string, vehicleNoteId: number, registerNo: string, senderName: string) {
+  if (!text) return
+
+  // ดึงข้อความที่มี @ (ES5-compatible regex execution)
+  const matches: string[] = []
+  const regex = /@([^\s@]+)/g
+  let match
+  while ((match = regex.exec(text)) !== null) {
+    if (match[1]) {
+      matches.push(match[1].trim())
+    }
+  }
+  if (matches.length === 0) return
+
+  try {
+    const mssqlPool = await getMSSQLPool()
+    if (!mssqlPool) return
+
+    for (const name of matches) {
+      let ev7UserId: number | null = null
+      let targetLineUserId: string | null = null
+
+      // 1. ค้นหาใน EV_User (SQL Server)
+      const userReq = mssqlPool.request()
+      userReq.input('name', sql.NVarChar, `%${name}%`)
+      const userRes = await userReq.query(`
+        SELECT UserID 
+        FROM dbo.EV_User 
+        WHERE (FirstName LIKE @name OR LastName LIKE @name OR (FirstName + ' ' + LastName) LIKE @name) 
+          AND IsActive = 1
+      `)
+
+      if (userRes.recordset.length > 0) {
+        ev7UserId = userRes.recordset[0].UserID
+      }
+
+      // 2. นำ ev7UserId มาค้นหาใน LineRegistration (Postgres)
+      if (ev7UserId) {
+        const lineReg = await prisma.lineRegistration.findFirst({
+          where: { ev7UserId, isActive: true }
+        })
+        if (lineReg) {
+          targetLineUserId = lineReg.lineUserId
+        }
+      }
+
+      // 3. หากยังไม่พบ ให้ลองค้นหาจาก DisplayName ใน LineRegistration ตรงๆ
+      if (!targetLineUserId) {
+        const lineReg = await prisma.lineRegistration.findFirst({
+          where: {
+            displayName: {
+              contains: name,
+              mode: 'insensitive'
+            },
+            isActive: true
+          }
+        })
+        if (lineReg) {
+          targetLineUserId = lineReg.lineUserId
+        }
+      }
+
+      // 4. ส่ง Push Message
+      if (targetLineUserId) {
+        console.log(`[LINE Vehicle Note Mention] Sending notification to ${name} (LINE ID: ${targetLineUserId}) for Note #${vehicleNoteId}`)
+        
+        const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}/quick-report?registerNo=${encodeURIComponent(registerNo)}&tab=chat`
+        
+        const flexMessage: any = {
+          type: 'flex',
+          altText: `🔔 คุณถูกกล่าวถึงโดยคุณ ${senderName} ในบันทึกรถทะเบียน ${registerNo}`,
+          contents: {
+            type: 'bubble',
+            size: 'mega',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              backgroundColor: '#E8F5E9',
+              paddingAll: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: '🔔 คุณถูกกล่าวถึงในบันทึกข้อมูลรถทั่วไป',
+                  weight: 'bold',
+                  size: 'sm',
+                  color: '#2E7D32'
+                }
+              ]
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'horizontal',
+                  contents: [
+                    {
+                      type: 'box',
+                      layout: 'vertical',
+                      flex: 3,
+                      contents: [
+                        {
+                          type: 'text',
+                          text: 'ผู้ส่ง',
+                          size: 'xs',
+                          color: '#8C8C8C',
+                          weight: 'bold'
+                        },
+                        {
+                          type: 'text',
+                          text: 'ทะเบียน',
+                          size: 'xs',
+                          color: '#8C8C8C',
+                          weight: 'bold',
+                          margin: 'sm'
+                        }
+                      ]
+                    },
+                    {
+                      type: 'box',
+                      layout: 'vertical',
+                      flex: 7,
+                      contents: [
+                        {
+                          type: 'text',
+                          text: senderName,
+                          size: 'xs',
+                          color: '#333333'
+                        },
+                        {
+                          type: 'text',
+                          text: registerNo,
+                          size: 'xs',
+                          color: '#333333',
+                          weight: 'bold',
+                          margin: 'sm'
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  type: 'separator',
+                  margin: 'md'
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  backgroundColor: '#F8F9FA',
+                  paddingAll: 'md',
+                  cornerRadius: 'md',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: text,
+                      size: 'xs',
+                      color: '#444444',
+                      wrap: true
+                    }
+                  ]
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'primary',
+                  color: '#2E7D32',
+                  action: {
+                    type: 'uri',
+                    label: '💬 ดูรายละเอียด / ประวัติรถ',
+                    uri: liffUrl
+                  }
+                }
+              ]
+            }
+          }
+        }
+
+        await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
+          console.error(`[LINE Vehicle Note Mention Error] Failed to send push message to ${targetLineUserId}:`, err)
+        })
+      } else {
+        console.log(`[LINE Vehicle Note Mention] User "${name}" mentioned in text but no active LINE Registration found.`)
+      }
+    }
+  } catch (err) {
+    console.error('[LINE Vehicle Note Mention Notification Error]', err)
+  }
+}

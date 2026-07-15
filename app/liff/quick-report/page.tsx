@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import GuideTab from './GuideTab'
+import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 
 interface DbCar {
   InventoryItemID: number
@@ -110,7 +111,7 @@ const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) 
 
 export default function QuickReportPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'contact' | 'dashboard' | 'guide'>('report')
+  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'chat' | 'contact' | 'dashboard' | 'guide'>('report')
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
 
@@ -569,6 +570,8 @@ export default function QuickReportPage() {
           setActiveTab('history')
         } else if (tab === 'report') {
           setActiveTab('report')
+        } else if (tab === 'chat') {
+          setActiveTab('chat')
         }
 
         if (registerNo) {
@@ -3630,6 +3633,102 @@ export default function QuickReportPage() {
           </div>
         )}
 
+        {/* TAB 2.5: CHATLOG / VEHICLE NOTES */}
+        {activeTab === 'chat' && (
+          <div className="space-y-4 animate-fade-in-up">
+            
+            {/* Search Box inside Tab */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm relative">
+              <h3 className="text-xs font-bold text-slate-600 block mb-2">💬 ค้นหารถและบันทึกข้อมูลทั่วไป</h3>
+              <p className="text-xxs text-slate-555 mb-3">
+                เลือกและพิมพ์ประวัติการพบเห็น ข้อสังเกต หรือรูปภาพของรถที่ไม่ได้เข้าใบซ่อมบำรุง
+              </p>
+
+              {selectedCar ? (
+                <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
+                  <div>
+                    <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                    <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
+                    <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
+                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
+                        <span>📍 สถานที่ปัจจุบัน:</span>
+                        <span className="font-bold text-slate-800">
+                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCar(null)
+                      setVehicleHistory([])
+                    }}
+                    className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
+                    <span className="text-slate-400 mr-2">🔍</span>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value)
+                        setShowCarDropdown(true)
+                      }}
+                      onFocus={() => setShowCarDropdown(true)}
+                      placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
+                      className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
+                    />
+                    {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
+                  </div>
+
+                  {/* Dropdown search results */}
+                  {showCarDropdown && searchTerm && (
+                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
+                      {dbCars.length > 0 ? (
+                        dbCars.map((car, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectCar(car)}
+                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-900">{car.RegisterNo}</p>
+                              <p className="text-xxs text-slate-555 font-mono">VIN: {car.VinNo}</p>
+                            </div>
+                            <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
+                              {car.Project}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedCar && (
+              <VehicleNotesSection
+                inventoryItemId={selectedCar.InventoryItemID}
+                registerNo={selectedCar.RegisterNo}
+                lineUserId={getLineUserId()}
+              />
+            )}
+          </div>
+        )}
+
         {/* TAB 3: UPDATE LOCATION */}
         {activeTab === 'contact' && (
           <div className="space-y-4 animate-fade-in-up">
@@ -4242,6 +4341,16 @@ export default function QuickReportPage() {
         >
           <span className="text-lg">📋</span>
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">ติดตามงาน</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('chat')}
+          className={`flex flex-col items-center justify-center w-full h-full transition ${
+            activeTab === 'chat' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <span className="text-lg">💬</span>
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">แชตรถ</span>
         </button>
 
         <button

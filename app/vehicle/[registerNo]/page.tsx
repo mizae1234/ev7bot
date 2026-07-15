@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -264,6 +265,12 @@ function VehicleDetailContent() {
             </div>
           )}
         </div>
+
+        {/* ── General Vehicle Notes ── */}
+        <VehicleNotesSection
+          inventoryItemId={car.InventoryItemID}
+          registerNo={car.RegisterNo || car.VinNo}
+        />
 
         {/* ── Current Rent ── */}
         {currentRent && (
