@@ -337,10 +337,10 @@ export default function QuickReportPage() {
   const [showLocDropdown, setShowLocDropdown] = useState(false)
   const [updatingLocation, setUpdatingLocation] = useState(false)
 
-  // Sync selectedLocCode and locSearchTerm when locationOptions, vehicleHistory, or selectedMaintId changes
+  // Sync selectedLocCode and locSearchTerm when locationOptions, vehicleHistory, selectedMaintId, selectedCar, or selectedCarDetails changes
   useEffect(() => {
-    if (locationOptions.length > 0 && vehicleHistory.length > 0) {
-      if (selectedMaintId && selectedMaintId !== 0) {
+    if (locationOptions.length > 0) {
+      if (selectedMaintId && selectedMaintId !== 0 && vehicleHistory.length > 0) {
         const currentTicket = vehicleHistory.find((t: any) => Number(t.MaintenanceItemID) === Number(selectedMaintId))
         if (currentTicket) {
           const matchedLoc = locationOptions.find(o => o.code === currentTicket.ServiceLocationCode || o.name === currentTicket.ServiceLocation)
@@ -348,14 +348,15 @@ export default function QuickReportPage() {
           setLocSearchTerm(matchedLoc ? matchedLoc.name : (currentTicket.ServiceLocation || ''))
         }
       } else {
-        if (selectedCar) {
-          const matchedLoc = locationOptions.find(o => o.code === selectedCar.CurrentLocation)
-          setSelectedLocCode(matchedLoc ? matchedLoc.code : (selectedCar.CurrentLocation || ''))
-          setLocSearchTerm(matchedLoc ? matchedLoc.name : (selectedCar.CurrentLocation || ''))
+        const currentCarLoc = selectedCarDetails?.CurrentLocation || selectedCar?.CurrentLocation
+        if (currentCarLoc) {
+          const matchedLoc = locationOptions.find(o => o.code === currentCarLoc)
+          setSelectedLocCode(matchedLoc ? matchedLoc.code : currentCarLoc)
+          setLocSearchTerm(matchedLoc ? matchedLoc.name : currentCarLoc)
         }
       }
     }
-  }, [locationOptions, vehicleHistory, selectedMaintId, selectedCar])
+  }, [locationOptions, vehicleHistory, selectedMaintId, selectedCar, selectedCarDetails])
 
   // Tab 4 Mobile Dashboard States
   const [mobileDashboardData, setMobileDashboardData] = useState<any>(null)
@@ -2188,11 +2189,11 @@ export default function QuickReportPage() {
                           </span>
                         )}
                       </div>
-                      {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                      {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
                         <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                           <span>📍 สถานที่ปัจจุบัน:</span>
                           <span className="font-bold text-slate-800">
-                            {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                            {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
                           </span>
                         </div>
                       )}
@@ -3433,11 +3434,11 @@ export default function QuickReportPage() {
                         </span>
                       )}
                     </div>
-                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
                       <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                         <span>📍 สถานที่ปัจจุบัน:</span>
                         <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
                         </span>
                       </div>
                     )}
@@ -3718,11 +3719,11 @@ export default function QuickReportPage() {
                         </span>
                       )}
                     </div>
-                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
                       <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                         <span>📍 สถานที่ปัจจุบัน:</span>
                         <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
                         </span>
                       </div>
                     )}
@@ -3854,11 +3855,11 @@ export default function QuickReportPage() {
                         </span>
                       )}
                     </div>
-                    {(selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation) && (
+                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
                       <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                         <span>📍 สถานที่ปัจจุบัน:</span>
                         <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation))?.name || (selectedCar.CurrentLocation || selectedCarDetails?.CurrentLocation)}
+                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
                         </span>
                       </div>
                     )}
