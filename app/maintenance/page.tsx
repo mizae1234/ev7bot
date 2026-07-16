@@ -22,6 +22,7 @@ interface MaintenanceItem {
   car_case: string
   service_location: string
   service_location_code: string
+  current_location: string | null
   insurance: string
   report_date: string | null
   incident_date: string | null
@@ -155,7 +156,7 @@ function MaintenanceContent() {
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
       periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel} | ประเภท: ${typeLabel}`,
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ตำแหน่งปัจจุบันของรถ', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
         item.vin,
@@ -169,6 +170,7 @@ function MaintenanceContent() {
           if (code === 'COMPLETE') return '-'
           return formatLocation(item.service_location_code || item.service_location) || '-'
         })(),
+        item.current_location || '-',
         item.problem_type,
         item.car_case,
         item.fault_party,
@@ -453,6 +455,12 @@ function MaintenanceContent() {
                                     <span className="text-zinc-450 font-bold block mb-1">📍 สถานที่ซ่อม (อู่):</span>
                                     <span className="text-zinc-800 dark:text-zinc-200">
                                       {formatLocation(item.service_location_code || item.service_location)}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">📍 ตำแหน่งปัจจุบันของรถ:</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">
+                                      {item.current_location || '-'}
                                     </span>
                                   </div>
                                   <div>

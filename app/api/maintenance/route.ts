@@ -222,11 +222,14 @@ export async function GET(req: NextRequest) {
           cu.FirstName AS CreateUserFirstName,
           cu.LastName AS CreateUserLastName,
           uu.FirstName AS UpdateUserFirstName,
-          uu.LastName AS UpdateUserLastName
+          uu.LastName AS UpdateUserLastName,
+          i.CurrentLocation AS CarCurrentLocation,
+          loc.StatusName AS CarCurrentLocationName
         FROM dbo.EV_MaintenanceItem m
         LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
         LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
+        LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
         WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
         ORDER BY 
           CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
@@ -279,6 +282,7 @@ export async function GET(req: NextRequest) {
       car_case: mapCode(m.CarCaseCode, carCaseMap),
       service_location: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
       service_location_code: m.ServiceLocationCode,
+      current_location: (m.CarCurrentLocationName as string) || (m.CarCurrentLocation as string) || null,
       insurance: mapCode(m.InsuranceCode, insuranceMap),
       report_date: m.ReportDate,
       incident_date: m.IncidentDate,
