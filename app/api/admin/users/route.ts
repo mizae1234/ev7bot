@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
-    const { lineUserId, role, isActive, ev7UserId, passcode, userId } = body
+    const { lineUserId, role, isActive, ev7UserId, receiveAllNotes, passcode, userId } = body
 
     if (passcode !== 'ev7admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -130,6 +130,9 @@ export async function PATCH(req: NextRequest) {
     }
     if (ev7UserId !== undefined) {
       updateData.ev7UserId = ev7UserId === null ? null : parseInt(String(ev7UserId), 10)
+    }
+    if (receiveAllNotes !== undefined) {
+      updateData.receiveAllNotes = !!receiveAllNotes
     }
 
     const updatedUser = await prisma.lineRegistration.update({

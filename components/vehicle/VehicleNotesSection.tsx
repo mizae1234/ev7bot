@@ -22,16 +22,18 @@ interface VehicleNotesSectionProps {
   lineUserId?: string | null
 }
 
+// SQL Server stores Bangkok time directly — mssql driver serializes as UTC (Z suffix).
+// Use UTC methods to read the raw value without browser adding +7 again.
 function formatTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   try {
     const d = new Date(dateStr)
-    const day = d.getDate()
+    const day = d.getUTCDate()
     const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
-    const month = months[d.getMonth()]
-    const year = d.getFullYear() + 543
-    const hours = String(d.getHours()).padStart(2, '0')
-    const minutes = String(d.getMinutes()).padStart(2, '0')
+    const month = months[d.getUTCMonth()]
+    const year = d.getUTCFullYear() + 543
+    const hours = String(d.getUTCHours()).padStart(2, '0')
+    const minutes = String(d.getUTCMinutes()).padStart(2, '0')
     return `${day} ${month} ${year} ${hours}:${minutes} น.`
   } catch {
     return dateStr || ''

@@ -85,10 +85,10 @@ export async function POST(req: NextRequest) {
 
     const newNoteId = insertRes.recordset[0]?.VehicleNoteID
 
-    // Send LINE Mention Notification if noteDetail contains @mentions
+    // Send LINE Notifications (mention + receiveAllNotes subscribers)
     if (noteDetail && noteDetail.trim() && newNoteId && registerNo) {
-      sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName).catch((err) => {
-        console.error('[LINE Vehicle Note Mention Error]', err)
+      sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId).catch((err) => {
+        console.error('[LINE Vehicle Note Notification Error]', err)
       })
     }
 

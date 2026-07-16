@@ -64,12 +64,27 @@ export function exportToExcel({ reportName, periodLabel, headers, rows, fileName
 }
 
 // ─── Helper: Format date for Excel cell value ───────────────────────
+// Use this for data that went through adjustTimezone() (e.g. dashboard API)
 export function formatDateForExcel(dateStr: string | null): string {
   if (!dateStr) return '-'
   try {
     return new Date(dateStr).toLocaleDateString('th-TH', {
       day: 'numeric', month: 'short', year: 'numeric',
       timeZone: 'Asia/Bangkok'
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+// Use this for raw mssql datetime that was NOT adjusted by the API
+// SQL Server stores Bangkok time directly, mssql driver adds Z suffix
+export function formatDateForExcelRaw(dateStr: string | null): string {
+  if (!dateStr) return '-'
+  try {
+    return new Date(dateStr).toLocaleDateString('th-TH', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      timeZone: 'UTC'
     })
   } catch {
     return dateStr

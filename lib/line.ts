@@ -249,9 +249,15 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
 
 /**
  * ค้นหาผู้ใช้ที่ถูกกล่าวถึงในข้อความโน้ตรถ แล้วส่ง LINE Push Message แจ้งเตือนไปยังผู้นั้น
+ * + ส่งให้ผู้ใช้ที่เปิด receiveAllNotes ด้วย (deduplicate ไม่ส่งซ้ำ)
  */
-export async function sendVehicleNoteMentionNotifications(text: string, vehicleNoteId: number, registerNo: string, senderName: string) {
+export async function sendVehicleNoteMentionNotifications(text: string, vehicleNoteId: number, registerNo: string, senderName: string, senderLineUserId?: string | null) {
   if (!text) return
+
+  // Track who already received notification (for deduplication)
+  const notifiedLineUserIds = new Set<string>()
+  // Exclude sender from receiving their own notification
+  if (senderLineUserId) notifiedLineUserIds.add(senderLineUserId)
 
   // ดึงข้อความที่มี @ (ES5-compatible regex execution)
   const matches: string[] = []
@@ -262,12 +268,14 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
       matches.push(match[1].trim())
     }
   }
-  if (matches.length === 0) return
+
+  const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}/quick-report?registerNo=${encodeURIComponent(registerNo)}&tab=chat`
 
   try {
     const mssqlPool = await getMSSQLPool()
     if (!mssqlPool) return
 
+    // ─── Part 1: Send to @mentioned users ──────────────────────────
     for (const name of matches) {
       let ev7UserId: number | null = null
       let targetLineUserId: string | null = null
@@ -312,137 +320,192 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
         }
       }
 
-      // 4. ส่ง Push Message
-      if (targetLineUserId) {
+      // 4. ส่ง Push Message (mention)
+      if (targetLineUserId && !notifiedLineUserIds.has(targetLineUserId)) {
         console.log(`[LINE Vehicle Note Mention] Sending notification to ${name} (LINE ID: ${targetLineUserId}) for Note #${vehicleNoteId}`)
         
-        const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}/quick-report?registerNo=${encodeURIComponent(registerNo)}&tab=chat`
-        
-        const flexMessage: any = {
-          type: 'flex',
-          altText: `🔔 คุณถูกกล่าวถึงโดยคุณ ${senderName} ในบันทึกรถทะเบียน ${registerNo}`,
-          contents: {
-            type: 'bubble',
-            size: 'mega',
-            header: {
-              type: 'box',
-              layout: 'vertical',
-              backgroundColor: '#E8F5E9',
-              paddingAll: 'md',
-              contents: [
-                {
-                  type: 'text',
-                  text: '🔔 คุณถูกกล่าวถึงในบันทึกข้อมูลรถทั่วไป',
-                  weight: 'bold',
-                  size: 'sm',
-                  color: '#2E7D32'
-                }
-              ]
-            },
-            body: {
-              type: 'box',
-              layout: 'vertical',
-              spacing: 'md',
-              contents: [
-                {
-                  type: 'box',
-                  layout: 'horizontal',
-                  contents: [
-                    {
-                      type: 'box',
-                      layout: 'vertical',
-                      flex: 3,
-                      contents: [
-                        {
-                          type: 'text',
-                          text: 'ผู้ส่ง',
-                          size: 'xs',
-                          color: '#8C8C8C',
-                          weight: 'bold'
-                        },
-                        {
-                          type: 'text',
-                          text: 'ทะเบียน',
-                          size: 'xs',
-                          color: '#8C8C8C',
-                          weight: 'bold',
-                          margin: 'sm'
-                        }
-                      ]
-                    },
-                    {
-                      type: 'box',
-                      layout: 'vertical',
-                      flex: 7,
-                      contents: [
-                        {
-                          type: 'text',
-                          text: senderName,
-                          size: 'xs',
-                          color: '#333333'
-                        },
-                        {
-                          type: 'text',
-                          text: registerNo,
-                          size: 'xs',
-                          color: '#333333',
-                          weight: 'bold',
-                          margin: 'sm'
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  type: 'separator',
-                  margin: 'md'
-                },
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  backgroundColor: '#F8F9FA',
-                  paddingAll: 'md',
-                  cornerRadius: 'md',
-                  contents: [
-                    {
-                      type: 'text',
-                      text: text,
-                      size: 'xs',
-                      color: '#444444',
-                      wrap: true
-                    }
-                  ]
-                }
-              ]
-            },
-            footer: {
-              type: 'box',
-              layout: 'vertical',
-              spacing: 'sm',
-              contents: [
-                {
-                  type: 'button',
-                  style: 'primary',
-                  color: '#2E7D32',
-                  action: {
-                    type: 'uri',
-                    label: '💬 ดูรายละเอียด / ประวัติรถ',
-                    uri: liffUrl
-                  }
-                }
-              ]
-            }
-          }
-        }
+        const flexMessage = buildVehicleNoteFlexMessage({
+          headerText: '🔔 คุณถูกกล่าวถึงในบันทึกข้อมูลรถทั่วไป',
+          headerBg: '#E8F5E9',
+          headerColor: '#2E7D32',
+          buttonColor: '#2E7D32',
+          senderName,
+          registerNo,
+          noteText: text,
+          liffUrl
+        })
 
         await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
           console.error(`[LINE Vehicle Note Mention Error] Failed to send push message to ${targetLineUserId}:`, err)
         })
-      } else {
+        notifiedLineUserIds.add(targetLineUserId)
+      } else if (!targetLineUserId) {
         console.log(`[LINE Vehicle Note Mention] User "${name}" mentioned in text but no active LINE Registration found.`)
       }
     }
+
+    // ─── Part 2: Send to receiveAllNotes subscribers ──────────────
+    const subscribers = await prisma.lineRegistration.findMany({
+      where: {
+        receiveAllNotes: true,
+        isActive: true
+      },
+      select: { lineUserId: true, displayName: true }
+    })
+
+    for (const sub of subscribers) {
+      if (notifiedLineUserIds.has(sub.lineUserId)) continue // skip already notified (mentioned or sender)
+
+      console.log(`[LINE Vehicle Note Subscriber] Sending notification to ${sub.displayName || sub.lineUserId} for Note #${vehicleNoteId}`)
+
+      const flexMessage = buildVehicleNoteFlexMessage({
+        headerText: '📝 มีบันทึกข้อมูลรถใหม่',
+        headerBg: '#E3F2FD',
+        headerColor: '#1565C0',
+        buttonColor: '#1565C0',
+        senderName,
+        registerNo,
+        noteText: text,
+        liffUrl
+      })
+
+      await lineClient.pushMessage(sub.lineUserId, flexMessage).catch(err => {
+        console.error(`[LINE Vehicle Note Subscriber Error] Failed to send to ${sub.lineUserId}:`, err)
+      })
+      notifiedLineUserIds.add(sub.lineUserId)
+    }
+
   } catch (err) {
-    console.error('[LINE Vehicle Note Mention Notification Error]', err)
+    console.error('[LINE Vehicle Note Notification Error]', err)
   }
 }
+
+// ─── Helper: Build Flex Message for Vehicle Note ─────────────────────
+function buildVehicleNoteFlexMessage(opts: {
+  headerText: string
+  headerBg: string
+  headerColor: string
+  buttonColor: string
+  senderName: string
+  registerNo: string
+  noteText: string
+  liffUrl: string
+}): any {
+  return {
+    type: 'flex',
+    altText: `${opts.headerText} — ทะเบียน ${opts.registerNo} โดย ${opts.senderName}`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: opts.headerBg,
+        paddingAll: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: opts.headerText,
+            weight: 'bold',
+            size: 'sm',
+            color: opts.headerColor
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 3,
+                contents: [
+                  {
+                    type: 'text',
+                    text: 'ผู้ส่ง',
+                    size: 'xs',
+                    color: '#8C8C8C',
+                    weight: 'bold'
+                  },
+                  {
+                    type: 'text',
+                    text: 'ทะเบียน',
+                    size: 'xs',
+                    color: '#8C8C8C',
+                    weight: 'bold',
+                    margin: 'sm'
+                  }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 7,
+                contents: [
+                  {
+                    type: 'text',
+                    text: opts.senderName,
+                    size: 'xs',
+                    color: '#333333'
+                  },
+                  {
+                    type: 'text',
+                    text: opts.registerNo,
+                    size: 'xs',
+                    color: '#333333',
+                    weight: 'bold',
+                    margin: 'sm'
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'md'
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#F8F9FA',
+            paddingAll: 'md',
+            cornerRadius: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: opts.noteText,
+                size: 'xs',
+                color: '#444444',
+                wrap: true
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: opts.buttonColor,
+            action: {
+              type: 'uri',
+              label: '💬 ดูรายละเอียด / ประวัติรถ',
+              uri: opts.liffUrl
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+

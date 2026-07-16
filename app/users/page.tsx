@@ -14,6 +14,7 @@ interface RegisteredUser {
   isActive: boolean
   role: 'USER' | 'ADMIN' | 'SUPER_ADMIN'
   ev7UserId?: number | null
+  receiveAllNotes?: boolean
   registeredAt: string
   updatedAt: string
 }
@@ -325,6 +326,27 @@ function UserManagementContent() {
       if (!res.ok) {
         const data = await res.json()
         alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไข EV7 User ID ได้'}`)
+      } else {
+        await fetchUsers()
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleReceiveAllNotesToggle = async (targetLineUserId: string, current: boolean) => {
+    setActionLoading(targetLineUserId)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineUserId: targetLineUserId, receiveAllNotes: !current, passcode, userId: liffUserId })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไขได้'}`)
       } else {
         await fetchUsers()
       }
@@ -852,6 +874,20 @@ function UserManagementContent() {
                              <option value="ADMIN">Admin</option>
                              <option value="SUPER_ADMIN">Super Admin</option>
                            </select>
+
+                           {/* Receive All Notes toggle */}
+                            <button
+                              onClick={() => handleReceiveAllNotesToggle(user.lineUserId, !!user.receiveAllNotes)}
+                              disabled={actionLoading === user.lineUserId}
+                              title={user.receiveAllNotes ? 'ปิดรับการแจ้งเตือนบันทึกรถทั้งหมด' : 'เปิดรับการแจ้งเตือนบันทึกรถทั้งหมด'}
+                              className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold transition-all disabled:opacity-50 active:scale-95 ${
+                                user.receiveAllNotes
+                                  ? 'bg-blue-500/15 text-blue-400 border border-blue-500/25 hover:bg-blue-500/25'
+                                  : 'bg-zinc-900 text-zinc-600 border border-zinc-800 hover:bg-zinc-800'
+                              }`}
+                            >
+                              {user.receiveAllNotes ? '📝 รับทุกบันทึก ✓' : '📝 รับทุกบันทึก'}
+                            </button>
 
                            {/* Active toggle */}
                            <button

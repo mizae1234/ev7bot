@@ -2,7 +2,7 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { exportToExcel, formatDateForExcel, ExportButton } from '@/lib/exportExcel'
+import { exportToExcel, formatDateForExcelRaw, ExportButton } from '@/lib/exportExcel'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 
@@ -167,11 +167,11 @@ function MaintenanceContent() {
         item.car_case,
         item.fault_party,
         item.insurance,
-        formatDateForExcel(item.report_date),
-        formatDateForExcel(item.incident_date),
-        formatDateForExcel(item.start_date),
-        formatDateForExcel(item.finish_date),
-        formatDateForExcel(item.return_date),
+        formatDateForExcelRaw(item.report_date),
+        formatDateForExcelRaw(item.incident_date),
+        formatDateForExcelRaw(item.start_date),
+        formatDateForExcelRaw(item.finish_date),
+        formatDateForExcelRaw(item.return_date),
         item.status_text,
         item.replacements.map(r => r.register_no || r.vin).join(', ') || '-',
         item.follow_up || '-',
