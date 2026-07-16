@@ -255,6 +255,13 @@ function DashboardContent() {
             </a>
 
             <a
+              href="/vehicle-notes"
+              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              📝 บันทึกตัวรถทั้งหมด
+            </a>
+
+            <a
               href="/chat"
               className="flex items-center gap-1.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-zinc-900 text-xs font-bold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md"
             >
