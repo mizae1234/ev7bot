@@ -61,10 +61,18 @@ export async function GET(req: NextRequest) {
         COALESCE(i.RegisterNo, '') AS RegisterNo,
         i.VinNo,
         i.Model,
+        i.ProjectType,
+        s.DescriptionStatus AS StatusName,
+        sub.DescriptionStatus AS SubStatusName,
+        loc.StatusName AS CurrentLocationName,
+        i.CurrentLocation AS LocationCode,
         ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreateUserName
       FROM dbo.EV_VehicleNote n
       JOIN dbo.EV_InventoryItem i ON n.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
+      LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
       WHERE n.IsActive = 1
     `
 
@@ -146,6 +154,10 @@ export async function GET(req: NextRequest) {
         RegisterNo: n.RegisterNo || null,
         VinNo: n.VinNo,
         Model: n.Model || '-',
+        ProjectType: n.ProjectType || '-',
+        StatusName: n.StatusName || null,
+        SubStatusName: n.SubStatusName || null,
+        CurrentLocation: n.CurrentLocationName || n.LocationCode || null,
         IsActive: n.IsActive
       }
     })
