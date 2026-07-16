@@ -20,6 +20,15 @@ interface VehicleNote {
   SubStatusName: string | null
   CurrentLocation: string | null
   IsActive: boolean
+  attachments?: {
+    FileAttachmentID: number
+    fileName: string
+    originalFileName: string
+    s3Key: string
+    fileSize: number
+    contentType: string
+    url: string
+  }[]
 }
 
 interface GroupedVehicleNotes {
@@ -37,6 +46,15 @@ interface GroupedVehicleNotes {
     CreateDate: string
     CreateUserID: number | null
     CreateUserName: string
+    attachments?: {
+      FileAttachmentID: number
+      fileName: string
+      originalFileName: string
+      s3Key: string
+      fileSize: number
+      contentType: string
+      url: string
+    }[]
   }[]
 }
 
@@ -135,7 +153,8 @@ function VehicleNotesContent() {
         NoteDetail: note.NoteDetail,
         CreateDate: note.CreateDate,
         CreateUserID: note.CreateUserID,
-        CreateUserName: note.CreateUserName
+        CreateUserName: note.CreateUserName,
+        attachments: note.attachments || []
       })
     }
     return grouped
@@ -286,6 +305,34 @@ function VehicleNotesContent() {
                           <div className="bg-zinc-50/50 dark:bg-zinc-950/30 p-3.5 rounded-xl border border-zinc-150/60 dark:border-zinc-850/60 text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed font-sans shadow-xxs">
                             {n.NoteDetail}
                           </div>
+
+                          {/* Note Attachments list in timeline */}
+                          {n.attachments && n.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {n.attachments.map((att: any) => {
+                                const isImage = att.contentType?.startsWith('image/') || att.fileType?.startsWith('image/')
+                                return (
+                                  <a
+                                    key={att.FileAttachmentID}
+                                    href={att.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="border border-slate-200 dark:border-zinc-800 hover:border-indigo-400 dark:hover:border-indigo-500 rounded-xl p-2 bg-white dark:bg-zinc-900 flex items-center gap-2 max-w-xs transition shadow-sm"
+                                  >
+                                    {isImage ? (
+                                      <img src={att.url} alt={att.originalFileName} className="w-12 h-12 rounded-lg object-cover" />
+                                    ) : (
+                                      <span className="text-2xl">📄</span>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] font-bold truncate text-slate-700 dark:text-zinc-300 hover:underline">{att.originalFileName || att.fileName}</p>
+                                      <p className="text-[8px] text-slate-400">{(att.fileSize / 1024).toFixed(1)} KB</p>
+                                    </div>
+                                  </a>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

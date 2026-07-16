@@ -9,14 +9,14 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { inventoryItemId, noteDetail, registerNo, lineUserId } = body
+    const { inventoryItemId, noteDetail, registerNo, lineUserId, attachments } = body
 
     if (!inventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
     }
 
     if (env.MOCK_MODE) {
-      console.log('[Mock Mode] Create Vehicle Note:', { inventoryItemId, noteDetail, registerNo, lineUserId })
+      console.log('[Mock Mode] Create Vehicle Note:', { inventoryItemId, noteDetail, registerNo, lineUserId, attachments })
       return NextResponse.json({
         success: true,
         message: 'บันทึกโน้ตสำเร็จ (จำลองสถานะ MOCK_MODE)'
@@ -84,6 +84,51 @@ export async function POST(req: NextRequest) {
     `)
 
     const newNoteId = insertRes.recordset[0]?.VehicleNoteID
+
+    // Insert attachments if present
+    if (attachments && Array.isArray(attachments) && attachments.length > 0 && newNoteId) {
+      for (const fileInfo of attachments) {
+        try {
+          const fileReq = pool.request()
+          fileReq.input('FN', sql.NVarChar, fileInfo.fileName)
+          fileReq.input('OFN', sql.NVarChar, fileInfo.originalFileName)
+          fileReq.input('SK', sql.NVarChar, fileInfo.s3Key)
+          fileReq.input('FS', sql.Int, fileInfo.fileSize)
+          fileReq.input('FT', sql.NVarChar, fileInfo.fileType)
+          fileReq.input('noteId', sql.Int, Number(newNoteId))
+          fileReq.input('userId', sql.Int, dbUserId || 1)
+
+          await fileReq.query(`
+            INSERT INTO dbo.FileAttachment (
+                FileName, 
+                OriginalFileName,
+                S3Key,
+                FileSize,
+                ContentType,
+                ReferenceID,
+                ReferenceType,
+                UploadDate,
+                CreatedBy,
+                CreatedDate
+            )
+            VALUES (
+                @FN, 
+                @OFN,
+                @SK,
+                @FS, 
+                @FT, 
+                @noteId,
+                'VEHICLE_NOTES',
+                GETDATE(),
+                @userId,
+                GETDATE()
+            )
+          `)
+        } catch (attInsErr) {
+          console.error('[Insert FileAttachment Error]', attInsErr)
+        }
+      }
+    }
 
     // Fetch Current Location and Status of the vehicle to include in the notification
     let currentLocationName: string | null = null
@@ -205,6 +250,42 @@ export async function GET(req: NextRequest) {
       console.warn('[Vehicle Note API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
     }
 
+    // Fetch attachments for these vehicle notes
+    let attachmentMap = new Map<number, any[]>()
+    if (notesResult.recordset && notesResult.recordset.length > 0) {
+      try {
+        const noteIds = notesResult.recordset.map((n: any) => n.VehicleNoteID)
+        const attachmentsRes = await pool.request().query(`
+          SELECT 
+            FileAttachmentID,
+            FileName,
+            OriginalFileName,
+            S3Key,
+            FileSize,
+            ContentType,
+            ReferenceID
+          FROM dbo.FileAttachment
+          WHERE ReferenceType = 'VEHICLE_NOTES'
+            AND ReferenceID IN (${noteIds.join(',')})
+        `)
+        for (const att of attachmentsRes.recordset) {
+          const list = attachmentMap.get(att.ReferenceID) || []
+          list.push({
+            FileAttachmentID: att.FileAttachmentID,
+            fileName: att.FileName,
+            originalFileName: att.OriginalFileName,
+            s3Key: att.S3Key,
+            fileSize: att.FileSize,
+            contentType: att.ContentType,
+            url: `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${att.S3Key}`
+          })
+          attachmentMap.set(att.ReferenceID, list)
+        }
+      } catch (attErr) {
+        console.error('[Fetch Note Attachments Error]', attErr)
+      }
+    }
+
     // Process Vehicle Notes
     const vehicleNotes = (notesResult.recordset || []).map((n: any) => {
       const originalName = (n.CreateUserName || '').trim();
@@ -232,7 +313,8 @@ export async function GET(req: NextRequest) {
         CreateDate: n.CreateDate,
         CreateUserID: n.CreateUserID,
         CreateUserName: creatorName,
-        IsActive: n.IsActive
+        IsActive: n.IsActive,
+        attachments: attachmentMap.get(n.VehicleNoteID) || []
       }
     })
 

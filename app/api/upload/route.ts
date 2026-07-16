@@ -19,24 +19,29 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
     const files = formData.getAll('files') as File[]
+    const processType = (formData.get('processType') as string) || 'MAINTENANCE'
     const maintenanceId = formData.get('maintenanceId') as string
     const lineUserId = formData.get('lineUserId') as string
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: 'ไม่พบไฟล์ภาพที่ต้องการอัปโหลด' }, { status: 400 })
     }
-    if (!maintenanceId) {
+    if (processType !== 'VEHICLE_NOTES' && !maintenanceId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม (maintenanceId)' }, { status: 400 })
     }
 
     if (env.MOCK_MODE) {
-      console.log('[Mock Mode] Uploading files for maintenance:', maintenanceId, files.map(f => f.name))
+      console.log('[Mock Mode] Uploading files for process:', processType, maintenanceId, files.map(f => f.name))
+      const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '')
       return NextResponse.json({
         success: true,
         message: 'อัปโหลดภาพสำเร็จ (จำลองสถานะ MOCK_MODE)',
         files: files.map(f => ({
-          fileName: f.name,
-          filePath: `https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com/Maintenance/MOCK/${maintenanceId}/${f.name}`,
+          fileName: `${Date.now()}_${f.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
+          originalFileName: f.name,
+          s3Key: processType === 'VEHICLE_NOTES' 
+            ? `VehicleNotes/${yearMonth}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+            : `Maintenance/${yearMonth}/${maintenanceId}/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
           fileType: f.type,
           fileSize: f.size
         }))
@@ -70,9 +75,14 @@ export async function POST(req: NextRequest) {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
 
-      // Sanitize and construct the key path: Maintenance/YYYYMM/MaintenanceItemID/<timestamp>_<filename>
+      // Sanitize and construct the key path
       const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-      const key = `Maintenance/${yearMonth}/${maintenanceId}/${Date.now()}_${cleanFileName}`
+      let key = ''
+      if (processType === 'VEHICLE_NOTES') {
+        key = `VehicleNotes/${yearMonth}/${Date.now()}_${cleanFileName}`
+      } else {
+        key = `Maintenance/${yearMonth}/${maintenanceId}/${Date.now()}_${cleanFileName}`
+      }
 
       // Upload to DigitalOcean Spaces
       await s3Client.send(new PutObjectCommand({
@@ -83,8 +93,6 @@ export async function POST(req: NextRequest) {
         ACL: 'public-read'
       }))
 
-      const fileUrl = `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${key}`
-
       uploadedUrls.push({
         fileName: `${Date.now()}_${cleanFileName}`,
         originalFileName: file.name,
@@ -94,7 +102,14 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const processType = (formData.get('processType') as string) || 'MAINTENANCE'
+    if (processType === 'VEHICLE_NOTES') {
+      // Just return the uploaded files details, frontend will save them during note creation
+      return NextResponse.json({
+        success: true,
+        message: `อัปโหลดไฟล์สำเร็จจำนวน ${files.length} รายการ`,
+        files: uploadedUrls
+      })
+    }
 
     if (processType === 'MAINTENANCE_COMPLETED' || processType === 'MAINTENANCE_COMPLETE') {
       for (const fileInfo of uploadedUrls) {
@@ -145,7 +160,7 @@ export async function POST(req: NextRequest) {
           VALUES (
               @maintId, 
               @NewFileID, 
-              'MAINTENANCE_COMPLETE',
+              @processType,
               1, 
               @userId,
               GETDATE()

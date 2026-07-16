@@ -125,6 +125,42 @@ export async function GET(req: NextRequest) {
       console.warn('[Vehicle Notes API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
     }
 
+    // Fetch attachments for these vehicle notes
+    let attachmentMap = new Map<number, any[]>()
+    if (dataResult.recordset && dataResult.recordset.length > 0) {
+      try {
+        const noteIds = dataResult.recordset.map((n: any) => n.VehicleNoteID)
+        const attachmentsRes = await pool.request().query(`
+          SELECT 
+            FileAttachmentID,
+            FileName,
+            OriginalFileName,
+            S3Key,
+            FileSize,
+            ContentType,
+            ReferenceID
+          FROM dbo.FileAttachment
+          WHERE ReferenceType = 'VEHICLE_NOTES'
+            AND ReferenceID IN (${noteIds.join(',')})
+        `)
+        for (const att of attachmentsRes.recordset) {
+          const list = attachmentMap.get(att.ReferenceID) || []
+          list.push({
+            FileAttachmentID: att.FileAttachmentID,
+            fileName: att.FileName,
+            originalFileName: att.OriginalFileName,
+            s3Key: att.S3Key,
+            fileSize: att.FileSize,
+            contentType: att.ContentType,
+            url: `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${att.S3Key}`
+          })
+          attachmentMap.set(att.ReferenceID, list)
+        }
+      } catch (attErr) {
+        console.error('[Fetch Notes Attachments Error]', attErr)
+      }
+    }
+
     const vehicleNotes = (dataResult.recordset || []).map((n: any) => {
       const originalName = (n.CreateUserName || '').trim()
       const lineDisplayName = n.CreateUserID ? regMap.get(Number(n.CreateUserID)) : null
@@ -158,7 +194,8 @@ export async function GET(req: NextRequest) {
         StatusName: n.StatusName || null,
         SubStatusName: n.SubStatusName || null,
         CurrentLocation: n.CurrentLocationName || n.LocationCode || null,
-        IsActive: n.IsActive
+        IsActive: n.IsActive,
+        attachments: attachmentMap.get(n.VehicleNoteID) || []
       }
     })
 
