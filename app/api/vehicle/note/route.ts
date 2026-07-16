@@ -269,17 +269,18 @@ export async function GET(req: NextRequest) {
             AND ReferenceID IN (${noteIds.join(',')})
         `)
         for (const att of attachmentsRes.recordset) {
-          const list = attachmentMap.get(att.ReferenceID) || []
+          const refId = Number(att.ReferenceID)
+          const list = attachmentMap.get(refId) || []
           list.push({
-            FileAttachmentID: att.FileAttachmentID,
+            FileAttachmentID: Number(att.FileAttachmentID),
             fileName: att.FileName,
             originalFileName: att.OriginalFileName,
             s3Key: att.S3Key,
-            fileSize: att.FileSize,
+            fileSize: Number(att.FileSize),
             contentType: att.ContentType,
             url: `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${att.S3Key}`
           })
-          attachmentMap.set(att.ReferenceID, list)
+          attachmentMap.set(refId, list)
         }
       } catch (attErr) {
         console.error('[Fetch Note Attachments Error]', attErr)
