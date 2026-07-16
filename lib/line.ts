@@ -271,80 +271,88 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
 
   const liffUrl = `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}/quick-report?registerNo=${encodeURIComponent(registerNo)}&tab=chat`
 
-  try {
-    const mssqlPool = await getMSSQLPool()
-    if (!mssqlPool) return
+  // ─── Part 1: Send to @mentioned users ──────────────────────────
+  if (matches.length > 0) {
+    try {
+      const mssqlPool = await getMSSQLPool()
+      if (mssqlPool) {
+        for (const name of matches) {
+          let ev7UserId: number | null = null
+          let targetLineUserId: string | null = null
 
-    // ─── Part 1: Send to @mentioned users ──────────────────────────
-    for (const name of matches) {
-      let ev7UserId: number | null = null
-      let targetLineUserId: string | null = null
+          // 1. ค้นหาใน EV_User (SQL Server)
+          const userReq = mssqlPool.request()
+          userReq.input('name', sql.NVarChar, `%${name}%`)
+          const userRes = await userReq.query(`
+            SELECT UserID 
+            FROM dbo.EV_User 
+            WHERE (FirstName LIKE @name OR LastName LIKE @name OR (FirstName + ' ' + LastName) LIKE @name) 
+              AND IsActive = 1
+          `)
 
-      // 1. ค้นหาใน EV_User (SQL Server)
-      const userReq = mssqlPool.request()
-      userReq.input('name', sql.NVarChar, `%${name}%`)
-      const userRes = await userReq.query(`
-        SELECT UserID 
-        FROM dbo.EV_User 
-        WHERE (FirstName LIKE @name OR LastName LIKE @name OR (FirstName + ' ' + LastName) LIKE @name) 
-          AND IsActive = 1
-      `)
-
-      if (userRes.recordset.length > 0) {
-        ev7UserId = userRes.recordset[0].UserID
-      }
-
-      // 2. นำ ev7UserId มาค้นหาใน LineRegistration (Postgres)
-      if (ev7UserId) {
-        const lineReg = await prisma.lineRegistration.findFirst({
-          where: { ev7UserId, isActive: true }
-        })
-        if (lineReg) {
-          targetLineUserId = lineReg.lineUserId
-        }
-      }
-
-      // 3. หากยังไม่พบ ให้ลองค้นหาจาก DisplayName ใน LineRegistration ตรงๆ
-      if (!targetLineUserId) {
-        const lineReg = await prisma.lineRegistration.findFirst({
-          where: {
-            displayName: {
-              contains: name,
-              mode: 'insensitive'
-            },
-            isActive: true
+          if (userRes.recordset.length > 0) {
+            ev7UserId = userRes.recordset[0].UserID
           }
-        })
-        if (lineReg) {
-          targetLineUserId = lineReg.lineUserId
+
+          // 2. นำ ev7UserId มาค้นหาใน LineRegistration (Postgres)
+          if (ev7UserId) {
+            const lineReg = await prisma.lineRegistration.findFirst({
+              where: { ev7UserId, isActive: true }
+            })
+            if (lineReg) {
+              targetLineUserId = lineReg.lineUserId
+            }
+          }
+
+          // 3. หากยังไม่พบ ให้ลองค้นหาจาก DisplayName ใน LineRegistration ตรงๆ
+          if (!targetLineUserId) {
+            const lineReg = await prisma.lineRegistration.findFirst({
+              where: {
+                displayName: {
+                  contains: name,
+                  mode: 'insensitive'
+                },
+                isActive: true
+              }
+            })
+            if (lineReg) {
+              targetLineUserId = lineReg.lineUserId
+            }
+          }
+
+          // 4. ส่ง Push Message (mention)
+          if (targetLineUserId && !notifiedLineUserIds.has(targetLineUserId)) {
+            console.log(`[LINE Vehicle Note Mention] Sending notification to ${name} (LINE ID: ${targetLineUserId}) for Note #${vehicleNoteId}`)
+            
+            const flexMessage = buildVehicleNoteFlexMessage({
+              headerText: '🔔 คุณถูกกล่าวถึงในบันทึกข้อมูลรถทั่วไป',
+              headerBg: '#E8F5E9',
+              headerColor: '#2E7D32',
+              buttonColor: '#2E7D32',
+              senderName,
+              registerNo,
+              noteText: text,
+              liffUrl
+            })
+
+            await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
+              console.error(`[LINE Vehicle Note Mention Error] Failed to send push message to ${targetLineUserId}:`, err)
+            })
+            notifiedLineUserIds.add(targetLineUserId)
+          } else if (!targetLineUserId) {
+            console.log(`[LINE Vehicle Note Mention] User "${name}" mentioned in text but no active LINE Registration found.`)
+          }
         }
+      } else {
+        console.warn('[LINE Vehicle Note Mention] MSSQL Pool is unavailable (possibly MOCK_MODE or connection error), skipping SQL Server lookup for mentions.')
       }
-
-      // 4. ส่ง Push Message (mention)
-      if (targetLineUserId && !notifiedLineUserIds.has(targetLineUserId)) {
-        console.log(`[LINE Vehicle Note Mention] Sending notification to ${name} (LINE ID: ${targetLineUserId}) for Note #${vehicleNoteId}`)
-        
-        const flexMessage = buildVehicleNoteFlexMessage({
-          headerText: '🔔 คุณถูกกล่าวถึงในบันทึกข้อมูลรถทั่วไป',
-          headerBg: '#E8F5E9',
-          headerColor: '#2E7D32',
-          buttonColor: '#2E7D32',
-          senderName,
-          registerNo,
-          noteText: text,
-          liffUrl
-        })
-
-        await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
-          console.error(`[LINE Vehicle Note Mention Error] Failed to send push message to ${targetLineUserId}:`, err)
-        })
-        notifiedLineUserIds.add(targetLineUserId)
-      } else if (!targetLineUserId) {
-        console.log(`[LINE Vehicle Note Mention] User "${name}" mentioned in text but no active LINE Registration found.`)
-      }
+    } catch (err) {
+      console.error('[LINE Vehicle Note Mention Error] Failed to process mentions:', err)
     }
+  }
 
-    // ─── Part 2: Send to receiveAllNotes subscribers ──────────────
+  // ─── Part 2: Send to receiveAllNotes subscribers ──────────────
+  try {
     const subscribers = await prisma.lineRegistration.findMany({
       where: {
         receiveAllNotes: true,
@@ -374,9 +382,8 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
       })
       notifiedLineUserIds.add(sub.lineUserId)
     }
-
   } catch (err) {
-    console.error('[LINE Vehicle Note Notification Error]', err)
+    console.error('[LINE Vehicle Note Subscriber Error] Failed to process subscribers:', err)
   }
 }
 

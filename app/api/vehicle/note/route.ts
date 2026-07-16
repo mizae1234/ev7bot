@@ -87,9 +87,11 @@ export async function POST(req: NextRequest) {
 
     // Send LINE Notifications (mention + receiveAllNotes subscribers)
     if (noteDetail && noteDetail.trim() && newNoteId && registerNo) {
-      sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId).catch((err) => {
+      try {
+        await sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId)
+      } catch (err) {
         console.error('[LINE Vehicle Note Notification Error]', err)
-      })
+      }
     }
 
     return NextResponse.json({
