@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
           }, { status: 400 })
         }
         const userRow = userCheckRes.recordset[0]
-        senderName = `${userRow.FirstName} ${userRow.LastName || ''}`.trim()
+        senderName = userRow.FirstName.trim()
       } catch (checkErr: any) {
         console.error('[User check error]', checkErr)
         return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ผู้ใช้งาน: ' + checkErr.message }, { status: 500 })

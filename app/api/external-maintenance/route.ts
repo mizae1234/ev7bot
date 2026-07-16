@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
           `)
         if (userCheckRes.recordset.length > 0) {
           const userRow = userCheckRes.recordset[0]
-          senderName = `${userRow.FirstName} ${userRow.LastName || ''}`.trim()
+          senderName = userRow.FirstName.trim()
         }
       } catch (userErr) {
         console.error('[User name check error]', userErr)
