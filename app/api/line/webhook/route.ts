@@ -2755,6 +2755,7 @@ async function trySendVehicleFlexMessage(
 
     let maintBubble: any = null
     let timelineBubble: any = null
+    let vehicleNoteBubble: any = null
 
     if (maint) {
       // Query replacement car if exists
@@ -3318,13 +3319,243 @@ async function trySendVehicleFlexMessage(
       }
     }
 
+    // Query vehicle notes
+    const vehicleNoteResult = await pool.request()
+      .input('inventoryItemId', sql.Int, car.InventoryItemID)
+      .query(`
+        SELECT TOP 5 n.VehicleNoteID, n.NoteDetail, n.CreateDate, n.CreateUserID,
+               ISNULL(NULLIF(u.FirstName, ''), u.UserName) AS CreateUserName
+        FROM dbo.EV_VehicleNote n
+        LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
+        WHERE n.InventoryItemID = @inventoryItemId AND n.IsActive = 1
+        ORDER BY n.CreateDate DESC
+      `)
+    const vehicleNotes = vehicleNoteResult.recordset || []
+
+    if (vehicleNotes.length > 0) {
+      const noteRows: any[] = []
+      const maxNotes = 4
+      const notesToShow = vehicleNotes.slice(0, maxNotes)
+
+      notesToShow.forEach((n, idx) => {
+        const isLast = idx === notesToShow.length - 1 && vehicleNotes.length <= maxNotes
+        noteRows.push({
+          type: 'box',
+          layout: 'horizontal',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'box',
+              layout: 'vertical',
+              width: '16px',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  width: '8px',
+                  height: '8px',
+                  cornerRadius: '4px',
+                  backgroundColor: '#4f46e5',
+                  contents: [{ type: 'filler' }]
+                },
+                ...(!isLast ? [{
+                  type: 'box',
+                  layout: 'vertical',
+                  width: '2px',
+                  flex: 1,
+                  backgroundColor: '#cbd5e1',
+                  margin: 'xs',
+                  contents: [{ type: 'filler' }]
+                }] : [])
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              flex: 1,
+              contents: [
+                {
+                  type: 'text',
+                  text: `${formatDateTh(n.CreateDate)} - โดย ${n.CreateUserName || `User ${n.CreateUserID || '-'}`}`,
+                  size: 'xxs',
+                  color: '#6b7280',
+                  weight: 'bold'
+                },
+                {
+                  type: 'text',
+                  text: n.NoteDetail || '-',
+                  size: 'xs',
+                  color: '#111827',
+                  weight: 'bold',
+                  wrap: true,
+                  margin: 'xs'
+                }
+              ]
+            }
+          ]
+        })
+      })
+
+      if (vehicleNotes.length > maxNotes) {
+        noteRows.push({
+          type: 'text',
+          text: `... และบันทึกข้อมูลรถอีก ${vehicleNotes.length - maxNotes} รายการ`,
+          size: 'xxs',
+          color: '#9ca3af',
+          align: 'center',
+          margin: 'sm'
+        })
+      }
+
+      vehicleNoteBubble = {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#4f46e5',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '12px',
+          paddingBottom: '12px',
+          contents: [
+            {
+              type: 'text',
+              text: '📝 บันทึกข้อมูลรถ (Vehicle Notes)',
+              color: '#ffffff',
+              weight: 'bold',
+              size: 'md'
+            },
+            {
+              type: 'text',
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
+              color: '#e0e7ff',
+              size: 'xs',
+              margin: 'xs',
+              weight: 'bold'
+            }
+          ]
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '10px',
+          paddingBottom: '10px',
+          spacing: 'md',
+          contents: noteRows
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '8px',
+          paddingBottom: '12px',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#4f46e5',
+              height: 'sm',
+              action: {
+                type: 'uri',
+                label: 'ดูรายละเอียดทั้งหมด',
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
+              }
+            }
+          ]
+        }
+      }
+    } else {
+      vehicleNoteBubble = {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#4f46e5',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '12px',
+          paddingBottom: '12px',
+          contents: [
+            {
+              type: 'text',
+              text: '📝 บันทึกข้อมูลรถ (Vehicle Notes)',
+              color: '#ffffff',
+              weight: 'bold',
+              size: 'md'
+            },
+            {
+              type: 'text',
+              text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
+              color: '#e0e7ff',
+              size: 'xs',
+              margin: 'xs',
+              weight: 'bold'
+            }
+          ]
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '30px',
+          paddingBottom: '30px',
+          spacing: 'md',
+          justifyContent: 'center',
+          alignItems: 'center',
+          contents: [
+            {
+              type: 'text',
+              text: 'ไม่มีบันทึกข้อมูลสำหรับรถคันนี้',
+              color: '#9ca3af',
+              size: 'sm',
+              align: 'center',
+              weight: 'bold'
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          paddingStart: '16px',
+          paddingEnd: '16px',
+          paddingTop: '8px',
+          paddingBottom: '12px',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              color: '#4f46e5',
+              height: 'sm',
+              action: {
+                type: 'uri',
+                label: 'ดูรายละเอียดทั้งหมด',
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
+              }
+            }
+          ]
+        }
+      }
+    }
+
     // 3. Assemble flexContents
     if (statusCode === 'MAINTENANCE') {
       if (maintBubble) {
+        const carouselContents = [maintBubble]
         if (timelineBubble) {
+          carouselContents.push(timelineBubble)
+        }
+        if (vehicleNoteBubble) {
+          carouselContents.push(vehicleNoteBubble)
+        }
+
+        if (carouselContents.length > 1) {
           flexContents = {
             type: 'carousel',
-            contents: [maintBubble, timelineBubble]
+            contents: carouselContents
           }
         } else {
           flexContents = maintBubble
@@ -3332,11 +3563,18 @@ async function trySendVehicleFlexMessage(
       }
     } else if (statusCode === 'ON_RENT') {
       if (rentBubble) {
+        const carouselContents = [rentBubble]
         if (maintBubble) {
-          const carouselContents = [rentBubble, maintBubble]
-          if (timelineBubble) {
-            carouselContents.push(timelineBubble)
-          }
+          carouselContents.push(maintBubble)
+        }
+        if (timelineBubble) {
+          carouselContents.push(timelineBubble)
+        }
+        if (vehicleNoteBubble) {
+          carouselContents.push(vehicleNoteBubble)
+        }
+
+        if (carouselContents.length > 1) {
           flexContents = {
             type: 'carousel',
             contents: carouselContents
