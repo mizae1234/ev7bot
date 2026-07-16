@@ -50,7 +50,7 @@ function formatDateTh(dateStr: string | null | undefined): string {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      timeZone: 'Asia/Bangkok'
+      timeZone: 'UTC'
     })
   } catch {
     return String(dateStr)
