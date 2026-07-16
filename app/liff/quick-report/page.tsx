@@ -1803,9 +1803,24 @@ export default function QuickReportPage() {
                             <span>เตรียมลบ</span>
                           </div>
                         ) : (
-                          <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
-                            ✕
-                          </div>
+                          <>
+                            <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
+                              ✕
+                            </div>
+                            <a
+                              href={att.FilePath}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={att.FileName}
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/60 hover:bg-indigo-600 text-white flex items-center justify-center text-xs shadow-md backdrop-blur-xs transition-all duration-200 hover:scale-105 active:scale-95"
+                              title="ดาวน์โหลดรูปภาพ"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                              </svg>
+                            </a>
+                          </>
                         )}
                       </div>
                     )
@@ -2011,9 +2026,24 @@ export default function QuickReportPage() {
                             <span>เตรียมลบ</span>
                           </div>
                         ) : (
-                          <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
-                            ✕
-                          </div>
+                          <>
+                            <div className="absolute top-1 right-1 bg-black/40 hover:bg-black/60 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm transition">
+                              ✕
+                            </div>
+                            <a
+                              href={att.FilePath}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={att.FileName}
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/60 hover:bg-indigo-600 text-white flex items-center justify-center text-xs shadow-md backdrop-blur-xs transition-all duration-200 hover:scale-105 active:scale-95"
+                              title="ดาวน์โหลดรูปภาพ"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                              </svg>
+                            </a>
+                          </>
                         )}
                       </div>
                     )
