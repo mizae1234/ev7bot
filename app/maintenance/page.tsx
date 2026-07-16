@@ -155,14 +155,20 @@ function MaintenanceContent() {
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
       periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel} | ประเภท: ${typeLabel}`,
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
         item.vin,
         item.model || '-',
         item.project || '-',
         item.issue_title || '-',
-        item.service_location,
+        formatLocation(item.service_location_code || item.service_location),
+        (() => {
+          const code = item.status_code || ''
+          if (code === 'READY_PICKUP_MAINTENANCE') return 'EV7'
+          if (code === 'COMPLETE') return '-'
+          return formatLocation(item.service_location_code || item.service_location) || '-'
+        })(),
         item.problem_type,
         item.car_case,
         item.fault_party,
