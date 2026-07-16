@@ -2716,9 +2716,7 @@ async function trySendVehicleFlexMessage(
     const car = carResult.recordset[0]
     const statusCode = car.StatusCode
 
-    if (statusCode !== 'MAINTENANCE' && statusCode !== 'ON_RENT') {
-      return false
-    }
+    // Allow status checking for all cars
 
     const cleanedText = aiResponse
       .replace(/(?:\n\r?|\r)?(?:🔗\s*)?(?:ดูเพิ่มเติม|ดูเพิ่มเติมได้ที่นี่|ดูข้อมูลเพิ่มเติม)[:\s]*(?:https?:\/\/[^\s]+|\/vehicle\/[^\s]+)/gi, '')
@@ -2756,6 +2754,7 @@ async function trySendVehicleFlexMessage(
     let maintBubble: any = null
     let timelineBubble: any = null
     let vehicleNoteBubble: any = null
+    let infoBubble: any = null
 
     if (maint) {
       // Query replacement car if exists
@@ -3467,13 +3466,47 @@ async function trySendVehicleFlexMessage(
           ]
         }
       }
-    } else {
-      vehicleNoteBubble = {
+    }
+
+    if (!maintBubble && !rentBubble) {
+      const currentStatus = getCarStatusDisplay(car.StatusName, car.StatusCode, car.SubStatusName, car.StatusType)
+      const projectDisplay = (car.ProjectType || '').toLowerCase() === 'taxi' ? 'EV7' : (car.ProjectType || '-')
+
+      const infoBodyContents: any[] = [
+        {
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            { type: 'text', text: 'VIN', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: car.VinNo || '-', color: '#111827', size: 'xs', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'sm',
+          contents: [
+            { type: 'text', text: 'รุ่น/โครงการ', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: `${car.Model || '-'} (${projectDisplay})`, color: '#111827', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+          ]
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'sm',
+          contents: [
+            { type: 'text', text: 'สถานะปัจจุบัน', color: '#6b7280', size: 'xs', flex: 3 },
+            { type: 'text', text: currentStatus, color: '#059669', size: 'xs', weight: 'bold', flex: 5, wrap: true }
+          ]
+        }
+      ]
+
+      infoBubble = {
         type: 'bubble',
         header: {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#4f46e5',
+          backgroundColor: '#1e3a8a',
           paddingStart: '16px',
           paddingEnd: '16px',
           paddingTop: '12px',
@@ -3481,7 +3514,7 @@ async function trySendVehicleFlexMessage(
           contents: [
             {
               type: 'text',
-              text: '📝 บันทึกข้อมูลรถ (Vehicle Notes)',
+              text: '🚙 ข้อมูลรถยนต์',
               color: '#ffffff',
               weight: 'bold',
               size: 'md'
@@ -3489,7 +3522,7 @@ async function trySendVehicleFlexMessage(
             {
               type: 'text',
               text: car.RegisterNo ? `ทะเบียน: ${car.RegisterNo}` : `เลขตัวถัง (VIN): ${car.VinNo}`,
-              color: '#e0e7ff',
+              color: '#93c5fd',
               size: 'xs',
               margin: 'xs',
               weight: 'bold'
@@ -3501,21 +3534,10 @@ async function trySendVehicleFlexMessage(
           layout: 'vertical',
           paddingStart: '16px',
           paddingEnd: '16px',
-          paddingTop: '30px',
-          paddingBottom: '30px',
-          spacing: 'md',
-          justifyContent: 'center',
-          alignItems: 'center',
-          contents: [
-            {
-              type: 'text',
-              text: 'ไม่มีบันทึกข้อมูลสำหรับรถคันนี้',
-              color: '#9ca3af',
-              size: 'sm',
-              align: 'center',
-              weight: 'bold'
-            }
-          ]
+          paddingTop: '10px',
+          paddingBottom: '10px',
+          spacing: 'sm',
+          contents: infoBodyContents
         },
         footer: {
           type: 'box',
@@ -3528,11 +3550,11 @@ async function trySendVehicleFlexMessage(
             {
               type: 'button',
               style: 'primary',
-              color: '#4f46e5',
+              color: '#1e3a8a',
               height: 'sm',
               action: {
                 type: 'uri',
-                label: 'ดูรายละเอียดทั้งหมด',
+                label: 'ดูรายละเอียดเพิ่มเติม',
                 uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=${encodeURIComponent(`/vehicle/${car.RegisterNo || car.VinNo}`)}`
               }
             }
@@ -3581,6 +3603,22 @@ async function trySendVehicleFlexMessage(
           }
         } else {
           flexContents = rentBubble
+        }
+      }
+    } else {
+      if (infoBubble) {
+        const carouselContents = [infoBubble]
+        if (vehicleNoteBubble) {
+          carouselContents.push(vehicleNoteBubble)
+        }
+
+        if (carouselContents.length > 1) {
+          flexContents = {
+            type: 'carousel',
+            contents: carouselContents
+          }
+        } else {
+          flexContents = infoBubble
         }
       }
     }
