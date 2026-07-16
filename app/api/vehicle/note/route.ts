@@ -85,10 +85,31 @@ export async function POST(req: NextRequest) {
 
     const newNoteId = insertRes.recordset[0]?.VehicleNoteID
 
+    // Fetch Current Location of the vehicle to include in the notification
+    let currentLocationName: string | null = null
+    try {
+      const locQueryReq = pool.request()
+      locQueryReq.input('itemId', sql.Int, inventoryItemId)
+      const locQueryResult = await locQueryReq.query(`
+        SELECT TOP 1
+          sub.StatusName AS LocationName,
+          i.CurrentLocation AS LocationCode
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.CurrentLocation = sub.StatusCode AND sub.Type = 'LOCATION'
+        WHERE i.InventoryItemID = @itemId
+      `)
+      if (locQueryResult.recordset.length > 0) {
+        const row = locQueryResult.recordset[0]
+        currentLocationName = row.LocationName || row.LocationCode || null
+      }
+    } catch (locErr) {
+      console.error('[Fetch CurrentLocation Error]', locErr)
+    }
+
     // Send LINE Notifications (mention + receiveAllNotes subscribers)
     if (noteDetail && noteDetail.trim() && newNoteId && registerNo) {
       try {
-        await sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId)
+        await sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId, currentLocationName)
       } catch (err) {
         console.error('[LINE Vehicle Note Notification Error]', err)
       }

@@ -251,7 +251,14 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
  * ค้นหาผู้ใช้ที่ถูกกล่าวถึงในข้อความโน้ตรถ แล้วส่ง LINE Push Message แจ้งเตือนไปยังผู้นั้น
  * + ส่งให้ผู้ใช้ที่เปิด receiveAllNotes ด้วย (deduplicate ไม่ส่งซ้ำ)
  */
-export async function sendVehicleNoteMentionNotifications(text: string, vehicleNoteId: number, registerNo: string, senderName: string, senderLineUserId?: string | null) {
+export async function sendVehicleNoteMentionNotifications(
+  text: string,
+  vehicleNoteId: number,
+  registerNo: string,
+  senderName: string,
+  senderLineUserId?: string | null,
+  currentLocation?: string | null
+) {
   if (!text) return
 
   // Track who already received notification (for deduplication)
@@ -332,7 +339,8 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
               senderName,
               registerNo,
               noteText: text,
-              liffUrl
+              liffUrl,
+              currentLocation
             })
 
             await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
@@ -374,7 +382,8 @@ export async function sendVehicleNoteMentionNotifications(text: string, vehicleN
         senderName,
         registerNo,
         noteText: text,
-        liffUrl
+        liffUrl,
+        currentLocation
       })
 
       await lineClient.pushMessage(sub.lineUserId, flexMessage).catch(err => {
@@ -397,6 +406,7 @@ function buildVehicleNoteFlexMessage(opts: {
   registerNo: string
   noteText: string
   liffUrl: string
+  currentLocation?: string | null
 }): any {
   return {
     type: 'flex',
@@ -447,6 +457,14 @@ function buildVehicleNoteFlexMessage(opts: {
                     color: '#8C8C8C',
                     weight: 'bold',
                     margin: 'sm'
+                  },
+                  {
+                    type: 'text',
+                    text: 'ตำแหน่ง',
+                    size: 'xs',
+                    color: '#8C8C8C',
+                    weight: 'bold',
+                    margin: 'sm'
                   }
                 ]
               },
@@ -467,6 +485,13 @@ function buildVehicleNoteFlexMessage(opts: {
                     size: 'xs',
                     color: '#333333',
                     weight: 'bold',
+                    margin: 'sm'
+                  },
+                  {
+                    type: 'text',
+                    text: opts.currentLocation || '-',
+                    size: 'xs',
+                    color: '#333333',
                     margin: 'sm'
                   }
                 ]
