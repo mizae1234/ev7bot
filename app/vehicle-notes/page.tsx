@@ -155,87 +155,75 @@ function VehicleNotesContent() {
           </div>
         )}
 
-        {/* Data List */}
+        {/* Data List (Log Timeline) */}
         {!loading && !error && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex justify-between items-center px-1">
-              <p className="text-xs text-zinc-500 dark:text-zinc-455 font-bold">
+              <p className="text-xs text-zinc-500 dark:text-zinc-450 font-bold">
                 พบข้อมูลทั้งหมด {total} รายการ
               </p>
             </div>
 
             {notes.length > 0 ? (
-              notes.map((note) => (
-                <div 
-                  key={note.VehicleNoteID} 
-                  className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 p-5 shadow-sm hover:shadow-md transition-all duration-200"
-                >
-                  {/* Vehicle Header Info */}
-                  <div className="pb-3.5 border-b border-zinc-150 dark:border-zinc-800/60">
-                    <a
-                      href={`/vehicle/${encodeURIComponent(note.RegisterNo || note.VinNo)}`}
-                      className="text-lg font-extrabold text-zinc-900 dark:text-zinc-100 hover:text-indigo-650 dark:hover:text-indigo-400 hover:underline transition-colors tracking-tight block"
-                    >
-                      {note.RegisterNo || 'ยังไม่มีทะเบียน'}
-                    </a>
-                    <div className="font-mono text-[11px] text-zinc-450 dark:text-zinc-550 mt-0.5">
-                      VIN: {note.VinNo}
-                    </div>
+              <div className="relative border-l-2 border-indigo-100 dark:border-zinc-800 ml-4 md:ml-6 pl-6 md:pl-8 space-y-6">
+                {notes.map((note) => (
+                  <div key={note.VehicleNoteID} className="relative">
+                    {/* Timeline Dot */}
+                    <span className="absolute -left-[31px] md:-left-[39px] top-1.5 w-4 h-4 rounded-full bg-indigo-600 border-4 border-white dark:border-zinc-950 shadow-sm" />
+                    
+                    {/* Note Card */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 p-5 shadow-sm hover:shadow-md transition-all duration-200 space-y-3.5">
+                      {/* Top bar: Time and Author */}
+                      <div className="flex flex-wrap items-center justify-between text-xs text-zinc-450 dark:text-zinc-500 pb-2 border-b border-zinc-100 dark:border-zinc-850">
+                        <span className="font-mono">📅 {formatDateTh(note.CreateDate)}</span>
+                        <span className="font-semibold text-zinc-700 dark:text-zinc-350">👤 ผู้บันทึก: <span className="font-bold text-zinc-850 dark:text-zinc-250">{note.CreateUserName}</span></span>
+                      </div>
 
-                    <div className="text-[11px] text-zinc-550 dark:text-zinc-450 mt-2 font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span>
-                        โครงการ: <span className="font-bold text-emerald-600 dark:text-emerald-450">{note.ProjectType || '-'}</span>
-                        <span className="mx-2 text-zinc-300 dark:text-zinc-700">|</span>
-                        รุ่น: <span className="font-bold text-zinc-800 dark:text-zinc-200">{note.Model || '-'}</span>
-                      </span>
-
-                      {/* Badges */}
-                      <span className="inline-flex flex-wrap items-center gap-1">
+                      {/* Compact Vehicle Info Tag */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+                        <a
+                          href={`/vehicle/${encodeURIComponent(note.RegisterNo || note.VinNo)}`}
+                          className="font-mono font-black text-indigo-650 hover:text-indigo-850 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline flex items-center gap-1"
+                        >
+                          🚗 {note.RegisterNo || 'ยังไม่มีทะเบียน'}
+                        </a>
+                        <span className="text-zinc-300 dark:text-zinc-750 font-normal">|</span>
+                        <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-mono">VIN: {note.VinNo}</span>
+                        <span className="text-zinc-300 dark:text-zinc-750 font-normal">|</span>
+                        <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">
+                          โครงการ: <span className="font-bold text-emerald-600 dark:text-emerald-450">{note.ProjectType || '-'}</span>
+                        </span>
+                        <span className="text-zinc-300 dark:text-zinc-750 font-normal">|</span>
+                        <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">
+                          รุ่น: <span className="font-bold text-zinc-700 dark:text-zinc-300">{note.Model || '-'}</span>
+                        </span>
+                        
+                        {/* Status & Substatus Badges */}
                         {note.StatusName && (
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-rose-50 border border-rose-150 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900/50 dark:text-rose-455">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 border border-rose-100 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900/50 dark:text-rose-455">
                             {note.StatusName}
                           </span>
                         )}
                         {note.SubStatusName && (
-                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-indigo-50 border border-indigo-150 text-indigo-700 dark:bg-indigo-950/40 dark:border-indigo-900/50 dark:text-indigo-400">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-755 dark:bg-indigo-950/40 dark:border-indigo-900/50 dark:text-indigo-400">
                             {note.SubStatusName}
                           </span>
                         )}
-                      </span>
-                    </div>
-
-                    {/* Location */}
-                    {note.CurrentLocation && (
-                      <div className="text-[11px] text-zinc-550 dark:text-zinc-455 mt-1.5 font-medium flex items-center gap-1">
-                        <span>📍 สถานที่ปัจจุบัน:</span>
-                        <span className="font-extrabold text-zinc-850 dark:text-zinc-150">
-                          {note.CurrentLocation}
-                        </span>
+                        {note.CurrentLocation && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-50 border border-zinc-200 text-zinc-650 dark:bg-zinc-950/40 dark:border-zinc-800 dark:text-zinc-400 flex items-center gap-0.5">
+                            📍 {note.CurrentLocation}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Note Text */}
-                  <div className="mt-4 space-y-1">
-                    <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
-                      📝 ข้อความบันทึก
-                    </span>
-                    <div className="bg-zinc-50/50 dark:bg-zinc-950/30 p-4 rounded-xl border border-zinc-150/60 dark:border-zinc-850/60 text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed font-sans">
-                      {note.NoteDetail}
+                      {/* Note Content */}
+                      <div className="bg-zinc-50/50 dark:bg-zinc-950/30 p-4 rounded-xl border border-zinc-150/60 dark:border-zinc-850/60 text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed font-sans">
+                        {note.NoteDetail}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between text-[10px] text-zinc-450 dark:text-zinc-555 mt-3.5 pt-3 border-t border-zinc-100/60 dark:border-zinc-850/60">
-                    <span>
-                      👤 ผู้บันทึก: <span className="text-zinc-700 dark:text-zinc-300 font-bold">{note.CreateUserName}</span>
-                    </span>
-                    <span className="font-mono">
-                      📅 วันที่บันทึก: {formatDateTh(note.CreateDate)}
-                    </span>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl py-20 text-center text-zinc-450 font-medium">
                 ไม่พบข้อมูลบันทึกตัวรถ
