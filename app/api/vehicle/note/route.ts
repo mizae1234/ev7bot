@@ -85,31 +85,46 @@ export async function POST(req: NextRequest) {
 
     const newNoteId = insertRes.recordset[0]?.VehicleNoteID
 
-    // Fetch Current Location of the vehicle to include in the notification
+    // Fetch Current Location and Status of the vehicle to include in the notification
     let currentLocationName: string | null = null
+    let carStatus: string | null = null
     try {
       const locQueryReq = pool.request()
       locQueryReq.input('itemId', sql.Int, inventoryItemId)
       const locQueryResult = await locQueryReq.query(`
         SELECT TOP 1
-          sub.StatusName AS LocationName,
-          i.CurrentLocation AS LocationCode
+          loc.StatusName AS LocationName,
+          i.CurrentLocation AS LocationCode,
+          i.Status AS StatusCode,
+          s.DescriptionStatus AS StatusName,
+          i.StatusType AS SubStatusCode,
+          sub.DescriptionStatus AS SubStatusName
         FROM dbo.EV_InventoryItem i
-        LEFT JOIN dbo.EV_MsSubStatus sub ON i.CurrentLocation = sub.StatusCode AND sub.Type = 'LOCATION'
+        LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+        LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
         WHERE i.InventoryItemID = @itemId
       `)
       if (locQueryResult.recordset.length > 0) {
         const row = locQueryResult.recordset[0]
         currentLocationName = row.LocationName || row.LocationCode || null
+        
+        const mainStatus = row.StatusName || row.StatusCode || ''
+        const subStatus = row.SubStatusName || row.SubStatusCode || ''
+        if (mainStatus && subStatus) {
+          carStatus = `${mainStatus} (${subStatus})`
+        } else {
+          carStatus = mainStatus || subStatus || '-'
+        }
       }
     } catch (locErr) {
-      console.error('[Fetch CurrentLocation Error]', locErr)
+      console.error('[Fetch CurrentLocation/Status Error]', locErr)
     }
 
     // Send LINE Notifications (mention + receiveAllNotes subscribers)
     if (noteDetail && noteDetail.trim() && newNoteId && registerNo) {
       try {
-        await sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId, currentLocationName)
+        await sendVehicleNoteMentionNotifications(noteDetail, Number(newNoteId), registerNo, senderName, lineUserId, currentLocationName, carStatus)
       } catch (err) {
         console.error('[LINE Vehicle Note Notification Error]', err)
       }

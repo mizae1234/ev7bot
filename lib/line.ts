@@ -257,7 +257,8 @@ export async function sendVehicleNoteMentionNotifications(
   registerNo: string,
   senderName: string,
   senderLineUserId?: string | null,
-  currentLocation?: string | null
+  currentLocation?: string | null,
+  carStatus?: string | null
 ) {
   if (!text) return
 
@@ -340,7 +341,8 @@ export async function sendVehicleNoteMentionNotifications(
               registerNo,
               noteText: text,
               liffUrl,
-              currentLocation
+              currentLocation,
+              carStatus
             })
 
             await lineClient.pushMessage(targetLineUserId, flexMessage).catch(err => {
@@ -383,7 +385,8 @@ export async function sendVehicleNoteMentionNotifications(
         registerNo,
         noteText: text,
         liffUrl,
-        currentLocation
+        currentLocation,
+        carStatus
       })
 
       await lineClient.pushMessage(sub.lineUserId, flexMessage).catch(err => {
@@ -407,6 +410,7 @@ function buildVehicleNoteFlexMessage(opts: {
   noteText: string
   liffUrl: string
   currentLocation?: string | null
+  carStatus?: string | null
 }): any {
   return {
     type: 'flex',
@@ -460,6 +464,14 @@ function buildVehicleNoteFlexMessage(opts: {
                   },
                   {
                     type: 'text',
+                    text: 'สถานะ',
+                    size: 'xs',
+                    color: '#8C8C8C',
+                    weight: 'bold',
+                    margin: 'sm'
+                  },
+                  {
+                    type: 'text',
                     text: 'ตำแหน่ง',
                     size: 'xs',
                     color: '#8C8C8C',
@@ -485,6 +497,13 @@ function buildVehicleNoteFlexMessage(opts: {
                     size: 'xs',
                     color: '#333333',
                     weight: 'bold',
+                    margin: 'sm'
+                  },
+                  {
+                    type: 'text',
+                    text: opts.carStatus || '-',
+                    size: 'xs',
+                    color: '#333333',
                     margin: 'sm'
                   },
                   {
