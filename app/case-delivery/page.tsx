@@ -248,9 +248,21 @@ function CaseDeliveryContent() {
       item.TrackingCustomerName?.toLowerCase().includes(q)
     )
   })
+  // Sort by date descending (latest first)
+  const sorted = [...filtered].sort((a, b) => {
+    const getDate = (item: CaseDeliveryItem) => {
+      if (item.ExpectedReleaseDate) {
+        const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
+        if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]} ${item.ExpectedReleaseDate.split(' ')[1] || '00:00:00'}`
+      }
+      if (item.TrackingReleaseDate) return item.TrackingReleaseDate
+      return ''
+    }
+    return getDate(b).localeCompare(getDate(a))
+  })
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const paginated = filtered.slice(
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE)
+  const paginated = sorted.slice(
     (page - 1) * ITEMS_PER_PAGE,
     page * ITEMS_PER_PAGE
   )
@@ -594,13 +606,13 @@ function CaseDeliveryContent() {
           </div>
 
           {/* Pagination */}
-          {!loading && filtered.length > 0 && (
+          {!loading && sorted.length > 0 && (
             <div className="px-4 pb-4">
               <Pagination
                 currentPage={page}
                 totalPages={totalPages}
                 onPageChange={setPage}
-                totalItems={filtered.length}
+                totalItems={sorted.length}
                 itemsPerPage={ITEMS_PER_PAGE}
               />
             </div>
