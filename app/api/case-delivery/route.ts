@@ -1,9 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { execSync } from 'child_process'
+import https from 'https'
 import { getMSSQLPool, sql } from '@/lib/mssql'
 
 const API_BASE = 'https://api-aion.com7tracking.com'
 const API_TOKEN = 'a28dbe832c007c1d99b90e9d422815315dfc6f43a0814de8b4c3b753da5edc5d'
+
+// Use native https.request to support GET with body (fetch doesn't allow it)
+function fetchWithBody(url: string, body: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_TOKEN}`,
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }
+
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => resolve(data))
+    })
+
+    req.on('error', reject)
+    req.setTimeout(30000, () => {
+      req.destroy(new Error('Request timeout'))
+    })
+    req.write(body)
+    req.end()
+  })
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,12 +52,7 @@ export async function GET(request: NextRequest) {
     if (projectType) body.project_type = projectType
 
     const apiUrl = `${API_BASE}/api/icare/getCaseTaxi`
-    const jsonBody = JSON.stringify(body)
-
-    // Use curl to support GET with body (Node.js fetch doesn't allow it)
-    const curlCmd = `curl -s -X GET "${apiUrl}" -H "Content-Type: application/json" -H "Authorization: Bearer ${API_TOKEN}" -d '${jsonBody.replace(/'/g, "'\\''")}'`
-    const result = execSync(curlCmd, { timeout: 30000, encoding: 'utf-8' })
-
+    const result = await fetchWithBody(apiUrl, JSON.stringify(body))
     const data = JSON.parse(result)
 
     // Cross-reference with View_AccumarateReleaseCar from SQL Server
@@ -57,7 +83,6 @@ export async function GET(request: NextRequest) {
           `)
 
           // Build lookup map: VinNo → latest tracking record
-          // Use the one with highest RentItemID (most recent)
           const trackingMap = new Map<string, {
             ContractNo: string;
             RentStatusID: number;
