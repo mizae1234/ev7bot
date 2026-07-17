@@ -14,6 +14,14 @@ interface CaseDeliveryItem {
   LastName: string
   ExpectedReleaseDate: string
   ProjectType: string
+  // Tracking fields from View_AccumarateReleaseCar
+  TrackingStatus?: 'MATCHED' | 'NOT_FOUND'
+  TrackingContractNo?: string
+  TrackingReleaseDate?: string | null
+  TrackingRentType?: string
+  TrackingIsActive?: boolean
+  TrackingRegisterNo?: string
+  TrackingContractType?: string
 }
 
 const ITEMS_PER_PAGE = 20
@@ -29,6 +37,11 @@ const PROJECT_BADGE_COLORS: Record<string, string> = {
   EV: 'bg-blue-50 text-blue-700 border-blue-200',
   GRAB: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   LINEMAN: 'bg-lime-50 text-lime-700 border-lime-200',
+}
+
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  MATCHED: { label: '✅ ปล่อยแล้ว', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  NOT_FOUND: { label: '⏳ ยังไม่ปล่อย', className: 'bg-amber-50 text-amber-700 border-amber-200' },
 }
 
 function getThaiDate(dateStr: string | null | undefined): string {
@@ -158,6 +171,8 @@ function CaseDeliveryContent() {
     ev: filtered.filter((i) => i.ProjectType === 'EV').length,
     grab: filtered.filter((i) => i.ProjectType === 'GRAB').length,
     lineman: filtered.filter((i) => i.ProjectType === 'LINEMAN').length,
+    matched: filtered.filter((i) => i.TrackingStatus === 'MATCHED').length,
+    notFound: filtered.filter((i) => i.TrackingStatus === 'NOT_FOUND').length,
   }
 
   const handleExport = () => {
@@ -173,12 +188,17 @@ function CaseDeliveryContent() {
         '#',
         'VIN No',
         'Motor No',
-        'ทะเบียน',
-        'เลขสัญญา',
+        'ทะเบียน (Core)',
+        'เลขสัญญา (Core)',
         'ชื่อ',
         'นามสกุล',
         'วันที่นัดปล่อย',
         'โครงการ',
+        'สถานะ Tracking',
+        'เลขสัญญา (Tracking)',
+        'ทะเบียน (Tracking)',
+        'RentType',
+        'วันที่ปล่อยจริง',
       ],
       rows: filtered.map((item, idx) => [
         idx + 1,
@@ -190,6 +210,11 @@ function CaseDeliveryContent() {
         item.LastName || '-',
         item.ExpectedReleaseDate || '-',
         item.ProjectType || '-',
+        item.TrackingStatus === 'MATCHED' ? 'ปล่อยแล้ว' : 'ยังไม่ปล่อย',
+        item.TrackingContractNo || '-',
+        item.TrackingRegisterNo || '-',
+        item.TrackingRentType || '-',
+        item.TrackingReleaseDate ? getThaiDateTime(new Date(item.TrackingReleaseDate).toLocaleDateString('en-GB') + ' 00:00:00') : '-',
       ]),
       fileName: 'CaseDelivery',
     })
@@ -271,7 +296,7 @@ function CaseDeliveryContent() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-4 text-center">
             <div className="text-2xl font-bold text-slate-800">{summary.total}</div>
             <div className="text-xs font-medium text-slate-500 mt-1">ทั้งหมด</div>
@@ -287,6 +312,14 @@ function CaseDeliveryContent() {
           <div className="bg-white rounded-2xl border border-lime-100 shadow-sm p-4 text-center">
             <div className="text-2xl font-bold text-lime-600">{summary.lineman}</div>
             <div className="text-xs font-medium text-lime-500 mt-1">Line Man</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-4 text-center">
+            <div className="text-2xl font-bold text-emerald-600">{summary.matched}</div>
+            <div className="text-xs font-medium text-emerald-500 mt-1">✅ ปล่อยแล้ว</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-4 text-center">
+            <div className="text-2xl font-bold text-amber-600">{summary.notFound}</div>
+            <div className="text-xs font-medium text-amber-500 mt-1">⏳ ยังไม่ปล่อย</div>
           </div>
         </div>
 
@@ -305,18 +338,19 @@ function CaseDeliveryContent() {
                 <tr className="bg-slate-50/80 border-b border-slate-200/60">
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">#</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">VIN No</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">Motor No</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ทะเบียน</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">เลขสัญญา</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ชื่อ-นามสกุล</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">วันที่นัดปล่อย</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">โครงการ</th>
+                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">สถานะ Tracking</th>
+                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">RentType</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16 text-slate-400">
+                    <td colSpan={10} className="text-center py-16 text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                         <span className="font-medium">กำลังโหลดข้อมูล...</span>
@@ -325,7 +359,7 @@ function CaseDeliveryContent() {
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16 text-slate-400 font-medium">
+                    <td colSpan={10} className="text-center py-16 text-slate-400 font-medium">
                       ไม่พบข้อมูล
                     </td>
                   </tr>
@@ -340,7 +374,6 @@ function CaseDeliveryContent() {
                       >
                         <td className="py-3 px-4 text-slate-400 font-medium">{rowNum}</td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-700">{item.VinNo || '-'}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-500">{item.MotorNo || '-'}</td>
                         <td className="py-3 px-4 font-bold text-slate-800">{item.RegisterNo || '-'}</td>
                         <td className="py-3 px-4 text-slate-600">{item.ContractNo || '-'}</td>
                         <td className="py-3 px-4 text-slate-700">
@@ -353,6 +386,19 @@ function CaseDeliveryContent() {
                           <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg border ${badgeColor}`}>
                             {item.ProjectType || '-'}
                           </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          {(() => {
+                            const st = STATUS_BADGE[item.TrackingStatus || ''] || { label: '-', className: 'bg-slate-50 text-slate-500 border-slate-200' }
+                            return (
+                              <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg border ${st.className}`}>
+                                {st.label}
+                              </span>
+                            )
+                          })()}
+                        </td>
+                        <td className="py-3 px-4 text-xs font-medium text-slate-600">
+                          {item.TrackingRentType || '-'}
                         </td>
                       </tr>
                     )
