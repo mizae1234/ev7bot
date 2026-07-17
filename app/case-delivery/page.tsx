@@ -111,6 +111,7 @@ function CaseDeliveryContent() {
   const [dateStart, setDateStart] = useState(getTodayStr())
   const [dateEnd, setDateEnd] = useState(getTodayStr())
   const [projectType, setProjectType] = useState('')
+  const [matchFilter, setMatchFilter] = useState('')
   const [searchText, setSearchText] = useState('')
   const [page, setPage] = useState(1)
 
@@ -232,8 +233,14 @@ function CaseDeliveryContent() {
     fetchData()
   }, [fetchData])
 
-  // Client-side filtering by search text
+  // Client-side filtering by search text and match status
   const filtered = data.filter((item) => {
+    // Match status filter
+    if (matchFilter === 'MATCHED' && item.TrackingStatus !== 'MATCHED') return false
+    if (matchFilter === 'MISMATCH' && item.TrackingStatus === 'MATCHED') return false
+    if (matchFilter === 'CORE_ONLY' && item.TrackingStatus !== 'NOT_FOUND') return false
+    if (matchFilter === 'TRACKING_ONLY' && item.TrackingStatus !== 'TRACKING_ONLY') return false
+
     if (!searchText) return true
     const q = searchText.toLowerCase()
     return (
@@ -248,14 +255,14 @@ function CaseDeliveryContent() {
       item.TrackingCustomerName?.toLowerCase().includes(q)
     )
   })
-  // Sort by date descending (latest first)
+  // Sort by date descending (latest first) — ใช้ ReleaseDate จริง
   const sorted = [...filtered].sort((a, b) => {
     const getDate = (item: CaseDeliveryItem) => {
+      if (item.TrackingReleaseDate) return item.TrackingReleaseDate
       if (item.ExpectedReleaseDate) {
         const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
         if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]} ${item.ExpectedReleaseDate.split(' ')[1] || '00:00:00'}`
       }
-      if (item.TrackingReleaseDate) return item.TrackingReleaseDate
       return ''
     }
     return getDate(b).localeCompare(getDate(a))
@@ -417,6 +424,20 @@ function CaseDeliveryContent() {
                 {PROJECT_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">สถานะ</label>
+              <select
+                value={matchFilter}
+                onChange={(e) => { setMatchFilter(e.target.value); setPage(1) }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition font-medium"
+              >
+                <option value="">ทั้งหมด</option>
+                <option value="MATCHED">✅ ตรงกัน</option>
+                <option value="MISMATCH">❌ ไม่ตรงกัน (ทั้งหมด)</option>
+                <option value="CORE_ONLY">⏳ Core อย่างเดียว</option>
+                <option value="TRACKING_ONLY">⚠️ Tracking อย่างเดียว</option>
               </select>
             </div>
             <div>
