@@ -76,29 +76,36 @@ export async function GET(request: NextRequest) {
         if (vinNos.length > 0) {
           const pool = await getMSSQLPool()
           if (pool) {
-            const req = pool.request()
-            const vinParams = vinNos.map((v, i) => {
-              req.input(`vin${i}`, sql.NVarChar, v)
-              return `@vin${i}`
-            }).join(',')
+            // Batch VINs in chunks of 2000 to avoid SQL Server 2100 param limit
+            const BATCH_SIZE = 2000
+            const allTrackingRows: Array<Record<string, unknown>> = []
 
-            // Add date filters to tracking query
-            let dateFilter = ''
-            if (dateStart) {
-              req.input('dateStart', sql.Date, dateStart)
-              dateFilter += ' AND ReleaseDate >= @dateStart'
-            }
-            if (dateEnd) {
-              req.input('dateEnd', sql.Date, dateEnd)
-              dateFilter += ' AND ReleaseDate < DATEADD(day, 1, @dateEnd)'
-            }
+            for (let i = 0; i < vinNos.length; i += BATCH_SIZE) {
+              const batch = vinNos.slice(i, i + BATCH_SIZE)
+              const req = pool.request()
+              const vinParams = batch.map((v, idx) => {
+                req.input(`vin${idx}`, sql.NVarChar, v)
+                return `@vin${idx}`
+              }).join(',')
 
-            const trackingResult = await req.query(`
-              SELECT VinNo, ContractNo, RentItemID, RentStatusID, 
-                     ReleaseDate, RentType, IsActive, RegisterNo, ContractType
-              FROM dbo.View_AccumarateReleaseCar
-              WHERE VinNo IN (${vinParams})${dateFilter}
-            `)
+              let dateFilter = ''
+              if (dateStart) {
+                req.input('dateStart', sql.Date, dateStart)
+                dateFilter += ' AND ReleaseDate >= @dateStart'
+              }
+              if (dateEnd) {
+                req.input('dateEnd', sql.Date, dateEnd)
+                dateFilter += ' AND ReleaseDate < DATEADD(day, 1, @dateEnd)'
+              }
+
+              const result = await req.query(`
+                SELECT VinNo, ContractNo, RentItemID, RentStatusID, 
+                       ReleaseDate, RentType, IsActive, RegisterNo, ContractType
+                FROM dbo.View_AccumarateReleaseCar
+                WHERE VinNo IN (${vinParams})${dateFilter}
+              `)
+              allTrackingRows.push(...result.recordset)
+            }
 
             // Build lookup map: VinNo → latest tracking record
             const trackingMap = new Map<string, {
@@ -111,7 +118,7 @@ export async function GET(request: NextRequest) {
               ContractType: string;
             }>()
 
-            for (const row of trackingResult.recordset) {
+            for (const row of allTrackingRows) {
               const existing = trackingMap.get(row.VinNo)
               if (!existing || parseInt(row.RentItemID) > parseInt(existing.ContractNo)) {
                 trackingMap.set(row.VinNo, {

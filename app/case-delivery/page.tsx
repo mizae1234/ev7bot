@@ -220,6 +220,41 @@ function CaseDeliveryContent() {
     })
   }
 
+  const handleExportCore = () => {
+    const periodLabel =
+      dateStart === dateEnd
+        ? getThaiDate(`${dateStart.split('-')[2]}/${dateStart.split('-')[1]}/${dateStart.split('-')[0]}`)
+        : `${getThaiDate(`${dateStart.split('-')[2]}/${dateStart.split('-')[1]}/${dateStart.split('-')[0]}`)} - ${getThaiDate(`${dateEnd.split('-')[2]}/${dateEnd.split('-')[1]}/${dateEnd.split('-')[0]}`)}`
+
+    exportToExcel({
+      reportName: 'รายงาน Case Delivery (EV7 Core)',
+      periodLabel,
+      headers: [
+        '#',
+        'VIN No',
+        'Motor No',
+        'ทะเบียน',
+        'เลขสัญญา',
+        'ชื่อ',
+        'นามสกุล',
+        'วันที่นัดปล่อย',
+        'โครงการ',
+      ],
+      rows: filtered.map((item, idx) => [
+        idx + 1,
+        item.VinNo || '-',
+        item.MotorNo || '-',
+        item.RegisterNo || '-',
+        item.ContractNo || '-',
+        item.FirstName || '-',
+        item.LastName || '-',
+        item.ExpectedReleaseDate || '-',
+        item.ProjectType || '-',
+      ]),
+      fileName: 'CaseDelivery_EVCore',
+    })
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       {/* Header */}
@@ -234,7 +269,10 @@ function CaseDeliveryContent() {
                 ข้อมูลการปล่อยรถจากระบบ EV7 Core
               </p>
             </div>
-            <ExportButton onClick={handleExport} />
+            <div className="flex items-center gap-2">
+              <ExportButton onClick={handleExportCore} label="📥 Export EV7 Core" />
+              <ExportButton onClick={handleExport} label="📥 Export เทียบ" />
+            </div>
           </div>
         </div>
       </div>
@@ -343,14 +381,17 @@ function CaseDeliveryContent() {
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ชื่อ-นามสกุล</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">วันที่นัดปล่อย</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">โครงการ</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">สถานะ Tracking</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">RentType</th>
+                  <th className="text-center py-3 px-4 font-bold text-indigo-600 text-xs border-l-2 border-indigo-200">สถานะ</th>
+                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">เลขสัญญา (Tracking)</th>
+                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">ทะเบียน (Tracking)</th>
+                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">RentType</th>
+                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">วันปล่อยจริง</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-16 text-slate-400">
+                    <td colSpan={13} className="text-center py-16 text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                         <span className="font-medium">กำลังโหลดข้อมูล...</span>
@@ -359,7 +400,7 @@ function CaseDeliveryContent() {
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-16 text-slate-400 font-medium">
+                    <td colSpan={13} className="text-center py-16 text-slate-400 font-medium">
                       ไม่พบข้อมูล
                     </td>
                   </tr>
@@ -397,8 +438,20 @@ function CaseDeliveryContent() {
                             )
                           })()}
                         </td>
+                        <td className="py-3 px-4 text-xs text-slate-600">
+                          {item.TrackingContractNo || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-600">
+                          {item.TrackingRegisterNo || '-'}
+                        </td>
                         <td className="py-3 px-4 text-xs font-medium text-slate-600">
                           {item.TrackingRentType || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-600">
+                          {item.TrackingReleaseDate ? getThaiDateTime(
+                            new Date(item.TrackingReleaseDate).toLocaleDateString('en-GB', { timeZone: 'UTC' }).split('/').join('/') + ' ' +
+                            new Date(item.TrackingReleaseDate).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                          ) : '-'}
                         </td>
                       </tr>
                     )
