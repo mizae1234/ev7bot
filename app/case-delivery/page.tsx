@@ -227,6 +227,8 @@ function CaseDeliveryContent() {
     lineman: filtered.filter((i) => i.ProjectType === 'LINEMAN').length,
     matched: filtered.filter((i) => i.TrackingStatus === 'MATCHED').length,
     notFound: filtered.filter((i) => i.TrackingStatus === 'NOT_FOUND').length,
+    trackingNew: filtered.filter((i) => i.TrackingRentType === 'ONRENT_NEW').length,
+    trackingUse: filtered.filter((i) => i.TrackingRentType === 'ONRENT_USE').length,
   }
 
   const handleExport = () => {
@@ -387,31 +389,58 @@ function CaseDeliveryContent() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-slate-800">{summary.total}</div>
-            <div className="text-xs font-medium text-slate-500 mt-1">ทั้งหมด</div>
+        {/* Summary Cards — EV Core vs Tracking */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* EV7 Core */}
+          <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-4">
+            <div className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+              EV7 Core (นัดปล่อย)
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-slate-800">{summary.total}</div>
+                <div className="text-[10px] font-medium text-slate-500 mt-0.5">ทั้งหมด</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{summary.ev}</div>
+                <div className="text-[10px] font-medium text-blue-500 mt-0.5">EV</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600">{summary.grab}</div>
+                <div className="text-[10px] font-medium text-emerald-500 mt-0.5">Grab</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-lime-600">{summary.lineman}</div>
+                <div className="text-[10px] font-medium text-lime-500 mt-0.5">Line Man</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{summary.ev}</div>
-            <div className="text-xs font-medium text-blue-500 mt-1">EV</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-emerald-600">{summary.grab}</div>
-            <div className="text-xs font-medium text-emerald-500 mt-1">Grab</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-lime-100 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-lime-600">{summary.lineman}</div>
-            <div className="text-xs font-medium text-lime-500 mt-1">Line Man</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-emerald-600">{summary.matched}</div>
-            <div className="text-xs font-medium text-emerald-500 mt-1">✅ ปล่อยแล้ว</div>
-          </div>
-          <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-4 text-center">
-            <div className="text-2xl font-bold text-amber-600">{summary.notFound}</div>
-            <div className="text-xs font-medium text-amber-500 mt-1">⏳ ยังไม่ปล่อย</div>
+
+          {/* Tracking */}
+          <div className="bg-white rounded-2xl border border-indigo-200/70 shadow-sm p-4">
+            <div className="text-xs font-bold text-indigo-500 mb-3 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
+              Tracking (ปล่อยจริง)
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-emerald-600">{summary.matched}</div>
+                <div className="text-[10px] font-medium text-emerald-500 mt-0.5">✅ ปล่อยแล้ว</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-amber-600">{summary.notFound}</div>
+                <div className="text-[10px] font-medium text-amber-500 mt-0.5">⏳ ยังไม่ปล่อย</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-600">{summary.trackingNew}</div>
+                <div className="text-[10px] font-medium text-indigo-500 mt-0.5">ONRENT_NEW</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{summary.trackingUse}</div>
+                <div className="text-[10px] font-medium text-purple-500 mt-0.5">ONRENT_USE</div>
+              </div>
+            </div>
           </div>
         </div>
 
