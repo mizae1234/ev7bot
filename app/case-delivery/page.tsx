@@ -15,13 +15,16 @@ interface CaseDeliveryItem {
   ExpectedReleaseDate: string
   ProjectType: string
   // Tracking fields from View_AccumarateReleaseCar
-  TrackingStatus?: 'MATCHED' | 'NOT_FOUND'
+  TrackingStatus?: 'MATCHED' | 'NOT_FOUND' | 'TRACKING_ONLY'
   TrackingContractNo?: string
   TrackingReleaseDate?: string | null
   TrackingRentType?: string
   TrackingIsActive?: boolean
   TrackingRegisterNo?: string
   TrackingContractType?: string
+  TrackingCustomerName?: string
+  // Data source indicator
+  DataSource?: 'BOTH' | 'CORE_ONLY' | 'TRACKING_ONLY'
 }
 
 const ITEMS_PER_PAGE = 20
@@ -40,8 +43,9 @@ const PROJECT_BADGE_COLORS: Record<string, string> = {
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  MATCHED: { label: '✅ ปล่อยแล้ว', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  NOT_FOUND: { label: '⏳ ยังไม่ปล่อย', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  MATCHED: { label: '✅ ตรงกัน', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  NOT_FOUND: { label: '⏳ Core อย่างเดียว', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  TRACKING_ONLY: { label: '⚠️ Tracking อย่างเดียว', className: 'bg-rose-50 text-rose-700 border-rose-200' },
 }
 
 function getThaiDate(dateStr: string | null | undefined): string {
@@ -128,15 +132,15 @@ function CaseDeliveryContent() {
       }
 
       const apiData = await apiRes.json()
-      let list: CaseDeliveryItem[] = apiData?.message?.list || []
+      let coreList: CaseDeliveryItem[] = apiData?.message?.list || []
 
-      // 2. Client-side date filtering (ExpectedReleaseDate format: "DD/MM/YYYY HH:mm:ss")
+      // 2. Client-side date filtering
       if (dateStart || dateEnd) {
-        list = list.filter((item) => {
+        coreList = coreList.filter((item) => {
           if (!item.ExpectedReleaseDate) return false
           const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
           if (parts.length !== 3) return false
-          const itemDate = `${parts[2]}-${parts[1]}-${parts[0]}` // YYYY-MM-DD
+          const itemDate = `${parts[2]}-${parts[1]}-${parts[0]}`
           if (dateStart && itemDate < dateStart) return false
           if (dateEnd && itemDate > dateEnd) return false
           return true
@@ -145,46 +149,75 @@ function CaseDeliveryContent() {
 
       // 3. Client-side project type filtering
       if (projectType) {
-        list = list.filter((item) => item.ProjectType === projectType)
+        coreList = coreList.filter((item) => item.ProjectType === projectType)
       }
 
-      // 4. Fetch tracking data from server (MSSQL query)
-      if (list.length > 0) {
-        const vinNos = [...new Set(list.map((item) => item.VinNo).filter(Boolean))]
-        try {
-          const trackRes = await fetch('/api/case-delivery/tracking', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vinNos, dateStart, dateEnd }),
-          })
-          if (trackRes.ok) {
-            const trackData = await trackRes.json()
-            const trackingMap = trackData.tracking || {}
-            for (const item of list) {
-              const tracking = trackingMap[item.VinNo]
-              if (tracking) {
-                item.TrackingContractNo = tracking.ContractNo
-                item.TrackingReleaseDate = tracking.ReleaseDate
-                item.TrackingRentType = tracking.RentType
-                item.TrackingIsActive = tracking.IsActive
-                item.TrackingRegisterNo = tracking.RegisterNo
-                item.TrackingContractType = tracking.ContractType
-                item.TrackingStatus = 'MATCHED'
-              } else {
-                item.TrackingStatus = 'NOT_FOUND'
-              }
+      // 4. Fetch ALL tracking records for this date range
+      const coreVinSet = new Set(coreList.map((item) => item.VinNo).filter(Boolean))
+      try {
+        const trackRes = await fetch('/api/case-delivery/tracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fetchAll: true, dateStart, dateEnd }),
+        })
+
+        if (trackRes.ok) {
+          const trackData = await trackRes.json()
+          const trackingMap = trackData.tracking || {}
+
+          // Match core items with tracking
+          for (const item of coreList) {
+            const tracking = trackingMap[item.VinNo]
+            if (tracking) {
+              item.TrackingContractNo = tracking.ContractNo
+              item.TrackingReleaseDate = tracking.ReleaseDate
+              item.TrackingRentType = tracking.RentType
+              item.TrackingIsActive = tracking.IsActive
+              item.TrackingRegisterNo = tracking.RegisterNo
+              item.TrackingContractType = tracking.ContractType
+              item.TrackingStatus = 'MATCHED'
+              item.DataSource = 'BOTH'
+            } else {
+              item.TrackingStatus = 'NOT_FOUND'
+              item.DataSource = 'CORE_ONLY'
             }
           }
-        } catch (trackErr) {
-          console.error('Tracking fetch error:', trackErr)
-          // Still show ev7core data even if tracking fails
-          for (const item of list) {
-            item.TrackingStatus = 'NOT_FOUND'
+
+          // Find tracking-only VINs (in tracking but not in core)
+          for (const [vin, tracking] of Object.entries(trackingMap)) {
+            if (!coreVinSet.has(vin)) {
+              const t = tracking as Record<string, unknown>
+              coreList.push({
+                VinNo: vin,
+                MotorNo: '',
+                RegisterNo: '',
+                ContractNo: '',
+                FirstName: (t.CustomerName as string) || '',
+                LastName: '',
+                ExpectedReleaseDate: '',
+                ProjectType: (t.ContractType as string) || '',
+                TrackingContractNo: t.ContractNo as string,
+                TrackingReleaseDate: t.ReleaseDate as string | null,
+                TrackingRentType: t.RentType as string,
+                TrackingIsActive: t.IsActive as boolean,
+                TrackingRegisterNo: t.RegisterNo as string,
+                TrackingContractType: t.ContractType as string,
+                TrackingCustomerName: t.CustomerName as string,
+                TrackingStatus: 'TRACKING_ONLY',
+                DataSource: 'TRACKING_ONLY',
+              })
+            }
           }
+        }
+      } catch (trackErr) {
+        console.error('Tracking fetch error:', trackErr)
+        for (const item of coreList) {
+          item.TrackingStatus = 'NOT_FOUND'
+          item.DataSource = 'CORE_ONLY'
         }
       }
 
-      setData(list)
+      setData(coreList)
       setPage(1)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'
@@ -209,7 +242,10 @@ function CaseDeliveryContent() {
       item.ContractNo?.toLowerCase().includes(q) ||
       item.FirstName?.toLowerCase().includes(q) ||
       item.LastName?.toLowerCase().includes(q) ||
-      item.MotorNo?.toLowerCase().includes(q)
+      item.MotorNo?.toLowerCase().includes(q) ||
+      item.TrackingContractNo?.toLowerCase().includes(q) ||
+      item.TrackingRegisterNo?.toLowerCase().includes(q) ||
+      item.TrackingCustomerName?.toLowerCase().includes(q)
     )
   })
 
@@ -220,13 +256,17 @@ function CaseDeliveryContent() {
   )
 
   // Summary counts
+  const coreItems = filtered.filter((i) => i.DataSource !== 'TRACKING_ONLY')
   const summary = {
     total: filtered.length,
-    ev: filtered.filter((i) => i.ProjectType === 'EV').length,
-    grab: filtered.filter((i) => i.ProjectType === 'GRAB').length,
-    lineman: filtered.filter((i) => i.ProjectType === 'LINEMAN').length,
+    coreTotal: coreItems.length,
+    ev: coreItems.filter((i) => i.ProjectType === 'EV').length,
+    grab: coreItems.filter((i) => i.ProjectType === 'GRAB').length,
+    lineman: coreItems.filter((i) => i.ProjectType === 'LINEMAN').length,
     matched: filtered.filter((i) => i.TrackingStatus === 'MATCHED').length,
-    notFound: filtered.filter((i) => i.TrackingStatus === 'NOT_FOUND').length,
+    coreOnly: filtered.filter((i) => i.TrackingStatus === 'NOT_FOUND').length,
+    trackingOnly: filtered.filter((i) => i.TrackingStatus === 'TRACKING_ONLY').length,
+    trackingTotal: filtered.filter((i) => i.TrackingStatus === 'MATCHED' || i.TrackingStatus === 'TRACKING_ONLY').length,
     trackingNew: filtered.filter((i) => i.TrackingRentType === 'ONRENT_NEW').length,
     trackingUse: filtered.filter((i) => i.TrackingRentType === 'ONRENT_USE').length,
   }
@@ -399,7 +439,7 @@ function CaseDeliveryContent() {
             </div>
             <div className="grid grid-cols-4 gap-3">
               <div className="text-center">
-                <div className="text-2xl font-bold text-slate-800">{summary.total}</div>
+                <div className="text-2xl font-bold text-slate-800">{summary.coreTotal}</div>
                 <div className="text-[10px] font-medium text-slate-500 mt-0.5">ทั้งหมด</div>
               </div>
               <div className="text-center">
@@ -423,14 +463,18 @@ function CaseDeliveryContent() {
               <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
               Tracking (ปล่อยจริง)
             </div>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{summary.matched}</div>
-                <div className="text-[10px] font-medium text-emerald-500 mt-0.5">✅ ปล่อยแล้ว</div>
+                <div className="text-2xl font-bold text-slate-800">{summary.trackingTotal}</div>
+                <div className="text-[10px] font-medium text-slate-500 mt-0.5">ทั้งหมด</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-amber-600">{summary.notFound}</div>
-                <div className="text-[10px] font-medium text-amber-500 mt-0.5">⏳ ยังไม่ปล่อย</div>
+                <div className="text-2xl font-bold text-emerald-600">{summary.matched}</div>
+                <div className="text-[10px] font-medium text-emerald-500 mt-0.5">✅ ตรงกัน</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-rose-600">{summary.trackingOnly}</div>
+                <div className="text-[10px] font-medium text-rose-500 mt-0.5">⚠️ Tracking อย่างเดียว</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-indigo-600">{summary.trackingNew}</div>
@@ -491,10 +535,15 @@ function CaseDeliveryContent() {
                   paginated.map((item, idx) => {
                     const rowNum = (page - 1) * ITEMS_PER_PAGE + idx + 1
                     const badgeColor = PROJECT_BADGE_COLORS[item.ProjectType] || 'bg-slate-50 text-slate-600 border-slate-200'
+                    const rowBg = item.DataSource === 'TRACKING_ONLY'
+                      ? 'bg-rose-50/50 border-b border-rose-100 hover:bg-rose-100/50'
+                      : item.DataSource === 'CORE_ONLY'
+                        ? 'bg-amber-50/30 border-b border-amber-100 hover:bg-amber-100/30'
+                        : 'border-b border-slate-100 hover:bg-indigo-50/30'
                     return (
                       <tr
                         key={`${item.VinNo}-${item.ContractNo}-${idx}`}
-                        className="border-b border-slate-100 hover:bg-indigo-50/30 transition-colors"
+                        className={`${rowBg} transition-colors`}
                       >
                         <td className="py-3 px-4 text-slate-400 font-medium">{rowNum}</td>
                         <td className="py-3 px-4 font-mono text-xs text-slate-700">{item.VinNo || '-'}</td>
