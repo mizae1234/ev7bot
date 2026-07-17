@@ -82,11 +82,22 @@ export async function GET(request: NextRequest) {
               return `@vin${i}`
             }).join(',')
 
+            // Add date filters to tracking query
+            let dateFilter = ''
+            if (dateStart) {
+              req.input('dateStart', sql.Date, dateStart)
+              dateFilter += ' AND ReleaseDate >= @dateStart'
+            }
+            if (dateEnd) {
+              req.input('dateEnd', sql.Date, dateEnd)
+              dateFilter += ' AND ReleaseDate < DATEADD(day, 1, @dateEnd)'
+            }
+
             const trackingResult = await req.query(`
               SELECT VinNo, ContractNo, RentItemID, RentStatusID, 
                      ReleaseDate, RentType, IsActive, RegisterNo, ContractType
               FROM dbo.View_AccumarateReleaseCar
-              WHERE VinNo IN (${vinParams})
+              WHERE VinNo IN (${vinParams})${dateFilter}
             `)
 
             // Build lookup map: VinNo → latest tracking record
