@@ -114,23 +114,77 @@ function CaseDeliveryContent() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (dateStart) params.set('date_start', dateStart)
-      if (dateEnd) params.set('date_end', dateEnd)
-      if (projectType) params.set('project_type', projectType)
+      // 1. Fetch from ev7core API directly (browser bypasses Cloudflare)
+      const apiRes = await fetch('https://api-aion.com7tracking.com/api/icare/getCaseTaxi', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer a28dbe832c007c1d99b90e9d422815315dfc6f43a0814de8b4c3b753da5edc5d',
+        },
+      })
 
-      const res = await fetch(`/api/case-delivery?${params.toString()}`)
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errData.error || `HTTP ${res.status}`)
+      if (!apiRes.ok) {
+        throw new Error(`API error: ${apiRes.status}`)
       }
 
-      const json = await res.json()
-      if (json.statusCode === 200 && json.message?.list) {
-        setData(json.message.list)
-      } else {
-        setData([])
+      const apiData = await apiRes.json()
+      let list: CaseDeliveryItem[] = apiData?.message?.list || []
+
+      // 2. Client-side date filtering (ExpectedReleaseDate format: "DD/MM/YYYY HH:mm:ss")
+      if (dateStart || dateEnd) {
+        list = list.filter((item) => {
+          if (!item.ExpectedReleaseDate) return false
+          const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
+          if (parts.length !== 3) return false
+          const itemDate = `${parts[2]}-${parts[1]}-${parts[0]}` // YYYY-MM-DD
+          if (dateStart && itemDate < dateStart) return false
+          if (dateEnd && itemDate > dateEnd) return false
+          return true
+        })
       }
+
+      // 3. Client-side project type filtering
+      if (projectType) {
+        list = list.filter((item) => item.ProjectType === projectType)
+      }
+
+      // 4. Fetch tracking data from server (MSSQL query)
+      if (list.length > 0) {
+        const vinNos = [...new Set(list.map((item) => item.VinNo).filter(Boolean))]
+        try {
+          const trackRes = await fetch('/api/case-delivery/tracking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vinNos, dateStart, dateEnd }),
+          })
+          if (trackRes.ok) {
+            const trackData = await trackRes.json()
+            const trackingMap = trackData.tracking || {}
+            for (const item of list) {
+              const tracking = trackingMap[item.VinNo]
+              if (tracking) {
+                item.TrackingContractNo = tracking.ContractNo
+                item.TrackingReleaseDate = tracking.ReleaseDate
+                item.TrackingRentType = tracking.RentType
+                item.TrackingIsActive = tracking.IsActive
+                item.TrackingRegisterNo = tracking.RegisterNo
+                item.TrackingContractType = tracking.ContractType
+                item.TrackingStatus = 'MATCHED'
+              } else {
+                item.TrackingStatus = 'NOT_FOUND'
+              }
+            }
+          }
+        } catch (trackErr) {
+          console.error('Tracking fetch error:', trackErr)
+          // Still show ev7core data even if tracking fails
+          for (const item of list) {
+            item.TrackingStatus = 'NOT_FOUND'
+          }
+        }
+      }
+
+      setData(list)
       setPage(1)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'
