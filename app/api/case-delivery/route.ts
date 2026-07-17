@@ -19,15 +19,25 @@ function fetchWithBody(url: string, body: string): Promise<string> {
         'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Length': Buffer.byteLength(body),
       },
+      rejectUnauthorized: false, // Docker may lack CA certificates
     }
 
     const req = https.request(options, (res) => {
       let data = ''
       res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => resolve(data))
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`API responded with status ${res.statusCode}: ${data.substring(0, 200)}`))
+        } else {
+          resolve(data)
+        }
+      })
     })
 
-    req.on('error', reject)
+    req.on('error', (err) => {
+      console.error('[getCaseDelivery] https.request error:', err.message)
+      reject(err)
+    })
     req.setTimeout(30000, () => {
       req.destroy(new Error('Request timeout'))
     })
