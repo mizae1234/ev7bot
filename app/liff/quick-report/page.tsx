@@ -132,7 +132,7 @@ export default function QuickReportPage() {
   const [driverName, setDriverName] = useState('')
   const [incidentDate, setIncidentDate] = useState(() => {
     const now = new Date()
-    return now.toISOString().slice(0, 16)
+    return now.toISOString().slice(0, 10)
   })
   const [issueDescription, setIssueDescription] = useState('')
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
@@ -622,7 +622,7 @@ export default function QuickReportPage() {
                       carStatusCode: targetTicket.CarStatusCode || '',
                       serviceLocationCode: targetTicket.ServiceLocationCode || '',
                       driverName: targetTicket.DriverName || '',
-                      incidentDate: targetTicket.IncidentDate ? targetTicket.IncidentDate.slice(0, 16) : '',
+                      incidentDate: targetTicket.IncidentDate ? targetTicket.IncidentDate.slice(0, 10) : '',
                       issueTitle: targetTicket.IssueTitle || '',
                       problemType: targetTicket.ProblemTypeCode || '',
                       faultParty: targetTicket.FaultPartyCode || '',
@@ -1176,7 +1176,7 @@ export default function QuickReportPage() {
     setEditDetailTicket(ticket)
     setEditDetailFields({
       driverName: ticket.DriverName || '',
-      incidentDate: ticket.IncidentDate ? new Date(ticket.IncidentDate).toISOString().slice(0, 16) : '',
+      incidentDate: ticket.IncidentDate ? new Date(ticket.IncidentDate).toISOString().slice(0, 10) : '',
       issueTitle: ticket.IssueTitle || '',
       carStatusCode: ticket.CarStatusCode || 'WAITING_FOR_MAINTENANCE',
       serviceLocationCode: ticket.ServiceLocationCode || '',
@@ -1521,9 +1521,9 @@ export default function QuickReportPage() {
 
             {/* Incident Date */}
             <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันที่เกิดเหตุ</label>
               <input
-                type="datetime-local"
+                type="date"
                 value={editDetailFields.incidentDate}
                 onChange={(e) => setEditDetailFields(prev => ({ ...prev, incidentDate: e.target.value }))}
                 className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition"
@@ -3045,9 +3045,9 @@ export default function QuickReportPage() {
 
                     {/* Incident Date */}
                     <div>
-                      <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันเวลาเกิดเหตุ <span className="text-rose-555">*</span></label>
+                      <label className="text-xs font-bold text-slate-600 block mb-1.5">📅 วันที่เกิดเหตุ <span className="text-rose-555">*</span></label>
                       <input
-                        type="datetime-local"
+                        type="date"
                         value={incidentDate}
                         onChange={(e) => setIncidentDate(e.target.value)}
                         required
