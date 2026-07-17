@@ -18,6 +18,8 @@ function fetchWithBody(url: string, body: string): Promise<string> {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'EV7Dashboard/1.0',
+        'Accept': 'application/json',
       },
       rejectUnauthorized: false, // Docker may lack CA certificates
     }
