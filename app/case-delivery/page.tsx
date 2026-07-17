@@ -27,7 +27,7 @@ interface CaseDeliveryItem {
   DataSource?: 'BOTH' | 'CORE_ONLY' | 'TRACKING_ONLY'
 }
 
-const ITEMS_PER_PAGE = 20
+const ITEMS_PER_PAGE = 50
 
 const PROJECT_TYPE_OPTIONS = [
   { value: '', label: 'ทั้งหมด' },
