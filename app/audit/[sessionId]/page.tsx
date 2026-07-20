@@ -190,7 +190,7 @@ function ScanSessionContent() {
           if (!ocrVideoRef.current || !ocrStreamRef.current) return
           
           const video = ocrVideoRef.current
-          if (video.readyState !== video.HAVE_CURRENT_DATA) return
+          if (video.readyState < 2) return
 
           const canvas = document.createElement('canvas')
           const ctx = canvas.getContext('2d')
@@ -228,16 +228,17 @@ function ScanSessionContent() {
             }
 
             if (detectedVin) {
-              setOcrScannerText(`พบข้อความ: ${detectedVin}`)
+              setOcrScannerText(`พบเลข VIN: ${detectedVin}`)
               playBeep('success')
               stopOcrScanner()
               handleSearchWithVin(detectedVin, 'OCR')
             } else {
-              const shortClean = text.replace(/[^A-Z0-9]/gi, ' ').trim().substring(0, 30)
-              setOcrScannerText(shortClean ? `เห็นตัวอักษร: ${shortClean}` : 'กำลังสแกนตัวอักษร...')
+              const shortClean = text.replace(/[^A-Z0-9]/gi, ' ').trim().replace(/\s+/g, ' ').substring(0, 30)
+              setOcrScannerText(shortClean ? `เห็นตัวอักษร: ${shortClean}` : 'ไม่พบตัวอักษรชัดเจน... กำลังเล็งใหม่...')
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('Tesseract error:', err)
+            setOcrScannerText('ข้อผิดพลาดการอ่านค่า: ' + err.message)
           }
         }, 1500)
       }, 500)
