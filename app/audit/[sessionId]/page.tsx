@@ -573,6 +573,39 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       </div>
 
       <div className="flex-1 max-w-md w-full mx-auto px-4 py-6 space-y-6">
+        {/* Session Stats Summary Card */}
+        <div className="bg-slate-800/40 border border-slate-800/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
+            <span className="text-xs font-black text-slate-300 uppercase tracking-wider">📊 สรุปผลการตรวจเช็กในรอบนี้</span>
+            <span className="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
+              ทั้งหมด {scannedItems.length} คัน
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {/* Matched */}
+            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+              <span className="text-[10px] font-bold text-emerald-400">ตรงพิกัด</span>
+              <span className="text-lg font-black text-emerald-300 mt-0.5">
+                {scannedItems.filter(item => item.DetectedStatus === 'MATCHED').length}
+              </span>
+            </div>
+            {/* Mismatched */}
+            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+              <span className="text-[10px] font-bold text-amber-400">ผิดพิกัด</span>
+              <span className="text-lg font-black text-amber-300 mt-0.5">
+                {scannedItems.filter(item => item.DetectedStatus === 'MISMATCH').length}
+              </span>
+            </div>
+            {/* Not in system */}
+            <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+              <span className="text-[10px] font-bold text-rose-400">ไม่มีในระบบ</span>
+              <span className="text-lg font-black text-rose-300 mt-0.5">
+                {scannedItems.filter(item => item.DetectedStatus === 'NOT_IN_SYSTEM').length}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Only allow scanning if the session is DRAFT */}
         {session.Status === 'DRAFT' && (
           <div className="space-y-4">
