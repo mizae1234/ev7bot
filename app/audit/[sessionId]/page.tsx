@@ -100,9 +100,7 @@ function ScanSessionContent() {
 
   // Live text scanner (OCR) state
   const [isOcrScannerOpen, setIsOcrScannerOpen] = useState(false)
-  const [ocrScannerText, setOcrScannerText] = useState('')
   const ocrVideoRef = useRef<HTMLVideoElement>(null)
-  const ocrIntervalRef = useRef<any>(null)
   const ocrStreamRef = useRef<MediaStream | null>(null)
 
   // Manual search state
@@ -150,9 +148,6 @@ function ScanSessionContent() {
     }
 
     return () => {
-      if (ocrIntervalRef.current) {
-        clearInterval(ocrIntervalRef.current)
-      }
       if (ocrStreamRef.current) {
         ocrStreamRef.current.getTracks().forEach(track => track.stop())
       }
@@ -161,7 +156,6 @@ function ScanSessionContent() {
 
   const startOcrScanner = async () => {
     setIsOcrScannerOpen(true)
-    setOcrScannerText('กำลังเปิดกล้อง...')
     setPreviewVehicle(null)
     
     try {
@@ -175,73 +169,6 @@ function ScanSessionContent() {
         ocrVideoRef.current.srcObject = stream
         ocrVideoRef.current.play()
       }
-
-      setTimeout(() => {
-        const Tesseract = (window as any).Tesseract
-        if (!Tesseract) {
-          alert('กำลังดาวน์โหลดไลบรารีสแกนตัวอักษร... กรุณารอสักครู่แล้วลองอีกครั้ง')
-          stopOcrScanner()
-          return
-        }
-        
-        setOcrScannerText('เล็งกล้องไปที่ตัวอักษรเลข VIN หน้ารถ...')
-        
-        ocrIntervalRef.current = setInterval(async () => {
-          if (!ocrVideoRef.current || !ocrStreamRef.current) return
-          
-          const video = ocrVideoRef.current
-          if (video.readyState < 2) return
-
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          if (!ctx) return
-
-          const vw = video.videoWidth
-          const vh = video.videoHeight
-          
-          const cropW = Math.round(vw * 0.85)
-          const cropH = Math.round(vh * 0.35)
-          const cropX = Math.round((vw - cropW) / 2)
-          const cropY = Math.round((vh - cropH) / 2)
-
-          canvas.width = cropW
-          canvas.height = cropH
-          
-          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
-          const imgData = canvas.toDataURL('image/jpeg', 0.8)
-          
-          try {
-            setOcrScannerText('กำลังวิเคราะห์ตัวอักษร...')
-            const result = await Tesseract.recognize(imgData, 'eng')
-            const text = result.data.text || ''
-            
-            const words = text.split(/\s+/)
-            let detectedVin = ''
-            
-            for (const word of words) {
-              const cleaned = word.replace(/[^A-Z0-9]/gi, '').toUpperCase()
-              
-              if (cleaned.length >= 10 && /[0-9]/.test(cleaned) && /[A-Z]/.test(cleaned)) {
-                detectedVin = cleaned
-                break
-              }
-            }
-
-            if (detectedVin) {
-              setOcrScannerText(`พบเลข VIN: ${detectedVin}`)
-              playBeep('success')
-              stopOcrScanner()
-              handleSearchWithVin(detectedVin, 'OCR')
-            } else {
-              const shortClean = text.replace(/[^A-Z0-9]/gi, ' ').trim().replace(/\s+/g, ' ').substring(0, 30)
-              setOcrScannerText(shortClean ? `เห็นตัวอักษร: ${shortClean}` : 'ไม่พบตัวอักษรชัดเจน... กำลังเล็งใหม่...')
-            }
-          } catch (err: any) {
-            console.error('Tesseract error:', err)
-            setOcrScannerText('ข้อผิดพลาดการอ่านค่า: ' + err.message)
-          }
-        }, 1500)
-      }, 500)
     } catch (err: any) {
       console.error('Failed to open camera for OCR:', err)
       alert('ไม่สามารถเปิดกล้องได้: ' + err.message)
@@ -250,16 +177,70 @@ function ScanSessionContent() {
   }
 
   const stopOcrScanner = () => {
-    if (ocrIntervalRef.current) {
-      clearInterval(ocrIntervalRef.current)
-      ocrIntervalRef.current = null
-    }
     if (ocrStreamRef.current) {
       ocrStreamRef.current.getTracks().forEach(track => track.stop())
       ocrStreamRef.current = null
     }
     setIsOcrScannerOpen(false)
-    setOcrScannerText('')
+  }
+
+  const captureOcrFrame = async () => {
+    if (!ocrVideoRef.current || !ocrStreamRef.current) return
+    const video = ocrVideoRef.current
+    if (video.readyState < 2) {
+      alert('กล้องยังไม่พร้อมทำงาน กรุณารอสักครู่')
+      return
+    }
+
+    setOcrLoading(true)
+    try {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const vw = video.videoWidth
+      const vh = video.videoHeight
+      
+      // Crop central 85% width and 35% height of the video frame
+      const cropW = Math.round(vw * 0.85)
+      const cropH = Math.round(vh * 0.35)
+      const cropX = Math.round((vw - cropW) / 2)
+      const cropY = Math.round((vh - cropH) / 2)
+
+      canvas.width = cropW
+      canvas.height = cropH
+      
+      ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+      const imgData = canvas.toDataURL('image/jpeg', 0.8)
+
+      // Send to our API route (which uses the cheap gemini-3.1-flash-lite)
+      const res = await fetch('/api/audit/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Image: imgData })
+      })
+
+      if (!res.ok) throw new Error('การประมวลผลสแกนล้มเหลว')
+      const data = await res.json()
+      const resultText = data.result
+
+      if (resultText === 'NOT_FOUND' || !resultText) {
+        playBeep('warning')
+        alert('❌ ไม่พบเลข VIN หรือป้ายทะเบียนที่ชัดเจนในกรอบ กรุณาเล็งใหม่และกดถ่ายใหม่อีกครั้ง')
+        return
+      }
+
+      playBeep('success')
+      setSearchKeyword(resultText) // Put the result text directly into the main search box!
+      stopOcrScanner()
+      
+      // Auto search the database with the result text
+      handleSearchWithVin(resultText, 'OCR')
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการวิเคราะห์: ' + err.message)
+    } finally {
+      setOcrLoading(false)
+    }
   }
 
   const handleSearchWithVin = async (vin: string, method: 'OCR' | 'BARCODE' | 'MANUAL' = 'MANUAL') => {
@@ -597,13 +578,14 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           <div className="space-y-4">
             {/* Live Camera Scanner Box */}
             {isOcrScannerOpen ? (
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-2xl">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-4 relative overflow-hidden shadow-2xl">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-cyan-400 animate-pulse">📷 กำลังสแกนตัวอักษรเลข VIN / ทะเบียนสด...</span>
+                  <span className="text-xs font-bold text-cyan-400 animate-pulse">📷 เล็งตัวหนังสือให้ตรงกรอบ...</span>
                   <button
                     type="button"
                     onClick={stopOcrScanner}
                     className="text-rose-400 hover:text-rose-300 text-xs font-bold px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-lg transition"
+                    disabled={ocrLoading}
                   >
                     ✕ ปิดกล้อง
                   </button>
@@ -628,14 +610,29 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                       <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-cyan-300 rounded-bl-md" />
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-cyan-300 rounded-br-md" />
                     </div>
-                    <span className="text-[10px] text-cyan-300/80 font-bold bg-slate-950/80 px-2.5 py-1 rounded-full mt-3 uppercase tracking-wider">จัดตัวอักษรให้อยู่ในกรอบ</span>
+                    <span className="text-[10px] text-cyan-300/80 font-bold bg-slate-950/80 px-2.5 py-1 rounded-full mt-3 uppercase tracking-wider">จัดข้อความให้อยู่ในกรอบ</span>
                   </div>
                 </div>
 
-                {/* Detected Live Text Status Indicator */}
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center text-xs font-semibold text-cyan-400 animate-pulse">
-                  {ocrScannerText}
-                </div>
+                {/* Big Action Button to Capture and Analyze with Gemini */}
+                <button
+                  type="button"
+                  onClick={captureOcrFrame}
+                  disabled={ocrLoading}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-900 text-white font-black text-sm py-3.5 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                >
+                  {ocrLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>⏳ กำลังวิเคราะห์ข้อความด้วย AI... กรุณารอสักครู่</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">⚡</span>
+                      <span>กดปุ่มนี้เพื่อสแกนด้วย AI</span>
+                    </>
+                  )}
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -886,7 +883,6 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
         </div>
       </div>
-      <Script src="https://unpkg.com/tesseract.js@5.0.3/dist/tesseract.min.js" strategy="lazyOnload" />
     </div>
   )
 }
