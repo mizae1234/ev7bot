@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { env } from '@/lib/env'
+import { logChatToDb } from '@/lib/chat-log'
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY)
 
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
       ? base64Image.split(';base64,')[1]
       : base64Image
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
+    const modelName = 'gemini-3.1-flash-lite'
+    const model = genAI.getGenerativeModel({ model: modelName })
 
     const prompt = `
       คุณเป็นระบบ OCR สำหรับตรวจจับเลขตัวถังรถ (VIN หรือ Chassis Number) และทะเบียนรถยนต์ไฟฟ้า
@@ -25,6 +27,7 @@ export async function POST(request: NextRequest) {
       3. หากไม่สามารถอ่านข้อมูลที่ระบุรถยนต์ได้เลย ให้ส่งคำตอบกลับว่า "NOT_FOUND" เท่านั้น
     `
 
+    const startTime = Date.now()
     const response = await model.generateContent([
       prompt,
       {
@@ -34,6 +37,7 @@ export async function POST(request: NextRequest) {
         }
       }
     ])
+    const responseTimeMs = Date.now() - startTime
 
     let resultText = response.response.text().trim()
     
@@ -44,6 +48,25 @@ export async function POST(request: NextRequest) {
       .replace(/["']/g, '')            // Remove quotes
       .replace(/\s+/g, '')             // Remove all spaces/newlines
       .trim()
+
+    // Log the token usage and cost to the DB
+    const usage = response.response.usageMetadata
+    const inputTokens = usage?.promptTokenCount || 0
+    const outputTokens = usage?.candidatesTokenCount || 0
+
+    await logChatToDb(
+      'OCR',
+      null,
+      'Audit System',
+      'Image OCR scan',
+      resultText,
+      {
+        inputTokens,
+        outputTokens,
+        modelName,
+        responseTimeMs
+      }
+    )
 
     return NextResponse.json({ result: resultText })
   } catch (error: unknown) {
