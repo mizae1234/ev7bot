@@ -35,7 +35,16 @@ export async function POST(request: NextRequest) {
       }
     ])
 
-    const resultText = response.response.text().trim()
+    let resultText = response.response.text().trim()
+    
+    // Clean markdown code blocks, backticks, quotes, and all whitespaces
+    resultText = resultText
+      .replace(/```[a-zA-Z]*\n?/g, '') // Remove markdown code blocks
+      .replace(/`/g, '')               // Remove backticks
+      .replace(/["']/g, '')            // Remove quotes
+      .replace(/\s+/g, '')             // Remove all spaces/newlines
+      .trim()
+
     return NextResponse.json({ result: resultText })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'

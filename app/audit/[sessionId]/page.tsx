@@ -142,6 +142,46 @@ function ScanSessionContent() {
     }
   }, [sessionId])
 
+function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.src = URL.createObjectURL(file)
+    img.onload = () => {
+      let width = img.width
+      let height = img.height
+      
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width)
+          width = maxWidth
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height)
+          height = maxHeight
+        }
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas context not available'))
+        return
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', quality)
+      resolve(dataUrl)
+    }
+    img.onerror = (err) => {
+      reject(err)
+    }
+  })
+}
+
   // Call OCR API
   const handleOcrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -150,13 +190,8 @@ function ScanSessionContent() {
     setOcrLoading(true)
     setPreviewVehicle(null)
     try {
-      // 1. Convert file to base64
-      const reader = new FileReader()
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onloadend = () => resolve(reader.result as string)
-        reader.readAsDataURL(file)
-      })
-      const base64Image = await base64Promise
+      // 1. Compress and convert file to base64
+      const base64Image = await compressImage(file)
 
       // 2. Call OCR API
       const ocrRes = await fetch('/api/audit/ocr', {
