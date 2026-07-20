@@ -18,9 +18,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 })
     }
 
+    const cleanedKeyword = keyword.replace(/[\s-]/g, '')
+
     // Search vehicles (limit 10 for quick dropdown)
     const result = await pool.request()
       .input('keyword', sql.NVarChar, keyword)
+      .input('cleanedKeyword', sql.NVarChar, cleanedKeyword)
       .query(`
         SELECT TOP 10 ii.VinNo, ii.RegisterNo, ii.Model, ii.Exterior_Color, ii.Status, 
                ii.CurrentLocation, ii.StockLocation,
@@ -29,8 +32,13 @@ export async function GET(request: NextRequest) {
         FROM dbo.EV_InventoryItem ii
         LEFT JOIN dbo.EV_MsSubStatus sub_curr ON ii.CurrentLocation = sub_curr.StatusCode AND sub_curr.Type = 'LOCATION'
         LEFT JOIN dbo.EV_MsSubStatus sub_stock ON ii.StockLocation = sub_stock.StatusCode AND sub_stock.Type = 'LOCATION'
-        WHERE (ii.VinNo LIKE '%' + @keyword + '%' OR ii.RegisterNo LIKE '%' + @keyword + '%')
-          AND ii.IsActive = 1
+        WHERE (
+          ii.VinNo LIKE '%' + @keyword + '%' 
+          OR ii.RegisterNo LIKE '%' + @keyword + '%'
+          OR REPLACE(REPLACE(ii.VinNo, ' ', ''), '-', '') LIKE '%' + @cleanedKeyword + '%'
+          OR REPLACE(REPLACE(ii.RegisterNo, ' ', ''), '-', '') LIKE '%' + @cleanedKeyword + '%'
+        )
+        AND ii.IsActive = 1
       `)
 
     return NextResponse.json({ vehicles: result.recordset })
