@@ -439,7 +439,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
     if (!previewVehicle || !session) return
 
     const expectedLoc = session.Location
-    const currentLoc = previewVehicle.CurrentLocation || previewVehicle.StockLocation || ''
+    const currentLoc = previewVehicle.CurrentLocation || ''
     
     let detectedStatus: 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM' = 'MATCHED'
     if (previewVehicle.Status === 'UNKNOWN') {
