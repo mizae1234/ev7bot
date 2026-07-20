@@ -42,6 +42,16 @@ const PROJECT_BADGE_COLORS: Record<string, string> = {
   LINEMAN: 'bg-lime-50 text-lime-700 border-lime-200',
 }
 
+const TRACKING_PROJECT_BADGE_COLORS: Record<string, string> = {
+  EV: 'bg-blue-50 text-blue-700 border-blue-200',
+  EV7: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  GRAB: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'LINE MAN': 'bg-lime-50 text-lime-700 border-lime-200',
+  AOT: 'bg-amber-50 text-amber-700 border-amber-200',
+  'FAST WHEEL': 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  FLEET: 'bg-violet-50 text-violet-700 border-violet-200',
+}
+
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   MATCHED: { label: '✅ ตรงกัน', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   NOT_FOUND: { label: '⏳ Core อย่างเดียว', className: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -312,6 +322,7 @@ function CaseDeliveryContent() {
         'สถานะ Tracking',
         'เลขสัญญา (Tracking)',
         'ทะเบียน (Tracking)',
+        'โครงการ (Tracking)',
         'RentType',
         'วันที่ปล่อยจริง',
       ],
@@ -328,6 +339,7 @@ function CaseDeliveryContent() {
         item.TrackingStatus === 'MATCHED' ? 'ปล่อยแล้ว' : 'ยังไม่ปล่อย',
         item.TrackingContractNo || '-',
         item.TrackingRegisterNo || '-',
+        item.TrackingContractType || '-',
         item.TrackingRentType || '-',
         item.TrackingReleaseDate ? getThaiDateTime(new Date(item.TrackingReleaseDate).toLocaleDateString('en-GB') + ' 00:00:00') : '-',
       ]),
@@ -544,6 +556,7 @@ function CaseDeliveryContent() {
                   <th className="text-center py-3 px-4 font-bold text-indigo-600 text-xs border-l-2 border-indigo-200">สถานะ</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">เลขสัญญา (Tracking)</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">ทะเบียน (Tracking)</th>
+                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">โครงการ (Tracking)</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">RentType</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">วันปล่อยจริง</th>
                 </tr>
@@ -608,6 +621,15 @@ function CaseDeliveryContent() {
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-600">
                           {item.TrackingRegisterNo || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-xs">
+                          {item.TrackingContractType ? (
+                            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${
+                              TRACKING_PROJECT_BADGE_COLORS[item.TrackingContractType.toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200'
+                            }`}>
+                              {item.TrackingContractType}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="py-3 px-4 text-xs font-medium text-slate-600">
                           {item.TrackingRentType || '-'}

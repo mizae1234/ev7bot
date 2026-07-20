@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     const BATCH_SIZE = 2000
     const allRows: Array<Record<string, unknown>> = []
-    const uniqueVins = [...new Set(vinNos.filter(Boolean))]
+    const uniqueVins = Array.from(new Set(vinNos.filter(Boolean)))
 
     for (let i = 0; i < uniqueVins.length; i += BATCH_SIZE) {
       const batch = uniqueVins.slice(i, i + BATCH_SIZE)

@@ -1,0 +1,654 @@
+'use client'
+
+import React, { useState, useEffect, useRef } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { AuthGuard } from '@/components/ui/AuthGuard'
+
+interface AuditSession {
+  AuditSessionID: number
+  AuditDate: string
+  Location: string
+  LocationName?: string
+  Status: 'DRAFT' | 'COMPLETED' | 'CANCELED'
+  CreatedBy: string
+  CreateDate: string
+  Notes: string
+}
+
+interface ScannedItem {
+  AuditItemID: number
+  VinNo: string
+  ScanTime: string
+  ScanMethod: 'OCR' | 'BARCODE' | 'MANUAL'
+  DetectedStatus: 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM'
+  PreviousLocation?: string
+  PreviousLocationName?: string
+  IsConfirmed: boolean
+  CreatedBy: string
+  Notes?: string
+  RegisterNo?: string
+  Model?: string
+  Exterior_Color?: string
+}
+
+interface VehiclePreview {
+  VinNo: string
+  RegisterNo: string
+  Model: string
+  Exterior_Color: string
+  Status: string
+  CurrentLocation: string
+  StockLocation: string
+  CurrentLocationName?: string
+  StockLocationName?: string
+}
+
+function playBeep(type: 'success' | 'warning' | 'error' = 'success') {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return
+    const audioCtx = new AudioContextClass()
+    const oscillator = audioCtx.createOscillator()
+    const gainNode = audioCtx.createGain()
+    oscillator.connect(gainNode)
+    gainNode.connect(audioCtx.destination)
+    
+    oscillator.type = 'sine'
+    if (type === 'success') {
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime) // A5
+      gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime)
+      oscillator.start()
+      oscillator.stop(audioCtx.currentTime + 0.12)
+    } else if (type === 'warning') {
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime) // A4
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime)
+      oscillator.start()
+      oscillator.stop(audioCtx.currentTime + 0.2)
+      
+      // Double beep for warning
+      setTimeout(() => {
+        const osc2 = audioCtx.createOscillator()
+        const gain2 = audioCtx.createGain()
+        osc2.connect(gain2)
+        gain2.connect(audioCtx.destination)
+        osc2.type = 'sine'
+        osc2.frequency.setValueAtTime(440, audioCtx.currentTime)
+        gain2.gain.setValueAtTime(0.2, audioCtx.currentTime)
+        osc2.start()
+        osc2.stop(audioCtx.currentTime + 0.2)
+      }, 250)
+    }
+  } catch (e) {
+    console.error('Audio beep failed', e)
+  }
+}
+
+function ScanSessionContent() {
+  const params = useParams()
+  const router = useRouter()
+  const sessionId = params.sessionId as string
+
+  const [session, setSession] = useState<AuditSession | null>(null)
+  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Scanning state
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Manual search state
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchVehicles, setSearchVehicles] = useState<VehiclePreview[]>([])
+  const [searching, setSearching] = useState(false)
+
+  // Preview state
+  const [previewVehicle, setPreviewVehicle] = useState<VehiclePreview | null>(null)
+  const [previewMode, setPreviewMode] = useState<'OCR' | 'MANUAL'>('OCR')
+  const [previewNotes, setPreviewNotes] = useState('')
+  const [savingItem, setSavingItem] = useState(false)
+
+  // Operator
+  const [operatorName, setOperatorName] = useState('พนักงานตรวจเช็ก')
+
+  const fetchSessionDetails = async () => {
+    try {
+      const res = await fetch(`/api/audit/session?id=${sessionId}`)
+      if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลรายละเอียดรอบตรวจได้')
+      const data = await res.json()
+      setSession(data.session)
+      setScannedItems(data.items || [])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSessionDetails()
+    
+    // Retrieve displayName
+    try {
+      const profileStr = localStorage.getItem('liff_profile')
+      if (profileStr) {
+        const profile = JSON.parse(profileStr)
+        if (profile?.displayName) {
+          setOperatorName(profile.displayName.replace(' (Dev Mode)', ''))
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }, [sessionId])
+
+  // Call OCR API
+  const handleOcrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setOcrLoading(true)
+    setPreviewVehicle(null)
+    try {
+      // 1. Convert file to base64
+      const reader = new FileReader()
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+      const base64Image = await base64Promise
+
+      // 2. Call OCR API
+      const ocrRes = await fetch('/api/audit/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Image })
+      })
+
+      if (!ocrRes.ok) throw new Error('การประมวลผลสแกนล้มเหลว')
+      const ocrData = await ocrRes.json()
+      const resultText = ocrData.result
+
+      if (resultText === 'NOT_FOUND' || !resultText) {
+        playBeep('warning')
+        alert('❌ ไม่พบเลข VIN หรือป้ายทะเบียนที่ชัดเจน กรุณาถ่ายใหม่อีกครั้ง หรือใช้ช่องค้นหาแบบพิมพ์เองด้านล่าง')
+        return
+      }
+
+      // 3. Search database with the detected string
+      const searchRes = await fetch(`/api/audit/item?keyword=${encodeURIComponent(resultText)}`)
+      if (!searchRes.ok) throw new Error('เกิดข้อผิดพลาดการสืบค้นข้อมูลรถ')
+      const searchData = await searchRes.json()
+
+      const foundVehicles: VehiclePreview[] = searchData.vehicles || []
+      if (foundVehicles.length === 0) {
+        // Vehicle not in inventory system, create dummy preview
+        playBeep('warning')
+        setPreviewVehicle({
+          VinNo: resultText.length > 10 ? resultText : '',
+          RegisterNo: resultText.length <= 10 ? resultText : '',
+          Model: 'ไม่พบข้อมูลรถในฐานข้อมูลหลัก',
+          Exterior_Color: '-',
+          Status: 'UNKNOWN',
+          CurrentLocation: '-',
+          StockLocation: '-'
+        })
+        setPreviewMode('OCR')
+      } else {
+        // Found matching vehicles
+        playBeep('success')
+        setPreviewVehicle(foundVehicles[0])
+        setPreviewMode('OCR')
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setOcrLoading(false)
+      if (fileInputRef.current) fileInputRef.current.value = '' // Clear input
+    }
+  }
+
+  // Handle Manual Search
+  const handleManualSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchKeyword.trim()) return
+
+    setSearching(true)
+    setSearchVehicles([])
+    setPreviewVehicle(null)
+    try {
+      const res = await fetch(`/api/audit/item?keyword=${encodeURIComponent(searchKeyword)}`)
+      if (!res.ok) throw new Error('ค้นหาข้อมูลล้มเหลว')
+      const data = await res.json()
+      const list = data.vehicles || []
+      
+      if (list.length === 0) {
+        playBeep('warning')
+        alert('❌ ไม่พบข้อมูลรถคันนี้ในระบบ')
+      } else if (list.length === 1) {
+        playBeep('success')
+        setPreviewVehicle(list[0])
+        setPreviewMode('MANUAL')
+        setSearchKeyword('')
+      } else {
+        setSearchVehicles(list)
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Autocomplete / Typeahead Search Effect
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      const trimmed = searchKeyword.trim()
+      if (trimmed.length >= 2) {
+        setSearching(true)
+        try {
+          const res = await fetch(`/api/audit/item?keyword=${encodeURIComponent(trimmed)}`)
+          if (res.ok) {
+            const data = await res.json()
+            setSearchVehicles(data.vehicles || [])
+          }
+        } catch (e) {
+          console.error(e)
+        } finally {
+          setSearching(false)
+        }
+      } else {
+        setSearchVehicles([])
+      }
+    }, 250) // 250ms debounce
+
+    return () => clearTimeout(delayDebounce)
+  }, [searchKeyword])
+
+  // Save item checked in DB
+  const handleSaveAuditItem = async (force = false) => {
+    if (!previewVehicle || !session) return
+
+    const expectedLoc = session.Location
+    const currentLoc = previewVehicle.CurrentLocation || previewVehicle.StockLocation || ''
+    
+    let detectedStatus: 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM' = 'MATCHED'
+    if (previewVehicle.Status === 'UNKNOWN') {
+      detectedStatus = 'NOT_IN_SYSTEM'
+    } else if (currentLoc.trim() !== expectedLoc.trim()) {
+      detectedStatus = 'MISMATCH'
+    }
+
+    setSavingItem(true)
+    try {
+      const res = await fetch('/api/audit/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auditSessionID: parseInt(sessionId),
+          vinNo: previewVehicle.VinNo || previewVehicle.RegisterNo, // Fallback if no VIN
+          createdBy: operatorName,
+          method: previewMode,
+          detectedStatus,
+          previousLocation: currentLoc || '-',
+          isConfirmed: true,
+          notes: previewNotes,
+          forceSave: force
+        })
+      })
+
+      const data = await res.json()
+      
+      if (data.isDuplicate) {
+        playBeep('warning')
+        const confirmRetry = window.confirm(
+          `⚠️ แจ้งเตือนสแกนซ้ำ:\nรถคันนี้ถูกบันทึกไปแล้วในรอบนี้โดย "${data.existingRecord.createdBy}" เมื่อเวลา ${new Date(data.existingRecord.scanTime).toLocaleTimeString('th-TH')}\n\nคุณต้องการบันทึกทับและอัปเดตเวลาล่าสุดใช่หรือไม่?`
+        )
+        if (confirmRetry) {
+          handleSaveAuditItem(true) // Retry forcing save
+        }
+        return
+      }
+
+      if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ')
+
+      // Clear preview and notes
+      setPreviewVehicle(null)
+      setPreviewNotes('')
+      // Refresh list
+      fetchSessionDetails()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setSavingItem(false)
+    }
+  }
+
+  // Close audit session
+  const handleCloseSession = async () => {
+    if (!session) return
+    const confirmClose = window.confirm('คุณตรวจเช็ครถครบเรียบร้อยแล้ว และต้องการเสร็จสิ้นการทำ Stock Audit ในรอบนี้ใช่หรือไม่?')
+    if (!confirmClose) return
+
+    try {
+      const res = await fetch('/api/audit/session', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: session.AuditSessionID,
+          status: 'COMPLETED'
+        })
+      })
+
+      if (!res.ok) throw new Error('ปิดรอบตรวจเช็กไม่สำเร็จ')
+      fetchSessionDetails()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="w-10 h-10 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="text-sm text-slate-400 font-medium">กำลังโหลดข้อมูลรอบตรวจเช็ก...</div>
+      </div>
+    )
+  }
+
+  if (error || !session) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="text-4xl mb-4">⚠️</div>
+        <div className="text-sm text-rose-300 font-medium mb-4">{error || 'ไม่พบข้อมูลรอบตรวจเช็ก'}</div>
+        <button
+          onClick={() => router.push('/audit')}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-100 px-6 py-2 rounded-xl text-sm font-bold transition"
+        >
+          กลับหน้าหลัก Audit
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-slate-100 font-sans pb-16 flex flex-col">
+      {/* Session Title Bar */}
+      <div className="bg-slate-900/80 backdrop-blur-xl border-b border-indigo-500/20 shadow-md sticky top-0 z-40">
+        <div className="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => router.push('/audit')}
+            className="text-slate-400 hover:text-slate-200 text-sm font-bold flex items-center gap-1"
+          >
+            ← ย้อนกลับ
+          </button>
+          <div className="text-center">
+            <h1 className="text-sm font-bold text-slate-100">{session.LocationName || session.Location}</h1>
+            <p className="text-[10px] text-slate-400">{new Date(session.AuditDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          </div>
+          <div>
+            {session.Status === 'DRAFT' ? (
+              <button
+                onClick={handleCloseSession}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
+              >
+                🏁 เสร็จสิ้น
+              </button>
+            ) : (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold px-2 py-1 rounded">
+                เช็กเสร็จสิ้น
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 max-w-md w-full mx-auto px-4 py-6 space-y-6">
+        {/* Only allow scanning if the session is DRAFT */}
+        {session.Status === 'DRAFT' && (
+          <div className="space-y-4">
+            {/* 1. Camera Trigger Button (Fast Capture Input) */}
+            <div className="relative group">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleOcrFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                disabled={ocrLoading}
+                ref={fileInputRef}
+              />
+              <button
+                type="button"
+                className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-black text-base py-4 px-6 rounded-2xl transition duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3"
+              >
+                {ocrLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>กำลังแสกน & วิเคราะห์ภาพ...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl">📷</span>
+                    <span>เปิดกล้องสแกนเลข VIN หน้ารถ</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* 2. Manual Input Search (Autocomplete as you type) */}
+            <form onSubmit={handleManualSearch} className="relative">
+              <input
+                type="text"
+                placeholder="พิมพ์ทะเบียนรถ หรือเลข VIN..."
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-400 transition"
+              />
+              {searching && (
+                <div className="absolute right-3.5 top-3 flex items-center">
+                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </form>
+
+            {/* Dropdown Options for Manual search (if multiple cars match) */}
+            {searchVehicles.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 space-y-1 max-h-40 overflow-y-auto">
+                <div className="text-[10px] text-slate-400 font-bold px-2 py-1 uppercase tracking-wider">โปรดเลือกตัวเลือกรถที่ต้องการ:</div>
+                {searchVehicles.map((car) => (
+                  <div
+                    key={car.VinNo}
+                    onClick={() => {
+                      setPreviewVehicle(car)
+                      setPreviewMode('MANUAL')
+                      setSearchVehicles([])
+                    }}
+                    className="hover:bg-slate-800 p-2 rounded-lg cursor-pointer text-xs flex justify-between items-center transition"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-200">{car.RegisterNo || 'ไม่มีทะเบียน'}</span>
+                      <span className="text-[10px] text-slate-500 font-mono ml-2">({car.VinNo})</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium">{car.Model}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3. Preview Card (Stage 1: Preview-First before saving) */}
+        {previewVehicle && (
+          <div className="bg-slate-800/60 border-2 border-cyan-500/40 rounded-2xl p-5 shadow-xl space-y-4 animate-in slide-in-from-top-4 duration-300 backdrop-blur-sm">
+            <div className="flex justify-between items-start border-b border-slate-700 pb-3">
+              <div>
+                <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block mb-0.5">ผลการสแกน (ตรวจสอบก่อนบันทึก)</span>
+                <h3 className="text-lg font-black text-slate-100">{previewVehicle.RegisterNo || 'ยังไม่มีทะเบียน'}</h3>
+                <span className="text-xs text-slate-400 font-mono block mt-1">VIN: {previewVehicle.VinNo || '-'}</span>
+              </div>
+              <button
+                onClick={() => setPreviewVehicle(null)}
+                className="text-slate-400 hover:text-slate-200 text-lg font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-slate-500 block">รุ่นรถ (Model)</span>
+                <span className="font-bold text-slate-300">{previewVehicle.Model}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">สีภายนอก (Color)</span>
+                <span className="font-bold text-slate-300">{previewVehicle.Exterior_Color || '-'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">สถานะปัจจุบันในระบบ</span>
+                <span className="font-bold text-slate-300">{previewVehicle.Status || 'UNKNOWN'}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">พิกัดเดิมในระบบ</span>
+                <span className="font-bold text-slate-300">
+                  {previewVehicle.CurrentLocationName || previewVehicle.StockLocationName || previewVehicle.CurrentLocation || previewVehicle.StockLocation || '-'}
+                </span>
+              </div>
+            </div>
+
+            {/* Check location mismatch and show badge */}
+            <div className="pt-2">
+              {(() => {
+                const currentLoc = previewVehicle.CurrentLocation || previewVehicle.StockLocation || ''
+                const expectedLoc = session.Location
+                
+                if (previewVehicle.Status === 'UNKNOWN') {
+                  return (
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl p-3 text-xs font-semibold flex items-center gap-2">
+                      <span>⚠️</span> ไม่พบข้อมูลรถยนต์คันนี้ในฐานข้อมูลหลัก
+                    </div>
+                  )
+                } else if (currentLoc.trim() === expectedLoc.trim()) {
+                  return (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-xl p-3 text-xs font-semibold flex items-center gap-2">
+                      <span>✅</span> รถคันนี้อยู่ตรงตามพิกัดสถานที่ในระบบ
+                    </div>
+                  )
+                } else {
+                  return (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3 text-xs font-semibold space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span>⚠️</span> รถคันนี้อยู่ผิดพิกัดสถานที่!
+                      </div>
+                      <div className="text-[10px] text-amber-400 font-medium">
+                        พิกัดเดิมในระบบคือ "{previewVehicle.CurrentLocationName || previewVehicle.StockLocationName || currentLoc || '-'}" แต่สแกนเจอที่ "{session.LocationName || expectedLoc}"
+                      </div>
+                    </div>
+                  )
+                }
+              })()}
+            </div>
+
+            {/* Optional scan notes */}
+            <input
+              type="text"
+              placeholder="เขียนบันทึกเพิ่มเติมสำหรับรถคันนี้ (ถ้ามี)..."
+              value={previewNotes}
+              onChange={(e) => setPreviewNotes(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-400 transition"
+            />
+
+            {/* Confirm Actions */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPreviewVehicle(null)}
+                className="flex-1 bg-slate-700 hover:bg-slate-650 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition"
+              >
+                ยกเลิก (ไม่บันทึก)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveAuditItem(false)}
+                disabled={savingItem}
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs py-2.5 rounded-xl transition disabled:opacity-50"
+              >
+                {savingItem ? 'กำลังบันทึก...' : '➕ ยืนยันและบันทึกพิกัด'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Scanned List (Progress log) */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">รถที่เช็กในรอบนี้แล้ว ({scannedItems.length} คัน)</h2>
+
+          {scannedItems.length === 0 ? (
+            <div className="bg-slate-800/10 border border-slate-800/50 rounded-2xl py-12 text-center text-slate-500 text-xs font-medium">
+              ยังไม่มีการบันทึกรายการรถในรอบนี้
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {scannedItems.map((item, idx) => {
+                const scanTimeStr = new Date(item.ScanTime).toLocaleTimeString('th-TH', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) + ' น.'
+                
+                return (
+                  <div
+                    key={item.AuditItemID}
+                    className="bg-slate-800/20 border border-slate-800 rounded-xl p-3 flex justify-between items-center transition hover:bg-slate-800/30"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-500">#{scannedItems.length - idx}</span>
+                        <span className="text-sm font-bold text-slate-200">{item.RegisterNo || 'ไม่มีทะเบียน'}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          item.DetectedStatus === 'MATCHED'
+                            ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                            : item.DetectedStatus === 'MISMATCH'
+                              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                              : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                        }`}>
+                          {item.DetectedStatus === 'MATCHED' ? 'ตรงพิกัด' : item.DetectedStatus === 'MISMATCH' ? 'ผิดพิกัด' : 'ไม่มีในระบบ'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium">
+                        Model: {item.Model || 'ไม่ระบุ'} • VIN: <span className="font-mono text-[9px] text-slate-500">{item.VinNo}</span>
+                      </div>
+                      {item.DetectedStatus === 'MISMATCH' && (
+                        <div className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                          📍 พิกัดเดิม: {item.PreviousLocationName || item.PreviousLocation || '-'}
+                        </div>
+                      )}
+                      {item.Notes && (
+                        <div className="text-[10px] text-cyan-400 italic font-medium">
+                          📝 {item.Notes}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right text-[10px] text-slate-500 font-medium">
+                      <div>🕒 {scanTimeStr}</div>
+                      <div>👤 {item.CreatedBy}</div>
+                      <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">{item.ScanMethod}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function ScanSessionPage() {
+  return (
+    <AuthGuard>
+      <ScanSessionContent />
+    </AuthGuard>
+  )
+}
