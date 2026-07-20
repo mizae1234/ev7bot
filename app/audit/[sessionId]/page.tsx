@@ -412,7 +412,6 @@ function ScanSessionContent() {
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handleOcrFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 disabled={ocrLoading}
