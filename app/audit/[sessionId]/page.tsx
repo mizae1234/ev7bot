@@ -98,9 +98,12 @@ function ScanSessionContent() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Live barcode scanner state
-  const [isScannerOpen, setIsScannerOpen] = useState(false)
-  const scannerRef = useRef<any>(null)
+  // Live text scanner (OCR) state
+  const [isOcrScannerOpen, setIsOcrScannerOpen] = useState(false)
+  const [ocrScannerText, setOcrScannerText] = useState('')
+  const ocrVideoRef = useRef<HTMLVideoElement>(null)
+  const ocrIntervalRef = useRef<any>(null)
+  const ocrStreamRef = useRef<MediaStream | null>(null)
 
   // Manual search state
   const [searchKeyword, setSearchKeyword] = useState('')
@@ -147,74 +150,115 @@ function ScanSessionContent() {
     }
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(console.error)
+      if (ocrIntervalRef.current) {
+        clearInterval(ocrIntervalRef.current)
+      }
+      if (ocrStreamRef.current) {
+        ocrStreamRef.current.getTracks().forEach(track => track.stop())
       }
     }
   }, [sessionId])
 
-  const startScanner = async () => {
-    setIsScannerOpen(true)
+  const startOcrScanner = async () => {
+    setIsOcrScannerOpen(true)
+    setOcrScannerText('กำลังเปิดกล้อง...')
     setPreviewVehicle(null)
-    setTimeout(() => {
-      try {
-        const Html5QrcodeClass = (window as any).Html5Qrcode
-        if (!Html5QrcodeClass) {
-          alert('กำลังโหลดระบบสแกนเนอร์... กรุณาลองใหม่อีกครั้ง')
-          setIsScannerOpen(false)
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      })
+      ocrStreamRef.current = stream
+      
+      if (ocrVideoRef.current) {
+        ocrVideoRef.current.srcObject = stream
+        ocrVideoRef.current.play()
+      }
+
+      setTimeout(() => {
+        const Tesseract = (window as any).Tesseract
+        if (!Tesseract) {
+          alert('กำลังดาวน์โหลดไลบรารีสแกนตัวอักษร... กรุณารอสักครู่แล้วลองอีกครั้ง')
+          stopOcrScanner()
           return
         }
         
-        const html5QrCode = new Html5QrcodeClass("qr-reader")
-        scannerRef.current = html5QrCode
+        setOcrScannerText('เล็งกล้องไปที่ตัวอักษรเลข VIN หน้ารถ...')
         
-        const qrCodeSuccessCallback = (decodedText: string) => {
-          html5QrCode.stop().then(() => {
-            setIsScannerOpen(false)
-            playBeep('success')
-            handleSearchWithVin(decodedText, 'BARCODE')
-          }).catch((err: any) => {
-            console.error('Failed to stop scanner', err)
-            setIsScannerOpen(false)
-            handleSearchWithVin(decodedText, 'BARCODE')
-          })
-        }
-        
-        const config = { 
-          fps: 15, 
-          qrbox: (width: number, height: number) => {
-            return { width: Math.round(width * 0.85), height: Math.round(height * 0.35) }
+        ocrIntervalRef.current = setInterval(async () => {
+          if (!ocrVideoRef.current || !ocrStreamRef.current) return
+          
+          const video = ocrVideoRef.current
+          if (video.readyState !== video.HAVE_CURRENT_DATA) return
+
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return
+
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          
+          const cropW = Math.round(vw * 0.85)
+          const cropH = Math.round(vh * 0.35)
+          const cropX = Math.round((vw - cropW) / 2)
+          const cropY = Math.round((vh - cropH) / 2)
+
+          canvas.width = cropW
+          canvas.height = cropH
+          
+          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+          const imgData = canvas.toDataURL('image/jpeg', 0.8)
+          
+          try {
+            setOcrScannerText('กำลังวิเคราะห์ตัวอักษร...')
+            const result = await Tesseract.recognize(imgData, 'eng')
+            const text = result.data.text || ''
+            
+            const words = text.split(/\s+/)
+            let detectedVin = ''
+            
+            for (const word of words) {
+              const cleaned = word.replace(/[^A-Z0-9]/gi, '').toUpperCase()
+              
+              if (cleaned.length >= 10 && /[0-9]/.test(cleaned) && /[A-Z]/.test(cleaned)) {
+                detectedVin = cleaned
+                break
+              }
+            }
+
+            if (detectedVin) {
+              setOcrScannerText(`พบข้อความ: ${detectedVin}`)
+              playBeep('success')
+              stopOcrScanner()
+              handleSearchWithVin(detectedVin, 'OCR')
+            } else {
+              const shortClean = text.replace(/[^A-Z0-9]/gi, ' ').trim().substring(0, 30)
+              setOcrScannerText(shortClean ? `เห็นตัวอักษร: ${shortClean}` : 'กำลังสแกนตัวอักษร...')
+            }
+          } catch (err) {
+            console.error('Tesseract error:', err)
           }
-        }
-        
-        html5QrCode.start(
-          { facingMode: "environment" }, 
-          config, 
-          qrCodeSuccessCallback,
-          (errorMessage: string) => {}
-        ).catch((err: any) => {
-          console.error('Failed to start scanner', err)
-          alert('ไม่สามารถเข้าถึงกล้องหลังได้: ' + err)
-          setIsScannerOpen(false)
-        })
-      } catch (e: any) {
-        console.error('Scanner init error', e)
-        alert('เกิดข้อผิดพลาดในการเปิดกล้อง: ' + e.message)
-        setIsScannerOpen(false)
-      }
-    }, 300)
+        }, 1500)
+      }, 500)
+    } catch (err: any) {
+      console.error('Failed to open camera for OCR:', err)
+      alert('ไม่สามารถเปิดกล้องได้: ' + err.message)
+      setIsOcrScannerOpen(false)
+    }
   }
 
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop()
-      } catch (e) {
-        console.error('Failed to stop scanner', e)
-      }
-      scannerRef.current = null
+  const stopOcrScanner = () => {
+    if (ocrIntervalRef.current) {
+      clearInterval(ocrIntervalRef.current)
+      ocrIntervalRef.current = null
     }
-    setIsScannerOpen(false)
+    if (ocrStreamRef.current) {
+      ocrStreamRef.current.getTracks().forEach(track => track.stop())
+      ocrStreamRef.current = null
+    }
+    setIsOcrScannerOpen(false)
+    setOcrScannerText('')
   }
 
   const handleSearchWithVin = async (vin: string, method: 'OCR' | 'BARCODE' | 'MANUAL' = 'MANUAL') => {
@@ -551,13 +595,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
         {session.Status === 'DRAFT' && (
           <div className="space-y-4">
             {/* Live Camera Scanner Box */}
-            {isScannerOpen ? (
+            {isOcrScannerOpen ? (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-2xl">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                  <span className="text-xs font-bold text-cyan-400 animate-pulse">📷 กำลังสแกนบาร์โค้ด VIN / ทะเบียนสด...</span>
+                  <span className="text-xs font-bold text-cyan-400 animate-pulse">📷 กำลังสแกนตัวอักษรเลข VIN / ทะเบียนสด...</span>
                   <button
                     type="button"
-                    onClick={stopScanner}
+                    onClick={stopOcrScanner}
                     className="text-rose-400 hover:text-rose-300 text-xs font-bold px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-lg transition"
                   >
                     ✕ ปิดกล้อง
@@ -566,7 +610,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 
                 {/* Live Camera Viewfinder */}
                 <div className="relative aspect-[4/3] w-full bg-black rounded-xl overflow-hidden border border-slate-800">
-                  <div id="qr-reader" className="w-full h-full"></div>
+                  <video
+                    ref={ocrVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
                   
                   {/* Custom Target Laser Frame Overlay */}
                   <div className="absolute inset-0 pointer-events-none flex flex-col justify-center items-center">
@@ -577,8 +627,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                       <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-cyan-300 rounded-bl-md" />
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-cyan-300 rounded-br-md" />
                     </div>
-                    <span className="text-[10px] text-cyan-300/80 font-bold bg-slate-950/80 px-2.5 py-1 rounded-full mt-3 uppercase tracking-wider">จัดบาร์โค้ดให้อยู่ในกรอบ</span>
+                    <span className="text-[10px] text-cyan-300/80 font-bold bg-slate-950/80 px-2.5 py-1 rounded-full mt-3 uppercase tracking-wider">จัดตัวอักษรให้อยู่ในกรอบ</span>
                   </div>
+                </div>
+
+                {/* Detected Live Text Status Indicator */}
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center text-xs font-semibold text-cyan-400 animate-pulse">
+                  {ocrScannerText}
                 </div>
               </div>
             ) : (
@@ -586,12 +641,12 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 {/* 1A. Live Scanner Button */}
                 <button
                   type="button"
-                  onClick={startScanner}
+                  onClick={startOcrScanner}
                   className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm py-4 px-4 rounded-2xl transition duration-200 shadow-md hover:shadow-lg flex flex-col items-center justify-center gap-1.5"
                 >
                   <span className="text-xl">🎥</span>
                   <span>เปิดกล้องแสกนสด</span>
-                  <span className="text-[9px] text-emerald-100 font-normal">จ่อบาร์โค้ดปุ๊บติดปั๊บ</span>
+                  <span className="text-[9px] text-emerald-100 font-normal">ส่องตัวอักษรเพื่อแกะเลข</span>
                 </button>
 
                 {/* 1B. Camera Upload Button (Fast Capture Input) */}
@@ -830,7 +885,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
         </div>
       </div>
-      <Script src="https://unpkg.com/html5-qrcode" strategy="lazyOnload" />
+      <Script src="https://unpkg.com/tesseract.js@5.0.3/dist/tesseract.min.js" strategy="lazyOnload" />
     </div>
   )
 }
