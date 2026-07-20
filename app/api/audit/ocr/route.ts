@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       ? base64Image.split(';base64,')[1]
       : base64Image
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
 
     const prompt = `
       คุณเป็นระบบ OCR สำหรับตรวจจับเลขตัวถังรถ (VIN หรือ Chassis Number) และทะเบียนรถยนต์ไฟฟ้า
