@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import Script from 'next/script'
 
 interface AuditSession {
   AuditSessionID: number
@@ -97,6 +98,10 @@ function ScanSessionContent() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Live barcode scanner state
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const scannerRef = useRef<any>(null)
+
   // Manual search state
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchVehicles, setSearchVehicles] = useState<VehiclePreview[]>([])
@@ -104,7 +109,7 @@ function ScanSessionContent() {
 
   // Preview state
   const [previewVehicle, setPreviewVehicle] = useState<VehiclePreview | null>(null)
-  const [previewMode, setPreviewMode] = useState<'OCR' | 'MANUAL'>('OCR')
+  const [previewMode, setPreviewMode] = useState<'OCR' | 'BARCODE' | 'MANUAL'>('OCR')
   const [previewNotes, setPreviewNotes] = useState('')
   const [savingItem, setSavingItem] = useState(false)
 
@@ -140,7 +145,110 @@ function ScanSessionContent() {
     } catch (e) {
       console.error(e)
     }
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(console.error)
+      }
+    }
   }, [sessionId])
+
+  const startScanner = async () => {
+    setIsScannerOpen(true)
+    setPreviewVehicle(null)
+    setTimeout(() => {
+      try {
+        const Html5QrcodeClass = (window as any).Html5Qrcode
+        if (!Html5QrcodeClass) {
+          alert('กำลังโหลดระบบสแกนเนอร์... กรุณาลองใหม่อีกครั้ง')
+          setIsScannerOpen(false)
+          return
+        }
+        
+        const html5QrCode = new Html5QrcodeClass("qr-reader")
+        scannerRef.current = html5QrCode
+        
+        const qrCodeSuccessCallback = (decodedText: string) => {
+          html5QrCode.stop().then(() => {
+            setIsScannerOpen(false)
+            playBeep('success')
+            handleSearchWithVin(decodedText, 'BARCODE')
+          }).catch((err: any) => {
+            console.error('Failed to stop scanner', err)
+            setIsScannerOpen(false)
+            handleSearchWithVin(decodedText, 'BARCODE')
+          })
+        }
+        
+        const config = { 
+          fps: 15, 
+          qrbox: (width: number, height: number) => {
+            return { width: Math.round(width * 0.85), height: Math.round(height * 0.35) }
+          }
+        }
+        
+        html5QrCode.start(
+          { facingMode: "environment" }, 
+          config, 
+          qrCodeSuccessCallback,
+          (errorMessage: string) => {}
+        ).catch((err: any) => {
+          console.error('Failed to start scanner', err)
+          alert('ไม่สามารถเข้าถึงกล้องหลังได้: ' + err)
+          setIsScannerOpen(false)
+        })
+      } catch (e: any) {
+        console.error('Scanner init error', e)
+        alert('เกิดข้อผิดพลาดในการเปิดกล้อง: ' + e.message)
+        setIsScannerOpen(false)
+      }
+    }, 300)
+  }
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop()
+      } catch (e) {
+        console.error('Failed to stop scanner', e)
+      }
+      scannerRef.current = null
+    }
+    setIsScannerOpen(false)
+  }
+
+  const handleSearchWithVin = async (vin: string, method: 'OCR' | 'BARCODE' | 'MANUAL' = 'MANUAL') => {
+    const cleanedVin = vin.trim().replace(/\s+/g, '')
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/audit/item?keyword=${encodeURIComponent(cleanedVin)}`)
+      if (!res.ok) throw new Error('เกิดข้อผิดพลาดการสืบค้นข้อมูลรถ')
+      const data = await res.json()
+      const foundVehicles: VehiclePreview[] = data.vehicles || []
+      
+      if (foundVehicles.length === 0) {
+        playBeep('warning')
+        setPreviewVehicle({
+          VinNo: cleanedVin.length > 10 ? cleanedVin : '',
+          RegisterNo: cleanedVin.length <= 10 ? cleanedVin : '',
+          Model: 'ไม่พบข้อมูลรถในฐานข้อมูลหลัก',
+          Exterior_Color: '-',
+          Status: 'UNKNOWN',
+          CurrentLocation: '-',
+          StockLocation: '-'
+        })
+        setPreviewMode(method)
+      } else {
+        playBeep('success')
+        setPreviewVehicle(foundVehicles[0])
+        setPreviewMode(method)
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setSearching(false)
+    }
+  }
 
 function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -442,33 +550,80 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
         {/* Only allow scanning if the session is DRAFT */}
         {session.Status === 'DRAFT' && (
           <div className="space-y-4">
-            {/* 1. Camera Trigger Button (Fast Capture Input) */}
-            <div className="relative group">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleOcrFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                disabled={ocrLoading}
-                ref={fileInputRef}
-              />
-              <button
-                type="button"
-                className="w-full bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-black text-base py-4 px-6 rounded-2xl transition duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3"
-              >
-                {ocrLoading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>กำลังแสกน & วิเคราะห์ภาพ...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xl">📷</span>
-                    <span>เปิดกล้องสแกนเลข VIN หน้ารถ</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Live Camera Scanner Box */}
+            {isScannerOpen ? (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-2xl">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <span className="text-xs font-bold text-cyan-400 animate-pulse">📷 กำลังสแกนบาร์โค้ด VIN / ทะเบียนสด...</span>
+                  <button
+                    type="button"
+                    onClick={stopScanner}
+                    className="text-rose-400 hover:text-rose-300 text-xs font-bold px-3 py-1 bg-rose-500/10 border border-rose-500/20 rounded-lg transition"
+                  >
+                    ✕ ปิดกล้อง
+                  </button>
+                </div>
+                
+                {/* Live Camera Viewfinder */}
+                <div className="relative aspect-[4/3] w-full bg-black rounded-xl overflow-hidden border border-slate-800">
+                  <div id="qr-reader" className="w-full h-full"></div>
+                  
+                  {/* Custom Target Laser Frame Overlay */}
+                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-center items-center">
+                    <div className="w-[85%] h-[35%] border-2 border-cyan-400 rounded-xl relative flex justify-center items-center shadow-[0_0_15px_rgba(34,211,238,0.2)]">
+                      <div className="absolute left-0 w-full h-[2px] bg-cyan-400 shadow-[0_0_10px_#22d3ee] animate-bounce" style={{ animationDuration: '2.5s' }} />
+                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-cyan-300 rounded-tl-md" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-cyan-300 rounded-tr-md" />
+                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-cyan-300 rounded-bl-md" />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-cyan-300 rounded-br-md" />
+                    </div>
+                    <span className="text-[10px] text-cyan-300/80 font-bold bg-slate-950/80 px-2.5 py-1 rounded-full mt-3 uppercase tracking-wider">จัดบาร์โค้ดให้อยู่ในกรอบ</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1A. Live Scanner Button */}
+                <button
+                  type="button"
+                  onClick={startScanner}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm py-4 px-4 rounded-2xl transition duration-200 shadow-md hover:shadow-lg flex flex-col items-center justify-center gap-1.5"
+                >
+                  <span className="text-xl">🎥</span>
+                  <span>เปิดกล้องแสกนสด</span>
+                  <span className="text-[9px] text-emerald-100 font-normal">จ่อบาร์โค้ดปุ๊บติดปั๊บ</span>
+                </button>
+
+                {/* 1B. Camera Upload Button (Fast Capture Input) */}
+                <div className="relative group">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleOcrFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={ocrLoading}
+                    ref={fileInputRef}
+                  />
+                  <button
+                    type="button"
+                    className="w-full h-full bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-black text-sm py-4 px-4 rounded-2xl transition duration-200 shadow-md hover:shadow-lg flex flex-col items-center justify-center gap-1.5"
+                  >
+                    {ocrLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mb-1" />
+                        <span className="text-[10px] text-slate-400">กำลังวิเคราะห์ภาพ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xl">📷</span>
+                        <span>ถ่ายรูปส่งวิเคราะห์</span>
+                        <span className="text-[9px] text-slate-400 font-normal">แสกนตัวอักษรโดย AI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 2. Manual Input Search (Autocomplete as you type) */}
             <form onSubmit={handleManualSearch} className="relative">
@@ -675,6 +830,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
         </div>
       </div>
+      <Script src="https://unpkg.com/html5-qrcode" strategy="lazyOnload" />
     </div>
   )
 }
