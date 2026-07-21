@@ -16,7 +16,7 @@ interface CaseDeliveryItem {
   ProjectType: string
   Status?: string
   // Tracking fields from View_AccumarateReleaseCar
-  TrackingStatus?: 'MATCHED' | 'NOT_FOUND' | 'TRACKING_ONLY'
+  TrackingStatus?: 'MATCHED' | 'MISMATCH' | 'NOT_FOUND' | 'TRACKING_ONLY'
   TrackingContractNo?: string
   TrackingReleaseDate?: string | null
   TrackingRentType?: string
@@ -24,6 +24,7 @@ interface CaseDeliveryItem {
   TrackingRegisterNo?: string
   TrackingContractType?: string
   TrackingCustomerName?: string
+  TrackingMismatchFields?: string[]
   // Data source indicator
   DataSource?: 'BOTH' | 'CORE_ONLY' | 'TRACKING_ONLY'
 }
@@ -54,8 +55,9 @@ const TRACKING_PROJECT_BADGE_COLORS: Record<string, string> = {
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  MATCHED: { label: '✅ ตรงกัน', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  NOT_FOUND: { label: '⏳ Core อย่างเดียว', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  MATCHED: { label: '✅ ตรงกันทุกอย่าง', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  MISMATCH: { label: '⚠️ VIN ตรงแต่ข้อมูลอื่นต่าง', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  NOT_FOUND: { label: '⏳ Core อย่างเดียว', className: 'bg-slate-50 text-slate-600 border-slate-200' },
   TRACKING_ONLY: { label: '⚠️ Tracking อย่างเดียว', className: 'bg-rose-50 text-rose-700 border-rose-200' },
 }
 
@@ -187,8 +189,32 @@ function CaseDeliveryContent() {
               item.TrackingIsActive = tracking.IsActive
               item.TrackingRegisterNo = tracking.RegisterNo
               item.TrackingContractType = tracking.ContractType
-              item.TrackingStatus = 'MATCHED'
+              item.TrackingCustomerName = tracking.CustomerName
               item.DataSource = 'BOTH'
+
+              // Cross-check fields when VIN matches
+              const diffs: string[] = []
+              const c1 = (item.ContractNo || '').replace(/\s+/g, '')
+              const c2 = (tracking.ContractNo || '').replace(/\s+/g, '')
+              if (c1 && c2 && c1 !== c2) diffs.push('เลขสัญญา')
+
+              const r1 = (item.RegisterNo || '').replace(/[\s-]/g, '')
+              const r2 = (tracking.RegisterNo || '').replace(/[\s-]/g, '')
+              if (r1 && r2 && r1 !== r2) diffs.push('ทะเบียน')
+
+              const coreFullName = `${item.FirstName || ''}${item.LastName || ''}`.replace(/\s+/g, '')
+              const trackFullName = `${tracking.CustomerName || ''}`.replace(/\s+/g, '')
+              if (coreFullName && trackFullName && coreFullName !== trackFullName && !coreFullName.includes(trackFullName) && !trackFullName.includes(coreFullName)) {
+                diffs.push('ชื่อ-นามสกุล')
+              }
+
+              if (diffs.length > 0) {
+                item.TrackingStatus = 'MISMATCH'
+                item.TrackingMismatchFields = diffs
+              } else {
+                item.TrackingStatus = 'MATCHED'
+                item.TrackingMismatchFields = []
+              }
             } else {
               item.TrackingStatus = 'NOT_FOUND'
               item.DataSource = 'CORE_ONLY'
@@ -315,6 +341,7 @@ function CaseDeliveryContent() {
     grab: coreItems.filter((i) => i.ProjectType === 'GRAB').length,
     lineman: coreItems.filter((i) => i.ProjectType === 'LINEMAN').length,
     matched: filtered.filter((i) => i.TrackingStatus === 'MATCHED').length,
+    mismatch: filtered.filter((i) => i.TrackingStatus === 'MISMATCH').length,
     coreOnly: filtered.filter((i) => i.TrackingStatus === 'NOT_FOUND').length,
     trackingOnly: filtered.filter((i) => i.TrackingStatus === 'TRACKING_ONLY').length,
     trackingTotal: trackingItems.length,
@@ -347,8 +374,10 @@ function CaseDeliveryContent() {
         'โครงการ',
         'สถานะ (Core)',
         'สถานะ Tracking',
+        'หมายเหตุต่างกัน',
         'เลขสัญญา (Tracking)',
         'ทะเบียน (Tracking)',
+        'ชื่อ-นามสกุล (Tracking)',
         'โครงการ (Tracking)',
         'RentType',
         'วันที่ปล่อยจริง',
@@ -364,9 +393,11 @@ function CaseDeliveryContent() {
         item.ExpectedReleaseDate || '-',
         item.ProjectType || '-',
         item.Status || '-',
-        item.TrackingStatus === 'MATCHED' ? 'ปล่อยแล้ว' : 'ยังไม่ปล่อย',
+        item.TrackingStatus === 'MATCHED' ? 'ตรงกันทุกอย่าง' : item.TrackingStatus === 'MISMATCH' ? 'VINตรงแต่ข้อมูลต่าง' : item.TrackingStatus === 'NOT_FOUND' ? 'Coreอย่างเดียว' : 'Trackingอย่างเดียว',
+        item.TrackingMismatchFields?.join(', ') || '-',
         item.TrackingContractNo || '-',
         item.TrackingRegisterNo || '-',
+        item.TrackingCustomerName || '-',
         item.TrackingContractType || '-',
         item.TrackingRentType || '-',
         item.TrackingReleaseDate ? getThaiDateTime(new Date(item.TrackingReleaseDate).toLocaleDateString('en-GB') + ' 00:00:00') : '-',
@@ -547,14 +578,18 @@ function CaseDeliveryContent() {
             </div>
 
             {/* Status Row */}
-            <div className="grid grid-cols-3 gap-2 pb-2.5 border-b border-indigo-50/80">
+            <div className="grid grid-cols-4 gap-2 pb-2.5 border-b border-indigo-50/80">
               <div className="text-center bg-slate-50/70 rounded-xl p-1.5 border border-slate-100">
                 <div className="text-lg font-bold text-slate-800">{summary.trackingTotal}</div>
-                <div className="text-[10px] font-medium text-slate-500 mt-0.5">ทั้งหมด</div>
+                <div className="text-[10px] font-medium text-slate-500 mt-0.5">ปล่อยจริงทั้งหมด</div>
               </div>
               <div className="text-center bg-emerald-50/50 rounded-xl p-1.5 border border-emerald-100/60">
                 <div className="text-lg font-bold text-emerald-600">{summary.matched}</div>
-                <div className="text-[10px] font-medium text-emerald-600 mt-0.5">✅ ตรงกัน</div>
+                <div className="text-[10px] font-medium text-emerald-600 mt-0.5">✅ ตรงกันทุกอย่าง</div>
+              </div>
+              <div className="text-center bg-amber-50/50 rounded-xl p-1.5 border border-amber-100/60">
+                <div className="text-lg font-bold text-amber-600">{summary.mismatch}</div>
+                <div className="text-[10px] font-medium text-amber-600 mt-0.5">⚠️ ข้อมูลไม่ตรง</div>
               </div>
               <div className="text-center bg-rose-50/50 rounded-xl p-1.5 border border-rose-100/60">
                 <div className="text-lg font-bold text-rose-600">{summary.trackingOnly}</div>
@@ -600,11 +635,12 @@ function CaseDeliveryContent() {
         <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
           {/* Legend / Info Bar */}
           <div className="bg-slate-50/90 border-b border-slate-200/80 px-4 py-2.5 text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-1.5 font-medium">
+            <div className="flex items-center gap-1.5 font-medium flex-wrap">
               <span className="text-indigo-600 font-bold">ℹ️ หมายเหตุการเทียบสถานะ:</span>
               <span>
-                <strong className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✅ ตรงกัน</strong> = เจอเลข VIN ตรงกันทั้งฝั่ง EV7 Core และ Tracking |{' '}
-                <strong className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⏳ Core อย่างเดียว</strong> = อยู่ใน Core แต่นัดปล่อยแล้วยังไม่ออกสัญญา Tracking |{' '}
+                <strong className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✅ ตรงกันทุกอย่าง</strong> = VIN, เลขสัญญา และชื่อผู้เช็กตรงกัน |{' '}
+                <strong className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⚠️ VIN ตรงแต่ข้อมูลอื่นต่าง</strong> = VIN ตรงกันแต่เลขสัญญา/ชื่อลูกค้าใน Core ต่างกับ Tracking |{' '}
+                <strong className="text-slate-700 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">⏳ Core อย่างเดียว</strong> = อยู่ใน Core แต่นัดปล่อยแล้วยังไม่ออกสัญญา Tracking |{' '}
                 <strong className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">⚠️ Tracking อย่างเดียว</strong> = ทำสัญญาปล่อยแล้วแต่ไม่อยู่ใน Core
               </span>
             </div>
@@ -622,7 +658,7 @@ function CaseDeliveryContent() {
                   <th colSpan={7} className="py-2 px-3 text-left text-slate-700 bg-slate-100/70 border-r border-slate-200 whitespace-nowrap">
                     🍊 EV7 Core (ข้อมูลนัดปล่อย)
                   </th>
-                  <th colSpan={6} className="py-2 px-3 text-left text-indigo-700 bg-indigo-50/80 whitespace-nowrap">
+                  <th colSpan={7} className="py-2 px-3 text-left text-indigo-700 bg-indigo-50/80 whitespace-nowrap">
                     🔹 Tracking (ข้อมูลปล่อยจริง)
                   </th>
                 </tr>
@@ -639,6 +675,7 @@ function CaseDeliveryContent() {
                   <th className="py-2.5 px-3 text-center text-indigo-700 bg-indigo-50/50 whitespace-nowrap">สถานะเทียบ</th>
                   <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">เลขสัญญา</th>
                   <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">ทะเบียน</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">ชื่อ-นามสกุล</th>
                   <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">โครงการ</th>
                   <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">RentType</th>
                   <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">วันปล่อยจริง</th>
@@ -647,7 +684,7 @@ function CaseDeliveryContent() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={14} className="text-center py-16 text-slate-400">
+                    <td colSpan={15} className="text-center py-16 text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                         <span className="font-medium">กำลังโหลดข้อมูล...</span>
@@ -656,7 +693,7 @@ function CaseDeliveryContent() {
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="text-center py-16 text-slate-400 font-medium">
+                    <td colSpan={15} className="text-center py-16 text-slate-400 font-medium">
                       ไม่พบข้อมูล
                     </td>
                   </tr>
@@ -668,7 +705,22 @@ function CaseDeliveryContent() {
                       ? 'bg-rose-50/40 border-b border-rose-100 hover:bg-rose-100/40'
                       : item.DataSource === 'CORE_ONLY'
                         ? 'bg-amber-50/30 border-b border-amber-100 hover:bg-amber-100/30'
-                        : 'border-b border-slate-100 hover:bg-slate-50'
+                        : item.TrackingStatus === 'MISMATCH'
+                          ? 'bg-amber-50/20 border-b border-amber-100 hover:bg-amber-100/30'
+                          : 'border-b border-slate-100 hover:bg-slate-50'
+
+                    // Compare individual fields to flag differences
+                    const c1 = (item.ContractNo || '').replace(/\s+/g, '')
+                    const c2 = (item.TrackingContractNo || '').replace(/\s+/g, '')
+                    const isContractDiff = item.DataSource === 'BOTH' && Boolean(c1 && c2 && c1 !== c2)
+
+                    const r1 = (item.RegisterNo || '').replace(/[\s-]/g, '')
+                    const r2 = (item.TrackingRegisterNo || '').replace(/[\s-]/g, '')
+                    const isRegDiff = item.DataSource === 'BOTH' && Boolean(r1 && r2 && r1 !== r2)
+
+                    const coreFullName = `${item.FirstName || ''}${item.LastName || ''}`.replace(/\s+/g, '')
+                    const trackFullName = `${item.TrackingCustomerName || ''}`.replace(/\s+/g, '')
+                    const isNameDiff = item.DataSource === 'BOTH' && Boolean(coreFullName && trackFullName && coreFullName !== trackFullName && !coreFullName.includes(trackFullName) && !trackFullName.includes(coreFullName))
 
                     return (
                       <tr
@@ -702,22 +754,47 @@ function CaseDeliveryContent() {
                           )}
                         </td>
 
-                        {/* Tracking Data (Highlighted background) */}
+                        {/* Tracking Data (Highlighted background & diff flags) */}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap bg-indigo-50/30">
                           {(() => {
                             const st = STATUS_BADGE[item.TrackingStatus || ''] || { label: '-', className: 'bg-slate-50 text-slate-500 border-slate-200' }
                             return (
-                              <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-md border ${st.className}`}>
-                                {st.label}
-                              </span>
+                              <div>
+                                <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-md border ${st.className}`}>
+                                  {st.label}
+                                </span>
+                                {item.TrackingMismatchFields && item.TrackingMismatchFields.length > 0 && (
+                                  <div className="text-[10px] font-bold text-amber-700 mt-0.5">
+                                    ต่างที่: {item.TrackingMismatchFields.join(', ')}
+                                  </div>
+                                )}
+                              </div>
                             )
                           })()}
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-xs text-slate-600 whitespace-nowrap bg-indigo-50/30">
-                          {item.TrackingContractNo || '-'}
+                        <td className="py-2.5 px-3 font-mono text-xs whitespace-nowrap bg-indigo-50/30">
+                          {item.TrackingContractNo ? (
+                            <span className={isContractDiff ? 'bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded border border-rose-300 inline-flex items-center gap-1' : 'text-slate-600'}>
+                              {isContractDiff && <span>⚠️</span>}
+                              {item.TrackingContractNo}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-bold text-slate-700 whitespace-nowrap bg-indigo-50/30">
-                          {item.TrackingRegisterNo || '-'}
+                          {item.TrackingRegisterNo ? (
+                            <span className={isRegDiff ? 'bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded border border-rose-300 inline-flex items-center gap-1' : 'text-slate-700'}>
+                              {isRegDiff && <span>⚠️</span>}
+                              {item.TrackingRegisterNo}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-xs text-slate-700 font-medium whitespace-nowrap bg-indigo-50/30">
+                          {item.TrackingCustomerName ? (
+                            <span className={isNameDiff ? 'bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded border border-rose-300 inline-flex items-center gap-1' : 'text-slate-700'}>
+                              {isNameDiff && <span>⚠️</span>}
+                              {item.TrackingCustomerName}
+                            </span>
+                          ) : '-'}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap bg-indigo-50/30">
                           {item.TrackingContractType ? (
