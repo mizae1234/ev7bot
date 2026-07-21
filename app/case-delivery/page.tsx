@@ -14,6 +14,7 @@ interface CaseDeliveryItem {
   LastName: string
   ExpectedReleaseDate: string
   ProjectType: string
+  Status?: string
   // Tracking fields from View_AccumarateReleaseCar
   TrackingStatus?: 'MATCHED' | 'NOT_FOUND' | 'TRACKING_ONLY'
   TrackingContractNo?: string
@@ -207,6 +208,7 @@ function CaseDeliveryContent() {
                 LastName: '',
                 ExpectedReleaseDate: '',
                 ProjectType: (t.ContractType as string) || '',
+                Status: '-',
                 TrackingContractNo: t.ContractNo as string,
                 TrackingReleaseDate: t.ReleaseDate as string | null,
                 TrackingRentType: t.RentType as string,
@@ -260,6 +262,7 @@ function CaseDeliveryContent() {
       item.FirstName?.toLowerCase().includes(q) ||
       item.LastName?.toLowerCase().includes(q) ||
       item.MotorNo?.toLowerCase().includes(q) ||
+      item.Status?.toLowerCase().includes(q) ||
       item.TrackingContractNo?.toLowerCase().includes(q) ||
       item.TrackingRegisterNo?.toLowerCase().includes(q) ||
       item.TrackingCustomerName?.toLowerCase().includes(q)
@@ -319,6 +322,7 @@ function CaseDeliveryContent() {
         'นามสกุล',
         'วันที่นัดปล่อย',
         'โครงการ',
+        'สถานะ (Core)',
         'สถานะ Tracking',
         'เลขสัญญา (Tracking)',
         'ทะเบียน (Tracking)',
@@ -336,6 +340,7 @@ function CaseDeliveryContent() {
         item.LastName || '-',
         item.ExpectedReleaseDate || '-',
         item.ProjectType || '-',
+        item.Status || '-',
         item.TrackingStatus === 'MATCHED' ? 'ปล่อยแล้ว' : 'ยังไม่ปล่อย',
         item.TrackingContractNo || '-',
         item.TrackingRegisterNo || '-',
@@ -366,6 +371,7 @@ function CaseDeliveryContent() {
         'นามสกุล',
         'วันที่นัดปล่อย',
         'โครงการ',
+        'สถานะ',
       ],
       rows: filtered.map((item, idx) => [
         idx + 1,
@@ -377,6 +383,7 @@ function CaseDeliveryContent() {
         item.LastName || '-',
         item.ExpectedReleaseDate || '-',
         item.ProjectType || '-',
+        item.Status || '-',
       ]),
       fileName: 'CaseDelivery_EVCore',
     })
@@ -553,6 +560,7 @@ function CaseDeliveryContent() {
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ชื่อ-นามสกุล</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">วันที่นัดปล่อย</th>
                   <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">โครงการ</th>
+                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">สถานะ Core</th>
                   <th className="text-center py-3 px-4 font-bold text-indigo-600 text-xs border-l-2 border-indigo-200">สถานะ</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">เลขสัญญา (Tracking)</th>
                   <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">ทะเบียน (Tracking)</th>
@@ -564,7 +572,7 @@ function CaseDeliveryContent() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={13} className="text-center py-16 text-slate-400">
+                    <td colSpan={14} className="text-center py-16 text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                         <span className="font-medium">กำลังโหลดข้อมูล...</span>
@@ -573,7 +581,7 @@ function CaseDeliveryContent() {
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center py-16 text-slate-400 font-medium">
+                    <td colSpan={14} className="text-center py-16 text-slate-400 font-medium">
                       ไม่พบข้อมูล
                     </td>
                   </tr>
@@ -605,6 +613,15 @@ function CaseDeliveryContent() {
                           <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg border ${badgeColor}`}>
                             {item.ProjectType || '-'}
                           </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          {item.Status ? (
+                            <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-lg border bg-teal-50 text-teal-700 border-teal-200">
+                              {item.Status}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-medium text-xs">-</span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           {(() => {
