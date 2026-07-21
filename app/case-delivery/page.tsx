@@ -598,24 +598,50 @@ function CaseDeliveryContent() {
 
         {/* Table */}
         <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm overflow-hidden">
+          {/* Legend / Info Bar */}
+          <div className="bg-slate-50/90 border-b border-slate-200/80 px-4 py-2.5 text-xs text-slate-500 flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 font-medium">
+              <span className="text-indigo-600 font-bold">ℹ️ หมายเหตุการเทียบสถานะ:</span>
+              <span>
+                <strong className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">✅ ตรงกัน</strong> = เจอเลข VIN ตรงกันทั้งฝั่ง EV7 Core และ Tracking |{' '}
+                <strong className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⏳ Core อย่างเดียว</strong> = อยู่ใน Core แต่นัดปล่อยแล้วยังไม่ออกสัญญา Tracking |{' '}
+                <strong className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">⚠️ Tracking อย่างเดียว</strong> = ทำสัญญาปล่อยแล้วแต่ไม่อยู่ใน Core
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-bold">
+              แสดง {paginated.length} จาก {filtered.length} รายการ
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/60">
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">#</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">VIN No</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ทะเบียน</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">เลขสัญญา</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">ชื่อ-นามสกุล</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">วันที่นัดปล่อย</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">โครงการ</th>
-                  <th className="text-left py-3 px-4 font-bold text-slate-600 text-xs">สถานะ Core</th>
-                  <th className="text-center py-3 px-4 font-bold text-indigo-600 text-xs border-l-2 border-indigo-200">สถานะ</th>
-                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">เลขสัญญา (Tracking)</th>
-                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">ทะเบียน (Tracking)</th>
-                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">โครงการ (Tracking)</th>
-                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">RentType</th>
-                  <th className="text-left py-3 px-4 font-bold text-indigo-600 text-xs">วันปล่อยจริง</th>
+                {/* Level 1: Group Headers */}
+                <tr className="border-b border-slate-200/80 text-[11px] font-extrabold uppercase tracking-wider">
+                  <th rowSpan={2} className="py-2.5 px-3 text-center text-slate-500 bg-slate-100/90 border-r border-slate-200 whitespace-nowrap">#</th>
+                  <th colSpan={7} className="py-2 px-3 text-left text-slate-700 bg-slate-100/70 border-r border-slate-200 whitespace-nowrap">
+                    🍊 EV7 Core (ข้อมูลนัดปล่อย)
+                  </th>
+                  <th colSpan={6} className="py-2 px-3 text-left text-indigo-700 bg-indigo-50/80 whitespace-nowrap">
+                    🔹 Tracking (ข้อมูลปล่อยจริง)
+                  </th>
+                </tr>
+                {/* Level 2: Sub Headers */}
+                <tr className="bg-slate-50/90 border-b border-slate-200/80 text-xs font-bold">
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">VIN No</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">ทะเบียน</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">เลขสัญญา</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">ชื่อ-นามสกุล</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">วันที่นัดปล่อย</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap">โครงการ</th>
+                  <th className="py-2.5 px-3 text-left text-slate-600 whitespace-nowrap border-r border-slate-200">สถานะ Core</th>
+
+                  <th className="py-2.5 px-3 text-center text-indigo-700 bg-indigo-50/50 whitespace-nowrap">สถานะเทียบ</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">เลขสัญญา</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">ทะเบียน</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">โครงการ</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">RentType</th>
+                  <th className="py-2.5 px-3 text-left text-indigo-700 bg-indigo-50/50 whitespace-nowrap">วันปล่อยจริง</th>
                 </tr>
               </thead>
               <tbody>
@@ -639,56 +665,61 @@ function CaseDeliveryContent() {
                     const rowNum = (page - 1) * ITEMS_PER_PAGE + idx + 1
                     const badgeColor = PROJECT_BADGE_COLORS[item.ProjectType] || 'bg-slate-50 text-slate-600 border-slate-200'
                     const rowBg = item.DataSource === 'TRACKING_ONLY'
-                      ? 'bg-rose-50/50 border-b border-rose-100 hover:bg-rose-100/50'
+                      ? 'bg-rose-50/40 border-b border-rose-100 hover:bg-rose-100/40'
                       : item.DataSource === 'CORE_ONLY'
                         ? 'bg-amber-50/30 border-b border-amber-100 hover:bg-amber-100/30'
-                        : 'border-b border-slate-100 hover:bg-indigo-50/30'
+                        : 'border-b border-slate-100 hover:bg-slate-50'
+
                     return (
                       <tr
                         key={`${item.VinNo}-${item.ContractNo}-${idx}`}
-                        className={`${rowBg} transition-colors`}
+                        className={`${rowBg} transition-colors text-xs`}
                       >
-                        <td className="py-3 px-4 text-slate-400 font-medium">{rowNum}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-700">{item.VinNo || '-'}</td>
-                        <td className="py-3 px-4 font-bold text-slate-800">{item.RegisterNo || '-'}</td>
-                        <td className="py-3 px-4 text-slate-600">{item.ContractNo || '-'}</td>
-                        <td className="py-3 px-4 text-slate-700">
+                        {/* # */}
+                        <td className="py-2.5 px-3 text-center text-slate-400 font-medium whitespace-nowrap border-r border-slate-100">{rowNum}</td>
+                        {/* Core Data */}
+                        <td className="py-2.5 px-3 font-mono text-xs text-slate-700 font-semibold whitespace-nowrap">{item.VinNo || '-'}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-800 whitespace-nowrap">{item.RegisterNo || '-'}</td>
+                        <td className="py-2.5 px-3 font-mono text-xs text-slate-600 whitespace-nowrap">{item.ContractNo || '-'}</td>
+                        <td className="py-2.5 px-3 text-slate-700 font-medium whitespace-nowrap">
                           {item.FirstName || ''} {item.LastName || ''}
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap font-medium">
                           {getThaiDateTime(item.ExpectedReleaseDate)}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg border ${badgeColor}`}>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-md border ${badgeColor}`}>
                             {item.ProjectType || '-'}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3 whitespace-nowrap border-r border-slate-200">
                           {item.Status ? (
-                            <span className="inline-block text-xs font-bold px-2.5 py-1 rounded-lg border bg-teal-50 text-teal-700 border-teal-200">
+                            <span className="inline-block text-xs font-bold px-2 py-0.5 rounded-md border bg-teal-50 text-teal-700 border-teal-200">
                               {item.Status}
                             </span>
                           ) : (
                             <span className="text-slate-400 font-medium text-xs">-</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
+
+                        {/* Tracking Data (Highlighted background) */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap bg-indigo-50/30">
                           {(() => {
                             const st = STATUS_BADGE[item.TrackingStatus || ''] || { label: '-', className: 'bg-slate-50 text-slate-500 border-slate-200' }
                             return (
-                              <span className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg border ${st.className}`}>
+                              <span className={`inline-block text-xs font-bold px-2.5 py-0.5 rounded-md border ${st.className}`}>
                                 {st.label}
                               </span>
                             )
                           })()}
                         </td>
-                        <td className="py-3 px-4 text-xs text-slate-600">
+                        <td className="py-2.5 px-3 font-mono text-xs text-slate-600 whitespace-nowrap bg-indigo-50/30">
                           {item.TrackingContractNo || '-'}
                         </td>
-                        <td className="py-3 px-4 text-xs text-slate-600">
+                        <td className="py-2.5 px-3 font-bold text-slate-700 whitespace-nowrap bg-indigo-50/30">
                           {item.TrackingRegisterNo || '-'}
                         </td>
-                        <td className="py-3 px-4 text-xs">
+                        <td className="py-2.5 px-3 whitespace-nowrap bg-indigo-50/30">
                           {item.TrackingContractType ? (
                             <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${
                               TRACKING_PROJECT_BADGE_COLORS[item.TrackingContractType.toUpperCase()] || 'bg-slate-50 text-slate-600 border-slate-200'
@@ -697,10 +728,10 @@ function CaseDeliveryContent() {
                             </span>
                           ) : '-'}
                         </td>
-                        <td className="py-3 px-4 text-xs font-medium text-slate-600">
+                        <td className="py-2.5 px-3 text-xs font-medium text-slate-600 whitespace-nowrap bg-indigo-50/30">
                           {item.TrackingRentType || '-'}
                         </td>
-                        <td className="py-3 px-4 text-xs text-slate-600">
+                        <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap bg-indigo-50/30 font-medium">
                           {item.TrackingReleaseDate ? getThaiDateTime(
                             new Date(item.TrackingReleaseDate).toLocaleDateString('en-GB', { timeZone: 'UTC' }).split('/').join('/') + ' ' +
                             new Date(item.TrackingReleaseDate).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' })
