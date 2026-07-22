@@ -2158,7 +2158,18 @@ export default function QuickReportPage() {
                   <>
                   <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                     <div>
-                      <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                      <p className="text-base font-bold text-slate-800">
+                      <a
+                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
+                        title="ดูรายละเอียดเพิ่มเติม"
+                      >
+                        {selectedCar.RegisterNo}
+                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
+                      </a>
+                    </p>
                       <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
@@ -3361,7 +3372,18 @@ export default function QuickReportPage() {
               {selectedCar ? (
                 <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                   <div>
-                    <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                    <p className="text-base font-bold text-slate-800">
+                      <a
+                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
+                        title="ดูรายละเอียดเพิ่มเติม"
+                      >
+                        {selectedCar.RegisterNo}
+                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
+                      </a>
+                    </p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
@@ -3604,7 +3626,18 @@ export default function QuickReportPage() {
               {selectedCar ? (
                 <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                   <div>
-                    <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                    <p className="text-base font-bold text-slate-800">
+                      <a
+                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
+                        title="ดูรายละเอียดเพิ่มเติม"
+                      >
+                        {selectedCar.RegisterNo}
+                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
+                      </a>
+                    </p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
@@ -3698,7 +3731,18 @@ export default function QuickReportPage() {
               {selectedCar ? (
                 <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                   <div>
-                    <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                    <p className="text-base font-bold text-slate-800">
+                      <a
+                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
+                        title="ดูรายละเอียดเพิ่มเติม"
+                      >
+                        {selectedCar.RegisterNo}
+                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
+                      </a>
+                    </p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
@@ -3956,7 +4000,18 @@ export default function QuickReportPage() {
               {selectedCar ? (
                 <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
                   <div>
-                    <p className="text-base font-bold text-slate-800">{selectedCar.RegisterNo}</p>
+                    <p className="text-base font-bold text-slate-800">
+                      <a
+                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
+                        title="ดูรายละเอียดเพิ่มเติม"
+                      >
+                        {selectedCar.RegisterNo}
+                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
+                      </a>
+                    </p>
                     <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
                     <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
                   </div>
