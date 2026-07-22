@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import GuideTab from './GuideTab'
 import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
+import { VehicleSearchWithScanner } from '@/components/vehicle/VehicleSearchWithScanner'
 
 interface DbCar {
   InventoryItemID: number
@@ -116,12 +117,8 @@ export default function QuickReportPage() {
   const [userRole, setUserRole] = useState<string | null>(null)
 
   // Search and selection
-  const [searchTerm, setSearchTerm] = useState('')
   const [selectedCar, setSelectedCar] = useState<DbCar | null>(null)
   const [selectedCarDetails, setSelectedCarDetails] = useState<any>(null)
-  const [showCarDropdown, setShowCarDropdown] = useState(false)
-  const [dbCars, setDbCars] = useState<DbCar[]>([])
-  const [loadingCars, setLoadingCars] = useState(false)
 
   // Refs for focusing back on inputs after selecting mentions
   const editFollowUpRef = useRef<HTMLTextAreaElement>(null)
@@ -398,25 +395,6 @@ export default function QuickReportPage() {
   const [closeReplacementReturnDate, setCloseReplacementReturnDate] = useState('')
   const [closeReplacementLocation, setCloseReplacementLocation] = useState('')
 
-  // Fetch cars on mount or when typing (Debounced)
-  useEffect(() => {
-    const delayDebounce = setTimeout(async () => {
-      setLoadingCars(true)
-      try {
-        const res = await fetch(`/api/vehicles/search?q=${encodeURIComponent(searchTerm)}`)
-        if (res.ok) {
-          const data = await res.json()
-          setDbCars(data)
-        }
-      } catch (err) {
-        console.error('Error searching cars:', err)
-      } finally {
-        setLoadingCars(false)
-      }
-    }, 300)
-
-    return () => clearTimeout(delayDebounce)
-  }, [searchTerm])
 
   // Get current user's LINE User ID from AuthGuard's liff_profile cache
   const getLineUserId = (): string | null => {
@@ -511,7 +489,6 @@ export default function QuickReportPage() {
   // Fetch real details (active driver, history) when selectedCar changes
   const handleSelectCar = async (car: DbCar) => {
     setSelectedCar(car)
-    setShowCarDropdown(false)
     setLoadingHistory(true)
     setVehicleHistory([])
     setShowAddIncidentForm(false)
@@ -583,7 +560,6 @@ export default function QuickReportPage() {
             const matchedCar = cars.find((c: any) => c.RegisterNo === registerNo) || cars[0]
             if (matchedCar) {
               setSelectedCar(matchedCar)
-              setShowCarDropdown(false)
               setLoadingHistory(true)
               setVehicleHistory([])
               setShowAddIncidentForm(false)
@@ -1066,7 +1042,6 @@ export default function QuickReportPage() {
   }
 
   const handleReset = () => {
-    setSearchTerm('')
     setSelectedCar(null)
     setSelectedCarDetails(null)
     setContractorName('')
@@ -2245,49 +2220,7 @@ export default function QuickReportPage() {
                   </div>
                   </>
                 ) : (
-                  <div className="relative">
-                    <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
-                      <span className="text-slate-400 mr-2">🔍</span>
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value)
-                          setShowCarDropdown(true)
-                        }}
-                        onFocus={() => setShowCarDropdown(true)}
-                        placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
-                        className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
-                      />
-                      {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
-                    </div>
-
-                    {/* Dropdown search results */}
-                    {showCarDropdown && searchTerm && (
-                      <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
-                        {dbCars.length > 0 ? (
-                          dbCars.map((car, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => handleSelectCar(car)}
-                              className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
-                            >
-                              <div>
-                                <p className="font-bold text-slate-900">{car.RegisterNo}</p>
-                                <p className="text-xxs text-slate-550 font-mono">VIN: {car.VinNo}</p>
-                              </div>
-                              <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
-                                {car.Project}
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
                 )}
               </div>
 
@@ -3489,49 +3422,7 @@ export default function QuickReportPage() {
                   </button>
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
-                    <span className="text-slate-400 mr-2">🔍</span>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value)
-                        setShowCarDropdown(true)
-                      }}
-                      onFocus={() => setShowCarDropdown(true)}
-                      placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
-                      className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
-                    />
-                    {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
-                  </div>
-
-                  {/* Dropdown search results */}
-                  {showCarDropdown && searchTerm && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
-                      {dbCars.length > 0 ? (
-                        dbCars.map((car, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectCar(car)}
-                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900">{car.RegisterNo}</p>
-                              <p className="text-xxs text-slate-550 font-mono">VIN: {car.VinNo}</p>
-                            </div>
-                            <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
-                              {car.Project}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
             </div>
 
@@ -3774,49 +3665,7 @@ export default function QuickReportPage() {
                   </button>
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
-                    <span className="text-slate-400 mr-2">🔍</span>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value)
-                        setShowCarDropdown(true)
-                      }}
-                      onFocus={() => setShowCarDropdown(true)}
-                      placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
-                      className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
-                    />
-                    {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
-                  </div>
-
-                  {/* Dropdown search results */}
-                  {showCarDropdown && searchTerm && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
-                      {dbCars.length > 0 ? (
-                        dbCars.map((car, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectCar(car)}
-                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900">{car.RegisterNo}</p>
-                              <p className="text-xxs text-slate-555 font-mono">VIN: {car.VinNo}</p>
-                            </div>
-                            <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
-                              {car.Project}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
             </div>
 
@@ -3910,49 +3759,7 @@ export default function QuickReportPage() {
                   </button>
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
-                    <span className="text-slate-400 mr-2">🔍</span>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value)
-                        setShowCarDropdown(true)
-                      }}
-                      onFocus={() => setShowCarDropdown(true)}
-                      placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
-                      className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
-                    />
-                    {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
-                  </div>
-
-                  {/* Dropdown search results */}
-                  {showCarDropdown && searchTerm && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
-                      {dbCars.length > 0 ? (
-                        dbCars.map((car, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectCar(car)}
-                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900">{car.RegisterNo}</p>
-                              <p className="text-xxs text-slate-550 font-mono">VIN: {car.VinNo}</p>
-                            </div>
-                            <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
-                              {car.Project}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
             </div>
 
@@ -4167,52 +3974,12 @@ export default function QuickReportPage() {
                   </button>
                 </div>
               ) : (
-                <div className="relative">
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white rounded-2xl px-3.5 py-1 transition">
-                    <span className="text-slate-400 mr-2">🔍</span>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value)
-                        setShowCarDropdown(true)
-                      }}
-                      onFocus={() => setShowCarDropdown(true)}
-                      placeholder="พิมพ์ค้นหาเลขทะเบียนจริง หรือ VIN..."
-                      className="bg-transparent text-sm w-full py-2.5 focus:outline-none text-slate-800 placeholder-slate-400"
-                    />
-                    {loadingCars && <span className="text-xs text-slate-400 animate-pulse">ค้นหา...</span>}
-                  </div>
-
-                  {/* Dropdown search results */}
-                  {showCarDropdown && searchTerm && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg z-20 overflow-hidden max-h-56">
-                      {dbCars.length > 0 ? (
-                        dbCars.map((car, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              handleSelectCar(car)
-                              setActiveTab('history') // Transition directly to Tab 2
-                            }}
-                            className="w-full text-left px-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-800"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-900">{car.RegisterNo}</p>
-                              <p className="text-xxs text-slate-550 font-mono">VIN: {car.VinNo}</p>
-                            </div>
-                            <span className="text-xxs font-bold text-slate-655 bg-slate-150 px-2 py-1 rounded">
-                              {car.Project}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-xs text-slate-400">ไม่พบข้อมูลทะเบียนรถในฐานข้อมูล</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <VehicleSearchWithScanner
+                  onSelectCar={(car) => {
+                    handleSelectCar(car)
+                    setActiveTab('history') // Transition directly to Tab 2
+                  }}
+                />
               )}
             </div>
 
