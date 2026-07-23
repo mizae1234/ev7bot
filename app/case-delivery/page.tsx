@@ -178,7 +178,7 @@ function CaseDeliveryContent() {
         if (trackRes.ok) {
           const trackData = await trackRes.json()
           const trackingMap = trackData.tracking || {}
-          const matchedRentItemIds = new Set<string>()
+          const matchedContractNos = new Set<string>()
 
           // Match core items with tracking
           for (const item of coreList) {
@@ -187,7 +187,7 @@ function CaseDeliveryContent() {
             if (trackingList && trackingList.length > 0) {
               // 1. Try to find match by ContractNo
               let tracking = trackingList.find(t => {
-                if (matchedRentItemIds.has(String(t.RentItemID))) return false
+                if (matchedContractNos.has(String(t.ContractNo))) return false
                 const c1 = (item.ContractNo || '').replace(/\s+/g, '')
                 const c2 = (t.ContractNo || '').replace(/\s+/g, '')
                 return c1 && c2 && c1 === c2
@@ -196,7 +196,7 @@ function CaseDeliveryContent() {
               // 2. Try to find match by Date
               if (!tracking) {
                 tracking = trackingList.find(t => {
-                  if (matchedRentItemIds.has(String(t.RentItemID))) return false
+                  if (matchedContractNos.has(String(t.ContractNo))) return false
                   if (!item.ExpectedReleaseDate || !t.ReleaseDate) return false
                   const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
                   if (parts.length !== 3) return false
@@ -214,11 +214,11 @@ function CaseDeliveryContent() {
 
               // 3. Fallback to any remaining unmatched tracking record for this VIN
               if (!tracking) {
-                tracking = trackingList.find(t => !matchedRentItemIds.has(String(t.RentItemID)))
+                tracking = trackingList.find(t => !matchedContractNos.has(String(t.ContractNo)))
               }
 
               if (tracking) {
-                matchedRentItemIds.add(String(tracking.RentItemID))
+                matchedContractNos.add(String(tracking.ContractNo))
 
                 item.TrackingContractNo = tracking.ContractNo
                 item.TrackingReleaseDate = tracking.ReleaseDate
@@ -266,7 +266,7 @@ function CaseDeliveryContent() {
           for (const [vin, trackingList] of Object.entries(trackingMap)) {
             const list = trackingList as Array<any>
             for (const tracking of list) {
-              if (!matchedRentItemIds.has(String(tracking.RentItemID))) {
+              if (!matchedContractNos.has(String(tracking.ContractNo))) {
                 coreList.push({
                   VinNo: vin,
                   MotorNo: '',
