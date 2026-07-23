@@ -315,7 +315,7 @@ function CaseDeliveryContent() {
 
   // Summary counts
   const coreItems = filtered.filter((i) => i.DataSource !== 'TRACKING_ONLY')
-  const trackingItems = filtered.filter((i) => i.TrackingStatus === 'MATCHED' || i.TrackingStatus === 'TRACKING_ONLY')
+  const trackingItems = filtered.filter((i) => i.TrackingStatus === 'MATCHED' || i.TrackingStatus === 'TRACKING_ONLY' || i.TrackingStatus === 'MISMATCH')
 
   const getTrackingTypeCount = (type: string) => {
     const target = type.toUpperCase().replace(/\s+/g, '')
@@ -572,8 +572,8 @@ function CaseDeliveryContent() {
                 <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
                 Tracking (ปล่อยจริง)
               </span>
-              <span className="text-[10px] font-normal text-slate-400">
-                {summary.trackingNew} ONRENT_NEW • {summary.trackingUse} ONRENT_USE
+              <span className="text-[10px] font-bold text-slate-500">
+                ทั้งหมด {summary.trackingNew + summary.trackingUse} ({summary.trackingNew} ONRENT_NEW • {summary.trackingUse} ONRENT_USE)
               </span>
             </div>
 
