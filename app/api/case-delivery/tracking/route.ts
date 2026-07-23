@@ -40,24 +40,24 @@ export async function POST(request: NextRequest) {
         ${dateFilter}
       `)
 
-      // Build map (latest per VIN)
-      const trackingMap: Record<string, Record<string, unknown>> = {}
+      // Build map (all records per VIN)
+      const trackingMap: Record<string, Array<Record<string, unknown>>> = {}
       for (const row of result.recordset) {
         const vin = row.VinNo as string
-        const existing = trackingMap[vin]
-        if (!existing || parseInt(row.RentItemID as string) > parseInt((existing.RentItemID || '0') as string)) {
-          trackingMap[vin] = {
-            VinNo: row.VinNo,
-            ContractNo: row.ContractNo,
-            RentItemID: row.RentItemID,
-            ReleaseDate: row.ReleaseDate,
-            RentType: row.RentType,
-            IsActive: row.IsActive,
-            RegisterNo: row.RegisterNo,
-            ContractType: row.ContractType,
-            CustomerName: ((row.FirstName || '') + ' ' + (row.LastName || '')).trim(),
-          }
+        if (!trackingMap[vin]) {
+          trackingMap[vin] = []
         }
+        trackingMap[vin].push({
+          VinNo: row.VinNo,
+          ContractNo: row.ContractNo,
+          RentItemID: row.RentItemID,
+          ReleaseDate: row.ReleaseDate,
+          RentType: row.RentType,
+          IsActive: row.IsActive,
+          RegisterNo: row.RegisterNo,
+          ContractType: row.ContractType,
+          CustomerName: ((row.FirstName || '') + ' ' + (row.LastName || '')).trim(),
+        })
       }
 
       return NextResponse.json({ tracking: trackingMap })

@@ -178,42 +178,83 @@ function CaseDeliveryContent() {
         if (trackRes.ok) {
           const trackData = await trackRes.json()
           const trackingMap = trackData.tracking || {}
+          const matchedRentItemIds = new Set<string>()
 
           // Match core items with tracking
           for (const item of coreList) {
-            const tracking = trackingMap[item.VinNo]
-            if (tracking) {
-              item.TrackingContractNo = tracking.ContractNo
-              item.TrackingReleaseDate = tracking.ReleaseDate
-              item.TrackingRentType = tracking.RentType
-              item.TrackingIsActive = tracking.IsActive
-              item.TrackingRegisterNo = tracking.RegisterNo
-              item.TrackingContractType = tracking.ContractType
-              item.TrackingCustomerName = tracking.CustomerName
-              item.DataSource = 'BOTH'
+            const trackingList = trackingMap[item.VinNo] as Array<any> | undefined
+            
+            if (trackingList && trackingList.length > 0) {
+              // 1. Try to find match by ContractNo
+              let tracking = trackingList.find(t => {
+                if (matchedRentItemIds.has(String(t.RentItemID))) return false
+                const c1 = (item.ContractNo || '').replace(/\s+/g, '')
+                const c2 = (t.ContractNo || '').replace(/\s+/g, '')
+                return c1 && c2 && c1 === c2
+              })
 
-              // Cross-check fields when VIN matches
-              const diffs: string[] = []
-              const c1 = (item.ContractNo || '').replace(/\s+/g, '')
-              const c2 = (tracking.ContractNo || '').replace(/\s+/g, '')
-              if (c1 && c2 && c1 !== c2) diffs.push('เลขสัญญา')
-
-              const r1 = (item.RegisterNo || '').replace(/[\s-]/g, '')
-              const r2 = (tracking.RegisterNo || '').replace(/[\s-]/g, '')
-              if (r1 && r2 && r1 !== r2) diffs.push('ทะเบียน')
-
-              const coreFullName = `${item.FirstName || ''}${item.LastName || ''}`.replace(/\s+/g, '')
-              const trackFullName = `${tracking.CustomerName || ''}`.replace(/\s+/g, '')
-              if (coreFullName && trackFullName && coreFullName !== trackFullName && !coreFullName.includes(trackFullName) && !trackFullName.includes(coreFullName)) {
-                diffs.push('ชื่อ-นามสกุล')
+              // 2. Try to find match by Date
+              if (!tracking) {
+                tracking = trackingList.find(t => {
+                  if (matchedRentItemIds.has(String(t.RentItemID))) return false
+                  if (!item.ExpectedReleaseDate || !t.ReleaseDate) return false
+                  const parts = item.ExpectedReleaseDate.split(' ')[0].split('/')
+                  if (parts.length !== 3) return false
+                  const coreDateStr = `${parts[2]}-${parts[1]}-${parts[0]}`
+                  
+                  const d = new Date(t.ReleaseDate)
+                  const yyyy = d.getUTCFullYear()
+                  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+                  const dd = String(d.getUTCDate()).padStart(2, '0')
+                  const trackDateStr = `${yyyy}-${mm}-${dd}`
+                  
+                  return coreDateStr === trackDateStr
+                })
               }
 
-              if (diffs.length > 0) {
-                item.TrackingStatus = 'MISMATCH'
-                item.TrackingMismatchFields = diffs
+              // 3. Fallback to any remaining unmatched tracking record for this VIN
+              if (!tracking) {
+                tracking = trackingList.find(t => !matchedRentItemIds.has(String(t.RentItemID)))
+              }
+
+              if (tracking) {
+                matchedRentItemIds.add(String(tracking.RentItemID))
+
+                item.TrackingContractNo = tracking.ContractNo
+                item.TrackingReleaseDate = tracking.ReleaseDate
+                item.TrackingRentType = tracking.RentType
+                item.TrackingIsActive = tracking.IsActive
+                item.TrackingRegisterNo = tracking.RegisterNo
+                item.TrackingContractType = tracking.ContractType
+                item.TrackingCustomerName = tracking.CustomerName
+                item.DataSource = 'BOTH'
+
+                // Cross-check fields when VIN matches
+                const diffs: string[] = []
+                const c1 = (item.ContractNo || '').replace(/\s+/g, '')
+                const c2 = (tracking.ContractNo || '').replace(/\s+/g, '')
+                if (c1 && c2 && c1 !== c2) diffs.push('เลขสัญญา')
+
+                const r1 = (item.RegisterNo || '').replace(/[\s-]/g, '')
+                const r2 = (tracking.RegisterNo || '').replace(/[\s-]/g, '')
+                if (r1 && r2 && r1 !== r2) diffs.push('ทะเบียน')
+
+                const coreFullName = `${item.FirstName || ''}${item.LastName || ''}`.replace(/\s+/g, '')
+                const trackFullName = `${tracking.CustomerName || ''}`.replace(/\s+/g, '')
+                if (coreFullName && trackFullName && coreFullName !== trackFullName && !coreFullName.includes(trackFullName) && !trackFullName.includes(coreFullName)) {
+                  diffs.push('ชื่อ-นามสกุล')
+                }
+
+                if (diffs.length > 0) {
+                  item.TrackingStatus = 'MISMATCH'
+                  item.TrackingMismatchFields = diffs
+                } else {
+                  item.TrackingStatus = 'MATCHED'
+                  item.TrackingMismatchFields = []
+                }
               } else {
-                item.TrackingStatus = 'MATCHED'
-                item.TrackingMismatchFields = []
+                item.TrackingStatus = 'NOT_FOUND'
+                item.DataSource = 'CORE_ONLY'
               }
             } else {
               item.TrackingStatus = 'NOT_FOUND'
@@ -221,30 +262,32 @@ function CaseDeliveryContent() {
             }
           }
 
-          // Find tracking-only VINs (in tracking but not in core)
-          for (const [vin, tracking] of Object.entries(trackingMap)) {
-            if (!coreVinSet.has(vin)) {
-              const t = tracking as Record<string, unknown>
-              coreList.push({
-                VinNo: vin,
-                MotorNo: '',
-                RegisterNo: '',
-                ContractNo: '',
-                FirstName: (t.CustomerName as string) || '',
-                LastName: '',
-                ExpectedReleaseDate: '',
-                ProjectType: (t.ContractType as string) || '',
-                Status: '-',
-                TrackingContractNo: t.ContractNo as string,
-                TrackingReleaseDate: t.ReleaseDate as string | null,
-                TrackingRentType: t.RentType as string,
-                TrackingIsActive: t.IsActive as boolean,
-                TrackingRegisterNo: t.RegisterNo as string,
-                TrackingContractType: t.ContractType as string,
-                TrackingCustomerName: t.CustomerName as string,
-                TrackingStatus: 'TRACKING_ONLY',
-                DataSource: 'TRACKING_ONLY',
-              })
+          // Find tracking-only records (in tracking but not matched to any core record)
+          for (const [vin, trackingList] of Object.entries(trackingMap)) {
+            const list = trackingList as Array<any>
+            for (const tracking of list) {
+              if (!matchedRentItemIds.has(String(tracking.RentItemID))) {
+                coreList.push({
+                  VinNo: vin,
+                  MotorNo: '',
+                  RegisterNo: '',
+                  ContractNo: '',
+                  FirstName: tracking.CustomerName || '',
+                  LastName: '',
+                  ExpectedReleaseDate: '',
+                  ProjectType: tracking.ContractType || '',
+                  Status: '-',
+                  TrackingContractNo: tracking.ContractNo,
+                  TrackingReleaseDate: tracking.ReleaseDate,
+                  TrackingRentType: tracking.RentType,
+                  TrackingIsActive: tracking.IsActive,
+                  TrackingRegisterNo: tracking.RegisterNo,
+                  TrackingContractType: tracking.ContractType,
+                  TrackingCustomerName: tracking.CustomerName,
+                  TrackingStatus: 'TRACKING_ONLY',
+                  DataSource: 'TRACKING_ONLY',
+                })
+              }
             }
           }
         }
