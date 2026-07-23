@@ -78,6 +78,13 @@ export async function POST(req: NextRequest) {
         })
       }
 
+      // 1. SELECT old location before update
+      const oldLocRes = await pool.request()
+        .input('itemId', sql.Int, bodyInventoryItemId)
+        .query(`SELECT CurrentLocation FROM dbo.EV_InventoryItem WHERE InventoryItemID = @itemId`)
+      const oldLocationCode = oldLocRes.recordset[0]?.CurrentLocation || null
+
+      // 2. UPDATE CurrentLocation (same as before)
       const updateLocReq = pool.request()
       updateLocReq.input('itemId', sql.Int, bodyInventoryItemId)
       updateLocReq.input('locCode', sql.NVarChar, serviceLocationCode || '')
@@ -90,6 +97,33 @@ export async function POST(req: NextRequest) {
             UpdateUserID = @userId
         WHERE InventoryItemID = @itemId
       `)
+
+      // 3. INSERT chat log into EV_VehicleNote (only if location actually changed)
+      if (oldLocationCode !== (serviceLocationCode || '')) {
+        try {
+          const oldName = serviceLocationName && oldLocationCode
+            ? (await pool.request()
+                .input('code', sql.NVarChar, oldLocationCode)
+                .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
+              ).recordset[0]?.StatusName || oldLocationCode
+            : oldLocationCode || 'ไม่ระบุ'
+          const newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
+
+          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+
+          await pool.request()
+            .input('itemId', sql.Int, bodyInventoryItemId)
+            .input('note', sql.NVarChar, noteDetail)
+            .input('userId', sql.Int, dbUserId)
+            .query(`
+              INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+              VALUES (@itemId, @note, GETDATE(), @userId, 1)
+            `)
+        } catch (logErr) {
+          console.error('[Location Change Log Error]', logErr)
+          // ไม่ throw — ให้ UPDATE สำเร็จแม้ log จะ fail
+        }
+      }
 
       return NextResponse.json({
         success: true,

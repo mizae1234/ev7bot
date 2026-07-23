@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import GuideTab from './GuideTab'
+import CarInfoCard from './components/CarInfoCard'
 import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 import { VehicleSearchWithScanner } from '@/components/vehicle/VehicleSearchWithScanner'
 
@@ -279,6 +280,8 @@ export default function QuickReportPage() {
   const [replacementCars, setReplacementCars] = useState<any[]>([])
   const [loadingReplacementCars, setLoadingReplacementCars] = useState(false)
 
+  const replSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const loadReplacementCars = async (search: string = '') => {
     setLoadingReplacementCars(true)
     try {
@@ -293,6 +296,11 @@ export default function QuickReportPage() {
       setLoadingReplacementCars(false)
     }
   }
+
+  const loadReplacementCarsDebounced = useCallback((search: string) => {
+    if (replSearchTimerRef.current) clearTimeout(replSearchTimerRef.current)
+    replSearchTimerRef.current = setTimeout(() => loadReplacementCars(search), 300)
+  }, [])
   const [replCarSearch, setReplCarSearch] = useState('')
   const [editReplCarSearch, setEditReplCarSearch] = useState('')
   const [editDetailDeletedPhotoIds, setEditDetailDeletedPhotoIds] = useState<number[]>([])
@@ -1423,9 +1431,24 @@ export default function QuickReportPage() {
     }
   }
 
-  const pendingTickets = vehicleHistory.filter(
-    ticket => !isMaintComplete(ticket)
+  const pendingTickets = useMemo(
+    () => vehicleHistory.filter(ticket => !isMaintComplete(ticket)),
+    [vehicleHistory]
   )
+
+  // Pre-built Map for O(1) location lookups instead of O(n) .find() on every render
+  const locationMap = useMemo(
+    () => new Map(locationOptions.map(o => [o.code, o.name])),
+    [locationOptions]
+  )
+
+  // Shared deselect handler used by CarInfoCard across all tabs
+  const handleDeselectCar = useCallback(() => {
+    setSelectedCar(null)
+    setSelectedCarDetails(null)
+    setContractorName('')
+    setVehicleHistory([])
+  }, [])
 
   // Group vehicles at location from Mobile Dashboard Data
   const getVehiclesAtLocation = (locCode: string) => {
@@ -1576,7 +1599,7 @@ export default function QuickReportPage() {
                         value={editReplCarSearch}
                         onChange={(e) => {
                           setEditReplCarSearch(e.target.value)
-                          loadReplacementCars(e.target.value)
+                          loadReplacementCarsDebounced(e.target.value)
                         }}
                         onFocus={() => loadReplacementCars(editReplCarSearch)}
                         className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
@@ -2155,81 +2178,7 @@ export default function QuickReportPage() {
                 <label className="text-xs font-bold text-slate-600 block mb-2">🚗 1. ข้อมูลรถที่เกิดเหตุ / มีปัญหา <span className="text-rose-550">*</span></label>
                 
                 {selectedCar ? (
-                  <>
-                  <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
-                    <div>
-                      <p className="text-base font-bold text-slate-800">
-                      <a
-                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
-                        title="ดูรายละเอียดเพิ่มเติม"
-                      >
-                        {selectedCar.RegisterNo}
-                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
-                      </a>
-                    </p>
-                      <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                        <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                        {selectedCarDetails?.StatusName && (() => {
-                          const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
-                          const statusType = selectedCarDetails.StatusType || ''
-                          let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
-                          if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
-                            badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                          } else if (name.includes('ใช้งาน')) {
-                            badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
-                          } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
-                            badgeClass = 'bg-amber-50 border-amber-200 text-amber-700'
-                          } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
-                            badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
-                          } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
-                            badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                          }
-                          return (
-                            <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
-                              {name}
-                            </span>
-                          )
-                        })()}
-                        {selectedCarDetails?.StatusType && (
-                          <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                            {selectedCarDetails.StatusType.replace(/_/g, ' ')}
-                          </span>
-                        )}
-                        {selectedCarDetails?.MainVehicleRegisterNo && (
-                          <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
-                            ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
-                          </span>
-                        )}
-                      </div>
-                      {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
-                        <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
-                          <span>📍 สถานที่ปัจจุบัน:</span>
-                          <span className="font-bold text-slate-800">
-                            {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCar(null)
-                        setSelectedCarDetails(null)
-                        setContractorName('')
-                        setVehicleHistory([])
-                      }}
-                      className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  </>
+                  <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
                 ) : (
                   <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
                 )}
@@ -2904,7 +2853,7 @@ export default function QuickReportPage() {
                               <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
                             )}
                             {ticket.ServiceLocationCode && (
-                              <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationOptions.find(o => o.code === ticket.ServiceLocationCode)?.name || ticket.ServiceLocation || '-'}</p>
+                              <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationMap.get(ticket.ServiceLocationCode) || ticket.ServiceLocation || '-'}</p>
                             )}
                           </div>
                         </div>
@@ -3063,7 +3012,7 @@ export default function QuickReportPage() {
                                 value={replCarSearch}
                                 onChange={(e) => {
                                   setReplCarSearch(e.target.value)
-                                  loadReplacementCars(e.target.value)
+                                  loadReplacementCarsDebounced(e.target.value)
                                 }}
                                 onFocus={() => loadReplacementCars(replCarSearch)}
                                 className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-855 focus:outline-none transition font-semibold"
@@ -3370,79 +3319,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
-                  <div>
-                    <p className="text-base font-bold text-slate-800">
-                      <a
-                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
-                        title="ดูรายละเอียดเพิ่มเติม"
-                      >
-                        {selectedCar.RegisterNo}
-                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
-                      </a>
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                      {selectedCarDetails?.StatusName && (() => {
-                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
-                        const statusType = selectedCarDetails.StatusType || ''
-                        let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
-                        if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        } else if (name.includes('ใช้งาน')) {
-                          badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
-                        } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
-                          badgeClass = 'bg-amber-50 border-amber-200 text-amber-700'
-                        } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
-                          badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
-                        } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        }
-                        return (
-                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
-                            {name}
-                          </span>
-                        )
-                      })()}
-                      {selectedCarDetails?.StatusType && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {selectedCarDetails?.MainVehicleRegisterNo && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
-                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
-                        </span>
-                      )}
-                    </div>
-                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
-                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
-                        <span>📍 สถานที่ปัจจุบัน:</span>
-                        <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCar(null)
-                      setSelectedCarDetails(null)
-                      setContractorName('')
-                      setVehicleHistory([])
-                    }}
-                    className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3482,7 +3359,7 @@ export default function QuickReportPage() {
                             <p className="text-[9px] text-slate-400 mt-0.5">📅 เกิดเหตุ: {formatLiffDate(ticket.IncidentDate)}</p>
                           )}
                           {ticket.ServiceLocationCode && (
-                            <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationOptions.find(o => o.code === ticket.ServiceLocationCode)?.name || ticket.ServiceLocation || '-'}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">📍 {locationMap.get(ticket.ServiceLocationCode) || ticket.ServiceLocation || '-'}</p>
                           )}
                         </div>
                         <span className={`px-2.5 py-1 text-xxs font-bold rounded-full border shrink-0 ${
@@ -3624,79 +3501,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
-                  <div>
-                    <p className="text-base font-bold text-slate-800">
-                      <a
-                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
-                        title="ดูรายละเอียดเพิ่มเติม"
-                      >
-                        {selectedCar.RegisterNo}
-                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
-                      </a>
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                      {selectedCarDetails?.StatusName && (() => {
-                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
-                        const statusType = selectedCarDetails.StatusType || ''
-                        let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
-                        if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        } else if (name.includes('ใช้งาน')) {
-                          badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
-                        } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
-                          badgeClass = 'bg-amber-50 border-amber-205 text-amber-700'
-                        } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
-                          badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
-                        } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        }
-                        return (
-                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
-                            {name}
-                          </span>
-                        )
-                      })()}
-                      {selectedCarDetails?.StatusType && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {selectedCarDetails?.MainVehicleRegisterNo && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
-                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
-                        </span>
-                      )}
-                    </div>
-                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
-                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
-                        <span>📍 สถานที่ปัจจุบัน:</span>
-                        <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCar(null)
-                      setSelectedCarDetails(null)
-                      setContractorName('')
-                      setVehicleHistory([])
-                    }}
-                    className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3729,79 +3534,7 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-2">🚗 ค้นหารถยนต์เพื่ออัปเดตสถานที่ <span className="text-rose-550">*</span></label>
               
               {selectedCar ? (
-                <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
-                  <div>
-                    <p className="text-base font-bold text-slate-800">
-                      <a
-                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
-                        title="ดูรายละเอียดเพิ่มเติม"
-                      >
-                        {selectedCar.RegisterNo}
-                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
-                      </a>
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <span className="text-xxs text-slate-655">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</span>
-                      {selectedCarDetails?.StatusName && (() => {
-                        const name = selectedCarDetails.SubStatusName || selectedCarDetails.StatusName
-                        const statusType = selectedCarDetails.StatusType || ''
-                        let badgeClass = 'bg-slate-100 border-slate-200 text-slate-600' // default
-                        if (name.includes('ว่าง') || name.includes('พร้อม') || name.includes('ไม่ได้ใช้งาน')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        } else if (name.includes('ใช้งาน')) {
-                          badgeClass = 'bg-blue-50 border-blue-200 text-blue-700'
-                        } else if (name.includes('จอดรอ') || name.includes('รอซ่อม')) {
-                          badgeClass = 'bg-amber-50 border-amber-200 text-amber-700'
-                        } else if (name.includes('ระหว่างซ่อม') || name.includes('กำลังซ่อม') || name.includes('เข้าซ่อม')) {
-                          badgeClass = 'bg-rose-50 border-rose-200 text-rose-700'
-                        } else if (name.includes('เสร็จ') || name.includes('สำเร็จ')) {
-                          badgeClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        }
-                        return (
-                          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
-                            {name}
-                          </span>
-                        )
-                      })()}
-                      {selectedCarDetails?.StatusType && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                          {selectedCarDetails.StatusType.replace(/_/g, ' ')}
-                        </span>
-                      )}
-                      {selectedCarDetails?.MainVehicleRegisterNo && (
-                        <span className="px-1.5 py-0.5 text-[8px] font-bold rounded border bg-amber-50 border-amber-250 text-amber-700">
-                          ทดแทนของคัน: {selectedCarDetails.MainVehicleRegisterNo}
-                        </span>
-                      )}
-                    </div>
-                    {(selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation) && (
-                      <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
-                        <span>📍 สถานที่ปัจจุบัน:</span>
-                        <span className="font-bold text-slate-800">
-                          {locationOptions.find(o => o.code === (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation))?.name || (selectedCarDetails?.CurrentLocation || selectedCar.CurrentLocation)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCar(null)
-                      setSelectedCarDetails(null)
-                      setContractorName('')
-                      setVehicleHistory([])
-                    }}
-                    className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3998,36 +3731,7 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-2">🚗 ค้นหารถยนต์เพื่อดูสถิติ/รายละเอียด <span className="text-rose-550">*</span></label>
               
               {selectedCar ? (
-                <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
-                  <div>
-                    <p className="text-base font-bold text-slate-800">
-                      <a
-                        href={`/vehicle/${encodeURIComponent(selectedCar.RegisterNo)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-indigo-650 inline-flex items-center gap-1"
-                        title="ดูรายละเอียดเพิ่มเติม"
-                      >
-                        {selectedCar.RegisterNo}
-                        <span className="text-[10px] font-normal text-indigo-400/80">(ดูรายละเอียด ↗)</span>
-                      </a>
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">VIN: {selectedCar.VinNo}</p>
-                    <p className="text-xxs text-slate-655 mt-1">โครงการ: <span className="font-bold text-emerald-700">{selectedCar.Project}</span> | รุ่น: {selectedCar.Model}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCar(null)
-                      setVehicleHistory([])
-                    }}
-                    className="bg-white hover:bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600 transition border border-slate-200 shadow-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} compact />
               ) : (
                 <VehicleSearchWithScanner
                   onSelectCar={(car) => {
@@ -4125,7 +3829,7 @@ export default function QuickReportPage() {
                               {item.IssueTitle}
                             </p>
                             <p className="text-[9px] text-indigo-650 font-bold mt-0.5">
-                              อู่: {locationOptions.find(o => o.code === item.ServiceLocationCode)?.name || item.ServiceLocationCode || 'ไม่ระบุ'}
+                              อู่: {locationMap.get(item.ServiceLocationCode) || item.ServiceLocationCode || 'ไม่ระบุ'}
                             </p>
                           </div>
                           
