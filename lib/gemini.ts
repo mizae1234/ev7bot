@@ -39,6 +39,7 @@ StatusType (สถานะย่อย — สำคัญมาก ต้อ�
   - REPLACEMENT_AVAILABLE = รถทดแทนพร้อมใช้
   - REPLACEMENT_MAINTENANCE = รถทดแทนเข้าซ่อม
   สรุป: ถ้า StatusType = 'AVAILABLE' หรือ 'AVAILABLE_NEW' = รถใหม่, ถ้า StatusType = 'AVAILABLE_USE' = รถมือสอง/รถเก่า
+CurrentLocation (รหัสสถานที่จอดรถปัจจุบัน เช่น EV7_YARD_PRAPADAENG, AION_GI_SALAYA — ใช้ JOIN กับ EV_MsSubStatus WHERE Type='LOCATION' เพื่อแปลงเป็นชื่อสถานที่),
 Exterior_Color, Interior_Color, IsActive (bit)
 
 ### ตาราง: dbo.EV_RentItem (สัญญาเช่า/ส่งมอบ)
@@ -76,6 +77,16 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 ### View: dbo.View_GetOnrentNewOrUse (การแยกรถเช่าแบบ Real-time เฉพาะที่มีสถานะ ON_RENT)
 คอลัมน์: ProjectType, VinNo, Model, ContractNo, FirstName, LastName, ReleaseDate, RentType (ค่าระบุประเภท ได้แก่ 'ONRENT_NEW' หรือ 'ONRENT_USE')
 
+### ตาราง: dbo.EV_VehicleNote (โน้ตประจำรถ / Log ย้ายสถานที่)
+คอลัมน์: VehicleNoteID (PK), InventoryItemID (FK → EV_InventoryItem), NoteDetail (เนื้อหาโน้ต — รวมถึง log การย้ายสถานที่ในรูปแบบ "📍 ย้ายสถานที่: สถานที่เดิม → สถานที่ใหม่ | โดย: ชื่อผู้ย้าย"),
+CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.UserID ผู้บันทึก), IsActive (bit, เอาเฉพาะ IsActive=1)
+หมายเหตุ: ตาราง EV_VehicleNote ทำหน้าที่เป็นทั้ง "โน้ตบันทึกประจำรถ" และ "log การเคลื่อนย้ายสถานที่" ทุกครั้งที่มีการเปลี่ยนสถานที่จอดรถ ระบบจะบันทึก note ใหม่อัตโนมัติพร้อมข้อความ "📍 ย้ายสถานที่: ..." เข้ามา
+
+### ตาราง: dbo.EV_MsSubStatus (Master สถานที่/สถานะย่อย)
+เมื่อ Type = 'LOCATION' → เป็นรายการสถานที่จอดรถทั้งหมดในระบบ
+คอลัมน์: StatusCode (รหัส เช่น EV7_YARD_PRAPADAENG, AION_GI_SALAYA), StatusName (ชื่อสถานที่ เช่น "EV7 Yard พระประแดง", "Aion ศาลายา"), Type, IsActive
+ใช้ JOIN กับ EV_InventoryItem.CurrentLocation เพื่อแปลงรหัสเป็นชื่อสถานที่
+
 ### ตาราง: task_notes (จดโน้ต/ติดตามงาน - อยู่ใน PostgreSQL)
 คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
 
@@ -86,12 +97,14 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - EV_ReplacementItem.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
 - EV_MaintenanceFollowUp.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
 - EV_ReturnItem เก็บข้อมูลแยก (ใช้ VinNo เชื่อม)
+- EV_VehicleNote.InventoryItemID → EV_InventoryItem.InventoryItemID
+- EV_MsSubStatus (Type='LOCATION') — EV_InventoryItem.CurrentLocation = EV_MsSubStatus.StatusCode
 
 ## วิธี Query ตามสถานการณ์
 
 ### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร") หรือถามด้วยเลข VIN (เลขตัวถัง)
 1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน (รองรับทั้งทะเบียนรถและเลข VIN):
-   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%'
+   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType, CurrentLocation FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%'
 2. ถ้า Status = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
    SELECT IssueTitle, CarStatusCode, ProblemTypeCode AS ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocationCode AS ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
@@ -125,6 +138,37 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 - SELECT COUNT(*) FROM EV_MaintenanceItem WHERE CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE') AND IsActive = 1
 - หากถามเรื่องอู่ซ่อมเฉพาะพื้นที่/เจาะจงสถานที่ (เช่น "ซ่อม ศาลายา", "รถซ่อมที่อู่บางนา") ให้ค้นหาจาก ServiceLocationCode:
   SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode LIKE '%ศาลายา%'
+
+### ถามจำนวนรถที่จอดอยู่ตามสถานที่ (เช่น "รถจอดที่วิภา กี่คัน", "รถที่ศาลายา", "รถที่พระประแดง")
+- ข้อมูลสถานที่จอดปัจจุบันอยู่ใน EV_InventoryItem.CurrentLocation ซึ่งเก็บเป็นรหัส (StatusCode)
+- ใช้ JOIN กับ EV_MsSubStatus เพื่อแปลงเป็นชื่อสถานที่:
+  SELECT loc.StatusName AS LocationName, COUNT(DISTINCT i.VinNo) AS Total
+  FROM EV_InventoryItem i
+  LEFT JOIN EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+  WHERE i.IsActive = 1 AND loc.StatusName LIKE '%วิภา%'
+  GROUP BY loc.StatusName
+- ถ้าต้องการดูรายคัน:
+  SELECT i.RegisterNo, i.VinNo, i.Model, i.Status, i.StatusType, loc.StatusName AS CurrentLocationName
+  FROM EV_InventoryItem i
+  LEFT JOIN EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+  WHERE i.IsActive = 1 AND (loc.StatusName LIKE '%วิภา%' OR i.CurrentLocation LIKE '%วิภา%')
+- ถ้าต้องการดูรถทุกสถานที่ (สรุปจำนวนแยกตาม Location):
+  SELECT ISNULL(loc.StatusName, ISNULL(NULLIF(i.CurrentLocation, ''), 'ไม่ระบุ')) AS LocationName, COUNT(DISTINCT i.VinNo) AS Total
+  FROM EV_InventoryItem i
+  LEFT JOIN EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+  WHERE i.IsActive = 1 AND i.CurrentLocation IS NOT NULL AND i.CurrentLocation != ''
+  GROUP BY ISNULL(loc.StatusName, ISNULL(NULLIF(i.CurrentLocation, ''), 'ไม่ระบุ'))
+  ORDER BY Total DESC
+
+### ถามโน้ตประจำรถ / ประวัติการย้ายสถานที่ (เช่น "โน้ตรถ ทอ-3791", "ประวัติย้ายรถ ทอ-3791")
+- ดึงโน้ตทั้งหมดของรถคันนั้น:
+  SELECT n.VehicleNoteID, n.NoteDetail, n.CreateDate, ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreatedBy
+  FROM EV_VehicleNote n
+  JOIN EV_InventoryItem i ON n.InventoryItemID = i.InventoryItemID
+  LEFT JOIN EV_User u ON n.CreateUserID = u.UserID
+  WHERE (i.RegisterNo LIKE '%3791%' OR i.VinNo LIKE '%3791%') AND n.IsActive = 1
+  ORDER BY n.CreateDate DESC
+- ถ้าต้องการเฉพาะ log การย้ายสถานที่ ให้กรอง NoteDetail LIKE '%ย้ายสถานที่%'
 
 ### ถามรถส่งมอบวันนี้
 - ใช้ function getDeliveryToday ก่อน ถ้าต้องการ detail ใช้:
