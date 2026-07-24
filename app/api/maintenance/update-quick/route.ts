@@ -498,6 +498,13 @@ export async function POST(req: NextRequest) {
     const locationToUpdate = currentLocation || serviceLocationCode
     if (locationToUpdate && inventoryItemId) {
       try {
+        // 1. SELECT old location before update
+        const oldLocRes = await pool.request()
+          .input('invId', sql.Int, inventoryItemId)
+          .query(`SELECT CurrentLocation FROM dbo.EV_InventoryItem WHERE InventoryItemID = @invId`)
+        const oldLocationCode = oldLocRes.recordset[0]?.CurrentLocation || null
+
+        // 2. UPDATE CurrentLocation
         const locReq = pool.request()
         locReq.input('currentLocation', sql.NVarChar, locationToUpdate)
         locReq.input('invId', sql.Int, inventoryItemId)
@@ -507,6 +514,39 @@ export async function POST(req: NextRequest) {
           WHERE InventoryItemID = @invId
         `)
         console.log(`[Inventory CurrentLocation Update] InventoryItemID=${inventoryItemId}: set CurrentLocation=${locationToUpdate}`)
+
+        // 3. INSERT movement log into EV_VehicleNote (only if location actually changed)
+        if (oldLocationCode !== locationToUpdate) {
+          try {
+            // Resolve old location name
+            let oldName = oldLocationCode || 'ไม่ระบุ'
+            if (oldLocationCode) {
+              const oldNameRes = await pool.request()
+                .input('code', sql.NVarChar, oldLocationCode)
+                .query(`SELECT TOP 1 StatusName FROM dbo.EV_MsSubStatus WHERE StatusCode = @code AND Type = 'LOCATION'`)
+              oldName = oldNameRes.recordset[0]?.StatusName || oldLocationCode
+            }
+            // Resolve new location name
+            let newName = locationToUpdate
+            const newNameRes = await pool.request()
+              .input('code', sql.NVarChar, locationToUpdate)
+              .query(`SELECT TOP 1 StatusName FROM dbo.EV_MsSubStatus WHERE StatusCode = @code AND Type = 'LOCATION'`)
+            newName = newNameRes.recordset[0]?.StatusName || locationToUpdate
+
+            const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+            await pool.request()
+              .input('itemId', sql.Int, inventoryItemId)
+              .input('note', sql.NVarChar, noteDetail)
+              .input('userId', sql.Int, dbUserId)
+              .query(`
+                INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+                VALUES (@itemId, @note, GETDATE(), @userId, 1)
+              `)
+            console.log(`[Maintenance Location Log] InventoryItemID=${inventoryItemId}: ${noteDetail}`)
+          } catch (logErr) {
+            console.error('[Maintenance Location Log Error]', logErr)
+          }
+        }
       } catch (locErr) {
         console.error('[Inventory CurrentLocation Update Error]', locErr)
       }
