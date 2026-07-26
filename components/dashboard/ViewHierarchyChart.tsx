@@ -191,7 +191,7 @@ export default function ViewHierarchyChart({ items }: ViewHierarchyChartProps) {
   return (
     <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/50 pb-2">
-        <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-wider">🏗️ สถานะรถแยกตามประเภท</span>
+        <span className="text-xs font-black text-slate-600 dark:text-slate-300 uppercase tracking-wider">🏗️ สถานะรถแยกตามประเภท (ภาพรวมทั้งหมด ไม่ได้ปรับตาม filter)</span>
         <span className="text-[10px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
           ทั้งหมด {items.length} คัน
         </span>
