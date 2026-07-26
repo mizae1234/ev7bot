@@ -2,14 +2,14 @@
 
 import React from 'react'
 import useSWR from 'swr'
-import StatusHierarchyChart from '@/components/audit/StatusHierarchyChart'
+import ViewHierarchyChart from '@/components/dashboard/ViewHierarchyChart'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 /**
  * FleetStatusChart — Self-contained component
  * Fetches all active vehicles from /api/vehicles/status-summary
- * and renders the StatusHierarchyChart tree.
+ * and renders the ViewHierarchyChart tree.
  */
 export default function FleetStatusChart() {
   const { data, error, isLoading } = useSWR('/api/vehicles/status-summary', fetcher, {
@@ -27,5 +27,5 @@ export default function FleetStatusChart() {
 
   if (error || !data?.items) return null
 
-  return <StatusHierarchyChart items={data.items} />
+  return <ViewHierarchyChart items={data.items} />
 }
