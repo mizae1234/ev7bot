@@ -1069,6 +1069,94 @@ ORDER BY StatusCode
 
 การอ้างอิงวิธีนี้จะช่วยให้น้อง Butter และแดชบอร์ดแสดงผลเป็นมาตรฐานเดียวกัน และมีความยืดหยุ่นสูงเมื่อชื่อสถานะในฐานข้อมูลถูกเปลี่ยนแก้ไข
 
+## 15. การจัดกลุ่มสถานะรถสำหรับ Dashboard (Vehicle Status Hierarchy)
 
+โครงสร้าง Org Chart ใช้แสดงสถานะรถทั้งระบบ ข้อมูลดึงจาก `EV_InventoryItem` ครั้งเดียว แล้ว classify ด้วย JavaScript ฝั่ง client
+
+### 15.1 Query ฐาน (API: `/api/vehicles/status-summary`)
+```sql
+SELECT 
+  i.VinNo,
+  i.Status AS VehicleStatus,
+  i.StatusType AS VehicleStatusType,
+  i.ProjectType,
+  COALESCE(
+    ISNULL(sub_st.DescriptionStatus, sub_st.StatusName),
+    ISNULL(sub_s.DescriptionStatus, sub_s.StatusName),
+    i.StatusType,
+    i.Status
+  ) AS StatusTypeName
+FROM dbo.EV_InventoryItem i
+LEFT JOIN dbo.EV_MsSubStatus sub_st ON i.StatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
+LEFT JOIN dbo.EV_MsSubStatus sub_s ON i.Status = sub_s.StatusCode AND sub_s.Type = 'STATUS'
+WHERE i.IsActive = 1
+  AND ISNULL(i.ProjectType,'') NOT IN ('OTH','Fleet')
+```
+
+### 15.2 โครงสร้าง Tree 3 ระดับ
+
+```
+Car Status (ทั้งหมด)
+├── รถใหม่ (New)
+│   ├── Production         → Status = PRODUCTION
+│   ├── Pending (รอเรียกรถลง) → Status = PENDING
+│   ├── Defect             → StatusType = NEW_MAINTENANCE
+│   └── Ready              → StatusType = AVAILABLE_NEW / AVAILABLE / AVAILABLE_SHOWROOM
+│
+├── รถใช้งานแล้ว (Used)
+│   ├── Ready              → StatusType = AVAILABLE_USE
+│   ├── Recondition/Maintenance → StatusType = USE_MAINTENANCE
+│   └── Replacement        → Status = REPLACEMENT
+│       ├── Ready ▸        → StatusType = REPLACEMENT_AVAILABLE + REPLACEMENT_RESERVED (รวมกัน, กดขยายได้)
+│       │   ├── พร้อมใช้      → StatusType = REPLACEMENT_AVAILABLE
+│       │   └── ถูกจอง       → StatusType = REPLACEMENT_RESERVED
+│       ├── ถูกใช้งาน        → StatusType = REPLACEMENT_CAR
+│       └── เข้าซ่อม         → StatusType = REPLACEMENT_MAINTENANCE
+│
+├── ให้เช่า (On Rent)      → Status = ON_RENT หรือ StatusType = ON_RENT_MAINTENANCE
+│   └── [แยกกล่องตาม ProjectType: EV7, Line Man, Grab, AOT, ...]
+│
+└── อื่นๆ                  → สถานะที่ไม่เข้าหมวดข้างต้น (เช่น Display → แสดงเป็น "Demo")
+```
+
+### 15.3 การ classify ระดับบนสุด (classifyTop)
+
+| เงื่อนไข (ตรวจตามลำดับ) | หมวด |
+|---|---|
+| `Status = ON_RENT` หรือ `StatusType = ON_RENT_MAINTENANCE` | **ON_RENT** |
+| `StatusType` ขึ้นต้นด้วย `REPLACEMENT` หรือ `= USE_MAINTENANCE / AVAILABLE_USE` | **USED** |
+| `Status = REPLACEMENT` | **USED** |
+| `Status IN (PRODUCTION, PENDING, AVAILABLE)` หรือ `StatusType IN (AVAILABLE_NEW, AVAILABLE_SHOWROOM, NEW_MAINTENANCE)` | **NEW** |
+| อื่นๆ | **OTHER** |
+
+### 15.4 ค่า Status / StatusType ที่มีในฐานข้อมูลจริง (ณ ก.ค. 2569)
+
+| Status | StatusType | จำนวน | หมวด |
+|---|---|---|---|
+| ON_RENT | NULL | ~3,012 | On Rent |
+| PENDING | NULL | ~650 | New → Pending |
+| AVAILABLE | AVAILABLE_USE | ~225 | Used → Ready |
+| AVAILABLE | AVAILABLE | ~65 | New → Ready |
+| REPLACEMENT | REPLACEMENT_AVAILABLE | ~75 | Used → Replacement → Ready |
+| REPLACEMENT | REPLACEMENT_CAR | ~73 | Used → Replacement → ถูกใช้งาน |
+| PRODUCTION | PRODUCTION | ~54 | New → Production |
+| REPLACEMENT | REPLACEMENT_RESERVED | ~24 | Used → Replacement → ถูกจอง |
+| MAINTENANCE | ON_RENT_MAINTENANCE | ~221 | On Rent (maintenance) |
+| MAINTENANCE | USE_MAINTENANCE | ~97 | Used → Recondition |
+| MAINTENANCE | REPLACEMENT_MAINTENANCE | ~17 | Used → Replacement → เข้าซ่อม |
+| MAINTENANCE | NEW_MAINTENANCE | ~9 | New → Defect |
+| AVAILABLE | AVAILABLE_SHOWROOM | ~2 | New → Ready |
+| Display | Display | ~2 | อื่นๆ → Demo |
+
+### 15.5 SP อ้างอิง: `GetEV_HeadlineDashboard`
+SP นี้ให้ตัวเลข summary ที่ dashboard เดิมใช้ (Total = ~4,443) แต่ **ดูนิยาม SP ไม่ได้** เพราะ definition ถูก encrypt
+- เรา query เองได้ ~4,526 คัน (IsActive=1, ไม่รวม OTH/Fleet)
+- ส่วนต่าง ~83 คัน เกิดจากเงื่อนไขภายใน SP ที่ซ่อนอยู่
+- หากต้องการตัวเลขตรง 100% ให้เรียก `EXEC GetEV_HeadlineDashboard` โดยตรง
+
+### 15.6 Component ที่เกี่ยวข้อง
+- **API**: `app/api/vehicles/status-summary/route.ts`
+- **Chart**: `components/audit/StatusHierarchyChart.tsx` — รองรับทั้ง light/dark theme
+- **Dashboard wrapper**: `components/dashboard/FleetStatusChart.tsx` — SWR + render
 
 

@@ -12,6 +12,7 @@ import { ReturnTable } from '@/components/dashboard/ReturnTable'
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import FleetStatusChart from '@/components/dashboard/FleetStatusChart'
 import type { DashboardData } from '@/types'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -535,6 +536,9 @@ function DashboardContent() {
             </>
           ) : null}
         </div>
+
+        {/* Fleet Status Hierarchy Chart */}
+        <FleetStatusChart />
 
         {/* Master Calendar Section */}
         {filterMode === 'month' && (
