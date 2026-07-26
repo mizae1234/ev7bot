@@ -121,6 +121,9 @@ function ScanSessionContent() {
   const [previewNotes, setPreviewNotes] = useState('')
   const [savingItem, setSavingItem] = useState(false)
 
+  // Filter state for scanned items list
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM'>('ALL')
+
   // Operator
   const [operatorName, setOperatorName] = useState('พนักงานตรวจเช็ก')
 
@@ -927,13 +930,52 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
             )}
           </div>
 
-          {scannedItems.length === 0 ? (
-            <div className="bg-slate-800/10 border border-slate-800/50 rounded-2xl py-12 text-center text-slate-500 text-xs font-medium">
-              ยังไม่มีการบันทึกรายการรถในรอบนี้
+          {/* Filter Pills */}
+          {scannedItems.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                { key: 'ALL' as const, label: 'ทั้งหมด', count: scannedItems.length, activeClass: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' },
+                { key: 'MATCHED' as const, label: '✅ ตรงพิกัด', count: scannedItems.filter(i => i.DetectedStatus === 'MATCHED').length, activeClass: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
+                { key: 'MISMATCH' as const, label: '⚠️ ผิดพิกัด', count: scannedItems.filter(i => i.DetectedStatus === 'MISMATCH').length, activeClass: 'bg-amber-500/20 border-amber-500/40 text-amber-300' },
+                { key: 'NOT_IN_SYSTEM' as const, label: '❌ ไม่มีในระบบ', count: scannedItems.filter(i => i.DetectedStatus === 'NOT_IN_SYSTEM').length, activeClass: 'bg-rose-500/20 border-rose-500/40 text-rose-300' },
+              ]).map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilterStatus(f.key)}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition ${
+                    filterStatus === f.key
+                      ? f.activeClass
+                      : 'bg-slate-800/30 border-slate-700/30 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {f.label} {f.count}
+                </button>
+              ))}
             </div>
-          ) : (
+          )}
+
+          {(() => {
+            const filtered = filterStatus === 'ALL' ? scannedItems : scannedItems.filter(i => i.DetectedStatus === filterStatus)
+
+            if (filtered.length === 0 && scannedItems.length > 0) {
+              return (
+                <div className="bg-slate-800/10 border border-slate-800/50 rounded-2xl py-8 text-center text-slate-500 text-xs font-medium">
+                  ไม่มีรายการที่ตรงกับตัวกรอง
+                </div>
+              )
+            }
+
+            if (filtered.length === 0) {
+              return (
+                <div className="bg-slate-800/10 border border-slate-800/50 rounded-2xl py-12 text-center text-slate-500 text-xs font-medium">
+                  ยังไม่มีการบันทึกรายการรถในรอบนี้
+                </div>
+              )
+            }
+
+            return (
             <div className="space-y-3">
-              {scannedItems.map((item, idx) => {
+              {filtered.map((item, idx) => {
                 const scanTimeStr = new Date(item.ScanTime).toLocaleTimeString('th-TH', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -983,7 +1025,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 )
               })}
             </div>
-          )}
+          )})}
         </div>
       </div>
 
