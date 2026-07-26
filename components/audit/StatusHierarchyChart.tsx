@@ -200,7 +200,7 @@ export default function StatusHierarchyChart({ items }: StatusHierarchyChartProp
 
     const usedChildren: (LeafNode | SubGroup)[] = [
       { label: 'Ready', count: usedReady.length, color: 'emerald' },
-      { label: 'Recondition/Maintenance', count: usedRecondition.length, color: 'indigo' },
+      { label: 'Recondition/Maintenance', count: usedRecondition.length, color: 'amber' },
       replacementNode,
     ]
     if (usedOther.length > 0) usedChildren.push({ label: 'อื่นๆ', count: usedOther.length, color: 'slate' })

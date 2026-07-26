@@ -62,7 +62,7 @@ export default function ViewHierarchyChart({ items }: ViewHierarchyChartProps) {
     usedItems.forEach(i => usedMap[i.SubGroup] = (usedMap[i.SubGroup] || 0) + 1)
 
     if (usedMap['Ready']) usedChildren.push({ label: 'Ready', count: usedMap['Ready'], color: 'emerald' })
-    if (usedMap['Recondition/Maintenance']) usedChildren.push({ label: 'Recondition/Maintenance', count: usedMap['Recondition/Maintenance'], color: 'indigo' })
+    if (usedMap['Recondition/Maintenance']) usedChildren.push({ label: 'Recondition/Maintenance', count: usedMap['Recondition/Maintenance'], color: 'amber' })
 
     if (usedMap['Replacement']) {
       const replItems = usedItems.filter(i => i.SubGroup === 'Replacement')
