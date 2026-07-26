@@ -92,7 +92,7 @@ function getSubStatusLabel(status?: string, statusType?: string, statusTypeName?
   if (t.includes('AVAILABLE') || t.includes('READY')) return 'Ready'
   
   // Used car sub-statuses
-  if (t.includes('RECONDITION') || (t.includes('MAINTENANCE') && t.includes('USE'))) return 'Recondition'
+  if (t.includes('RECONDITION') || (t.includes('MAINTENANCE') && t.includes('USE'))) return 'Recondition/ซ่อม'
   if (t.includes('REPLACEMENT')) return 'Replacement'
 
   return statusType || status || 'ไม่ระบุ'
