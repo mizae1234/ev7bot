@@ -916,10 +916,32 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                     'ผู้บันทึก': item.CreatedBy,
                     'หมายเหตุ': item.Notes || ''
                   }))
-                  const ws = XLSX.utils.json_to_sheet(rows)
+
+                  const locationName = session?.LocationName || session?.Location || 'audit'
+                  const auditDateStr = session?.AuditDate ? new Date(session.AuditDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '-'
+                  const exportTime = new Date().toLocaleString('th-TH')
+                  const matchedCount = scannedItems.filter(i => i.DetectedStatus === 'MATCHED').length
+                  const mismatchCount = scannedItems.filter(i => i.DetectedStatus === 'MISMATCH').length
+
+                  // Build sheet with header info rows
+                  const headerRows = [
+                    ['รายงาน Stock Audit'],
+                    ['สถานที่ตรวจ', locationName],
+                    ['วันที่ตรวจ', auditDateStr],
+                    ['ผู้ตรวจ', session?.CreatedBy || '-'],
+                    ['จำนวนรถทั้งหมด', scannedItems.length, '', 'ตรงพิกัด', matchedCount, '', 'ผิดพิกัด', mismatchCount],
+                    ['วันที่ Export', exportTime],
+                    [], // blank row separator
+                  ]
+
+                  const ws = XLSX.utils.aoa_to_sheet(headerRows)
+                  XLSX.utils.sheet_add_json(ws, rows, { origin: `A${headerRows.length + 1}` })
+
+                  // Auto-size title merge
+                  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
+
                   const wb = XLSX.utils.book_new()
                   XLSX.utils.book_append_sheet(wb, ws, 'Audit Detail')
-                  const locationName = session?.LocationName || session?.Location || 'audit'
                   const dateStr = session?.AuditDate ? new Date(session.AuditDate).toISOString().split('T')[0] : 'export'
                   XLSX.writeFile(wb, `audit_${locationName}_${dateStr}.xlsx`)
                 }}
