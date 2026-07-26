@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { getStatusThaiLabel } from '@/lib/audit-status'
+import StatusHierarchyChart from '@/components/audit/StatusHierarchyChart'
 import Script from 'next/script'
 import * as XLSX from 'xlsx'
 
@@ -640,6 +641,10 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           </div>
         </div>
 
+        {/* Status Hierarchy Chart */}
+        {scannedItems.length > 0 && (
+          <StatusHierarchyChart items={scannedItems} />
+        )}
 
         {/* Only allow scanning if the session is DRAFT */}
         {session.Status === 'DRAFT' && (
