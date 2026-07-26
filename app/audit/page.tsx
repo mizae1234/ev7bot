@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { getStatusStyle } from '@/lib/audit-status'
 
 interface AuditSession {
   AuditSessionID: number
@@ -238,26 +239,18 @@ function AuditDashboard() {
 
                   {/* Status Breakdown Pills */}
                   {(() => {
-                    const sessionStatuses = statusSummary.filter(s => s.AuditSessionID === session.AuditSessionID)
-                    if (sessionStatuses.length === 0) return null
-
-                    const getColor = (label: string) => {
-                      const k = label.toUpperCase()
-                      if (k.includes('ON_RENT') || k.includes('ON RENT')) return 'bg-violet-500/15 text-violet-300 border-violet-500/25'
-                      if (k.includes('AVAILABLE') || k.includes('พร้อม')) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
-                      if (k.includes('MAINTENANCE') || k.includes('ซ่อม')) return 'bg-amber-500/15 text-amber-300 border-amber-500/25'
-                      if (k.includes('REPLACEMENT') || k.includes('ทดแทน')) return 'bg-sky-500/15 text-sky-300 border-sky-500/25'
-                      if (k.includes('ไม่ทราบ')) return 'bg-slate-500/15 text-slate-400 border-slate-500/25'
-                      return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25'
-                    }
-
+                    const items = statusSummary.filter(s => s.AuditSessionID === session.AuditSessionID)
+                    if (items.length === 0) return null
                     return (
                       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-700/30">
-                        {sessionStatuses.map(s => (
-                          <span key={s.StatusLabel} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${getColor(s.StatusLabel)}`}>
-                            {s.StatusLabel} {s.Count}
-                          </span>
-                        ))}
+                        {items.map(s => {
+                          const style = getStatusStyle(s.StatusLabel)
+                          return (
+                            <span key={s.StatusLabel} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.border} ${style.text}`}>
+                              {style.label} {s.Count}
+                            </span>
+                          )
+                        })}
                       </div>
                     )
                   })()}
