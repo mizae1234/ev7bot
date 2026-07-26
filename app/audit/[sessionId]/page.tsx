@@ -97,6 +97,7 @@ function ScanSessionContent() {
   // Scanning state
   const [ocrLoading, setOcrLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false)
 
   // Live text scanner (OCR) state
   const [isOcrScannerOpen, setIsOcrScannerOpen] = useState(false)
@@ -159,6 +160,20 @@ function ScanSessionContent() {
     setPreviewVehicle(null)
     
     try {
+      // Check permission status first (if supported)
+      if (navigator.permissions) {
+        try {
+          const permStatus = await navigator.permissions.query({ name: 'camera' as PermissionName })
+          if (permStatus.state === 'denied') {
+            setIsOcrScannerOpen(false)
+            setShowPermissionHelp(true)
+            return
+          }
+        } catch (_) {
+          // permissions.query not supported for camera in some browsers, continue anyway
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
@@ -171,8 +186,12 @@ function ScanSessionContent() {
       }
     } catch (err: any) {
       console.error('Failed to open camera for OCR:', err)
-      alert('ไม่สามารถเปิดกล้องได้: ' + err.message)
       setIsOcrScannerOpen(false)
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.message?.includes('Permission')) {
+        setShowPermissionHelp(true)
+      } else {
+        alert('ไม่สามารถเปิดกล้องได้: ' + err.message)
+      }
     }
   }
 
@@ -370,7 +389,11 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
         setPreviewMode('OCR')
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+        setShowPermissionHelp(true)
+      } else {
+        alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+      }
     } finally {
       setOcrLoading(false)
       if (fileInputRef.current) fileInputRef.current.value = '' // Clear input
@@ -685,6 +708,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={handleOcrFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     disabled={ocrLoading}
@@ -917,6 +941,64 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
         </div>
       </div>
+
+      {/* Permission Denied Help Modal */}
+      {showPermissionHelp && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-slate-900 border border-rose-500/30 rounded-2xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="text-base font-bold text-rose-300 flex items-center gap-2">🔒 ไม่สามารถเข้าถึงกล้องได้</h3>
+              <button
+                onClick={() => setShowPermissionHelp(false)}
+                className="text-slate-400 hover:text-slate-200 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              แอปไม่ได้รับอนุญาตให้เข้าถึงกล้องถ่ายรูป กรุณาเปิดสิทธิ์ตามขั้นตอนด้านล่าง:
+            </p>
+
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-3">
+              <p className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">สำหรับ Android (LINE)</p>
+              <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>ไปที่ <span className="font-bold text-slate-100">ตั้งค่า (Settings)</span> ของมือถือ</li>
+                <li>เลือก <span className="font-bold text-slate-100">แอป (Apps)</span> → ค้นหา <span className="font-bold text-emerald-300">LINE</span></li>
+                <li>กดเข้า <span className="font-bold text-slate-100">สิทธิ์ (Permissions)</span></li>
+                <li>เปิดสิทธิ์ <span className="font-bold text-amber-300">กล้อง (Camera)</span> และ <span className="font-bold text-amber-300">ไฟล์ (Storage)</span></li>
+                <li>กลับมาเปิดหน้านี้ใหม่แล้วลองอีกครั้ง</li>
+              </ol>
+            </div>
+
+            <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-3">
+              <p className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">สำหรับ iPhone (Safari / LINE)</p>
+              <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>ไปที่ <span className="font-bold text-slate-100">ตั้งค่า → LINE</span></li>
+                <li>เปิดสิทธิ์ <span className="font-bold text-amber-300">กล้อง (Camera)</span></li>
+                <li>กลับมาเปิดหน้านี้ใหม่</li>
+              </ol>
+            </div>
+
+            <div className="pt-1 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPermissionHelp(false)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm py-2.5 rounded-xl transition"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowPermissionHelp(false); window.location.reload() }}
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-sm py-2.5 rounded-xl transition"
+              >
+                🔄 รีโหลดหน้า
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
