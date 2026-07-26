@@ -41,6 +41,7 @@ function AuditDashboard() {
   const router = useRouter()
   const [sessions, setSessions] = useState<AuditSession[]>([])
   const [statusSummary, setStatusSummary] = useState<StatusSummaryItem[]>([])
+  const [mismatchSummary, setMismatchSummary] = useState<StatusSummaryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -66,6 +67,7 @@ function AuditDashboard() {
       const data = await res.json()
       setSessions(data.sessions || [])
       setStatusSummary(data.statusSummary || [])
+      setMismatchSummary(data.mismatchSummary || [])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
     } finally {
@@ -251,6 +253,27 @@ function AuditDashboard() {
                             </span>
                           )
                         })}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Mismatch Breakdown Pills */}
+                  {(() => {
+                    const items = mismatchSummary.filter(s => s.AuditSessionID === session.AuditSessionID)
+                    if (items.length === 0) return null
+                    return (
+                      <div className="space-y-1.5 pt-2 border-t border-amber-500/15">
+                        <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">⚠️ ผิดพิกัด แยกตามสถานะ</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {items.map(s => {
+                            const style = getStatusStyle(s.StatusLabel)
+                            return (
+                              <span key={s.StatusLabel} className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/20 text-amber-300">
+                                {style.label} {s.Count}
+                              </span>
+                            )
+                          })}
+                        </div>
                       </div>
                     )
                   })()}

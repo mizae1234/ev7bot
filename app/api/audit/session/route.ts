@@ -111,7 +111,20 @@ export async function GET(request: NextRequest) {
       ORDER BY ai.AuditSessionID, Count DESC
     `)
 
-    return NextResponse.json({ sessions: result.recordset, statusSummary: statusResult.recordset })
+    // 5. Fetch mismatch breakdown per session (which statuses have mismatched locations)
+    const mismatchResult = await pool.request().query(`
+      SELECT ai.AuditSessionID,
+             COALESCE(ISNULL(sub_st.DescriptionStatus, sub_st.StatusName), ISNULL(sub_s.DescriptionStatus, sub_s.StatusName), ai.VehicleStatusType, ai.VehicleStatus, N'ไม่ทราบสถานะ') AS StatusLabel,
+             COUNT(*) AS Count
+      FROM dbo.EV_AuditItem ai
+      LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsSubStatus sub_s ON ai.VehicleStatus = sub_s.StatusCode AND sub_s.Type = 'STATUS'
+      WHERE ai.DetectedStatus = 'MISMATCH'
+      GROUP BY ai.AuditSessionID, COALESCE(ISNULL(sub_st.DescriptionStatus, sub_st.StatusName), ISNULL(sub_s.DescriptionStatus, sub_s.StatusName), ai.VehicleStatusType, ai.VehicleStatus, N'ไม่ทราบสถานะ')
+      ORDER BY ai.AuditSessionID, Count DESC
+    `)
+
+    return NextResponse.json({ sessions: result.recordset, statusSummary: statusResult.recordset, mismatchSummary: mismatchResult.recordset })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Get Session Error:', message)
