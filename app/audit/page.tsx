@@ -260,20 +260,33 @@ function AuditDashboard() {
                   {/* Mismatch Breakdown Pills */}
                   {(() => {
                     const items = mismatchSummary.filter(s => s.AuditSessionID === session.AuditSessionID)
-                    if (items.length === 0) return null
+                    const mismatchTotal = items.reduce((acc, s) => acc + s.Count, 0)
+                    const matchedTotal = session.CheckedCount - mismatchTotal
+
+                    if (mismatchTotal === 0 && session.CheckedCount === 0) return null
+
                     return (
-                      <div className="space-y-1.5 pt-2 border-t border-amber-500/15">
-                        <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">⚠️ ผิดพิกัด แยกตามสถานะ</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {items.map(s => {
-                            const style = getStatusStyle(s.StatusLabel)
-                            return (
-                              <span key={s.StatusLabel} className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/20 text-amber-300">
-                                {style.label} {s.Count}
-                              </span>
-                            )
-                          })}
+                      <div className="space-y-1.5 pt-2 border-t border-slate-700/20">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/10 border-emerald-500/20 text-emerald-300">
+                            ✅ ตรงพิกัด {matchedTotal}
+                          </span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/20 text-amber-300">
+                            ⚠️ ผิดพิกัด {mismatchTotal}
+                          </span>
                         </div>
+                        {items.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pl-2">
+                            {items.map(s => {
+                              const style = getStatusStyle(s.StatusLabel)
+                              return (
+                                <span key={s.StatusLabel} className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-amber-500/5 border-amber-500/15 text-amber-400/80">
+                                  ↳ {style.label} {s.Count}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
