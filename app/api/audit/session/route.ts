@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
           SELECT ai.AuditItemID, ai.AuditSessionID, ai.VinNo, ai.ScanTime, ai.ScanMethod,
                  ai.DetectedStatus, ai.PreviousLocation, ai.IsConfirmed, ai.CreatedBy, ai.Notes,
                  ai.VehicleStatus, ai.VehicleStatusType,
-                 ii.RegisterNo, ii.Model, ii.Exterior_Color,
+                 ii.RegisterNo, ii.Model, ii.Exterior_Color, ii.ProjectType,
                  sub_prev.StatusName AS PreviousLocationName,
                  sub_st.StatusName AS StatusTypeName
           FROM dbo.EV_AuditItem ai

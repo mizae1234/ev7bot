@@ -36,6 +36,7 @@ interface ScannedItem {
   VehicleStatus?: string
   VehicleStatusType?: string
   StatusTypeName?: string
+  ProjectType?: string
 }
 
 interface VehiclePreview {
