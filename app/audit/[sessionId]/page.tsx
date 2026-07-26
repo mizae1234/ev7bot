@@ -1004,6 +1004,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                       <div className="text-[10px] text-slate-400 font-medium">
                         Model: {item.Model || 'ไม่ระบุ'} • VIN: <span className="font-mono text-[9px] text-slate-500">{item.VinNo}</span>
                       </div>
+                      {item.VehicleStatus && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                            🚗 {getStatusThaiLabel(item.StatusTypeName || item.VehicleStatusType || item.VehicleStatus)}
+                          </span>
+                        </div>
+                      )}
                       {item.DetectedStatus === 'MISMATCH' && (
                         <div className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
                           📍 พิกัดเดิม: {item.PreviousLocationName || item.PreviousLocation || '-'}
