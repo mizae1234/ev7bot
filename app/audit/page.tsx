@@ -22,7 +22,8 @@ function getThaiDate(dateStr: string): string {
     return date.toLocaleDateString('th-TH', {
       day: 'numeric',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'UTC'
     })
   } catch {
     return dateStr

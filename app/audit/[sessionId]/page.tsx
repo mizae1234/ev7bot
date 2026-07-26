@@ -471,7 +471,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       if (data.isDuplicate) {
         playBeep('warning')
         const confirmRetry = window.confirm(
-          `⚠️ แจ้งเตือนสแกนซ้ำ:\nรถคันนี้ถูกบันทึกไปแล้วในรอบนี้โดย "${data.existingRecord.createdBy}" เมื่อเวลา ${new Date(data.existingRecord.scanTime).toLocaleTimeString('th-TH')}\n\nคุณต้องการบันทึกทับและอัปเดตเวลาล่าสุดใช่หรือไม่?`
+          `⚠️ แจ้งเตือนสแกนซ้ำ:\nรถคันนี้ถูกบันทึกไปแล้วในรอบนี้โดย "${data.existingRecord.createdBy}" เมื่อเวลา ${new Date(data.existingRecord.scanTime).toLocaleTimeString('th-TH', { timeZone: 'UTC' })}\n\nคุณต้องการบันทึกทับและอัปเดตเวลาล่าสุดใช่หรือไม่?`
         )
         if (confirmRetry) {
           handleSaveAuditItem(true) // Retry forcing save
@@ -553,7 +553,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           </button>
           <div className="text-center">
             <h1 className="text-sm font-bold text-slate-100">{session.LocationName || session.Location}</h1>
-            <p className="text-[10px] text-slate-400">{new Date(session.AuditDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            <p className="text-[10px] text-slate-400">{new Date(session.AuditDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
           </div>
           <div>
             {session.Status === 'DRAFT' ? (
@@ -867,7 +867,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
               {scannedItems.map((item, idx) => {
                 const scanTimeStr = new Date(item.ScanTime).toLocaleTimeString('th-TH', {
                   hour: '2-digit',
-                  minute: '2-digit'
+                  minute: '2-digit',
+                  timeZone: 'UTC'
                 }) + ' น.'
                 
                 return (
