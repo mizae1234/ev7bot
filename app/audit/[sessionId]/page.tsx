@@ -38,6 +38,7 @@ interface VehiclePreview {
   Model: string
   Exterior_Color: string
   Status: string
+  StatusType?: string
   CurrentLocation: string
   StockLocation: string
   CurrentLocationName?: string
@@ -485,7 +486,9 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           previousLocation: currentLoc || '-',
           isConfirmed: true,
           notes: previewNotes,
-          forceSave: force
+          forceSave: force,
+          vehicleStatus: previewVehicle.Status || null,
+          vehicleStatusType: previewVehicle.StatusType || null
         })
       })
 

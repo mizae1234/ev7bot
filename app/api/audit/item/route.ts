@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .input('keyword', sql.NVarChar, keyword)
       .input('cleanedKeyword', sql.NVarChar, cleanedKeyword)
       .query(`
-        SELECT TOP 10 ii.VinNo, ii.RegisterNo, ii.Model, ii.Exterior_Color, ii.Status, 
+        SELECT TOP 10 ii.VinNo, ii.RegisterNo, ii.Model, ii.Exterior_Color, ii.Status, ii.StatusType,
                ii.CurrentLocation, ii.StockLocation,
                sub_curr.StatusName AS CurrentLocationName,
                sub_stock.StatusName AS StockLocationName
@@ -60,7 +60,9 @@ export async function POST(request: NextRequest) {
       previousLocation,
       isConfirmed,
       notes,
-      forceSave
+      forceSave,
+      vehicleStatus,
+      vehicleStatusType
     } = await request.json()
 
     if (!auditSessionID || !vinNo || !method || !detectedStatus) {
@@ -106,6 +108,8 @@ export async function POST(request: NextRequest) {
         .input('isConfirmed', sql.Bit, isConfirmed ? 1 : 0)
         .input('createdBy', sql.NVarChar, createdBy || 'System')
         .input('notes', sql.NVarChar, notes || '')
+        .input('vehicleStatus', sql.NVarChar, vehicleStatus || null)
+        .input('vehicleStatusType', sql.NVarChar, vehicleStatusType || null)
         .query(`
           UPDATE dbo.EV_AuditItem
           SET ScanTime = GETDATE(),
@@ -114,7 +118,9 @@ export async function POST(request: NextRequest) {
               PreviousLocation = @previousLocation,
               IsConfirmed = @isConfirmed,
               CreatedBy = @createdBy,
-              Notes = @notes
+              Notes = @notes,
+              VehicleStatus = @vehicleStatus,
+              VehicleStatusType = @vehicleStatusType
           WHERE AuditSessionID = @auditSessionID AND VinNo = @vinNo
         `)
     } else {
@@ -128,9 +134,11 @@ export async function POST(request: NextRequest) {
         .input('isConfirmed', sql.Bit, isConfirmed ? 1 : 0)
         .input('createdBy', sql.NVarChar, createdBy || 'System')
         .input('notes', sql.NVarChar, notes || '')
+        .input('vehicleStatus', sql.NVarChar, vehicleStatus || null)
+        .input('vehicleStatusType', sql.NVarChar, vehicleStatusType || null)
         .query(`
-          INSERT INTO dbo.EV_AuditItem (AuditSessionID, VinNo, ScanTime, ScanMethod, DetectedStatus, PreviousLocation, IsConfirmed, CreatedBy, Notes)
-          VALUES (@auditSessionID, @vinNo, GETDATE(), @method, @detectedStatus, @previousLocation, @isConfirmed, @createdBy, @notes)
+          INSERT INTO dbo.EV_AuditItem (AuditSessionID, VinNo, ScanTime, ScanMethod, DetectedStatus, PreviousLocation, IsConfirmed, CreatedBy, Notes, VehicleStatus, VehicleStatusType)
+          VALUES (@auditSessionID, @vinNo, GETDATE(), @method, @detectedStatus, @previousLocation, @isConfirmed, @createdBy, @notes, @vehicleStatus, @vehicleStatusType)
         `)
     }
 
