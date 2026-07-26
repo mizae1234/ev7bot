@@ -15,6 +15,12 @@ interface AuditSession {
   CheckedCount: number
 }
 
+interface StatusSummaryItem {
+  AuditSessionID: number
+  StatusLabel: string
+  Count: number
+}
+
 function getThaiDate(dateStr: string): string {
   if (!dateStr) return '-'
   try {
@@ -33,6 +39,7 @@ function getThaiDate(dateStr: string): string {
 function AuditDashboard() {
   const router = useRouter()
   const [sessions, setSessions] = useState<AuditSession[]>([])
+  const [statusSummary, setStatusSummary] = useState<StatusSummaryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -57,6 +64,7 @@ function AuditDashboard() {
       if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลประวัติการตรวจเช็กได้')
       const data = await res.json()
       setSessions(data.sessions || [])
+      setStatusSummary(data.statusSummary || [])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
     } finally {
@@ -199,32 +207,60 @@ function AuditDashboard() {
                 <div
                   key={session.AuditSessionID}
                   onClick={() => router.push(`/audit/${session.AuditSessionID}`)}
-                  className="bg-slate-800/30 hover:bg-slate-800/50 border border-indigo-500/10 hover:border-cyan-500/30 rounded-2xl p-5 transition duration-200 cursor-pointer shadow-sm hover:shadow-md backdrop-blur-sm flex items-center justify-between"
+                  className="bg-slate-800/30 hover:bg-slate-800/50 border border-indigo-500/10 hover:border-cyan-500/30 rounded-2xl p-5 transition duration-200 cursor-pointer shadow-sm hover:shadow-md backdrop-blur-sm space-y-3"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-bold text-slate-100">{session.LocationName || session.Location}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        session.Status === 'DRAFT'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      }`}>
-                        {session.Status === 'DRAFT' ? 'กำลังดำเนินงาน' : 'เสร็จสิ้น'}
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-bold text-slate-100">{session.LocationName || session.Location}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          session.Status === 'DRAFT'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        }`}>
+                          {session.Status === 'DRAFT' ? 'กำลังดำเนินงาน' : 'เสร็จสิ้น'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-slate-400 font-medium">
+                        <span className="flex items-center gap-1">📅 {getThaiDate(session.AuditDate)}</span>
+                        <span className="flex items-center gap-1">👤 {session.CreatedBy}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-slate-400 font-medium">
-                      <span className="flex items-center gap-1">📅 {getThaiDate(session.AuditDate)}</span>
-                      <span className="flex items-center gap-1">👤 {session.CreatedBy}</span>
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-lg font-black text-slate-200">{session.CheckedCount} คัน</div>
+                        <div className="text-[10px] text-slate-500">สแกนเสร็จสิ้น</div>
+                      </div>
+                      <span className="text-slate-500 text-lg">➔</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-lg font-black text-slate-200">{session.CheckedCount} คัน</div>
-                      <div className="text-[10px] text-slate-500">สแกนเสร็จสิ้น</div>
-                    </div>
-                    <span className="text-slate-500 text-lg">➔</span>
-                  </div>
+                  {/* Status Breakdown Pills */}
+                  {(() => {
+                    const sessionStatuses = statusSummary.filter(s => s.AuditSessionID === session.AuditSessionID)
+                    if (sessionStatuses.length === 0) return null
+
+                    const getColor = (label: string) => {
+                      const k = label.toUpperCase()
+                      if (k.includes('ON_RENT') || k.includes('ON RENT')) return 'bg-violet-500/15 text-violet-300 border-violet-500/25'
+                      if (k.includes('AVAILABLE') || k.includes('พร้อม')) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'
+                      if (k.includes('MAINTENANCE') || k.includes('ซ่อม')) return 'bg-amber-500/15 text-amber-300 border-amber-500/25'
+                      if (k.includes('REPLACEMENT') || k.includes('ทดแทน')) return 'bg-sky-500/15 text-sky-300 border-sky-500/25'
+                      if (k.includes('ไม่ทราบ')) return 'bg-slate-500/15 text-slate-400 border-slate-500/25'
+                      return 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25'
+                    }
+
+                    return (
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-700/30">
+                        {sessionStatuses.map(s => (
+                          <span key={s.StatusLabel} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${getColor(s.StatusLabel)}`}>
+                            {s.StatusLabel} {s.Count}
+                          </span>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

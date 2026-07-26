@@ -99,7 +99,18 @@ export async function GET(request: NextRequest) {
       ORDER BY s.AuditDate DESC, s.CreateDate DESC
     `)
 
-    return NextResponse.json({ sessions: result.recordset })
+    // 4. Fetch vehicle status breakdown per session
+    const statusResult = await pool.request().query(`
+      SELECT ai.AuditSessionID,
+             COALESCE(sub_st.StatusName, ai.VehicleStatus, ai.VehicleStatusType, N'ไม่ทราบสถานะ') AS StatusLabel,
+             COUNT(*) AS Count
+      FROM dbo.EV_AuditItem ai
+      LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
+      GROUP BY ai.AuditSessionID, COALESCE(sub_st.StatusName, ai.VehicleStatus, ai.VehicleStatusType, N'ไม่ทราบสถานะ')
+      ORDER BY ai.AuditSessionID, Count DESC
+    `)
+
+    return NextResponse.json({ sessions: result.recordset, statusSummary: statusResult.recordset })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Get Session Error:', message)
