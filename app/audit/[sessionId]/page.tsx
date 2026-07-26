@@ -1025,6 +1025,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 )
               })}
             </div>
+            )
           })()}
         </div>
       </div>
