@@ -30,6 +30,9 @@ interface ScannedItem {
   RegisterNo?: string
   Model?: string
   Exterior_Color?: string
+  VehicleStatus?: string
+  VehicleStatusType?: string
+  StatusTypeName?: string
 }
 
 interface VehiclePreview {
@@ -631,6 +634,52 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
             </div>
           </div>
         </div>
+
+        {/* Vehicle Status Breakdown Card */}
+        {scannedItems.length > 0 && (() => {
+          // Build status groups: use StatusTypeName if available, else VehicleStatus (e.g. ON_RENT), else 'ไม่ทราบสถานะ'
+          const statusMap = new Map<string, { count: number, key: string }>()
+          scannedItems.forEach(item => {
+            const label = item.StatusTypeName || item.VehicleStatus || item.VehicleStatusType || 'ไม่ทราบสถานะ'
+            const existing = statusMap.get(label)
+            if (existing) {
+              existing.count++
+            } else {
+              statusMap.set(label, { count: 1, key: label })
+            }
+          })
+          const groups = Array.from(statusMap.entries()).sort((a, b) => b[1].count - a[1].count)
+
+          // Color palette for different statuses
+          const getStatusColor = (key: string) => {
+            const k = key.toUpperCase()
+            if (k.includes('ON_RENT') || k.includes('ON RENT')) return { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-300', num: 'text-violet-400' }
+            if (k.includes('AVAILABLE') || k.includes('พร้อม')) return { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-300', num: 'text-emerald-400' }
+            if (k.includes('MAINTENANCE') || k.includes('ซ่อม')) return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-300', num: 'text-amber-400' }
+            if (k.includes('REPLACEMENT') || k.includes('ทดแทน')) return { bg: 'bg-sky-500/10', border: 'border-sky-500/20', text: 'text-sky-300', num: 'text-sky-400' }
+            if (k.includes('ไม่ทราบ')) return { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-slate-400', num: 'text-slate-300' }
+            return { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-300', num: 'text-indigo-400' }
+          }
+
+          return (
+            <div className="bg-slate-800/40 border border-slate-800/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
+                <span className="text-xs font-black text-slate-300 uppercase tracking-wider">🚗 สรุปสถานะรถ ณ เวลาที่สแกน</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {groups.map(([label, { count }]) => {
+                  const colors = getStatusColor(label)
+                  return (
+                    <div key={label} className={`${colors.bg} border ${colors.border} rounded-xl py-2 px-3 flex items-center justify-between`}>
+                      <span className={`text-[10px] font-bold ${colors.text} truncate mr-2`}>{label}</span>
+                      <span className={`text-base font-black ${colors.num} shrink-0`}>{count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Only allow scanning if the session is DRAFT */}
         {session.Status === 'DRAFT' && (

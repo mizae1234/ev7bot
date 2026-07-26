@@ -72,11 +72,14 @@ export async function GET(request: NextRequest) {
         .query(`
           SELECT ai.AuditItemID, ai.AuditSessionID, ai.VinNo, ai.ScanTime, ai.ScanMethod,
                  ai.DetectedStatus, ai.PreviousLocation, ai.IsConfirmed, ai.CreatedBy, ai.Notes,
+                 ai.VehicleStatus, ai.VehicleStatusType,
                  ii.RegisterNo, ii.Model, ii.Exterior_Color,
-                 sub_prev.StatusName AS PreviousLocationName
+                 sub_prev.StatusName AS PreviousLocationName,
+                 sub_st.StatusName AS StatusTypeName
           FROM dbo.EV_AuditItem ai
           LEFT JOIN dbo.EV_InventoryItem ii ON ai.VinNo = ii.VinNo AND ii.IsActive = 1
           LEFT JOIN dbo.EV_MsSubStatus sub_prev ON ai.PreviousLocation = sub_prev.StatusCode AND sub_prev.Type = 'LOCATION'
+          LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
           WHERE ai.AuditSessionID = @sessionId
           ORDER BY ai.ScanTime DESC
         `)
