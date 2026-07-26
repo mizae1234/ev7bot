@@ -161,7 +161,7 @@ function AuditDashboard() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl p-4 text-center backdrop-blur-sm">
             <div className="text-2xl font-black text-cyan-400">{sessions.length}</div>
             <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-1">รอบตรวจทั้งหมด</div>
@@ -171,12 +171,6 @@ function AuditDashboard() {
               {sessions.filter(s => s.Status === 'DRAFT').length}
             </div>
             <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-1">กำลังดำเนินการ</div>
-          </div>
-          <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl p-4 text-center backdrop-blur-sm">
-            <div className="text-2xl font-black text-emerald-400">
-              {sessions.reduce((acc, curr) => acc + curr.CheckedCount, 0)}
-            </div>
-            <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-1">รถที่สแกนแล้ว</div>
           </div>
         </div>
 
