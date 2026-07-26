@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { getStatusThaiLabel } from '@/lib/audit-status'
 import Script from 'next/script'
+import * as XLSX from 'xlsx'
 
 interface AuditSession {
   AuditSessionID: number
@@ -887,7 +889,43 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
 
         {/* 4. Scanned List (Progress log) */}
         <div className="space-y-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">รถที่เช็กในรอบนี้แล้ว ({scannedItems.length} คัน)</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">รถที่เช็กในรอบนี้แล้ว ({scannedItems.length} คัน)</h2>
+            {scannedItems.length > 0 && (
+              <button
+                onClick={() => {
+                  const detectStatusThai: Record<string, string> = {
+                    'MATCHED': 'ตรงพิกัด',
+                    'MISMATCH': 'ผิดพิกัด',
+                    'NOT_IN_SYSTEM': 'ไม่มีในระบบ'
+                  }
+                  const rows = scannedItems.map((item, idx) => ({
+                    'ลำดับ': scannedItems.length - idx,
+                    'ทะเบียน': item.RegisterNo || '-',
+                    'VinNo': item.VinNo,
+                    'รุ่น': item.Model || '-',
+                    'สี': item.Exterior_Color || '-',
+                    'สถานะรถ': item.VehicleStatus ? getStatusThaiLabel(item.StatusTypeName || item.VehicleStatusType || item.VehicleStatus) : '-',
+                    'ผลตรวจ': detectStatusThai[item.DetectedStatus] || item.DetectedStatus,
+                    'พิกัดก่อนหน้า': item.PreviousLocationName || item.PreviousLocation || '-',
+                    'วิธีสแกน': item.ScanMethod,
+                    'เวลาสแกน': new Date(item.ScanTime).toLocaleString('th-TH', { timeZone: 'UTC' }),
+                    'ผู้บันทึก': item.CreatedBy,
+                    'หมายเหตุ': item.Notes || ''
+                  }))
+                  const ws = XLSX.utils.json_to_sheet(rows)
+                  const wb = XLSX.utils.book_new()
+                  XLSX.utils.book_append_sheet(wb, ws, 'Audit Detail')
+                  const locationName = session?.LocationName || session?.Location || 'audit'
+                  const dateStr = session?.AuditDate ? new Date(session.AuditDate).toISOString().split('T')[0] : 'export'
+                  XLSX.writeFile(wb, `audit_${locationName}_${dateStr}.xlsx`)
+                }}
+                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1 rounded-lg transition flex items-center gap-1"
+              >
+                📥 Export Excel
+              </button>
+            )}
+          </div>
 
           {scannedItems.length === 0 ? (
             <div className="bg-slate-800/10 border border-slate-800/50 rounded-2xl py-12 text-center text-slate-500 text-xs font-medium">
