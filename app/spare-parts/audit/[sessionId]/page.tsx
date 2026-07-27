@@ -237,13 +237,6 @@ function SparePartsScanningInterface() {
       </div>
 
       <div className="p-4 space-y-6">
-        {showCamera && (
-          <CameraScanner 
-            onScan={handleCameraScan} 
-            onClose={() => setShowCamera(false)} 
-          />
-        )}
-
         {/* Scanner Form */}
         {!isCompleted && (
           <form onSubmit={handleScan} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
@@ -298,6 +291,13 @@ function SparePartsScanningInterface() {
               </div>
             </div>
           </form>
+        )}
+
+        {showCamera && (
+          <CameraScanner 
+            onScan={handleCameraScan} 
+            onClose={() => setShowCamera(false)} 
+          />
         )}
 
         {/* List of scanned items */}
