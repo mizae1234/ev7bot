@@ -128,7 +128,7 @@ function SparePartsScanningInterface() {
   }
 
   const handleCameraScan = async (decodedText: string) => {
-    setShowCamera(false)
+    // Keep camera open like a real scanner gun
     await submitScan(decodedText, 1) // default 1 for camera scan
   }
 
