@@ -28,13 +28,14 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
 
   useEffect(() => {
     let mounted = true
-    let isStarted = false
+    let startPromise: Promise<any> | null = null
+    let localScanner: Html5Qrcode | null = null
 
     if (typeof window !== 'undefined' && !scannerRef.current) {
-      const html5QrCode = new Html5Qrcode('reader')
-      scannerRef.current = html5QrCode
+      localScanner = new Html5Qrcode('reader')
+      scannerRef.current = localScanner
 
-      html5QrCode.start(
+      startPromise = localScanner.start(
         { facingMode: 'environment' }, 
         {
           fps: 10,
@@ -42,7 +43,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           aspectRatio: 1.0,
         },
         (text) => {
-          if (mounted && isStarted && isArmedRef.current) {
+          if (mounted && isArmedRef.current) {
             // Trigger pulled and barcode found!
             isArmedRef.current = false
             setIsArmed(false)
@@ -54,7 +55,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
               audio.play().catch(() => {})
             } catch(e) {}
             
-            // Trigger parent callback (does not close camera anymore)
+            // Trigger parent callback
             onScanRef.current(text)
 
             // Clear success message after 2 seconds
@@ -64,21 +65,23 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           }
         },
         (error) => {}
-      ).then(() => {
-        isStarted = true
-      }).catch((err) => {
+      )
+      
+      startPromise.catch((err) => {
         if (mounted) {
-          setErrorMsg('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้งานกล้องบนเบราว์เซอร์')
+          setErrorMsg('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้อง')
         }
       })
     }
 
     return () => {
       mounted = false
-      if (scannerRef.current && isStarted) {
-        scannerRef.current.stop().then(() => {
-          scannerRef.current?.clear()
-        }).catch(console.error)
+      if (startPromise && localScanner) {
+        startPromise.then(() => {
+          localScanner!.stop().then(() => {
+            localScanner!.clear()
+          }).catch(console.error)
+        }).catch(() => {})
       }
       scannerRef.current = null
     }
