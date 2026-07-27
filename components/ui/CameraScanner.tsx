@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
-import { Html5QrcodeScanner } from 'html5-qrcode'
+import React, { useEffect, useRef, useState } from 'react'
+import { Html5Qrcode } from 'html5-qrcode'
 
 interface CameraScannerProps {
   onScan: (decodedText: string) => void
@@ -9,41 +9,53 @@ interface CameraScannerProps {
 }
 
 export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    // Only run on client and avoid double initialization in React Strict Mode
-    if (typeof window !== 'undefined' && !scannerRef.current) {
-      scannerRef.current = new Html5QrcodeScanner(
-        'reader',
-        { 
-          fps: 10, 
-          qrbox: { width: 250, height: 150 },
-          aspectRatio: 1.0,
-          showTorchButtonIfSupported: true
-        },
-        false
-      )
+    let mounted = true
+    let isStarted = false
 
-      scannerRef.current.render(
+    if (typeof window !== 'undefined' && !scannerRef.current) {
+      const html5QrCode = new Html5Qrcode('reader')
+      scannerRef.current = html5QrCode
+
+      html5QrCode.start(
+        { facingMode: 'environment' }, // Auto-select rear camera
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 100 },
+          aspectRatio: 1.0,
+        },
         (text) => {
-          // On successful scan
-          if (scannerRef.current) {
-            scannerRef.current.clear().catch(console.error)
+          if (mounted && isStarted) {
+            html5QrCode.stop().then(() => {
+              html5QrCode.clear()
+              onScan(text)
+            }).catch(console.error)
           }
-          onScan(text)
         },
         (error) => {
-          // Ignore scanning errors
+          // Ignore frequent scanning errors
         }
-      )
+      ).then(() => {
+        isStarted = true
+      }).catch((err) => {
+        if (mounted) {
+          setErrorMsg('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้งานกล้องบนเบราว์เซอร์')
+          console.error(err)
+        }
+      })
     }
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch((error) => console.error('Failed to clear scanner', error))
-        scannerRef.current = null
+      mounted = false
+      if (scannerRef.current && isStarted) {
+        scannerRef.current.stop().then(() => {
+          scannerRef.current?.clear()
+        }).catch(console.error)
       }
+      scannerRef.current = null
     }
   }, [onScan])
 
@@ -60,13 +72,20 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           </button>
         </div>
         
-        {/* The div where html5-qrcode injects the camera stream */}
-        <div id="reader" className="w-full bg-white text-slate-800 min-h-[300px] flex items-center justify-center"></div>
+        {errorMsg ? (
+          <div className="p-8 text-center text-rose-600 font-bold">
+            {errorMsg}
+          </div>
+        ) : (
+          <div id="reader" className="w-full bg-slate-900 min-h-[300px] flex items-center justify-center"></div>
+        )}
       </div>
       
-      <p className="text-slate-400 mt-6 text-sm font-medium animate-pulse text-center">
-        หันกล้องไปที่บาร์โค้ด (เช่น GI-xxx) เพื่อสแกน...
-      </p>
+      {!errorMsg && (
+        <p className="text-slate-400 mt-6 text-sm font-medium animate-pulse text-center">
+          หันกล้องมือถือ (กล้องหลัง) ไปที่บาร์โค้ด<br/>ระบบจะสแกนให้อัตโนมัติโดยไม่ต้องกดปุ่มถ่าย
+        </p>
+      )}
     </div>
   )
 }
