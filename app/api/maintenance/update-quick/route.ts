@@ -608,29 +608,40 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Update EV_InventoryItem Status & StatusType if no pending tickets remain ───
-    if (carStatusCode === 'COMPLETE' && inventoryItemId) {
+    // ─── Update EV_InventoryItem Status & StatusType if no pending tickets remain OR all are STILL_WORK ───
+    if ((carStatusCode === 'COMPLETE' || carStatusCode === 'STILL_WORK') && inventoryItemId) {
       try {
-        // Query remaining pending count
+        // Query remaining pending tickets
         const countReq = pool.request()
         countReq.input('invId', sql.Int, inventoryItemId)
         const countRes = await countReq.query(`
-          SELECT COUNT(*) AS PendingCount 
+          SELECT CarStatusCode 
           FROM dbo.EV_MaintenanceItem 
           WHERE InventoryItemID = @invId 
             AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
             AND IsActive = 1
         `)
-        const pendingCount = countRes.recordset[0]?.PendingCount || 0
-        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Remaining Pending Count=${pendingCount}, isLastPending=${isLastPending}`)
+        const pendingItems = countRes.recordset
+        const pendingCount = pendingItems.length
+        
+        let allStillWork = true
+        for (const item of pendingItems) {
+          if (item.CarStatusCode !== 'STILL_WORK') {
+            allStillWork = false
+            break
+          }
+        }
 
-        if (isLastPending || pendingCount === 0) {
+        const shouldRevertToAvailable = isLastPending || pendingCount === 0 || (pendingCount > 0 && allStillWork)
+        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Remaining Pending Count=${pendingCount}, allStillWork=${allStillWork}, isLastPending=${isLastPending}`)
+
+        if (shouldRevertToAvailable) {
           let newStatus: string | null = null
           let newStatusType: string | null = null
           let shouldUpdate = false
 
           if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
-            if (resolvedCarStatusCode === 'COMPLETE') {
+            if (resolvedCarStatusCode === 'COMPLETE' || resolvedCarStatusCode === 'STILL_WORK') {
               newStatus = 'ON_RENT'
               newStatusType = null
               shouldUpdate = true
@@ -654,12 +665,23 @@ export async function POST(req: NextRequest) {
           if (shouldUpdate && newStatus) {
             const updReq = pool.request()
             updReq.input('newStatus', sql.NVarChar, newStatus)
-            updReq.input('newStatusType', sql.NVarChar, newStatusType)
             updReq.input('invId', sql.Int, inventoryItemId)
             updReq.input('userId', sql.Int, dbUserId)
+            
+            let setStatusType = "StatusType = NULL"
+            if (newStatusType !== null) {
+              updReq.input('newStatusType', sql.NVarChar, newStatusType)
+              setStatusType = "StatusType = @newStatusType"
+            }
+
+            let extraUpdate = ''
+            if (newStatus === 'ON_RENT' && newStatusType === null) {
+              extraUpdate = `, CurrentLocation = 'ON_RENT'`
+            }
+            
             await updReq.query(`
               UPDATE dbo.EV_InventoryItem
-              SET Status = @newStatus, StatusType = @newStatusType, UpdateUserID = @userId, UpdateDate = GETDATE()
+              SET Status = @newStatus, ${setStatusType}${extraUpdate}, UpdateUserID = @userId, UpdateDate = GETDATE()
               WHERE InventoryItemID = @invId
             `)
             console.log(`[Inventory Status Update Success] InventoryItemID=${inventoryItemId} set Status=${newStatus}, StatusType=${newStatusType}`)
