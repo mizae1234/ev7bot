@@ -6,6 +6,15 @@ import { sendMentionNotifications } from '@/lib/line'
 
 export const dynamic = 'force-dynamic'
 
+const carStatusMap: Record<string, string> = {
+  'COMPLETE': 'ซ่อมเสร็จ',
+  'IN_MAINTENANCE': 'รถอยู่ระหว่างซ่อม',
+  'WAITING_FOR_MAINTENANCE': 'รถจอดรอซ่อม',
+  'STILL_WORK': 'รถยังขับใช้งานได้อยู่',
+  'READY_PICKUP_MAINTENANCE': 'รถซ่อมเสร็จ รอลูกค้ามารับ',
+  'GARAGE_COMPLETE': 'เสร็จงานซ่อม'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -135,6 +144,7 @@ export async function POST(req: NextRequest) {
     let resolvedCarStatusCode = carStatusCode
     let inventoryItemId: number | null = null
     let vehicleStatusType: string | null = null
+    let oldCarStatusCode: string | null = null
 
     try {
       const vehicleInfoReq = pool.request()
@@ -149,6 +159,7 @@ export async function POST(req: NextRequest) {
       if (vehicleInfoRes.recordset.length > 0) {
         inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
         vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
+        oldCarStatusCode = vehicleInfoRes.recordset[0].CarStatusCode
 
         // If carStatusCode is not provided in body, default to the existing one from database
         if (carStatusCode === undefined) {
@@ -702,7 +713,9 @@ export async function POST(req: NextRequest) {
 
                 // 2. Maintenance Follow Up
                 if (maintenanceId) {
-                  const followUpMsg = `ระบบอัปเดต : ปรับสถานะรถกลับเป็น ON_RENT อัตโนมัติเนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                  const oldStatusName = oldCarStatusCode ? (carStatusMap[oldCarStatusCode] || oldCarStatusCode) : 'ไม่ระบุ';
+                  const newStatusName = resolvedCarStatusCode ? (carStatusMap[resolvedCarStatusCode] || resolvedCarStatusCode) : 'ไม่ระบุ';
+                  const followUpMsg = `ระบบอัปเดต : เปลี่ยนสถานะจาก ${oldStatusName} เป็น ${newStatusName}`;
                   await pool.request()
                     .input('maintId', sql.Int, maintenanceId)
                     .input('detail', sql.NVarChar, followUpMsg)
