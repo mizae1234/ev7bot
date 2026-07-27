@@ -221,15 +221,30 @@ function SparePartsScanningInterface() {
       return
     }
 
-    const exportData = items.map(item => ({
-      'รหัสอะไหล่ (SKU)': item.SKU,
-      'ชื่ออะไหล่': item.PartName || 'ไม่พบในข้อมูลหลัก',
-      'จำนวนที่นับได้': item.Quantity,
-      'ผู้สแกน': item.CreatedBy,
-      'เวลาสแกน': getThaiDateTime(item.ScanTime)
-    }))
+    const branchName = session?.LocationName || session?.Location || 'ไม่ระบุสาขา'
+    const auditDateStr = getThaiDateTime(session?.AuditDate)
+    const exportDateStr = getThaiDateTime(new Date().toISOString())
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const ws_data: any[][] = [
+      ['รายงานการตรวจนับสต็อกอะไหล่'],
+      [`สาขา: ${branchName}`],
+      [`วันที่เข้าเช็ค: ${auditDateStr}`],
+      [`พิมพ์รายงานเมื่อ: ${exportDateStr}`],
+      [], // Empty row for spacing
+      ['รหัสอะไหล่ (SKU)', 'ชื่ออะไหล่', 'จำนวนที่นับได้', 'ผู้สแกน', 'เวลาสแกน']
+    ]
+
+    items.forEach(item => {
+      ws_data.push([
+        item.SKU,
+        item.PartName || 'ไม่พบในข้อมูลหลัก',
+        item.Quantity,
+        item.CreatedBy,
+        getThaiDateTime(item.ScanTime)
+      ])
+    })
+
+    const worksheet = XLSX.utils.aoa_to_sheet(ws_data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Scanned Items')
     XLSX.writeFile(workbook, `Audit_Items_${session?.Location || sessionId}_${new Date().toISOString().slice(0,10)}.xlsx`)
