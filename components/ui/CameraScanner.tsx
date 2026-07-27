@@ -69,7 +69,17 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
       
       startPromise.catch((err) => {
         if (mounted) {
-          setErrorMsg('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้อง')
+          const errStr = String(err).toLowerCase()
+          if (errStr.includes('notallowed') || errStr.includes('permission')) {
+            setErrorMsg(
+              'ไม่สามารถเปิดกล้องได้เนื่องจากถูกปิดกั้นสิทธิ์\n\n' +
+              'วิธีแก้ไข:\n' +
+              '📱 iOS (Safari/LINE): ไปที่ Settings > Safari > Camera > เลือก Allow (อนุญาต)\n' +
+              '📱 Android (Chrome): แตะไอคอนแม่กุญแจ 🔒 บนแถบเว็บ > สิทธิ์ > กล้อง > เลือก อนุญาต'
+            )
+          } else {
+            setErrorMsg('ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบว่ามีกล้องและเบราว์เซอร์รองรับ (' + errStr + ')')
+          }
         }
       })
     }
@@ -115,8 +125,10 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
         </div>
         
         {errorMsg ? (
-          <div className="p-8 text-center text-rose-500 font-bold text-sm mt-8">
-            {errorMsg}
+          <div className="p-6 pt-12 pb-8 text-center text-rose-400 text-xs mt-4">
+            <div className="bg-slate-800/80 p-4 rounded-xl border border-rose-500/30 whitespace-pre-wrap leading-relaxed text-left">
+              {errorMsg}
+            </div>
           </div>
         ) : (
           <div className="relative pt-8 bg-black">
