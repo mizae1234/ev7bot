@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     let itemNotes = notes || ''
     let partName = null
     if (partResult.recordset.length === 0) {
-      itemNotes = itemNotes ? `${itemNotes} (ไม่พบในข้อมูลหลัก)` : 'ไม่พบในข้อมูลหลัก'
+      return NextResponse.json({ error: `ไม่พบข้อมูลอะไหล่รหัส: ${sku} ในระบบ ไม่สามารถบันทึกได้`, notFound: true }, { status: 404 })
     } else {
       partName = partResult.recordset[0].PartName
     }
