@@ -312,7 +312,7 @@ function SparePartsScanningInterface() {
                       </span>
                     </div>
                     <div className="text-xs text-slate-400 truncate">
-                      {item.PartName || 'ไม่ทราบชื่ออะไหล่'}
+                      {item.PartName || 'ไม่พบในข้อมูลหลัก'}
                     </div>
                     <div className="text-[9px] text-slate-500">
                       {getThaiDateTime(item.ScanTime)} • {item.CreatedBy}

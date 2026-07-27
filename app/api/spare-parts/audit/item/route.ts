@@ -19,8 +19,12 @@ export async function POST(request: NextRequest) {
       .input('sku', sql.NVarChar, sku)
       .query(`SELECT PartName FROM dbo.GI_SparePart WHERE SKU = @sku AND IsActive = 1`)
 
+    let itemNotes = notes || ''
+    let partName = null
     if (partResult.recordset.length === 0) {
-      return NextResponse.json({ error: 'ไม่พบรหัสอะไหล่นี้ในระบบ', notFound: true }, { status: 404 })
+      itemNotes = itemNotes ? `${itemNotes} (ไม่พบในข้อมูลหลัก)` : 'ไม่พบในข้อมูลหลัก'
+    } else {
+      partName = partResult.recordset[0].PartName
     }
 
     const qty = quantity && quantity > 0 ? quantity : 1
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
         .input('auditItemId', sql.Int, auditItemId)
         .input('quantity', sql.Int, qty)
         .input('createdBy', sql.NVarChar, createdBy || 'System')
-        .input('notes', sql.NVarChar, notes || '')
+        .input('notes', sql.NVarChar, itemNotes)
         .query(`
           UPDATE dbo.GI_SparePartAuditItem
           SET Quantity = Quantity + @quantity,
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
         .input('sku', sql.NVarChar, sku)
         .input('quantity', sql.Int, qty)
         .input('createdBy', sql.NVarChar, createdBy || 'System')
-        .input('notes', sql.NVarChar, notes || '')
+        .input('notes', sql.NVarChar, itemNotes)
         .query(`
           INSERT INTO dbo.GI_SparePartAuditItem (AuditSessionID, SKU, Quantity, ScanTime, CreatedBy, Notes, IsActive)
           VALUES (@sessionId, @sku, @quantity, GETDATE(), @createdBy, @notes, 1);
@@ -71,7 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       auditItemId: auditItemId,
-      partName: partResult.recordset[0].PartName,
+      partName: partName,
       quantity: qty
     })
   } catch (error: unknown) {
