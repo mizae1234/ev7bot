@@ -685,6 +685,43 @@ export async function POST(req: NextRequest) {
               WHERE InventoryItemID = @invId
             `)
             console.log(`[Inventory Status Update Success] InventoryItemID=${inventoryItemId} set Status=${newStatus}, StatusType=${newStatusType}`)
+
+            // ─── INSERT LOGS ───
+            if (newStatus === 'ON_RENT' && newStatusType === null) {
+              try {
+                // 1. Vehicle Note
+                const vehicleNoteDetail = `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                await pool.request()
+                  .input('itemId', sql.Int, inventoryItemId)
+                  .input('note', sql.NVarChar, vehicleNoteDetail)
+                  .input('userId', sql.Int, dbUserId)
+                  .query(`
+                    INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+                    VALUES (@itemId, @note, GETDATE(), @userId, 1)
+                  `)
+
+                // 2. Maintenance Follow Up
+                if (maintenanceId) {
+                  const followUpMsg = `ระบบอัปเดต : ปรับสถานะรถกลับเป็น ON_RENT อัตโนมัติเนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                  await pool.request()
+                    .input('maintId', sql.Int, maintenanceId)
+                    .input('detail', sql.NVarChar, followUpMsg)
+                    .input('userId', sql.Int, dbUserId)
+                    .query(`
+                      INSERT INTO dbo.EV_MaintenanceFollowUp (
+                        MaintenanceItemID, FollowUpDate, FollowUpDetail, IsActive,
+                        CreateDate, CreateUserID, UpdateDate, UpdateUserID
+                      )
+                      VALUES (
+                        @maintId, GETDATE(), @detail, 1,
+                        GETDATE(), @userId, GETDATE(), @userId
+                      )
+                    `)
+                }
+              } catch (logErr) {
+                console.error('[Auto Revert Log Error]', logErr)
+              }
+            }
           }
         } else {
           console.log(`[Inventory Update Skipped] There are still ${pendingCount} pending tickets.`)
