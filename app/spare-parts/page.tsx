@@ -227,8 +227,6 @@ function SparePartsAdminDashboard() {
   )
 }
 
-import { AuthGuard } from '@/components/ui/AuthGuard'
-
 export default function SparePartsAdminPage() {
   return (
     <AuthGuard>
