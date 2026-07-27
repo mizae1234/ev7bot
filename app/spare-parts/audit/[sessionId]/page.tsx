@@ -251,25 +251,31 @@ function SparePartsScanningInterface() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="text-xs font-bold text-slate-400">สแกนรหัสอะไหล่ (SKU)</label>
+                </div>
+                <div className="relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    placeholder="พิมพ์รหัส หรือ ยิงบาร์โค้ด..."
+                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-xl pl-4 pr-14 py-4 text-xl font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none"
+                    autoFocus
+                  />
                   {!showCamera && (
                     <button 
                       type="button" 
                       onClick={() => setShowCamera(true)}
-                      className="text-xs bg-teal-500/20 text-teal-300 px-2 py-1 rounded border border-teal-500/30 font-bold flex items-center gap-1"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-3 text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center"
+                      title="เปิดกล้องสแกน"
                     >
-                      📷 เปิดกล้องสแกน
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                        <circle cx="12" cy="13" r="3"></circle>
+                      </svg>
                     </button>
                   )}
                 </div>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={sku}
-                  onChange={(e) => setSku(e.target.value)}
-                  placeholder="ยิงบาร์โค้ดที่นี่..."
-                  className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-xl px-4 py-4 text-xl font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none"
-                  autoFocus
-                />
               </div>
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
