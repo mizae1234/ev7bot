@@ -10,7 +10,7 @@ export async function GET() {
     }
 
     const result = await pool.request().query(`
-      SELECT PartID, SKU, PartName, IsActive, CreatedAt, UpdatedAt
+      SELECT PartID, SKU, PartName, ProductNumberReference, SearchName, IsActive, CreatedAt, UpdatedAt
       FROM dbo.GI_SparePart
       WHERE IsActive = 1
       ORDER BY PartName ASC, SKU ASC
@@ -63,9 +63,11 @@ export async function POST(request: NextRequest) {
         await transaction.request()
           .input('sku', sql.NVarChar, part.SKU)
           .input('partName', sql.NVarChar, part.PartName)
+          .input('productNumberReference', sql.NVarChar, part.ProductNumberReference || null)
+          .input('searchName', sql.NVarChar, part.SearchName || null)
           .query(`
-            INSERT INTO dbo.GI_SparePart (SKU, PartName, IsActive, CreatedAt, UpdatedAt)
-            VALUES (@sku, @partName, 1, GETDATE(), GETDATE())
+            INSERT INTO dbo.GI_SparePart (SKU, PartName, ProductNumberReference, SearchName, IsActive, CreatedAt, UpdatedAt)
+            VALUES (@sku, @partName, @productNumberReference, @searchName, 1, GETDATE(), GETDATE())
           `)
         inserted++
       }
