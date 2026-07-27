@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
               updNewCarReq.input('userId', sql.Int, dbUserId)
               await updNewCarReq.query(`
                 UPDATE dbo.EV_InventoryItem
-                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
                 WHERE VinNo = @newVin AND IsActive = 1
               `)
               console.log(`[Replacement Update] Ticket #${maintenanceId}: Changed replacement car from ${existVin} to ${replacementVin}`)
@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
             updNewCarReq.input('userId', sql.Int, dbUserId)
             await updNewCarReq.query(`
               UPDATE dbo.EV_InventoryItem
-              SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+              SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
               WHERE VinNo = @newVin AND IsActive = 1
             `)
             console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}`)

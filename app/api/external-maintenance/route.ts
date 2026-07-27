@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
         updReplCarReq.input('userId', sql.Int, dbUserId)
         await updReplCarReq.query(`
           UPDATE dbo.EV_InventoryItem
-          SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+          SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
           WHERE VinNo = @vin AND IsActive = 1
         `)
       } catch (replErr) {
