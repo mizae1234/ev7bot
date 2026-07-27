@@ -239,11 +239,11 @@ function SparePartsScanningInterface() {
       <div className="p-4 space-y-6">
         {/* Scanner Form */}
         {!isCompleted && (
-          <form onSubmit={handleScan} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
-            <div className="space-y-4">
+          <form onSubmit={handleScan} className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl">
+            <div className="space-y-3">
               <div>
                 <div className="flex justify-between items-end mb-1">
-                  <label className="text-xs font-bold text-slate-400">สแกนรหัสอะไหล่ (SKU)</label>
+                  <label className="text-[11px] font-bold text-slate-400">สแกนรหัสอะไหล่ (SKU)</label>
                 </div>
                 <div className="relative">
                   <input
@@ -252,17 +252,17 @@ function SparePartsScanningInterface() {
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
                     placeholder="พิมพ์รหัส หรือ ยิงบาร์โค้ด..."
-                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-xl pl-4 pr-14 py-4 text-xl font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none"
+                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-lg pl-3 pr-12 py-3 text-lg font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none"
                     autoFocus
                   />
                   {!showCamera && (
                     <button 
                       type="button" 
                       onClick={() => setShowCamera(true)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-3 text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center"
                       title="เปิดกล้องสแกน"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
                         <circle cx="12" cy="13" r="3"></circle>
                       </svg>
@@ -270,21 +270,21 @@ function SparePartsScanningInterface() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-3 items-end">
+              <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <label className="text-xs font-bold text-slate-400 block mb-1">จำนวนชิ้น</label>
+                  <label className="text-[11px] font-bold text-slate-400 block mb-1">จำนวนชิ้น</label>
                   <input
                     type="number"
                     min="1"
                     value={quantity}
                     onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-3 text-center text-lg font-bold text-slate-200 outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2.5 text-center text-base font-bold text-slate-200 outline-none"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={scanning || !sku.trim()}
-                  className="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold py-3 rounded-xl shadow-lg transition disabled:opacity-50"
+                  className="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold py-2.5 rounded-lg shadow-lg transition disabled:opacity-50 text-sm"
                 >
                   {scanning ? 'บันทึก...' : 'บันทึก (Enter)'}
                 </button>
