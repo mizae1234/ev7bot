@@ -126,39 +126,44 @@ export async function POST(req: NextRequest) {
     const insertRes = await insertReq.execute('dbo.sp_InsertMaintenanceItemJson')
     const newMaintenanceId = insertRes.output.NewMaintenanceItemID
 
+    // 0. Save Replacement Car (if requested, independent of ticket status)
+    if (body.hasReplacement && body.replacementVin) {
+      try {
+        console.log(`[Replacement Car Assignment] New Ticket #${newMaintenanceId}: Assigning replacement car VinNo=${body.replacementVin} at Location=${body.replacementLocation}`)
+        
+        // 1. Insert into EV_ReplacementItem
+        const insReplReq = pool.request()
+        insReplReq.input('maintId', sql.Int, newMaintenanceId)
+        insReplReq.input('vin', sql.VarChar, body.replacementVin)
+        insReplReq.input('startDate', sql.Date, body.replacementStartDate ? body.replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
+        insReplReq.input('location', sql.VarChar, body.replacementLocation || null)
+        insReplReq.input('userId', sql.Int, dbUserId)
+        await insReplReq.query(`
+          INSERT INTO dbo.EV_ReplacementItem (
+            MaintenanceItemID, VinNo, ReplacementStartDate, Location, IsActive, CreateDate, CreateUserID
+          )
+          VALUES (
+            @maintId, @vin, @startDate, @location, 1, GETDATE(), @userId
+          )
+        `)
+
+        // 2. Update replacement car status to REPLACEMENT_CAR
+        const updReplCarReq = pool.request()
+        updReplCarReq.input('vin', sql.VarChar, body.replacementVin)
+        updReplCarReq.input('userId', sql.Int, dbUserId)
+        await updReplCarReq.query(`
+          UPDATE dbo.EV_InventoryItem
+          SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+          WHERE VinNo = @vin AND IsActive = 1
+        `)
+      } catch (replErr) {
+        console.error('[New Ticket Replacement Assignment Error]', replErr)
+      }
+    }
+
     // ─── If new report is WAITING_FOR_MAINTENANCE or IN_MAINTENANCE, update inventory and other pending tickets ───
     if (carStatusCode === 'WAITING_FOR_MAINTENANCE' || carStatusCode === 'IN_MAINTENANCE') {
       try {
-        // 0. Save Replacement Car (if requested)
-        if (body.hasReplacement && body.replacementVin) {
-          console.log(`[Replacement Car Assignment] New Ticket #${newMaintenanceId}: Assigning replacement car VinNo=${body.replacementVin} at Location=${body.replacementLocation}`)
-          
-          // 1. Insert into EV_ReplacementItem
-          const insReplReq = pool.request()
-          insReplReq.input('maintId', sql.Int, newMaintenanceId)
-          insReplReq.input('vin', sql.VarChar, body.replacementVin)
-          insReplReq.input('startDate', sql.Date, body.replacementStartDate ? body.replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
-          insReplReq.input('location', sql.VarChar, body.replacementLocation || null)
-          insReplReq.input('userId', sql.Int, dbUserId)
-          await insReplReq.query(`
-            INSERT INTO dbo.EV_ReplacementItem (
-              MaintenanceItemID, VinNo, ReplacementStartDate, Location, IsActive, CreateDate, CreateUserID
-            )
-            VALUES (
-              @maintId, @vin, @startDate, @location, 1, GETDATE(), @userId
-            )
-          `)
-
-          // 2. Update replacement car status to REPLACEMENT_CAR
-          const updReplCarReq = pool.request()
-          updReplCarReq.input('vin', sql.VarChar, body.replacementVin)
-          updReplCarReq.input('userId', sql.Int, dbUserId)
-          await updReplCarReq.query(`
-            UPDATE dbo.EV_InventoryItem
-            SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
-            WHERE VinNo = @vin AND IsActive = 1
-          `)
-        }
 
         // 1. Get current Status and StatusType of the vehicle
         const invReq = pool.request()

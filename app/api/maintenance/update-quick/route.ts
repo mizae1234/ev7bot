@@ -238,101 +238,21 @@ export async function POST(req: NextRequest) {
       console.error('[User Log Fix Error]', fixErr)
     }
 
-    // ─── Update EV_InventoryItem Status and Replacement Car when entering maintenance (เข้าซ่อม / เริ่มซ่อม) ───
-    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE') {
+    // ─── Update Replacement Car Assignment (only if explicitly provided in body) ───
+    if (hasReplacement !== undefined && maintenanceId) {
       try {
-        // 0. Update Replacement Car Assignment (only if explicitly provided in body)
-        if (hasReplacement !== undefined) {
-        try {
-          const existReplReq = pool.request()
-          existReplReq.input('maintId', sql.Int, maintenanceId)
-          const existReplRes = await existReplReq.query(`
-            SELECT VinNo, ReplacementItemID FROM dbo.EV_ReplacementItem WHERE MaintenanceItemID = @maintId AND IsActive = 1
-          `)
+        const existReplReq = pool.request()
+        existReplReq.input('maintId', sql.Int, maintenanceId)
+        const existReplRes = await existReplReq.query(`
+          SELECT VinNo, ReplacementItemID FROM dbo.EV_ReplacementItem WHERE MaintenanceItemID = @maintId AND IsActive = 1
+        `)
 
-          const hasExistRepl = existReplRes.recordset.length > 0
-          const existVin = hasExistRepl ? existReplRes.recordset[0].VinNo : null
+        const hasExistRepl = existReplRes.recordset.length > 0
+        const existVin = hasExistRepl ? existReplRes.recordset[0].VinNo : null
 
-          if (hasReplacement && replacementVin) {
-            if (hasExistRepl) {
-              if (existVin !== replacementVin) {
-                // 1. Revert old replacement car to REPLACEMENT_AVAILABLE
-                const revOldReq = pool.request()
-                revOldReq.input('oldVin', sql.VarChar, existVin)
-                revOldReq.input('userId', sql.Int, dbUserId)
-                await revOldReq.query(`
-                  UPDATE dbo.EV_InventoryItem
-                  SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_AVAILABLE', UpdateDate = GETDATE(), UpdateUserID = @userId
-                  WHERE VinNo = @oldVin AND IsActive = 1
-                `)
-
-                // 2. Update existing EV_ReplacementItem record
-                const updReplRecReq = pool.request()
-                updReplRecReq.input('maintId', sql.Int, maintenanceId)
-                updReplRecReq.input('vin', sql.VarChar, replacementVin)
-                updReplRecReq.input('startDate', sql.Date, replacementStartDate ? new Date(replacementStartDate) : new Date())
-                updReplRecReq.input('location', sql.VarChar, replacementLocation || null)
-                updReplRecReq.input('userId', sql.Int, dbUserId)
-                await updReplRecReq.query(`
-                  UPDATE dbo.EV_ReplacementItem
-                  SET VinNo = @vin, ReplacementStartDate = @startDate, Location = @location, UpdateUserID = @userId, UpdateDate = GETDATE()
-                  WHERE MaintenanceItemID = @maintId AND IsActive = 1
-                `)
-
-                // 3. Set new replacement car to REPLACEMENT_CAR
-                const updNewCarReq = pool.request()
-                updNewCarReq.input('newVin', sql.VarChar, replacementVin)
-                updNewCarReq.input('userId', sql.Int, dbUserId)
-                await updNewCarReq.query(`
-                  UPDATE dbo.EV_InventoryItem
-                  SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
-                  WHERE VinNo = @newVin AND IsActive = 1
-                `)
-                console.log(`[Replacement Update] Ticket #${maintenanceId}: Changed replacement car from ${existVin} to ${replacementVin}`)
-              } else {
-                // Same car, just update Location and StartDate if changed
-                const updReplRecReq = pool.request()
-                updReplRecReq.input('maintId', sql.Int, maintenanceId)
-                updReplRecReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
-                updReplRecReq.input('location', sql.VarChar, replacementLocation || null)
-                updReplRecReq.input('userId', sql.Int, dbUserId)
-                await updReplRecReq.query(`
-                  UPDATE dbo.EV_ReplacementItem
-                  SET ReplacementStartDate = @startDate, Location = @location, UpdateUserID = @userId, UpdateDate = GETDATE()
-                  WHERE MaintenanceItemID = @maintId AND IsActive = 1
-                `)
-              }
-            } else {
-              // No existing replacement record, create one!
-              const insReplReq = pool.request()
-              insReplReq.input('maintId', sql.Int, maintenanceId)
-              insReplReq.input('vin', sql.VarChar, replacementVin)
-              insReplReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
-              insReplReq.input('location', sql.VarChar, replacementLocation || null)
-              insReplReq.input('userId', sql.Int, dbUserId)
-              await insReplReq.query(`
-                INSERT INTO dbo.EV_ReplacementItem (
-                  MaintenanceItemID, VinNo, ReplacementStartDate, Location, IsActive, CreateDate, CreateUserID
-                )
-                VALUES (
-                  @maintId, @vin, @startDate, @location, 1, GETDATE(), @userId
-                )
-              `)
-
-              // Update new replacement car status to REPLACEMENT_CAR
-              const updNewCarReq = pool.request()
-              updNewCarReq.input('newVin', sql.VarChar, replacementVin)
-              updNewCarReq.input('userId', sql.Int, dbUserId)
-              await updNewCarReq.query(`
-                UPDATE dbo.EV_InventoryItem
-                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
-                WHERE VinNo = @newVin AND IsActive = 1
-              `)
-              console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}`)
-            }
-          } else {
-            // Unchecked or hasReplacement is false/null, deactivate any existing replacement
-            if (hasExistRepl) {
+        if (hasReplacement && replacementVin) {
+          if (hasExistRepl) {
+            if (existVin !== replacementVin) {
               // 1. Revert old replacement car to REPLACEMENT_AVAILABLE
               const revOldReq = pool.request()
               revOldReq.input('oldVin', sql.VarChar, existVin)
@@ -343,24 +263,103 @@ export async function POST(req: NextRequest) {
                 WHERE VinNo = @oldVin AND IsActive = 1
               `)
 
-              // 2. Soft-delete EV_ReplacementItem record
-              const delReplReq = pool.request()
-              delReplReq.input('maintId', sql.Int, maintenanceId)
-              delReplReq.input('userId', sql.Int, dbUserId)
-              await delReplReq.query(`
+              // 2. Update existing EV_ReplacementItem record
+              const updReplRecReq = pool.request()
+              updReplRecReq.input('maintId', sql.Int, maintenanceId)
+              updReplRecReq.input('vin', sql.VarChar, replacementVin)
+              updReplRecReq.input('startDate', sql.Date, replacementStartDate ? new Date(replacementStartDate) : new Date())
+              updReplRecReq.input('location', sql.VarChar, replacementLocation || null)
+              updReplRecReq.input('userId', sql.Int, dbUserId)
+              await updReplRecReq.query(`
                 UPDATE dbo.EV_ReplacementItem
-                SET IsActive = 0, ReplacementReturnDate = GETDATE(), UpdateUserID = @userId, UpdateDate = GETDATE()
+                SET VinNo = @vin, ReplacementStartDate = @startDate, Location = @location, UpdateUserID = @userId, UpdateDate = GETDATE()
                 WHERE MaintenanceItemID = @maintId AND IsActive = 1
               `)
-              console.log(`[Replacement Update] Ticket #${maintenanceId}: Removed replacement car ${existVin}`)
+
+              // 3. Set new replacement car to REPLACEMENT_CAR
+              const updNewCarReq = pool.request()
+              updNewCarReq.input('newVin', sql.VarChar, replacementVin)
+              updNewCarReq.input('userId', sql.Int, dbUserId)
+              await updNewCarReq.query(`
+                UPDATE dbo.EV_InventoryItem
+                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                WHERE VinNo = @newVin AND IsActive = 1
+              `)
+              console.log(`[Replacement Update] Ticket #${maintenanceId}: Changed replacement car from ${existVin} to ${replacementVin}`)
+            } else {
+              // Same car, just update Location and StartDate if changed
+              const updReplRecReq = pool.request()
+              updReplRecReq.input('maintId', sql.Int, maintenanceId)
+              updReplRecReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
+              updReplRecReq.input('location', sql.VarChar, replacementLocation || null)
+              updReplRecReq.input('userId', sql.Int, dbUserId)
+              await updReplRecReq.query(`
+                UPDATE dbo.EV_ReplacementItem
+                SET ReplacementStartDate = @startDate, Location = @location, UpdateUserID = @userId, UpdateDate = GETDATE()
+                WHERE MaintenanceItemID = @maintId AND IsActive = 1
+              `)
             }
+          } else {
+            // No existing replacement record, create one!
+            const insReplReq = pool.request()
+            insReplReq.input('maintId', sql.Int, maintenanceId)
+            insReplReq.input('vin', sql.VarChar, replacementVin)
+            insReplReq.input('startDate', sql.Date, replacementStartDate ? replacementStartDate.slice(0, 10) : new Date().toISOString().slice(0, 10))
+            insReplReq.input('location', sql.VarChar, replacementLocation || null)
+            insReplReq.input('userId', sql.Int, dbUserId)
+            await insReplReq.query(`
+              INSERT INTO dbo.EV_ReplacementItem (
+                MaintenanceItemID, VinNo, ReplacementStartDate, Location, IsActive, CreateDate, CreateUserID
+              )
+              VALUES (
+                @maintId, @vin, @startDate, @location, 1, GETDATE(), @userId
+              )
+            `)
+
+            // Update new replacement car status to REPLACEMENT_CAR
+            const updNewCarReq = pool.request()
+            updNewCarReq.input('newVin', sql.VarChar, replacementVin)
+            updNewCarReq.input('userId', sql.Int, dbUserId)
+            await updNewCarReq.query(`
+              UPDATE dbo.EV_InventoryItem
+              SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+              WHERE VinNo = @newVin AND IsActive = 1
+            `)
+            console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}`)
           }
-          } catch (replErr) {
-            console.error('[Replacement update error in update-quick]', replErr)
+        } else {
+          // Unchecked or hasReplacement is false/null, deactivate any existing replacement
+          if (hasExistRepl) {
+            // 1. Revert old replacement car to REPLACEMENT_AVAILABLE
+            const revOldReq = pool.request()
+            revOldReq.input('oldVin', sql.VarChar, existVin)
+            revOldReq.input('userId', sql.Int, dbUserId)
+            await revOldReq.query(`
+              UPDATE dbo.EV_InventoryItem
+              SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_AVAILABLE', UpdateDate = GETDATE(), UpdateUserID = @userId
+              WHERE VinNo = @oldVin AND IsActive = 1
+            `)
+
+            // 2. Soft-delete EV_ReplacementItem record
+            const delReplReq = pool.request()
+            delReplReq.input('maintId', sql.Int, maintenanceId)
+            delReplReq.input('userId', sql.Int, dbUserId)
+            await delReplReq.query(`
+              UPDATE dbo.EV_ReplacementItem
+              SET IsActive = 0, ReplacementReturnDate = GETDATE(), UpdateUserID = @userId, UpdateDate = GETDATE()
+              WHERE MaintenanceItemID = @maintId AND IsActive = 1
+            `)
+            console.log(`[Replacement Update] Ticket #${maintenanceId}: Removed replacement car ${existVin}`)
           }
         }
+      } catch (replErr) {
+        console.error('[Replacement update error in update-quick]', replErr)
+      }
+    }
 
-        // 1. Get InventoryItemID from the maintenance item
+    // ─── Update EV_InventoryItem Status when entering maintenance (เข้าซ่อม / เริ่มซ่อม) ───
+    if (resolvedCarStatusCode === 'WAITING_FOR_MAINTENANCE' || resolvedCarStatusCode === 'IN_MAINTENANCE') {
+      try {
         const maintReq = pool.request()
         maintReq.input('maintId', sql.Int, maintenanceId)
         const maintRes = await maintReq.query(`
