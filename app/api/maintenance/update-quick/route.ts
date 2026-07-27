@@ -383,26 +383,31 @@ export async function POST(req: NextRequest) {
 
             let newStatus: string | null = null
             let newStatusType: string | null = null
-
             // Mapping logic
+            let forceUpdate = false
             if (currentStatus === 'MAINTENANCE') {
-              // Already in maintenance, do nothing
+              // It's already in maintenance, but let's make sure the StatusType is correct if it was a replacement car
+              if (currentStatusType === 'REPLACEMENT_CAR' || currentStatusType === 'REPLACEMENT_AVAILABLE' || currentStatusType === 'REPLACEMENT') {
+                newStatus = 'MAINTENANCE'
+                newStatusType = 'REPLACEMENT_MAINTENANCE'
+                forceUpdate = true
+              }
             } else if (currentStatus === 'ON_RENT') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'ON_RENT_MAINTENANCE'
             } else if (currentStatusType === 'AVAILABLE_USE') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'USE_MAINTENANCE'
-            } else if (currentStatus === 'AVAILABLE' || currentStatusType === 'AVAILABLE' || currentStatusType === 'AVAILABLE_NEW') {
-              newStatus = 'MAINTENANCE'
-              newStatusType = 'NEW_MAINTENANCE'
             } else if (currentStatus === 'REPLACEMENT' || currentStatusType === 'REPLACEMENT_CAR' || currentStatusType === 'REPLACEMENT_AVAILABLE') {
               newStatus = 'MAINTENANCE'
               newStatusType = 'REPLACEMENT_MAINTENANCE'
+            } else if (currentStatus === 'AVAILABLE' || currentStatusType === 'AVAILABLE' || currentStatusType === 'AVAILABLE_NEW') {
+              newStatus = 'MAINTENANCE'
+              newStatusType = 'NEW_MAINTENANCE'
             }
 
             // 3. Update if mapping matched
-            if (newStatus && newStatusType) {
+            if (forceUpdate || (newStatus && newStatusType)) {
               const updReq = pool.request()
               updReq.input('newStatus', sql.NVarChar, newStatus)
               updReq.input('newStatusType', sql.NVarChar, newStatusType)
