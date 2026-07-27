@@ -31,6 +31,8 @@ function getThaiDateTime(dateStr: string): string {
   }
 }
 
+import CameraScanner from '@/components/ui/CameraScanner'
+
 function SparePartsScanningInterface() {
   const params = useParams()
   const router = useRouter()
@@ -43,6 +45,7 @@ function SparePartsScanningInterface() {
   const [sku, setSku] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [scanning, setScanning] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
   
   const [creatorName, setCreatorName] = useState('พนักงานตรวจเช็ก')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -82,9 +85,9 @@ function SparePartsScanningInterface() {
     }, 500)
   }, [sessionId])
 
-  const handleScan = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    if (!sku.trim()) return
+  // Split out the core submission logic to support both manual and camera scanning
+  const submitScan = async (scannedSku: string, scannedQty: number) => {
+    if (!scannedSku.trim()) return
 
     setScanning(true)
     try {
@@ -93,15 +96,14 @@ function SparePartsScanningInterface() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: parseInt(sessionId),
-          sku: sku.trim(),
-          quantity,
+          sku: scannedSku.trim(),
+          quantity: scannedQty,
           createdBy: creatorName
         })
       })
 
       const data = await res.json()
       if (res.ok) {
-        // Optimistic add or re-fetch
         fetchSessionData()
         setSku('')
         setQuantity(1)
@@ -109,7 +111,6 @@ function SparePartsScanningInterface() {
       } else {
         alert(data.error || 'เกิดข้อผิดพลาดในการบันทึก')
         if (data.notFound) {
-          // Keep SKU if not found, wait for user to clear
           inputRef.current?.focus()
         }
       }
@@ -119,6 +120,16 @@ function SparePartsScanningInterface() {
     } finally {
       setScanning(false)
     }
+  }
+
+  const handleScan = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    await submitScan(sku, quantity)
+  }
+
+  const handleCameraScan = async (decodedText: string) => {
+    setShowCamera(false)
+    await submitScan(decodedText, 1) // default 1 for camera scan
   }
 
   const handleUpdateQuantity = async (itemId: number, currentQty: number, delta: number) => {
@@ -143,9 +154,6 @@ function SparePartsScanningInterface() {
       if (!res.ok) {
         alert('ปรับปรุงจำนวนไม่สำเร็จ')
         fetchSessionData()
-      } else {
-        // Fetch to update total counts accurately if needed, but not strictly necessary since UI is updated
-        const data = await res.json()
       }
     } catch (e) {
       alert('Network error')
@@ -197,6 +205,14 @@ function SparePartsScanningInterface() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-24">
+      
+      {showCamera && (
+        <CameraScanner 
+          onScan={handleCameraScan} 
+          onClose={() => setShowCamera(false)} 
+        />
+      )}
+
       {/* Header */}
       <div className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-xl border-b border-teal-500/20 shadow-md">
         <div className="px-4 py-3 flex items-center justify-between">
@@ -233,7 +249,16 @@ function SparePartsScanningInterface() {
           <form onSubmit={handleScan} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 block mb-1">สแกนรหัสอะไหล่ (SKU)</label>
+                <div className="flex justify-between items-end mb-1">
+                  <label className="text-xs font-bold text-slate-400">สแกนรหัสอะไหล่ (SKU)</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowCamera(true)}
+                    className="text-xs bg-teal-500/20 text-teal-300 px-2 py-1 rounded border border-teal-500/30 font-bold flex items-center gap-1"
+                  >
+                    📷 เปิดกล้องสแกน
+                  </button>
+                </div>
                 <input
                   ref={inputRef}
                   type="text"
