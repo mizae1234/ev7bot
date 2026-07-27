@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 
 interface CameraScannerProps {
@@ -9,10 +9,12 @@ interface CameraScannerProps {
 }
 
 export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
+
   useEffect(() => {
-    // Only run on client
-    if (typeof window !== 'undefined') {
-      const scanner = new Html5QrcodeScanner(
+    // Only run on client and avoid double initialization in React Strict Mode
+    if (typeof window !== 'undefined' && !scannerRef.current) {
+      scannerRef.current = new Html5QrcodeScanner(
         'reader',
         { 
           fps: 10, 
@@ -23,19 +25,24 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
         false
       )
 
-      scanner.render(
+      scannerRef.current.render(
         (text) => {
           // On successful scan
-          scanner.clear()
+          if (scannerRef.current) {
+            scannerRef.current.clear().catch(console.error)
+          }
           onScan(text)
         },
         (error) => {
-          // Ignore scanning errors (happens continuously until barcode is found)
+          // Ignore scanning errors
         }
       )
+    }
 
-      return () => {
-        scanner.clear().catch((error) => console.error('Failed to clear scanner', error))
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch((error) => console.error('Failed to clear scanner', error))
+        scannerRef.current = null
       }
     }
   }, [onScan])
@@ -54,7 +61,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
         </div>
         
         {/* The div where html5-qrcode injects the camera stream */}
-        <div id="reader" className="w-full bg-black text-black min-h-[300px]"></div>
+        <div id="reader" className="w-full bg-white text-slate-800 min-h-[300px] flex items-center justify-center"></div>
       </div>
       
       <p className="text-slate-400 mt-6 text-sm font-medium animate-pulse text-center">
