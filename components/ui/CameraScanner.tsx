@@ -15,11 +15,16 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
   const [lastScanned, setLastScanned] = useState<string | null>(null)
   
   const isArmedRef = useRef(false)
+  const onScanRef = useRef(onScan)
 
   // Sync state to ref for the callback
   useEffect(() => {
     isArmedRef.current = isArmed
   }, [isArmed])
+
+  useEffect(() => {
+    onScanRef.current = onScan
+  }, [onScan])
 
   useEffect(() => {
     let mounted = true
@@ -34,7 +39,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
         {
           fps: 10,
           qrbox: { width: 250, height: 100 },
-          aspectRatio: 1.0,
+          aspectRatio: 1.777,
         },
         (text) => {
           if (mounted && isStarted && isArmedRef.current) {
@@ -50,7 +55,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
             } catch(e) {}
             
             // Trigger parent callback (does not close camera anymore)
-            onScan(text)
+            onScanRef.current(text)
 
             // Clear success message after 2 seconds
             setTimeout(() => {
@@ -77,7 +82,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
       }
       scannerRef.current = null
     }
-  }, [onScan])
+  }, [])
 
   const handleTrigger = () => {
     setIsArmed(true)
@@ -91,56 +96,55 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
   }
 
   return (
-    <div className="flex flex-col items-center p-2 mb-6 bg-slate-900 rounded-2xl border border-slate-800 shadow-xl">
-      <div className="w-full max-w-md bg-white rounded-xl overflow-hidden relative shadow-lg">
-        <div className="flex justify-between items-center p-3 bg-slate-100 border-b border-slate-200">
-          <h3 className="text-black font-bold text-sm">📷 กล้องสแกน</h3>
+    <div className="flex flex-col items-center mb-4 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
+      <div className="w-full max-w-md bg-black relative">
+        <div className="flex justify-between items-center px-3 py-2 bg-slate-800 border-b border-slate-700 absolute top-0 left-0 right-0 z-10 opacity-90">
+          <h3 className="text-white font-bold text-xs flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            กล้องสแกน
+          </h3>
           <button 
             onClick={onClose}
-            className="text-rose-500 font-bold hover:text-rose-600 text-sm flex items-center gap-1 bg-rose-50 px-2 py-1 rounded"
+            className="text-slate-300 hover:text-white font-bold text-xs bg-slate-700/50 px-2 py-1 rounded transition"
           >
             ✕ ปิด
           </button>
         </div>
         
         {errorMsg ? (
-          <div className="p-8 text-center text-rose-600 font-bold text-sm">
+          <div className="p-8 text-center text-rose-500 font-bold text-sm mt-8">
             {errorMsg}
           </div>
         ) : (
-          <div className="relative">
-            <div id="reader" className="w-full bg-slate-900 min-h-[250px] flex items-center justify-center"></div>
+          <div className="relative pt-8">
+            <div id="reader" className="w-full bg-black min-h-[150px] flex items-center justify-center [&>video]:object-cover"></div>
             
             {/* Overlay Frame / Trigger Status */}
-            <div className={`absolute inset-0 border-4 pointer-events-none transition-colors duration-300 ${isArmed ? 'border-amber-500' : lastScanned ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent'}`}></div>
+            <div className={`absolute inset-0 border-4 pointer-events-none transition-colors duration-300 z-10 ${isArmed ? 'border-amber-500' : lastScanned ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent'}`}></div>
             
             {lastScanned && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-4 py-2 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300 whitespace-nowrap text-sm">
-                ✅ สแกนสำเร็จ: {lastScanned}
+              <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300 whitespace-nowrap text-xs z-20">
+                ✅ สำเร็จ: {lastScanned}
               </div>
             )}
+
+            {/* Floating Trigger Button */}
+            <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center z-20">
+              <button 
+                onClick={handleTrigger}
+                disabled={isArmed}
+                className={`px-8 py-2.5 rounded-full font-bold text-white text-sm shadow-[0_4px_15px_rgba(0,0,0,0.5)] border border-white/20 backdrop-blur-sm transition-all ${
+                  isArmed 
+                    ? 'bg-amber-500/90 scale-95 shadow-[0_0_20px_rgba(245,158,11,0.6)]' 
+                    : 'bg-rose-600/90 hover:bg-rose-500 active:scale-95 shadow-[0_0_20px_rgba(225,29,72,0.6)]'
+                }`}
+              >
+                {isArmed ? 'กำลังหาบาร์โค้ด...' : 'กดยิง!'}
+              </button>
+            </div>
           </div>
         )}
       </div>
-      
-      {!errorMsg && (
-        <div className="mt-4 flex flex-col items-center gap-3 w-full">
-          <button 
-            onClick={handleTrigger}
-            disabled={isArmed}
-            className={`w-20 h-20 rounded-full flex items-center justify-center font-bold text-white text-base shadow-[0_0_20px_rgba(0,0,0,0.5)] transition-all ${
-              isArmed 
-                ? 'bg-amber-500 scale-95 shadow-[0_0_20px_rgba(245,158,11,0.6)]' 
-                : 'bg-rose-500 hover:bg-rose-600 active:scale-95 shadow-[0_0_20px_rgba(225,29,72,0.6)]'
-            }`}
-          >
-            {isArmed ? 'กำลังหา...' : 'กดยิง!'}
-          </button>
-          <p className="text-slate-400 text-xs font-medium text-center px-4">
-            {isArmed ? 'เล็งบาร์โค้ดให้อยู่ในกรอบ...' : 'เล็งบาร์โค้ดแล้วกดปุ่มแดง (ข้อมูลจะขึ้นด้านล่าง)'}
-          </p>
-        </div>
-      )}
     </div>
   )
 }
