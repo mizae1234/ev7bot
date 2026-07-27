@@ -39,7 +39,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
         {
           fps: 10,
           qrbox: { width: 250, height: 100 },
-          aspectRatio: 1.777,
+          aspectRatio: 1.0,
         },
         (text) => {
           if (mounted && isStarted && isArmedRef.current) {
@@ -98,7 +98,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
   return (
     <div className="flex flex-col items-center mb-4 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
       <div className="w-full max-w-md bg-black relative">
-        <div className="flex justify-between items-center px-3 py-2 bg-slate-800 border-b border-slate-700 absolute top-0 left-0 right-0 z-10 opacity-90">
+        <div className="flex justify-between items-center px-3 py-2 bg-slate-800 border-b border-slate-700 absolute top-0 left-0 right-0 z-20 opacity-90">
           <h3 className="text-white font-bold text-xs flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
             กล้องสแกน
@@ -116,11 +116,16 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
             {errorMsg}
           </div>
         ) : (
-          <div className="relative pt-8">
-            <div id="reader" className="w-full bg-black min-h-[150px] [&>video]:object-cover overflow-hidden"></div>
+          <div className="relative pt-8 bg-black">
+            {/* Cropping wrapper to make the camera appear shorter without breaking aspect ratio math */}
+            <div className="w-full h-[220px] overflow-hidden relative">
+              <div className="absolute top-1/2 left-0 w-full -translate-y-1/2">
+                <div id="reader" className="w-full"></div>
+              </div>
+            </div>
             
             {/* Overlay Frame / Trigger Status */}
-            <div className={`absolute inset-0 border-4 pointer-events-none transition-colors duration-300 z-10 ${isArmed ? 'border-amber-500' : lastScanned ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent'}`}></div>
+            <div className={`absolute top-8 bottom-0 left-0 right-0 border-4 pointer-events-none transition-colors duration-300 z-10 ${isArmed ? 'border-amber-500' : lastScanned ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent'}`}></div>
             
             {lastScanned && (
               <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-3 py-1.5 rounded-full font-bold shadow-lg animate-in slide-in-from-top-4 fade-in duration-300 whitespace-nowrap text-xs z-20">
