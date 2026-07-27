@@ -206,13 +206,6 @@ function SparePartsScanningInterface() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-24">
       
-      {showCamera && (
-        <CameraScanner 
-          onScan={handleCameraScan} 
-          onClose={() => setShowCamera(false)} 
-        />
-      )}
-
       {/* Header */}
       <div className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-xl border-b border-teal-500/20 shadow-md">
         <div className="px-4 py-3 flex items-center justify-between">
@@ -244,6 +237,13 @@ function SparePartsScanningInterface() {
       </div>
 
       <div className="p-4 space-y-6">
+        {showCamera && (
+          <CameraScanner 
+            onScan={handleCameraScan} 
+            onClose={() => setShowCamera(false)} 
+          />
+        )}
+
         {/* Scanner Form */}
         {!isCompleted && (
           <form onSubmit={handleScan} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
@@ -251,13 +251,15 @@ function SparePartsScanningInterface() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <label className="text-xs font-bold text-slate-400">สแกนรหัสอะไหล่ (SKU)</label>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowCamera(true)}
-                    className="text-xs bg-teal-500/20 text-teal-300 px-2 py-1 rounded border border-teal-500/30 font-bold flex items-center gap-1"
-                  >
-                    📷 เปิดกล้องสแกน
-                  </button>
+                  {!showCamera && (
+                    <button 
+                      type="button" 
+                      onClick={() => setShowCamera(true)}
+                      className="text-xs bg-teal-500/20 text-teal-300 px-2 py-1 rounded border border-teal-500/30 font-bold flex items-center gap-1"
+                    >
+                      📷 เปิดกล้องสแกน
+                    </button>
+                  )}
                 </div>
                 <input
                   ref={inputRef}
