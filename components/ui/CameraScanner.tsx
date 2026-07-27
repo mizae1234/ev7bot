@@ -117,7 +117,7 @@ export default function CameraScanner({ onScan, onClose }: CameraScannerProps) {
           </div>
         ) : (
           <div className="relative pt-8">
-            <div id="reader" className="w-full bg-black min-h-[150px] flex items-center justify-center [&>video]:object-cover"></div>
+            <div id="reader" className="w-full bg-black min-h-[150px] [&>video]:object-cover overflow-hidden"></div>
             
             {/* Overlay Frame / Trigger Status */}
             <div className={`absolute inset-0 border-4 pointer-events-none transition-colors duration-300 z-10 ${isArmed ? 'border-amber-500' : lastScanned ? 'border-emerald-500 bg-emerald-500/10' : 'border-transparent'}`}></div>
