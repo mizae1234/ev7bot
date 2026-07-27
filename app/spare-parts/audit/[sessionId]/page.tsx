@@ -46,6 +46,9 @@ function SparePartsScanningInterface() {
   const [quantity, setQuantity] = useState(1)
   const [scanning, setScanning] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+
+  const [catalog, setCatalog] = useState<{SKU: string, PartName: string}[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   
   const [creatorName, setCreatorName] = useState('พนักงานตรวจเช็ก')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -66,6 +69,19 @@ function SparePartsScanningInterface() {
 
   useEffect(() => {
     fetchSessionData()
+
+    const fetchCatalog = async () => {
+      try {
+        const res = await fetch('/api/spare-parts')
+        if (res.ok) {
+          const data = await res.json()
+          setCatalog(data.parts || [])
+        }
+      } catch (e) {
+        console.error('Failed to fetch catalog', e)
+      }
+    }
+    fetchCatalog()
 
     try {
       const profileStr = localStorage.getItem('liff_profile')
@@ -107,6 +123,7 @@ function SparePartsScanningInterface() {
         fetchSessionData()
         setSku('')
         setQuantity(1)
+        setShowSuggestions(false)
         inputRef.current?.focus()
       } else {
         alert(data.error || 'เกิดข้อผิดพลาดในการบันทึก')
@@ -203,6 +220,10 @@ function SparePartsScanningInterface() {
   const isCompleted = session.Status === 'COMPLETED'
   const totalItems = items.reduce((sum, item) => sum + item.Quantity, 0)
 
+  const filteredSuggestions = sku.trim() && showSuggestions 
+    ? catalog.filter(p => p.SKU.toLowerCase().includes(sku.toLowerCase()) || (p.PartName && p.PartName.toLowerCase().includes(sku.toLowerCase()))).slice(0, 15)
+    : []
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-24">
       
@@ -250,16 +271,21 @@ function SparePartsScanningInterface() {
                     ref={inputRef}
                     type="text"
                     value={sku}
-                    onChange={(e) => setSku(e.target.value)}
+                    onChange={(e) => {
+                      setSku(e.target.value)
+                      setShowSuggestions(true)
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="พิมพ์รหัส หรือ ยิงบาร์โค้ด..."
-                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-lg pl-3 pr-12 py-3 text-lg font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none"
+                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-emerald-500 rounded-lg pl-3 pr-12 py-3 text-lg font-mono text-emerald-300 placeholder:text-slate-600 transition outline-none relative z-10"
                     autoFocus
                   />
                   {!showCamera && (
                     <button 
                       type="button" 
                       onClick={() => setShowCamera(true)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-700/50 rounded-lg transition flex items-center justify-center z-20"
                       title="เปิดกล้องสแกน"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -267,6 +293,24 @@ function SparePartsScanningInterface() {
                         <circle cx="12" cy="13" r="3"></circle>
                       </svg>
                     </button>
+                  )}
+
+                  {filteredSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-50 max-h-60 overflow-y-auto">
+                      {filteredSuggestions.map(p => (
+                        <div 
+                          key={p.SKU}
+                          className="px-3 py-2.5 border-b border-slate-700/50 hover:bg-slate-700 cursor-pointer flex flex-col justify-center"
+                          onClick={() => {
+                            setSku(p.SKU)
+                            setShowSuggestions(false)
+                          }}
+                        >
+                          <div className="font-mono font-bold text-emerald-300 text-sm">{p.SKU}</div>
+                          <div className="text-xs text-slate-400 truncate">{p.PartName}</div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
