@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import * as XLSX from 'xlsx'
 
 interface ScannedItem {
   AuditItemID: number
@@ -214,6 +215,26 @@ function SparePartsScanningInterface() {
     }
   }
 
+  const exportToExcel = () => {
+    if (items.length === 0) {
+      alert('ไม่มีข้อมูลสำหรับ Export')
+      return
+    }
+
+    const exportData = items.map(item => ({
+      'รหัสอะไหล่ (SKU)': item.SKU,
+      'ชื่ออะไหล่': item.PartName || 'ไม่พบในข้อมูลหลัก',
+      'จำนวนที่นับได้': item.Quantity,
+      'ผู้สแกน': item.CreatedBy,
+      'เวลาสแกน': getThaiDateTime(item.ScanTime)
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Scanned Items')
+    XLSX.writeFile(workbook, `Audit_Items_${session?.Location || sessionId}_${new Date().toISOString().slice(0,10)}.xlsx`)
+  }
+
   if (loading) return <div className="min-h-screen bg-slate-900 flex justify-center items-center text-emerald-400">Loading...</div>
   if (!session) return <div className="min-h-screen bg-slate-900 flex justify-center items-center text-rose-400">Session not found</div>
 
@@ -347,7 +368,16 @@ function SparePartsScanningInterface() {
         {/* List of scanned items */}
         <div>
           <div className="flex justify-between items-end mb-3 px-1">
-            <h2 className="text-sm font-bold text-slate-400">รายการที่สแกนแล้ว</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-400">รายการที่สแกนแล้ว</h2>
+              <button 
+                onClick={exportToExcel}
+                className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition border border-slate-700"
+                title="Export Excel"
+              >
+                📥 Export
+              </button>
+            </div>
             <div className="text-xs font-bold bg-slate-800 px-2 py-1 rounded text-teal-300">
               รวม: {totalItems} ชิ้น
             </div>
