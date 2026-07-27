@@ -44,9 +44,9 @@ function SparePartsAdminDashboard() {
     fetchParts()
   }, [])
 
-  const processAndUpload = async (newParts: {SKU: string, PartName: string, ProductNumberReference?: string, SearchName?: string}[]) => {
+  const processAndUpload = async (newParts: {SKU: string, PartName: string, ProductNumberReference?: string}[]) => {
     if (newParts.length === 0) {
-      alert('ไม่พบข้อมูลที่ถูกต้อง กรุณาตรวจสอบไฟล์ (A: Item number, B: Product Number reference, C: Product name, D: Search name)')
+      alert('ไม่พบข้อมูลที่ถูกต้อง กรุณาตรวจสอบไฟล์ (A: Item number, B: Product Number reference, C: Product name)')
       setImporting(false)
       return
     }
@@ -93,8 +93,7 @@ function SparePartsAdminDashboard() {
           .map(row => ({
             SKU: String(row[0] || '').trim(),
             ProductNumberReference: String(row[1] || '').trim(),
-            PartName: String(row[2] || '').trim() || String(row[0] || '').trim(),
-            SearchName: String(row[3] || '').trim()
+            PartName: String(row[2] || '').trim() || String(row[0] || '').trim()
           }))
           
         processAndUpload(newParts)
@@ -153,7 +152,7 @@ function SparePartsAdminDashboard() {
               <h2 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
                 📥 นำเข้าจาก Excel
               </h2>
-              <p className="text-xs text-slate-400 mb-4">รูปแบบ: A=Item number, B=Product No. ref, C=Product name, D=Search name</p>
+              <p className="text-xs text-slate-400 mb-4">รูปแบบ 3 คอลัมน์: A=Item number (SKU), B=Product No., C=Product name</p>
               
               <div className="relative border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-cyan-400 transition cursor-pointer bg-slate-900/50">
                 <input 

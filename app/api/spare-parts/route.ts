@@ -64,10 +64,9 @@ export async function POST(request: NextRequest) {
           .input('sku', sql.NVarChar, part.SKU)
           .input('partName', sql.NVarChar, part.PartName)
           .input('productNumberReference', sql.NVarChar, part.ProductNumberReference || null)
-          .input('searchName', sql.NVarChar, part.SearchName || null)
           .query(`
-            INSERT INTO dbo.GI_SparePart (SKU, PartName, ProductNumberReference, SearchName, IsActive, CreatedAt, UpdatedAt)
-            VALUES (@sku, @partName, @productNumberReference, @searchName, 1, GETDATE(), GETDATE())
+            INSERT INTO dbo.GI_SparePart (SKU, PartName, ProductNumberReference, IsActive, CreatedAt, UpdatedAt)
+            VALUES (@sku, @partName, @productNumberReference, 1, GETDATE(), GETDATE())
           `)
         inserted++
       }
