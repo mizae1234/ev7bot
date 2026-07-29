@@ -167,10 +167,11 @@ export async function POST(req: NextRequest) {
       `)
 
       if (vehicleInfoRes.recordset.length > 0) {
-        inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
+        inventoryItemId = Number(vehicleInfoRes.recordset[0].InventoryItemID)
         vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
         oldCarStatusCode = vehicleInfoRes.recordset[0].CarStatusCode
         oldLocCode = vehicleInfoRes.recordset[0].CurrentLocation
+        console.log(`[Location Debug] inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', serviceLocationCode='${serviceLocationCode}'`)
 
         // If carStatusCode is not provided in body, default to the existing one from database
         if (carStatusCode === undefined) {
@@ -259,7 +260,9 @@ export async function POST(req: NextRequest) {
       }
       
       // 3. Location changed? Create EV_VehicleNote and LocationLog
+      console.log(`[Location Debug] Check: serviceLocationCode=${serviceLocationCode}, inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', match=${oldLocCode === serviceLocationCode}`)
       if (serviceLocationCode !== undefined && inventoryItemId && oldLocCode !== serviceLocationCode) {
+        console.log(`[Location Debug] ENTERING location change block!`)
         const oldName = oldLocCode
           ? (await pool.request()
               .input('code', sql.NVarChar, oldLocCode)

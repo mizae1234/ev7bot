@@ -1176,7 +1176,7 @@ export default function QuickReportPage() {
       carCase: ticket.CarCaseCode || '',
       insurance: ticket.InsuranceCode || '',
       claimNumber: ticket.ClaimNumber || '',
-      contractNo: ticket.ContractNo || activeContractNo || '',
+      contractNo: (ticket as any).ContractNo || activeContractNo || '',
       hasReplacement: !!activeRepl,
       replacementVin: activeRepl ? activeRepl.VinNo : '',
       replacementLocation: activeRepl ? (activeRepl.Location || '') : '',

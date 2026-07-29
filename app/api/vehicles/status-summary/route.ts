@@ -4,6 +4,7 @@ import { getMSSQLPool, sql } from '@/lib/mssql'
 export async function GET() {
   try {
     const pool = await getMSSQLPool()
+    if (!pool) return NextResponse.json({ error: 'Database connection failed' }, { status: 500 })
 
     const result = await pool.request().query(`
       SELECT 
