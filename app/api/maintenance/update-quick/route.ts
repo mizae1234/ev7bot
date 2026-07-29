@@ -18,7 +18,7 @@ const carStatusMap: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = body
+    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, contractNo, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = body
 
     if (!maintenanceId && !bodyInventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม หรือรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
@@ -210,6 +210,7 @@ export async function POST(req: NextRequest) {
       carCaseCode: carCaseCode || null,
       insuranceCode: insuranceCode || null,
       claimNumber: claimNumber || null,
+      contractNo: contractNo || null,
     }
 
     await pool.request()

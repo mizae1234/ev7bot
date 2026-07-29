@@ -165,7 +165,7 @@ export async function GET(
           m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
           m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode, m.IsActive,
           m.InsuranceCode, m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
-          m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode, m.ClaimNumber,
+          m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode, m.ClaimNumber, m.ContractNo,
           m.LastFollowUpDate, m.ParentMaintenanceItemID,
           m.CreateDate, m.UpdateDate, m.CreateUserID, m.UpdateUserID,
           ISNULL(NULLIF(uc.FirstName + ' ' + ISNULL(uc.LastName, ''), ''), uc.UserName) AS CreateUserName,
