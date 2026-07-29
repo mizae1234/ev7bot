@@ -128,6 +128,7 @@ export default function QuickReportPage() {
   // Form Fields
   const [contractorName, setContractorName] = useState('')
   const [driverName, setDriverName] = useState('')
+  const [activeContractNo, setActiveContractNo] = useState('')
   const [incidentDate, setIncidentDate] = useState(() => {
     const now = new Date()
     return now.toISOString().slice(0, 10)
@@ -517,9 +518,11 @@ export default function QuickReportPage() {
           const name = `${data.currentRent.FirstName} ${data.currentRent.LastName}`.trim()
           setContractorName(name)
           setDriverName(name)
+          setActiveContractNo(data.currentRent.ContractNo || '')
         } else {
           setContractorName('')
           setDriverName('')
+          setActiveContractNo('')
         }
 
         // 2. Set maintenance history & prepopulate location states for Tab 3
@@ -590,9 +593,11 @@ export default function QuickReportPage() {
                   const name = `${historyData.currentRent.FirstName} ${historyData.currentRent.LastName}`.trim()
                   setContractorName(name)
                   setDriverName(name)
+                  setActiveContractNo(historyData.currentRent.ContractNo || '')
                 } else {
                   setContractorName('')
                   setDriverName('')
+                  setActiveContractNo('')
                 }
 
                 // If maintId query parameter is provided, auto-open the edit ticket modal
@@ -988,6 +993,7 @@ export default function QuickReportPage() {
         problemType,
         insurance,
         claimNo,
+        contractNo: activeContractNo || null,
         faultPartyCode: faultParty,
         carCaseCode: carCase,
         serviceLocationCode: serviceLocation,
