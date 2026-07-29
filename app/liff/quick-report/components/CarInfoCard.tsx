@@ -22,6 +22,7 @@ interface CarInfoCardProps {
   onDeselect: () => void
   /** If true, show a compact card without status badges, location, etc. */
   compact?: boolean
+  activeContractNo?: string
 }
 
 /** Returns the Tailwind badge class for a given Thai status name */
@@ -40,7 +41,7 @@ function getStatusBadgeClass(name: string): string {
   return 'bg-slate-100 border-slate-200 text-slate-600'
 }
 
-export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, compact = false }: CarInfoCardProps) {
+export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, compact = false, activeContractNo }: CarInfoCardProps) {
   const currentLocationCode = carDetails?.CurrentLocation || car.CurrentLocation
   const currentLocationName = currentLocationCode
     ? (locationMap.get(currentLocationCode) || currentLocationCode)
@@ -75,6 +76,13 @@ export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, 
               <span className="text-xxs text-slate-655">
                 โครงการ: <span className="font-bold text-emerald-700">{car.Project}</span> | รุ่น: {car.Model}
               </span>
+
+              {/* Active Contract */}
+              {activeContractNo && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border bg-blue-50 border-blue-200 text-blue-700">
+                  สัญญา: {activeContractNo}
+                </span>
+              )}
 
               {/* Status Badge */}
               {carDetails?.StatusName && (() => {

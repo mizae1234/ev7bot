@@ -2184,7 +2184,7 @@ export default function QuickReportPage() {
                 <label className="text-xs font-bold text-slate-600 block mb-2">🚗 1. ข้อมูลรถที่เกิดเหตุ / มีปัญหา <span className="text-rose-550">*</span></label>
                 
                 {selectedCar ? (
-                  <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
+                  <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
                 ) : (
                   <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
                 )}
@@ -3325,7 +3325,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3507,7 +3507,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3540,7 +3540,7 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-2">🚗 ค้นหารถยนต์เพื่ออัปเดตสถานที่ <span className="text-rose-550">*</span></label>
               
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3737,7 +3737,7 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-2">🚗 ค้นหารถยนต์เพื่อดูสถิติ/รายละเอียด <span className="text-rose-550">*</span></label>
               
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} compact />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} compact />
               ) : (
                 <VehicleSearchWithScanner
                   onSelectCar={(car) => {
