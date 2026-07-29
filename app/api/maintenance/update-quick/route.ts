@@ -3,6 +3,7 @@ import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { sendMentionNotifications } from '@/lib/line'
+import { insertLocationLog } from '@/lib/location-log'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,6 +121,14 @@ export async function POST(req: NextRequest) {
 
           const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
 
+          await insertLocationLog({
+            inventoryItemId: bodyInventoryItemId,
+            oldLocation: oldLocationCode || null,
+            newLocation: serviceLocationCode || null,
+            actionCode: 'QUICK_REPORT_LOC',
+            createUserId: dbUserId
+          })
+
           await pool.request()
             .input('itemId', sql.Int, bodyInventoryItemId)
             .input('note', sql.NVarChar, noteDetail)
@@ -145,12 +154,13 @@ export async function POST(req: NextRequest) {
     let inventoryItemId: number | null = null
     let vehicleStatusType: string | null = null
     let oldCarStatusCode: string | null = null
+    let oldLocCode: string | null = null
 
     try {
       const vehicleInfoReq = pool.request()
       vehicleInfoReq.input('maintId', sql.Int, maintenanceId)
       const vehicleInfoRes = await vehicleInfoReq.query(`
-        SELECT m.InventoryItemID, m.CarStatusCode, i.StatusType 
+        SELECT m.InventoryItemID, m.CarStatusCode, i.StatusType, i.CurrentLocation
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.MaintenanceItemID = @maintId
@@ -160,6 +170,7 @@ export async function POST(req: NextRequest) {
         inventoryItemId = vehicleInfoRes.recordset[0].InventoryItemID
         vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
         oldCarStatusCode = vehicleInfoRes.recordset[0].CarStatusCode
+        oldLocCode = vehicleInfoRes.recordset[0].CurrentLocation
 
         // If carStatusCode is not provided in body, default to the existing one from database
         if (carStatusCode === undefined) {
@@ -246,8 +257,40 @@ export async function POST(req: NextRequest) {
         `)
         console.log(`[Follow-up User Fix] MaintenanceItemID=${maintenanceId}: set creator user ID to ${dbUserId}`)
       }
+      
+      // 3. Location changed? Create EV_VehicleNote and LocationLog
+      if (serviceLocationCode !== undefined && inventoryItemId && oldLocCode !== serviceLocationCode) {
+        const oldName = oldLocCode
+          ? (await pool.request()
+              .input('code', sql.NVarChar, oldLocCode)
+              .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
+            ).recordset[0]?.StatusName || oldLocCode
+          : 'ไม่ระบุ'
+        const newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
+
+        const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+
+        await insertLocationLog({
+          inventoryItemId: inventoryItemId,
+          oldLocation: oldLocCode || null,
+          newLocation: serviceLocationCode || null,
+          actionCode: 'QUICK_REPORT_EDIT',
+          refType: 'EV_MaintenanceItem',
+          refId: maintenanceId,
+          createUserId: dbUserId
+        })
+
+        await pool.request()
+          .input('itemId', sql.Int, inventoryItemId)
+          .input('note', sql.NVarChar, noteDetail)
+          .input('userId', sql.Int, dbUserId)
+          .query(`
+            INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+            VALUES (@itemId, @note, GETDATE(), @userId, 1)
+          `)
+      }
     } catch (fixErr) {
-      console.error('[User Log Fix Error]', fixErr)
+      console.error('[Post-Update Tasks Error]', fixErr)
     }
 
     // ─── Update Replacement Car Assignment (only if explicitly provided in body) ───

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMSSQLWritePool, sql } from '@/lib/mssql'
 import { prisma } from '@/lib/prisma'
+import { uploadToS3 } from '@/lib/s3'
+import { insertLocationLog } from '@/lib/location-log'
 import { env } from '@/lib/env'
 import { sendMentionNotifications } from '@/lib/line'
 
