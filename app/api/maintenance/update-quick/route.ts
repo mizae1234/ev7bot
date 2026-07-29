@@ -108,38 +108,48 @@ export async function POST(req: NextRequest) {
         WHERE InventoryItemID = @itemId
       `)
 
-      // 3. INSERT chat log into EV_VehicleNote (only if location actually changed)
+      // 3. INSERT logs (only if location actually changed)
       if (oldLocationCode !== (serviceLocationCode || '')) {
+        console.log(`[LOC CHANGE] Direct update: old='${oldLocationCode}' new='${serviceLocationCode}' itemId=${bodyInventoryItemId}`)
+
+        let oldName = oldLocationCode || 'ไม่ระบุ'
+        let newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
         try {
-          const oldName = serviceLocationName && oldLocationCode
-            ? (await pool.request()
-                .input('code', sql.NVarChar, oldLocationCode)
-                .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
-              ).recordset[0]?.StatusName || oldLocationCode
-            : oldLocationCode || 'ไม่ระบุ'
-          const newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
+          if (oldLocationCode) {
+            const nameRes = await pool.request()
+              .input('code', sql.NVarChar, oldLocationCode)
+              .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
+            if (nameRes.recordset[0]?.StatusName) oldName = nameRes.recordset[0].StatusName
+          }
+        } catch (e) { /* ignore name lookup error */ }
 
-          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
-
+        // 3a. LocationLog — independent try-catch
+        try {
           await insertLocationLog({
-            inventoryItemId: bodyInventoryItemId,
+            inventoryItemId: Number(bodyInventoryItemId),
             oldLocation: oldLocationCode || null,
             newLocation: serviceLocationCode || null,
             actionCode: 'QUICK_REPORT_LOC',
             createUserId: dbUserId
           })
+        } catch (logErr) {
+          console.error('[LocationLog Error - direct]', logErr)
+        }
 
+        // 3b. VehicleNote — independent try-catch (always runs even if log fails)
+        try {
+          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
           await pool.request()
-            .input('itemId', sql.Int, bodyInventoryItemId)
+            .input('itemId', sql.Int, Number(bodyInventoryItemId))
             .input('note', sql.NVarChar, noteDetail)
             .input('userId', sql.Int, dbUserId)
             .query(`
               INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
               VALUES (@itemId, @note, GETDATE(), @userId, 1)
             `)
-        } catch (logErr) {
-          console.error('[Location Change Log Error]', logErr)
-          // ไม่ throw — ให้ UPDATE สำเร็จแม้ log จะ fail
+          console.log(`[VehicleNote] ✅ Inserted note for itemId=${bodyInventoryItemId}`)
+        } catch (noteErr) {
+          console.error('[VehicleNote Error - direct]', noteErr)
         }
       }
 
@@ -260,37 +270,51 @@ export async function POST(req: NextRequest) {
       }
       
       // 3. Location changed? Create EV_VehicleNote and LocationLog
-      console.log(`[Location Debug] Check: serviceLocationCode=${serviceLocationCode}, inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', match=${oldLocCode === serviceLocationCode}`)
+      console.log(`[LOC CHANGE] SP path: serviceLocationCode=${serviceLocationCode}, inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', match=${oldLocCode === serviceLocationCode}`)
       if (serviceLocationCode !== undefined && inventoryItemId && oldLocCode !== serviceLocationCode) {
-        console.log(`[Location Debug] ENTERING location change block!`)
-        const oldName = oldLocCode
-          ? (await pool.request()
+        console.log(`[LOC CHANGE] SP path ENTERING location change block!`)
+
+        let oldName = oldLocCode || 'ไม่ระบุ'
+        let newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
+        try {
+          if (oldLocCode) {
+            const nameRes = await pool.request()
               .input('code', sql.NVarChar, oldLocCode)
               .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
-            ).recordset[0]?.StatusName || oldLocCode
-          : 'ไม่ระบุ'
-        const newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
+            if (nameRes.recordset[0]?.StatusName) oldName = nameRes.recordset[0].StatusName
+          }
+        } catch (e) { /* ignore name lookup error */ }
 
-        const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+        // 3a. LocationLog — independent
+        try {
+          await insertLocationLog({
+            inventoryItemId: Number(inventoryItemId),
+            oldLocation: oldLocCode || null,
+            newLocation: serviceLocationCode || null,
+            actionCode: 'QUICK_REPORT_EDIT',
+            refType: 'EV_MaintenanceItem',
+            refId: maintenanceId,
+            createUserId: dbUserId
+          })
+        } catch (logErr) {
+          console.error('[LocationLog Error - SP path]', logErr)
+        }
 
-        await insertLocationLog({
-          inventoryItemId: inventoryItemId,
-          oldLocation: oldLocCode || null,
-          newLocation: serviceLocationCode || null,
-          actionCode: 'QUICK_REPORT_EDIT',
-          refType: 'EV_MaintenanceItem',
-          refId: maintenanceId,
-          createUserId: dbUserId
-        })
-
-        await pool.request()
-          .input('itemId', sql.Int, inventoryItemId)
-          .input('note', sql.NVarChar, noteDetail)
-          .input('userId', sql.Int, dbUserId)
-          .query(`
-            INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
-            VALUES (@itemId, @note, GETDATE(), @userId, 1)
-          `)
+        // 3b. VehicleNote — independent (always runs)
+        try {
+          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+          await pool.request()
+            .input('itemId', sql.Int, Number(inventoryItemId))
+            .input('note', sql.NVarChar, noteDetail)
+            .input('userId', sql.Int, dbUserId)
+            .query(`
+              INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+              VALUES (@itemId, @note, GETDATE(), @userId, 1)
+            `)
+          console.log(`[VehicleNote] ✅ SP path: inserted note for itemId=${inventoryItemId}`)
+        } catch (noteErr) {
+          console.error('[VehicleNote Error - SP path]', noteErr)
+        }
       }
     } catch (fixErr) {
       console.error('[Post-Update Tasks Error]', fixErr)

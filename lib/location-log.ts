@@ -11,42 +11,60 @@ type LocationLogPayload = {
   createUserId: number;
 }
 
-export async function insertLocationLog(payload: LocationLogPayload) {
-  const pool = await getMSSQLWritePool()
-  if (!pool) throw new Error('Database connection failed')
-
-  // If both IDs are missing, we can't log
-  if (!payload.inventoryItemId && !payload.vinNo) {
-    console.warn('[LocationLog] Missing both inventoryItemId and vinNo, skipping log.')
-    return
-  }
-
+export async function insertLocationLog(payload: LocationLogPayload): Promise<boolean> {
   try {
-    const req = pool.request()
-    
-    // Resolve InventoryItemID and VinNo if one is missing
-    if (payload.inventoryItemId && !payload.vinNo) {
-      const vRes = await req
-        .input('qId', sql.Int, payload.inventoryItemId)
-        .query(`SELECT VinNo FROM dbo.EV_InventoryItem WHERE InventoryItemID = @qId`)
-      if (vRes.recordset.length > 0) payload.vinNo = vRes.recordset[0].VinNo
-    } else if (payload.vinNo && !payload.inventoryItemId) {
-      const iRes = await req
-        .input('qVin', sql.VarChar, payload.vinNo)
-        .query(`SELECT InventoryItemID FROM dbo.EV_InventoryItem WHERE VinNo = @qVin AND IsActive = 1`)
-      if (iRes.recordset.length > 0) payload.inventoryItemId = iRes.recordset[0].InventoryItemID
+    const pool = await getMSSQLWritePool()
+    if (!pool) {
+      console.error('[LocationLog] Write pool is null (MOCK_MODE?), skipping.')
+      return false
     }
 
-    req.input('itemId', sql.Int, payload.inventoryItemId || null)
-    req.input('vin', sql.VarChar, payload.vinNo || null)
-    req.input('oldLoc', sql.NVarChar, payload.oldLocation)
-    req.input('newLoc', sql.NVarChar, payload.newLocation)
-    req.input('action', sql.VarChar, payload.actionCode)
-    req.input('refType', sql.VarChar, payload.refType || null)
-    req.input('refId', sql.Int, payload.refId || null)
-    req.input('userId', sql.Int, payload.createUserId)
+    // If both IDs are missing, we can't log
+    if (!payload.inventoryItemId && !payload.vinNo) {
+      console.warn('[LocationLog] Missing both inventoryItemId and vinNo, skipping log.')
+      return false
+    }
 
-    await req.query(`
+    let itemId = payload.inventoryItemId ? Number(payload.inventoryItemId) : null
+    let vinNo = payload.vinNo || null
+
+    // Resolve missing VinNo or InventoryItemID using a SEPARATE request
+    if (itemId && !vinNo) {
+      try {
+        const lookupReq = pool.request()
+        lookupReq.input('qId', sql.Int, itemId)
+        const vRes = await lookupReq.query(
+          `SELECT VinNo FROM dbo.EV_InventoryItem WHERE InventoryItemID = @qId`
+        )
+        if (vRes.recordset.length > 0) vinNo = vRes.recordset[0].VinNo
+      } catch (lookupErr) {
+        console.error('[LocationLog] Error looking up VinNo:', lookupErr)
+      }
+    } else if (vinNo && !itemId) {
+      try {
+        const lookupReq = pool.request()
+        lookupReq.input('qVin', sql.VarChar, vinNo)
+        const iRes = await lookupReq.query(
+          `SELECT InventoryItemID FROM dbo.EV_InventoryItem WHERE VinNo = @qVin AND IsActive = 1`
+        )
+        if (iRes.recordset.length > 0) itemId = Number(iRes.recordset[0].InventoryItemID)
+      } catch (lookupErr) {
+        console.error('[LocationLog] Error looking up InventoryItemID:', lookupErr)
+      }
+    }
+
+    // INSERT using a FRESH request (never reuse)
+    const insertReq = pool.request()
+    insertReq.input('itemId', sql.Int, itemId)
+    insertReq.input('vin', sql.VarChar, vinNo)
+    insertReq.input('oldLoc', sql.NVarChar, payload.oldLocation)
+    insertReq.input('newLoc', sql.NVarChar, payload.newLocation)
+    insertReq.input('action', sql.VarChar, payload.actionCode)
+    insertReq.input('refType', sql.VarChar, payload.refType || null)
+    insertReq.input('refId', sql.Int, payload.refId || null)
+    insertReq.input('userId', sql.Int, payload.createUserId)
+
+    await insertReq.query(`
       INSERT INTO dbo.EV_VehicleLocationLog (
         InventoryItemID, VinNo, OldLocation, NewLocation, ActionCode, RefType, RefID, CreateDate, CreateUserID
       )
@@ -54,9 +72,11 @@ export async function insertLocationLog(payload: LocationLogPayload) {
         @itemId, @vin, @oldLoc, @newLoc, @action, @refType, @refId, GETDATE(), @userId
       )
     `)
-    
-    console.log(`[LocationLog] Inserted log for VinNo=${payload.vinNo} (${payload.actionCode})`)
+
+    console.log(`[LocationLog] ✅ Inserted log for VinNo=${vinNo} ItemId=${itemId} (${payload.actionCode})`)
+    return true
   } catch (err) {
-    console.error('[LocationLog] Error inserting location log:', err)
+    console.error('[LocationLog] ❌ Error inserting location log:', err)
+    return false
   }
 }
