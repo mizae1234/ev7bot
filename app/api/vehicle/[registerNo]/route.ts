@@ -148,14 +148,16 @@ export async function GET(
     const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult, problemTypesResult, notesResult] = await Promise.all([
       rentReq.query(`
         SELECT
-          RentItemID, ContractNo, ContractType,
-          FirstName, LastName, PhoneNo,
-          ExpectedReleaseDate, ReleaseDate,
-          ContractCancellationDate, IsActive,
-          RentType
-        FROM dbo.View_AccumarateReleaseCar
-        WHERE InventoryItemID = @inventoryItemId
-        ORDER BY ExpectedReleaseDate DESC, ReleaseDate DESC
+          v.RentItemID, v.ContractNo, v.ContractType,
+          v.FirstName, v.LastName, v.PhoneNo,
+          v.ExpectedReleaseDate, v.ReleaseDate,
+          v.ContractCancellationDate,
+          CAST(COALESCE(r.IsActive, 0) AS BIT) AS IsActive,
+          v.RentType
+        FROM dbo.View_AccumarateReleaseCar v
+        LEFT JOIN dbo.EV_RentItem r ON v.RentItemID = r.RentItemID
+        WHERE v.InventoryItemID = @inventoryItemId
+        ORDER BY v.ExpectedReleaseDate DESC, v.ReleaseDate DESC
       `),
       maintReq.query(`
         SELECT
