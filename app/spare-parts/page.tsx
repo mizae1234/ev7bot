@@ -20,6 +20,12 @@ function SparePartsAdminDashboard() {
   const [importing, setImporting] = useState(false)
   const [printPart, setPrintPart] = useState<SparePart | null>(null)
   
+  // States for manual add form
+  const [newSku, setNewSku] = useState('')
+  const [newProdNo, setNewProdNo] = useState('')
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchParts = async () => {
@@ -114,6 +120,83 @@ function SparePartsAdminDashboard() {
     }, 500)
   }
 
+  // Handle single part manual submission
+  const handleAddPart = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    const sku = newSku.trim()
+    const name = newName.trim()
+    const prodNo = newProdNo.trim()
+    
+    if (!sku || !name) {
+      alert('กรุณากรอกรหัส (SKU) และชื่ออะไหล่')
+      return
+    }
+
+    // Check for duplicate in local state (case-insensitive)
+    const isDuplicate = parts.some(p => p.SKU.trim().toLowerCase() === sku.toLowerCase())
+    if (isDuplicate) {
+      alert(`รหัสซ้ำ: มีรหัส (SKU) "${sku}" นี้ในระบบอยู่แล้ว`)
+      return
+    }
+
+    setAdding(true)
+    try {
+      const res = await fetch('/api/spare-parts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parts: [{
+            SKU: sku,
+            ProductNumberReference: prodNo || undefined,
+            PartName: name
+          }]
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        if (data.skipped > 0) {
+          alert(`รหัสซ้ำ: มีรหัส (SKU) "${sku}" นี้ในระบบอยู่แล้ว (ข้ามการบันทึก)`)
+        } else {
+          alert('เพิ่มข้อมูลอะไหล่เรียบร้อยแล้ว!')
+          setNewSku('')
+          setNewProdNo('')
+          setNewName('')
+          fetchParts()
+        }
+      } else {
+        alert('Error: ' + data.error)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  // Generate and download sample Excel Template
+  const downloadTemplate = () => {
+    try {
+      const headers = [['Item number', 'Product No.', 'Product name']]
+      const ws = XLSX.utils.aoa_to_sheet(headers)
+      
+      // Auto-fit column widths
+      ws['!cols'] = [
+        { wch: 20 }, // Item number (SKU)
+        { wch: 25 }, // Product No.
+        { wch: 40 }  // Product name
+      ]
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Template')
+      XLSX.writeFile(wb, 'spare_parts_import_template.xlsx')
+    } catch (err) {
+      console.error(err)
+      alert('เกิดข้อผิดพลาดในการดาวน์โหลดเทมเพลต')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans p-6 print:bg-white print:text-black print:p-0">
       
@@ -146,8 +229,9 @@ function SparePartsAdminDashboard() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Import Section */}
-          <div className="lg:col-span-1 space-y-4">
+          {/* Left Column: Import & Manual Add */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Import Section */}
             <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
               <h2 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
                 📥 นำเข้าจาก Excel
@@ -169,10 +253,74 @@ function SparePartsAdminDashboard() {
                 </div>
                 <div className="text-xs text-slate-500 mt-1">รองรับ .xlsx, .xls, .csv</div>
               </div>
+
+              <button
+                onClick={downloadTemplate}
+                className="w-full mt-4 flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl transition text-sm font-semibold border border-slate-600"
+              >
+                📥 ดาวน์โหลดเทมเพลต Excel
+              </button>
+            </div>
+
+            {/* Manual Add Section */}
+            <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
+              <h2 className="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
+                ➕ เพิ่มอะไหล่แบบรวดเร็ว
+              </h2>
+              <form onSubmit={handleAddPart} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    รหัส (SKU) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newSku}
+                    onChange={(e) => setNewSku(e.target.value)}
+                    placeholder="เช่น GI-0006337"
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Product No. (Reference)
+                  </label>
+                  <input
+                    type="text"
+                    value={newProdNo}
+                    onChange={(e) => setNewProdNo(e.target.value)}
+                    placeholder="เช่น 2740004AVN0501"
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    ชื่ออะไหล่ <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="เช่น AION WHEEL"
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition w-full"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={adding}
+                  className="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2.5 rounded-xl transition text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {adding ? 'กำลังบันทึก...' : '💾 บันทึกข้อมูล'}
+                </button>
+              </form>
             </div>
           </div>
 
-          {/* List Section */}
+          {/* Right Column: List Section */}
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl shadow-xl backdrop-blur-sm">
               <div className="flex justify-between items-center mb-6">
