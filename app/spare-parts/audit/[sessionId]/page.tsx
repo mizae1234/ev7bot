@@ -44,7 +44,7 @@ function SparePartsScanningInterface() {
   const [loading, setLoading] = useState(true)
 
   const [sku, setSku] = useState('')
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState<number | ''>(1)
   const [scanning, setScanning] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
@@ -142,7 +142,8 @@ function SparePartsScanningInterface() {
 
   const handleScan = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    await submitScan(sku, quantity)
+    const finalQty = typeof quantity === 'number' && quantity > 0 ? quantity : 1
+    await submitScan(sku, finalQty)
   }
 
   const handleCameraScan = async (decodedText: string) => {
@@ -357,18 +358,53 @@ function SparePartsScanningInterface() {
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-slate-400 block mb-1">จำนวนชิ้น</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2.5 text-center text-base font-bold text-slate-200 outline-none"
-                  />
+                  <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(prev => {
+                        const current = typeof prev === 'number' ? prev : 1;
+                        return Math.max(1, current - 1);
+                      })}
+                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-lg transition select-none"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setQuantity('');
+                        } else {
+                          const parsed = parseInt(val);
+                          setQuantity(isNaN(parsed) ? '' : parsed);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (quantity === '' || quantity < 1) {
+                          setQuantity(1);
+                        }
+                      }}
+                      className="w-full bg-transparent text-center text-base font-bold text-slate-200 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none py-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(prev => {
+                        const current = typeof prev === 'number' ? prev : 1;
+                        return current + 1;
+                      })}
+                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-lg transition select-none"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="submit"
                   disabled={scanning || !sku.trim()}
-                  className="flex-[2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold py-2.5 rounded-lg shadow-lg transition disabled:opacity-50 text-sm"
+                  className="flex-[1.2] bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold py-3.5 rounded-lg shadow-lg transition disabled:opacity-50 text-sm"
                 >
                   {scanning ? 'บันทึก...' : 'บันทึก (Enter)'}
                 </button>
