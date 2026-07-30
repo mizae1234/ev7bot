@@ -48,7 +48,12 @@ function SparePartsScanningInterface() {
   const [scanning, setScanning] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
 
-  const [catalog, setCatalog] = useState<{SKU: string, PartName: string}[]>([])
+  const [catalog, setCatalog] = useState<Array<{
+    SKU: string
+    PartName: string
+    ProductNumberReference?: string | null
+    SearchName?: string | null
+  }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   
   const [creatorName, setCreatorName] = useState('พนักงานตรวจเช็ก')
@@ -362,11 +367,31 @@ function SparePartsScanningInterface() {
                   <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
                     {matchedCatalogItem ? (
                       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2.5 flex items-start gap-2 text-xs">
-                        <span className="text-emerald-400 text-sm">📦</span>
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">พบข้อมูลอะไหล่ในระบบ</div>
-                          <div className="font-bold text-emerald-300 text-sm">{matchedCatalogItem.PartName}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">SKU: {matchedCatalogItem.SKU}</div>
+                        <span className="text-emerald-400 text-sm mt-0.5">📦</span>
+                        <div className="space-y-1.5 w-full">
+                          <div>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">พบข้อมูลอะไหล่ในระบบ</div>
+                            <div className="font-bold text-emerald-300 text-sm">{matchedCatalogItem.PartName}</div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1.5 border-t border-emerald-500/20 text-[11px] text-slate-300">
+                            <div>
+                              <span className="text-slate-500 font-medium block">รหัส SKU:</span>
+                              <span className="font-mono font-bold text-emerald-400/90">{matchedCatalogItem.SKU}</span>
+                            </div>
+                            {matchedCatalogItem.ProductNumberReference && (
+                              <div>
+                                <span className="text-slate-500 font-medium block">รหัสอ้างอิง (Ref):</span>
+                                <span className="font-mono text-slate-200">{matchedCatalogItem.ProductNumberReference}</span>
+                              </div>
+                            )}
+                            {matchedCatalogItem.SearchName && (
+                              <div className="col-span-2">
+                                <span className="text-slate-500 font-medium block">ชื่อสืบค้น/ชื่อเทียบ:</span>
+                                <span className="text-slate-200">{matchedCatalogItem.SearchName}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
