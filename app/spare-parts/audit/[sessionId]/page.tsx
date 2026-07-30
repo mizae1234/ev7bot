@@ -261,7 +261,11 @@ function SparePartsScanningInterface() {
   const isCompleted = session.Status === 'COMPLETED'
   const totalItems = items.reduce((sum, item) => sum + item.Quantity, 0)
 
-  const filteredSuggestions = sku.trim() && showSuggestions 
+  const matchedCatalogItem = sku.trim()
+    ? catalog.find(p => p.SKU.toLowerCase() === sku.trim().toLowerCase())
+    : null
+
+  const filteredSuggestions = sku.trim() && showSuggestions && !matchedCatalogItem
     ? catalog.filter(p => p.SKU.toLowerCase().includes(sku.toLowerCase()) || (p.PartName && p.PartName.toLowerCase().includes(sku.toLowerCase()))).slice(0, 15)
     : []
 
@@ -354,6 +358,29 @@ function SparePartsScanningInterface() {
                     </div>
                   )}
                 </div>
+                {sku.trim() && (
+                  <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {matchedCatalogItem ? (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2.5 flex items-start gap-2 text-xs">
+                        <span className="text-emerald-400 text-sm">📦</span>
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">พบข้อมูลอะไหล่ในระบบ</div>
+                          <div className="font-bold text-emerald-300 text-sm">{matchedCatalogItem.PartName}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">SKU: {matchedCatalogItem.SKU}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 flex items-start gap-2 text-xs">
+                        <span className="text-amber-400 text-sm">⚠️</span>
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">คำเตือน</div>
+                          <div className="font-bold text-amber-300">ไม่พบรหัสอะไหล่นี้ในฐานข้อมูลหลัก</div>
+                          <div className="text-[10px] text-slate-400">เมื่อกดบันทึก ระบบจะบันทึกรหัสนี้โดยไม่มีชื่ออะไหล่</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
