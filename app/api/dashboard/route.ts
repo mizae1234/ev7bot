@@ -615,11 +615,8 @@ export async function GET(req: NextRequest) {
         FROM dbo.EV_ReturnItem r
         LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
         LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
-        WHERE (
-          (r.ReceiveDate >= @startDate AND r.ReceiveDate <= @endDate)
-          OR (r.ReturnDate >= @startDate AND r.ReturnDate <= @endDate)
-        )
-        ORDER BY r.ReceiveDate DESC
+        WHERE r.ReturnDate >= @startDate AND r.ReturnDate <= @endDate
+        ORDER BY r.ReturnDate DESC
       `)
     ])
     const planTotal = planResult.recordset[0]?.planTotal || 0
