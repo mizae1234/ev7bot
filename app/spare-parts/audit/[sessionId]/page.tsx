@@ -146,8 +146,12 @@ function SparePartsScanningInterface() {
   }
 
   const handleCameraScan = async (decodedText: string) => {
-    // Keep camera open like a real scanner gun
-    await submitScan(decodedText, 1) // default 1 for camera scan
+    setSku(decodedText)
+    setShowCamera(false)
+    setShowSuggestions(false)
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 100)
   }
 
   const handleUpdateQuantity = async (itemId: number, currentQty: number, delta: number) => {
