@@ -128,11 +128,14 @@ CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.Use
 
 ### ถามจำนวนรถคืนสะสม (เช่น "เดือนนี้คืนรถกี่คัน", "รถคืนเดือนนี้")
 - ดึงจากวิว View_AccumarateReturnItem โดยใช้ ReturnDate เป็นเงื่อนไขวันที่
+- **สำคัญ**: เมื่อถูกถามเรื่องรถคืน ให้ตอบทั้ง 2 ตัวเลขเสมอ:
+  1. **รถคืนสะสม** = COUNT(*) จำนวนครั้งที่มีการคืนรถทั้งหมด (รถ 1 คันอาจคืนหลายครั้ง)
+  2. **รถคืน (Unique VIN)** = COUNT(DISTINCT VinNo) จำนวนรถจริงที่คืนมา (ไม่นับซ้ำ)
 - แยกเป็น 2 ประเภทดูจาก ReturnType (คอลัมน์คำนวณจาก StatusType):
   * **รถคืน** = รถคืนปกติ
   * **รถเวียนคืน Lineman** = รถเวียนคืนโครงการ Lineman
 - ตัวอย่าง Query:
-  SELECT ReturnType, COUNT(*) AS cnt
+  SELECT ReturnType, COUNT(*) AS TotalReturn, COUNT(DISTINCT VinNo) AS UniqueVIN
   FROM View_AccumarateReturnItem
   WHERE ReturnIsActive = 1
     AND ReturnDate >= @startDate AND ReturnDate <= @endDate
