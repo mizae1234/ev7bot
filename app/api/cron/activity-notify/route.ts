@@ -15,7 +15,7 @@ function formatDateTh(d: Date | string | null): string {
   try {
     return new Date(d).toLocaleDateString('th-TH', {
       day: 'numeric', month: 'short', year: 'numeric',
-      timeZone: 'Asia/Bangkok',
+      timeZone: 'UTC',
     })
   } catch { return String(d) }
 }

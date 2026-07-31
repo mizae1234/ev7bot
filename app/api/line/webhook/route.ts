@@ -2634,7 +2634,7 @@ function formatDateTh(dateStr: string | Date | null | undefined): string {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
-      timeZone: 'Asia/Bangkok',
+      timeZone: 'UTC',
     })
   } catch {
     return String(dateStr)
