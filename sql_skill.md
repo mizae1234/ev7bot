@@ -834,6 +834,25 @@ GROUP BY ProjectType
   * ใช้ตรวจสอบสถานะเช่าแล้วแบบ Real-time (เฉพาะที่เป็นสถานะ ON_RENT) ว่าเป็นรถใหม่หรือรถเก่า
   * คอลัมน์สำคัญ: `ProjectType`, `VinNo`, `Model`, `ContractNo`, `FirstName`, `LastName`, `ReleaseDate`, `RentType` (ค่าระบุประเภท ได้แก่ `ONRENT_NEW` หรือ `ONRENT_USE`)
 
+### 11.12 View สำหรับการดูรถคืนสะสม (View_AccumarateReturnItem)
+* **View: `dbo.View_AccumarateReturnItem` (รถคืนสะสม)**
+  * ใช้ดึงข้อมูลรถคืนสะสมย้อนหลัง โดย JOIN ตาราง `EV_ReturnItem` กับ `EV_InventoryItem` (ผ่าน `VinNo`) และ `EV_MsSubStatus` (Type='RETURN_REASON' ผ่าน `[Group]`)
+  * คอลัมน์สำคัญจาก EV_ReturnItem: `ReturnItemID`, `RentItemID`, `VinNo`, `ReturnModel`, `ReturnRegisterNo`, `CustomerName`, `PhoneNo`, `ReceiveDate`, `ReturnDate` (**วันที่คืนรถ — ใช้เป็นเงื่อนไขวันที่ในการ Query**), `IdleDays`, `Mileage`, `ParkLocation`, `ReturnStatus`, `ReturnGroupCode`, `ReturnIsActive`, `ReturnRemark`, `RemarkForCustomer`, `RemarkForReturnCar`, `IsSentToK2`, `SentToK2Date`
+  * คอลัมน์สำคัญจาก EV_MsSubStatus: `ReturnReasonName` (ชื่อเหตุผลการคืนรถ — แปลจาก ReturnGroupCode)
+  * **คอลัมน์คำนวณ: `ReturnType`** (Computed CASE จาก `StatusType` ของ `EV_InventoryItem`):
+    * **`รถคืน`** = รถคืนปกติ (StatusType ไม่ใช่ Lineman)
+    * **`รถเวียนคืน Lineman`** = รถเวียนคืนโครงการ Lineman (StatusType LIKE '%LINEMAN%')
+  * คอลัมน์สำคัญจาก EV_InventoryItem: `InventoryItemID`, `InventoryRegisterNo`, `InventoryModel`, `Project`, `ProjectType`, `Company`, `InventoryStatus`, `InventoryStatusType`, `InventoryCurrentLocation`, `Exterior_Color`, `Interior_Color`, `InventoryIsActive`
+  * **ตัวอย่างการ Query รถคืนสะสมประจำเดือน**:
+    ```sql
+    SELECT ReturnType, COUNT(*) AS cnt
+    FROM dbo.View_AccumarateReturnItem
+    WHERE ReturnIsActive = 1
+      AND ReturnDate >= '2026-07-01' AND ReturnDate <= '2026-07-31'
+    GROUP BY ReturnType
+    ```
+
+
 ---
 
 ## 12. ความสัมพันธ์และเงื่อนไขการ Query

@@ -126,6 +126,19 @@ CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.Use
        AND ReleaseDate >= @startDate AND ReleaseDate <= @endDate
      GROUP BY RentType
 
+### ถามจำนวนรถคืนสะสม (เช่น "เดือนนี้คืนรถกี่คัน", "รถคืนเดือนนี้")
+- ดึงจากวิว View_AccumarateReturnItem โดยใช้ ReturnDate เป็นเงื่อนไขวันที่
+- แยกเป็น 2 ประเภทดูจาก ReturnType (คอลัมน์คำนวณจาก StatusType):
+  * **รถคืน** = รถคืนปกติ
+  * **รถเวียนคืน Lineman** = รถเวียนคืนโครงการ Lineman
+- ตัวอย่าง Query:
+  SELECT ReturnType, COUNT(*) AS cnt
+  FROM View_AccumarateReturnItem
+  WHERE ReturnIsActive = 1
+    AND ReturnDate >= @startDate AND ReturnDate <= @endDate
+  GROUP BY ReturnType
+- หากต้องการดูเหตุผลการคืนรถ ให้ใช้คอลัมน์ ReturnReasonName (แปลจาก ReturnGroupCode)
+
 ### ถามทะเบียน หรือ VIN ให้ search แบบ LIKE
 - RegisterNo อาจมี - หรือไม่มี (เช่น ทอ-3791 หรือ ทอ3791)
 - ให้ search: WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%' หรือใช้ฟังก์ชัน searchVehicle
