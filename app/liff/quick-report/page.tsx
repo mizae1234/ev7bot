@@ -6,6 +6,7 @@ import GuideTab from './GuideTab'
 import CarInfoCard from './components/CarInfoCard'
 import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 import { VehicleSearchWithScanner } from '@/components/vehicle/VehicleSearchWithScanner'
+import InspectionTab from './inspection/InspectionTab'
 
 interface DbCar {
   InventoryItemID: number
@@ -113,7 +114,7 @@ const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) 
 
 export default function QuickReportPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'chat' | 'contact' | 'dashboard' | 'guide'>('report')
+  const [activeTab, setActiveTab] = useState<'report' | 'history' | 'chat' | 'contact' | 'dashboard' | 'guide' | 'inspection'>('report')
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
 
@@ -3963,6 +3964,14 @@ export default function QuickReportPage() {
         {/* TAB 5: USER MANUAL (GUIDE) */}
         {activeTab === 'guide' && <GuideTab />}
 
+        {/* TAB 6: VEHICLE RETURN CHECKLIST */}
+        {activeTab === 'inspection' && (
+          <InspectionTab
+            getLineUserId={getLineUserId}
+            sharedSelectedCar={selectedCar}
+          />
+        )}
+
 
       </div>
 
@@ -4016,6 +4025,16 @@ export default function QuickReportPage() {
         >
           <span className="text-lg">📊</span>
           <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">ภาพรวม</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('inspection')}
+          className={`flex flex-col items-center justify-center w-full h-full transition ${
+            activeTab === 'inspection' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <span className="text-lg">🔄</span>
+          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">รถคืน</span>
         </button>
 
         <button
