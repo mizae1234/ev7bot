@@ -962,6 +962,10 @@ export default function QuickReportPage() {
       alert('กรุณาเลือกสถานะใบแจ้งซ่อม')
       return
     }
+    if ((initialCarStatus === 'WAITING_FOR_MAINTENANCE' || initialCarStatus === 'IN_MAINTENANCE') && !serviceLocation) {
+      alert('กรุณาระบุสถานที่/อู่ที่ซ่อม')
+      return
+    }
     if (!issueDescription.trim()) {
       alert('กรุณาระบุอาการรถเสีย / รายละเอียดความเสียหาย')
       return
@@ -3126,7 +3130,7 @@ export default function QuickReportPage() {
               <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-2">
-                    📍 3. เลือกสถานที่ / พิกัดปัจจุบัน (ศูนย์บริการ/อู่/สาขา)
+                    📍 3. เลือกสถานที่ / พิกัดปัจจุบัน (ศูนย์บริการ/อู่/สาขา) {(initialCarStatus === 'WAITING_FOR_MAINTENANCE' || initialCarStatus === 'IN_MAINTENANCE') && <span className="text-rose-500">*</span>}
                   </label>
                   <select
                     value={serviceLocation}

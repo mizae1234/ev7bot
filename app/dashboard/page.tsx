@@ -249,6 +249,20 @@ function DashboardContent() {
             ) : null}
 
             <a
+              href="/case-delivery"
+              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              🚗 ส่งมอบรถ
+            </a>
+
+            <a
+              href="/case-contract"
+              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              📄 สัญญา (EV Core)
+            </a>
+
+            <a
               href="/custody"
               className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >

@@ -501,6 +501,18 @@ function CaseDeliveryContent() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <a
+                href="/dashboard"
+                className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all"
+              >
+                🏠 แดชบอร์ด
+              </a>
+              <a
+                href="/case-contract"
+                className="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all"
+              >
+                📄 สัญญา (EV Core)
+              </a>
               <ExportButton onClick={handleExportCore} label="📥 Export EV7 Core" />
               <ExportButton onClick={handleExport} label="📥 Export เทียบ" />
             </div>

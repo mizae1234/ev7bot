@@ -167,16 +167,20 @@ export async function POST(req: NextRequest) {
     if (carStatusCode === 'WAITING_FOR_MAINTENANCE' || carStatusCode === 'IN_MAINTENANCE') {
       try {
 
-        // 1. Get current Status and StatusType of the vehicle
+        const locCode = body.serviceLocationCode || body.serviceLocation || null
+        const locName = body.serviceLocationName || 'ไม่ระบุ / นอกสถานที่'
+
+        // 1. Get current Status, StatusType, and CurrentLocation of the vehicle
         const invReq = pool.request()
         invReq.input('invId', sql.Int, inventoryItemId)
         const invRes = await invReq.query(`
-          SELECT Status, StatusType FROM dbo.EV_InventoryItem WHERE InventoryItemID = @invId
+          SELECT Status, StatusType, CurrentLocation FROM dbo.EV_InventoryItem WHERE InventoryItemID = @invId
         `)
 
         if (invRes.recordset.length > 0) {
           const currentStatus = (invRes.recordset[0].Status || '').toUpperCase().trim()
           const currentStatusType = (invRes.recordset[0].StatusType || '').toUpperCase().trim()
+          const oldLocationCode = invRes.recordset[0].CurrentLocation || null
 
           let newStatus: string | null = null
           let newStatusType: string | null = null
@@ -204,23 +208,67 @@ export async function POST(req: NextRequest) {
             newStatusType = 'NEW_MAINTENANCE'
           }
 
-          if (forceUpdate || (newStatus && newStatusType)) {
-            const updReq = pool.request()
-            updReq.input('newStatus', sql.NVarChar, newStatus)
-            updReq.input('newStatusType', sql.NVarChar, newStatusType)
-            updReq.input('invId', sql.Int, inventoryItemId)
-            updReq.input('userId', sql.Int, dbUserId)
-            await updReq.query(`
-              UPDATE dbo.EV_InventoryItem
-              SET Status = @newStatus, StatusType = @newStatusType, UpdateUserID = @userId, UpdateDate = GETDATE()
-              WHERE InventoryItemID = @invId
-            `)
-            console.log(`[Inventory Update from New Ticket] InventoryItemID=${inventoryItemId}: ${currentStatus}/${currentStatusType} → ${newStatus}/${newStatusType}`)
+          // 2. Update CurrentLocation and Status/StatusType in EV_InventoryItem
+          const updReq = pool.request()
+          updReq.input('newStatus', sql.NVarChar, newStatus || currentStatus)
+          updReq.input('newStatusType', sql.NVarChar, newStatusType || currentStatusType)
+          updReq.input('currentLocation', sql.NVarChar, locCode)
+          updReq.input('invId', sql.Int, inventoryItemId)
+          updReq.input('userId', sql.Int, dbUserId)
+          await updReq.query(`
+            UPDATE dbo.EV_InventoryItem
+            SET Status = @newStatus, 
+                StatusType = @newStatusType, 
+                CurrentLocation = @currentLocation, 
+                UpdateUserID = @userId, 
+                UpdateDate = GETDATE()
+            WHERE InventoryItemID = @invId
+          `)
+          console.log(`[Inventory Update from New Ticket] InventoryItemID=${inventoryItemId}: Status=${newStatus || currentStatus}, StatusType=${newStatusType || currentStatusType}, CurrentLocation=${locCode}`)
+
+          // 3. Location log & note if location actually changed
+          if (oldLocationCode !== locCode) {
+            console.log(`[LOC CHANGE - New Ticket] old='${oldLocationCode}' new='${locCode}'`)
+
+            // 3a. LocationLog
+            try {
+              await insertLocationLog({
+                inventoryItemId: Number(inventoryItemId),
+                oldLocation: oldLocationCode || null,
+                newLocation: locCode || null,
+                actionCode: 'QUICK_REPORT_NEW',
+                refType: 'EV_MaintenanceItem',
+                refId: newMaintenanceId,
+                createUserId: dbUserId
+              })
+            } catch (logErr) {
+              console.error('[LocationLog Error - New Ticket]', logErr)
+            }
+
+            // 3b. VehicleNote
+            try {
+              let oldName = oldLocationCode || 'ไม่ระบุ'
+              let newName = locName || 'ไม่ระบุ'
+              if (oldLocationCode) {
+                const nameRes = await pool.request()
+                  .input('code', sql.NVarChar, oldLocationCode)
+                  .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
+                if (nameRes.recordset[0]?.StatusName) oldName = nameRes.recordset[0].StatusName
+              }
+              const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+              await pool.request()
+                .input('itemId', sql.Int, Number(inventoryItemId))
+                .input('note', sql.NVarChar, noteDetail)
+                .input('userId', sql.Int, dbUserId)
+                .query(`
+                  INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+                  VALUES (@itemId, @note, GETDATE(), @userId, 1)
+                `)
+            } catch (noteErr) {
+              console.error('[VehicleNote Error - New Ticket]', noteErr)
+            }
           }
         }
-
-        const locCode = body.serviceLocationCode || null
-        const locName = body.serviceLocationName || 'ไม่ระบุ / นอกสถานที่'
 
         // 1.5. Update READY_PICKUP_MAINTENANCE tickets of this vehicle to COMPLETE
         const readyPickupReq = pool.request()
