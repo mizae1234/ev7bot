@@ -9,14 +9,14 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { inventoryItemId, noteDetail, registerNo, lineUserId, attachments } = body
+    const { inventoryItemId, noteDetail, registerNo, lineUserId, attachments, sourceProcess, refDocNo } = body
 
     if (!inventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
     }
 
     if (env.MOCK_MODE) {
-      console.log('[Mock Mode] Create Vehicle Note:', { inventoryItemId, noteDetail, registerNo, lineUserId, attachments })
+      console.log('[Mock Mode] Create Vehicle Note:', { inventoryItemId, noteDetail, registerNo, lineUserId, attachments, sourceProcess, refDocNo })
       return NextResponse.json({
         success: true,
         message: 'บันทึกโน้ตสำเร็จ (จำลองสถานะ MOCK_MODE)'
@@ -76,11 +76,13 @@ export async function POST(req: NextRequest) {
     insertReq.input('itemId', sql.Int, inventoryItemId)
     insertReq.input('noteDetail', sql.NVarChar, noteDetail || null)
     insertReq.input('userId', sql.Int, dbUserId || null)
+    insertReq.input('sourceProcess', sql.VarChar, sourceProcess || null)
+    insertReq.input('refDocNo', sql.VarChar, refDocNo || null)
 
     const insertRes = await insertReq.query(`
-      INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+      INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive, SourceProcess, RefDocNo)
       OUTPUT INSERTED.VehicleNoteID
-      VALUES (@itemId, @noteDetail, GETDATE(), @userId, 1)
+      VALUES (@itemId, @noteDetail, GETDATE(), @userId, 1, @sourceProcess, @refDocNo)
     `)
 
     const newNoteId = insertRes.recordset[0]?.VehicleNoteID
@@ -190,6 +192,8 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const inventoryItemId = searchParams.get('inventoryItemId')
+    const sourceProcess = searchParams.get('sourceProcess')
+    const refDocNo = searchParams.get('refDocNo')
 
     if (!inventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
@@ -220,7 +224,7 @@ export async function GET(req: NextRequest) {
     const notesReq = pool.request()
     notesReq.input('inventoryItemId', sql.Int, Number(inventoryItemId))
 
-    const notesResult = await notesReq.query(`
+    let queryStr = `
       SELECT
         n.VehicleNoteID,
         n.InventoryItemID,
@@ -228,12 +232,23 @@ export async function GET(req: NextRequest) {
         n.CreateDate,
         n.CreateUserID,
         n.IsActive,
+        n.SourceProcess,
+        n.RefDocNo,
         ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreateUserName
       FROM dbo.EV_VehicleNote n
       LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
       WHERE n.InventoryItemID = @inventoryItemId AND n.IsActive = 1
-      ORDER BY n.CreateDate DESC
-    `)
+    `
+
+    if (sourceProcess && refDocNo) {
+      notesReq.input('sourceProcess', sql.VarChar, sourceProcess)
+      notesReq.input('refDocNo', sql.VarChar, refDocNo)
+      queryStr += ` AND n.SourceProcess = @sourceProcess AND n.RefDocNo = @refDocNo`
+    }
+
+    queryStr += ` ORDER BY n.CreateDate DESC`
+
+    const notesResult = await notesReq.query(queryStr)
 
     // Resolve names from lineRegistration in Postgres for any mock/custom UserIDs
     let regMap = new Map<number, string>()
@@ -315,6 +330,8 @@ export async function GET(req: NextRequest) {
         CreateUserID: n.CreateUserID,
         CreateUserName: creatorName,
         IsActive: n.IsActive,
+        SourceProcess: n.SourceProcess,
+        RefDocNo: n.RefDocNo,
         attachments: attachmentMap.get(n.VehicleNoteID) || []
       }
     })

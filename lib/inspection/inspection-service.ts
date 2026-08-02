@@ -54,7 +54,6 @@ export async function resolveEv7User(lineUserId: string | undefined): Promise<{ 
 // Inspection CRUD
 // =====================================================
 
-/** สร้าง Inspection ใหม่ พร้อม items (atomic) */
 export async function createInspection(params: {
   vinNo: string
   registerNo?: string
@@ -67,6 +66,17 @@ export async function createInspection(params: {
   items: InspectionItemData[]
   ev7UserId: number
   ev7UserName: string
+  returnDate?: string
+  location?: string
+  inspectorName?: string
+  inspectorUserId?: number
+  returnReason?: string
+  carStatus?: string
+  carStatusType?: string
+  assessmentResult?: string | null
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }): Promise<number> {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Database connection failed')
@@ -76,6 +86,25 @@ export async function createInspection(params: {
   await transaction.begin()
 
   try {
+    // Query active or latest contract for the VinNo to populate RentItemID, ContractNo, and default customer name
+    const rentResult = await transaction.request()
+      .input('vinNo', sql.VarChar, params.vinNo)
+      .query(`
+        SELECT TOP 1 RentItemID, ContractNo, FirstName, LastName
+        FROM dbo.EV_RentItem
+        WHERE VinNo = @vinNo AND IsActive = 1
+        ORDER BY ReleaseDate DESC, RentItemID DESC
+      `)
+    const activeRent = rentResult.recordset[0]
+    const resolvedRentItemId = activeRent?.RentItemID || null
+    const resolvedContractNo = activeRent?.ContractNo || null
+
+    let resolvedCustomerName = params.customerName
+    if (!resolvedCustomerName && activeRent) {
+      resolvedCustomerName = (activeRent.FirstName + (activeRent.LastName ? ' ' + activeRent.LastName : '')).trim() || null
+    }
+    const resolvedCustomerContact = params.customerContact || null
+
     // 1. Insert header
     const headerResult = await transaction.request()
       .input('vinNo', sql.NVarChar, params.vinNo)
@@ -85,20 +114,37 @@ export async function createInspection(params: {
       .input('inspectionSessionId', sql.Int, params.inspectionSessionId || null)
       .input('mileage', sql.Int, params.mileage || null)
       .input('inspectionDate', sql.Date, params.inspectionDate)
-      .input('inspectorUserID', sql.Int, params.ev7UserId)
-      .input('inspectorName', sql.NVarChar, params.ev7UserName)
+      .input('inspectorUserID', sql.Int, params.inspectorUserId || params.ev7UserId)
+      .input('inspectorName', sql.NVarChar, params.inspectorName || params.ev7UserName)
       .input('remark', sql.NVarChar, params.remark || null)
       .input('createUserID', sql.Int, params.ev7UserId)
+      .input('returnDate', sql.Date, params.returnDate || null)
+      .input('location', sql.VarChar, params.location || null)
+      .input('rentItemId', sql.BigInt, resolvedRentItemId)
+      .input('contractNo', sql.VarChar, resolvedContractNo)
+      .input('returnReason', sql.VarChar, params.returnReason || null)
+      .input('carStatus', sql.VarChar, params.carStatus || null)
+      .input('carStatusType', sql.VarChar, params.carStatusType || null)
+      .input('assessmentResult', sql.VarChar, params.assessmentResult || null)
+      .input('customerName', sql.NVarChar, resolvedCustomerName)
+      .input('customerContact', sql.VarChar, resolvedCustomerContact)
+      .input('contractCancellationDate', sql.Date, params.contractCancellationDate || null)
       .query(`
         INSERT INTO dbo.EV_Inspection (
           VinNo, RegisterNo, InspectionType, ReturnItemID, InspectionSessionID,
           Mileage, InspectionDate, InspectorUserID, InspectorName,
-          Status, Remark, IsActive, CreateDate, CreateUserID
+          Status, Remark, IsActive, CreateDate, CreateUserID,
+          ReturnDate, Location, RentItemID, ContractNo, ReturnReason,
+          CarStatus, CarStatusType, AssessmentResult, CustomerName, CustomerContact,
+          ContractCancellationDate
         )
         VALUES (
           @vinNo, @registerNo, @inspectionType, @returnItemId, @inspectionSessionId,
           @mileage, @inspectionDate, @inspectorUserID, @inspectorName,
-          'DRAFT', @remark, 1, GETDATE(), @createUserID
+          'DRAFT', @remark, 1, GETDATE(), @createUserID,
+          @returnDate, @location, @rentItemId, @contractNo, @returnReason,
+          @carStatus, @carStatusType, @assessmentResult, @customerName, @customerContact,
+          @contractCancellationDate
         );
         SELECT SCOPE_IDENTITY() AS InspectionID;
       `)
@@ -125,6 +171,17 @@ export async function updateInspection(params: {
   status?: InspectionStatus
   items: InspectionItemData[]
   ev7UserId: number
+  returnDate?: string
+  location?: string
+  inspectorName?: string
+  inspectorUserId?: number
+  returnReason?: string
+  carStatus?: string
+  carStatusType?: string
+  assessmentResult?: string | null
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }): Promise<void> {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Database connection failed')
@@ -133,6 +190,45 @@ export async function updateInspection(params: {
   await transaction.begin()
 
   try {
+    // Resolve RentItemID & ContractNo if they are null in the database
+    const inspectResult = await transaction.request()
+      .input('inspectionId', sql.BigInt, params.inspectionId)
+      .query(`
+        SELECT VinNo, RentItemID, ContractNo 
+        FROM dbo.EV_Inspection 
+        WHERE InspectionID = @inspectionId
+      `)
+    const currentInspect = inspectResult.recordset[0]
+    let resolvedRentItemId = currentInspect?.RentItemID
+    let resolvedContractNo = currentInspect?.ContractNo
+
+    if (currentInspect && (!resolvedRentItemId || !resolvedContractNo)) {
+      let rentFallbackResult = await transaction.request()
+        .input('vinNo', sql.VarChar, currentInspect.VinNo)
+        .query(`
+          SELECT TOP 1 RentItemID, ContractNo
+          FROM dbo.EV_RentItem
+          WHERE VinNo = @vinNo AND IsActive = 1
+          ORDER BY ReleaseDate DESC, RentItemID DESC
+        `)
+      let rent = rentFallbackResult.recordset[0]
+      if (!rent) {
+        rentFallbackResult = await transaction.request()
+          .input('vinNo', sql.VarChar, currentInspect.VinNo)
+          .query(`
+            SELECT TOP 1 RentItemID, ContractNo
+            FROM dbo.EV_RentItem
+            WHERE VinNo = @vinNo
+            ORDER BY ReleaseDate DESC, RentItemID DESC
+          `)
+        rent = rentFallbackResult.recordset[0]
+      }
+      if (rent) {
+        resolvedRentItemId = resolvedRentItemId || rent.RentItemID
+        resolvedContractNo = resolvedContractNo || rent.ContractNo
+      }
+    }
+
     // 1. Update header
     await transaction.request()
       .input('inspectionId', sql.BigInt, params.inspectionId)
@@ -140,11 +236,37 @@ export async function updateInspection(params: {
       .input('remark', sql.NVarChar, params.remark ?? null)
       .input('status', sql.VarChar, params.status || null)
       .input('updateUserID', sql.Int, params.ev7UserId)
+      .input('returnDate', sql.Date, params.returnDate || null)
+      .input('location', sql.VarChar, params.location || null)
+      .input('rentItemId', sql.BigInt, resolvedRentItemId || null)
+      .input('contractNo', sql.VarChar, resolvedContractNo || null)
+      .input('inspectorName', sql.NVarChar, params.inspectorName || null)
+      .input('inspectorUserId', sql.Int, params.inspectorUserId || null)
+      .input('returnReason', sql.VarChar, params.returnReason || null)
+      .input('carStatus', sql.VarChar, params.carStatus || null)
+      .input('carStatusType', sql.VarChar, params.carStatusType || null)
+      .input('assessmentResult', sql.VarChar, params.assessmentResult || null)
+      .input('customerName', sql.NVarChar, params.customerName ?? null)
+      .input('customerContact', sql.VarChar, params.customerContact ?? null)
+      .input('contractCancellationDate', sql.Date, params.contractCancellationDate || null)
       .query(`
         UPDATE dbo.EV_Inspection
         SET Mileage = COALESCE(@mileage, Mileage),
             Remark = COALESCE(@remark, Remark),
             Status = COALESCE(@status, Status),
+            ReturnDate = COALESCE(@returnDate, ReturnDate),
+            Location = COALESCE(@location, Location),
+            RentItemID = COALESCE(RentItemID, @rentItemId),
+            ContractNo = COALESCE(ContractNo, @contractNo),
+            InspectorName = COALESCE(@inspectorName, InspectorName),
+            InspectorUserID = COALESCE(@inspectorUserId, InspectorUserID),
+            ReturnReason = COALESCE(@returnReason, ReturnReason),
+            CarStatus = COALESCE(@carStatus, CarStatus),
+            CarStatusType = COALESCE(@carStatusType, CarStatusType),
+            AssessmentResult = COALESCE(@assessmentResult, AssessmentResult),
+            CustomerName = COALESCE(@customerName, CustomerName),
+            CustomerContact = COALESCE(@customerContact, CustomerContact),
+            ContractCancellationDate = COALESCE(@contractCancellationDate, ContractCancellationDate),
             UpdateDate = GETDATE(),
             UpdateUserID = @updateUserID
         WHERE InspectionID = @inspectionId
@@ -157,6 +279,282 @@ export async function updateInspection(params: {
         .query(`DELETE FROM dbo.EV_InspectionItem WHERE InspectionID = @inspectionId`)
 
       await insertItems(transaction, params.inspectionId, params.items)
+    }
+
+    // 3. Sync to EV_ReturnItem and EV_RentItem when COMPLETED
+    if (params.status === 'COMPLETED') {
+      const inspectResult = await transaction.request()
+        .input('inspectionId', sql.BigInt, params.inspectionId)
+        .query(`
+          SELECT i.VinNo, i.RegisterNo, i.ReturnItemID, i.Mileage, i.ReturnDate, i.Location,
+                 v.Model, i.RentItemID, i.ContractNo, i.InspectionType, i.CarStatus, i.CarStatusType,
+                 i.ContractCancellationDate
+          FROM dbo.EV_Inspection i
+          LEFT JOIN dbo.EV_InventoryItem v ON i.VinNo = v.VinNo
+          WHERE i.InspectionID = @inspectionId
+        `)
+      const inspect = inspectResult.recordset[0]
+
+      if (inspect && inspect.InspectionType === 'RETURN') {
+        const activeCarStatus = params.carStatus || inspect.CarStatus
+        const activeCarStatusType = params.carStatusType || inspect.CarStatusType
+        const activeVinNo = inspect.VinNo
+
+        const normalizedStatus = activeCarStatus?.toUpperCase()
+        const normalizedStatusType = activeCarStatusType?.toUpperCase()
+
+        // Case A: ON_RENT / ON_RENT_MAINTENANCE
+        if (
+          normalizedStatus === 'ON_RENT' || 
+          (normalizedStatus === 'MAINTENANCE' && normalizedStatusType === 'ON_RENT_MAINTENANCE')
+        ) {
+          let returnItemId = inspect.ReturnItemID
+
+          // If we don't have ReturnItemID, look for a pending one
+          if (!returnItemId) {
+            const pendingReturn = await transaction.request()
+              .input('vinNo', sql.VarChar, inspect.VinNo)
+              .query(`
+                SELECT TOP 1 ReturnItemID 
+                FROM dbo.EV_ReturnItem 
+                WHERE VinNo = @vinNo AND IsActive = 1 AND (Status = 'DRAFT' OR Status IS NULL)
+                ORDER BY ReturnItemID DESC
+              `)
+            returnItemId = pendingReturn.recordset[0]?.ReturnItemID
+          }
+
+          const finalReturnDate = params.returnDate || inspect.ReturnDate
+          const finalLocation = params.location || inspect.Location
+          const finalMileage = params.mileage || inspect.Mileage
+          const finalRentItemId = inspect.RentItemID
+
+          let targetRentItemId = finalRentItemId
+          if (!targetRentItemId && returnItemId) {
+            const returnItemData = await transaction.request()
+              .input('returnItemId', sql.BigInt, returnItemId)
+              .query(`SELECT RentItemID FROM dbo.EV_ReturnItem WHERE ReturnItemID = @returnItemId`)
+            targetRentItemId = returnItemData.recordset[0]?.RentItemID || null
+          }
+
+          if (!returnItemId) {
+            // Find latest rent item / active contract for the VinNo
+            const rentResult = await transaction.request()
+              .input('rentItemId', sql.BigInt, targetRentItemId)
+              .query(`
+                SELECT r.RentItemID, 
+                       ISNULL(NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), ''), 'ลูกค้าทั่วไป') AS CustomerName,
+                       i.Model, i.RegisterNo, r.PhoneNo
+                FROM dbo.EV_RentItem r
+                LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+                WHERE r.RentItemID = @rentItemId
+              `)
+            let rent = rentResult.recordset[0]
+
+            if (!rent) {
+              const rentFallbackResult = await transaction.request()
+                .input('vinNo', sql.VarChar, inspect.VinNo)
+                .query(`
+                  SELECT TOP 1 RentItemID, CustomerName, Model, RegisterNo, PhoneNo
+                  FROM (
+                    SELECT r.RentItemID, 
+                           ISNULL(NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), ''), 'ลูกค้าทั่วไป') AS CustomerName,
+                           i.Model, i.RegisterNo, r.PhoneNo, r.ReleaseDate
+                    FROM dbo.EV_RentItem r
+                    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+                    WHERE r.VinNo = @vinNo AND r.IsActive = 1
+                  ) t
+                  ORDER BY ReleaseDate DESC, RentItemID DESC
+                `)
+              rent = rentFallbackResult.recordset[0]
+            }
+
+            targetRentItemId = rent?.RentItemID || targetRentItemId
+            if (!targetRentItemId) {
+              throw new Error('ไม่พบข้อมูลการเช่ารถ (RentItem) สำหรับรถคันนี้ จึงไม่สามารถบันทึกข้อมูลคืนรถได้')
+            }
+
+            // Insert new ReturnItem row (Status = 'SUBMIT')
+            const insertReturnResult = await transaction.request()
+              .input('vinNo', sql.VarChar, inspect.VinNo)
+              .input('rentItemId', sql.BigInt, targetRentItemId)
+              .input('model', sql.VarChar, rent?.Model || null)
+              .input('registerNo', sql.VarChar, rent?.RegisterNo || inspect.RegisterNo || null)
+              .input('customerName', sql.VarChar, rent?.CustomerName || null)
+              .input('phoneNo', sql.VarChar, rent?.PhoneNo || null)
+              .input('mileage', sql.Int, finalMileage || null)
+              .input('parkLocation', sql.VarChar, finalLocation || null)
+              .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('createUserID', sql.Int, params.ev7UserId)
+              .query(`
+                INSERT INTO dbo.EV_ReturnItem (
+                  VinNo, RentItemID, Model, RegisterNo, CustomerName, PhoneNo, 
+                  Mileage, ParkLocation, ReturnDate, Status, IsActive, CreateDate, CreateUserID, IsSentToK2
+                )
+                VALUES (
+                  @vinNo, @rentItemId, @model, @registerNo, @customerName, @phoneNo,
+                  @mileage, @parkLocation, @returnDate, 'SUBMIT', 1, GETDATE(), @createUserID, 0
+                );
+                SELECT SCOPE_IDENTITY() AS ReturnItemID;
+              `)
+            returnItemId = insertReturnResult.recordset[0]?.ReturnItemID
+
+            // Link to EV_Inspection
+            await transaction.request()
+              .input('inspectionId', sql.BigInt, params.inspectionId)
+              .input('returnItemId', sql.Int, returnItemId)
+              .query(`
+                UPDATE dbo.EV_Inspection
+                SET ReturnItemID = @returnItemId
+                WHERE InspectionID = @inspectionId
+              `)
+          } else {
+            // Update existing ReturnItem row to Status = 'SUBMIT'
+            await transaction.request()
+              .input('returnItemId', sql.BigInt, returnItemId)
+              .input('mileage', sql.Int, finalMileage || null)
+              .input('parkLocation', sql.VarChar, finalLocation || null)
+              .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('updateUserID', sql.Int, params.ev7UserId)
+              .query(`
+                UPDATE dbo.EV_ReturnItem
+                SET Mileage = COALESCE(@mileage, Mileage),
+                    ParkLocation = COALESCE(@parkLocation, ParkLocation),
+                    ReturnDate = COALESCE(@returnDate, ReturnDate),
+                    Status = 'SUBMIT',
+                    UpdateDate = GETDATE(),
+                    UpdateUserID = @updateUserID
+                WHERE ReturnItemID = @returnItemId
+              `)
+
+            // Link to EV_Inspection in case it wasn't
+            await transaction.request()
+              .input('inspectionId', sql.BigInt, params.inspectionId)
+              .input('returnItemId', sql.Int, returnItemId)
+              .query(`
+                UPDATE dbo.EV_Inspection
+                SET ReturnItemID = @returnItemId
+                WHERE InspectionID = @inspectionId AND (ReturnItemID IS NULL OR ReturnItemID != @returnItemId)
+              `)
+          }
+
+          // Update EV_RentItem (set IsActive = 0, ContractCancellationDate, UpdateUserID, UpdateDate)
+          if (targetRentItemId) {
+            const finalCancellationDate = params.contractCancellationDate || inspect.ContractCancellationDate || finalReturnDate || new Date().toISOString().slice(0, 10)
+            await transaction.request()
+              .input('rentItemId', sql.BigInt, targetRentItemId)
+              .input('cancellationDate', sql.Date, finalCancellationDate)
+              .input('updateUserID', sql.Int, params.ev7UserId)
+              .query(`
+                UPDATE dbo.EV_RentItem
+                SET IsActive = 0,
+                    ContractCancellationDate = @cancellationDate,
+                    UpdateDate = GETDATE(),
+                    UpdateUserID = @updateUserID
+                WHERE RentItemID = @rentItemId
+              `)
+          }
+
+          // Update EV_InventoryItem (Status = AVAILABLE, StatusType = AVAILABLE_USE)
+          if (activeVinNo) {
+            const vehicleResult = await transaction.request()
+              .input('vinNo', sql.VarChar, activeVinNo)
+              .query(`
+                SELECT InventoryItemID, Status, StatusType
+                FROM dbo.EV_InventoryItem
+                WHERE VinNo = @vinNo
+              `)
+            const vehicle = vehicleResult.recordset[0]
+
+            await transaction.request()
+              .input('vinNo', sql.VarChar, activeVinNo)
+              .input('location', sql.VarChar, finalLocation || null)
+              .input('updateUserID', sql.Int, params.ev7UserId)
+              .query(`
+                UPDATE dbo.EV_InventoryItem
+                SET Status = 'AVAILABLE',
+                    StatusType = 'AVAILABLE_USE',
+                    CurrentLocation = COALESCE(@location, CurrentLocation),
+                    UpdateDate = GETDATE(),
+                    UpdateUserID = @updateUserID
+                WHERE VinNo = @vinNo;
+              `)
+
+            if (vehicle) {
+              const oldStatusStr = `${vehicle.Status || 'NULL'}${vehicle.StatusType ? ` (${vehicle.StatusType})` : ''}`
+              const noteDetail = `ระบบตรวจคืนรถ: เปลี่ยนสถานะรถจาก ${oldStatusStr} เป็น AVAILABLE (AVAILABLE_USE) (บันทึกอัตโนมัติจากการทำใบตรวจคืนรถ Inspection ID: ${params.inspectionId})`
+              await transaction.request()
+                .input('itemId', sql.Int, vehicle.InventoryItemID)
+                .input('noteDetail', sql.NVarChar, noteDetail)
+                .input('userId', sql.Int, params.ev7UserId || null)
+                .input('inspectionId', sql.VarChar, String(params.inspectionId))
+                .query(`
+                  INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive, SourceProcess, RefDocNo)
+                  VALUES (@itemId, @noteDetail, GETDATE(), @userId, 1, 'INSPECTION', @inspectionId)
+                `)
+            }
+          }
+        }
+
+        // Case B: REPLACEMENT_CAR
+        if (normalizedStatusType === 'REPLACEMENT_CAR') {
+          if (activeVinNo) {
+            const finalReturnDate = params.returnDate || inspect.ReturnDate
+            const finalLocation = params.location || inspect.Location
+            // 1. Update EV_ReplacementItem (Set return date, IsActive = 0, audit fields)
+            await transaction.request()
+              .input('vinNo', sql.VarChar, activeVinNo)
+              .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('updateUserID', sql.Int, params.ev7UserId)
+              .query(`
+                UPDATE dbo.EV_ReplacementItem
+                SET ReplacementReturnDate = @returnDate,
+                    IsActive = 0,
+                    UpdateDate = GETDATE(),
+                    UpdateUserID = @updateUserID
+                WHERE VinNo = @vinNo AND IsActive = 1 AND ReplacementReturnDate IS NULL;
+              `)
+
+            // Get original vehicle status before update
+            const vehicleResult = await transaction.request()
+              .input('vinNo', sql.VarChar, activeVinNo)
+              .query(`
+                SELECT InventoryItemID, Status, StatusType
+                FROM dbo.EV_InventoryItem
+                WHERE VinNo = @vinNo
+              `)
+            const vehicle = vehicleResult.recordset[0]
+
+            // 2. Update EV_InventoryItem (Status = REPLACEMENT, StatusType = REPLACEMENT_AVAILABLE)
+            await transaction.request()
+              .input('vinNo', sql.VarChar, activeVinNo)
+              .input('location', sql.VarChar, finalLocation || null)
+              .input('updateUserID', sql.Int, params.ev7UserId)
+              .query(`
+                UPDATE dbo.EV_InventoryItem
+                SET Status = 'REPLACEMENT',
+                    StatusType = 'REPLACEMENT_AVAILABLE',
+                    CurrentLocation = COALESCE(@location, CurrentLocation),
+                    UpdateDate = GETDATE(),
+                    UpdateUserID = @updateUserID
+                WHERE VinNo = @vinNo;
+              `)
+
+            if (vehicle) {
+              const oldStatusStr = `${vehicle.Status || 'NULL'}${vehicle.StatusType ? ` (${vehicle.StatusType})` : ''}`
+              const noteDetail = `ระบบตรวจคืนรถ: เปลี่ยนสถานะรถจาก ${oldStatusStr} เป็น REPLACEMENT (REPLACEMENT_AVAILABLE) (บันทึกอัตโนมัติจากการทำใบตรวจคืนรถ Inspection ID: ${params.inspectionId})`
+              await transaction.request()
+                .input('itemId', sql.Int, vehicle.InventoryItemID)
+                .input('noteDetail', sql.NVarChar, noteDetail)
+                .input('userId', sql.Int, params.ev7UserId || null)
+                .input('inspectionId', sql.VarChar, String(params.inspectionId))
+                .query(`
+                  INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive, SourceProcess, RefDocNo)
+                  VALUES (@itemId, @noteDetail, GETDATE(), @userId, 1, 'INSPECTION', @inspectionId)
+                `)
+            }
+          }
+        }
+      }
     }
 
     await transaction.commit()
@@ -241,7 +639,7 @@ export async function listInspections(filters: {
       i.Mileage AS mileage,
       i.CreateDate AS createDate,
       (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID) AS itemCount,
-      (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID) AS photoCount
+      (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
     FROM dbo.EV_Inspection i
     WHERE ${conditions.join(' AND ')}
     ORDER BY i.CreateDate DESC
@@ -264,7 +662,13 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
              InspectionType AS inspectionType, ReturnItemID AS returnItemId,
              InspectionSessionID AS inspectionSessionId, Mileage AS mileage,
              InspectionDate AS inspectionDate, InspectorUserID AS inspectorUserID,
-             InspectorName AS inspectorName, Status AS status, Remark AS remark
+             InspectorName AS inspectorName, Status AS status, Remark AS remark,
+             ReturnDate AS returnDate, Location AS location, RentItemID AS rentItemId, ContractNo AS contractNo,
+             ReturnReason AS returnReason, AssessmentResult AS assessmentResult,
+             IsDistributed AS isDistributed, DistributionDate AS distributionDate,
+             DistributionUserID AS distributionUserID,
+             CustomerName AS customerName, CustomerContact AS customerContact,
+             ContractCancellationDate AS contractCancellationDate
       FROM dbo.EV_Inspection
       WHERE InspectionID = @inspectionId AND IsActive = 1
     `),
@@ -280,7 +684,7 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
              PhotoPosition AS photoPosition, S3Key AS s3Key, FileName AS fileName,
              FileSize AS fileSize, ContentType AS contentType
       FROM dbo.EV_InspectionPhoto
-      WHERE InspectionID = @inspectionId
+      WHERE InspectionID = @inspectionId AND IsActive = 1
       ORDER BY InspectionPhotoID
     `),
   ])
@@ -309,6 +713,7 @@ export async function saveInspectionPhoto(params: {
   fileName: string
   fileSize: number | null
   contentType: string | null
+  createUserId?: number | null
 }): Promise<number> {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Database connection failed')
@@ -322,12 +727,13 @@ export async function saveInspectionPhoto(params: {
     .input('fileName', sql.NVarChar, params.fileName)
     .input('fileSize', sql.Int, params.fileSize || null)
     .input('contentType', sql.NVarChar, params.contentType || null)
+    .input('createUserId', sql.Int, params.createUserId || null)
     .query(`
       INSERT INTO dbo.EV_InspectionPhoto (
-        InspectionID, Category, ItemCode, PhotoPosition, S3Key, FileName, FileSize, ContentType
+        InspectionID, Category, ItemCode, PhotoPosition, S3Key, FileName, FileSize, ContentType, CreateUserID
       )
       VALUES (
-        @inspectionId, @category, @itemCode, @photoPosition, @s3Key, @fileName, @fileSize, @contentType
+        @inspectionId, @category, @itemCode, @photoPosition, @s3Key, @fileName, @fileSize, @contentType, @createUserId
       );
       SELECT SCOPE_IDENTITY() AS InspectionPhotoID;
     `)
@@ -401,4 +807,21 @@ export async function closeAuditSession(sessionId: number): Promise<void> {
       SET Status = 'CLOSED', UpdateDate = GETDATE()
       WHERE InspectionSessionID = @sessionId
     `)
+}
+
+/** ลบรูปภาพ Inspection (Soft delete โดยตั้ง IsActive = 0) */
+export async function deleteInspectionPhoto(photoId: number, updateUserId?: number | null): Promise<boolean> {
+  const pool = await getMSSQLWritePool()
+  if (!pool) throw new Error('Database connection failed')
+
+  await pool.request()
+    .input('photoId', sql.BigInt, photoId)
+    .input('updateUserId', sql.Int, updateUserId || null)
+    .query(`
+      UPDATE dbo.EV_InspectionPhoto
+      SET IsActive = 0, UpdateDate = GETDATE(), UpdateUserID = @updateUserId
+      WHERE InspectionPhotoID = @photoId
+    `)
+
+  return true
 }

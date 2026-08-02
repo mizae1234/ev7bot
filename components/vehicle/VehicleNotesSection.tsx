@@ -8,6 +8,8 @@ interface VehicleNote {
   CreateUserID: number | null
   CreateUserName: string
   IsActive: boolean
+  SourceProcess?: string | null
+  RefDocNo?: string | null
   attachments?: {
     FileAttachmentID: number
     fileName: string
@@ -29,6 +31,9 @@ interface VehicleNotesSectionProps {
   inventoryItemId: number
   registerNo: string
   lineUserId?: string | null
+  sourceProcess?: string | null
+  refDocNo?: string | null
+  initialNoteText?: string
 }
 
 // SQL Server stores Bangkok time directly — mssql driver serializes as UTC (Z suffix).
@@ -49,9 +54,23 @@ function formatTime(dateStr: string | null | undefined): string {
   }
 }
 
-export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: propLineUserId }: VehicleNotesSectionProps) {
+export function VehicleNotesSection({ 
+  inventoryItemId, 
+  registerNo, 
+  lineUserId: propLineUserId,
+  sourceProcess,
+  refDocNo,
+  initialNoteText = ''
+}: VehicleNotesSectionProps) {
   const [notes, setNotes] = useState<VehicleNote[]>([])
   const [noteText, setNoteText] = useState('')
+  
+  useEffect(() => {
+    if (initialNoteText) {
+      setNoteText(initialNoteText)
+    }
+  }, [initialNoteText])
+
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -169,7 +188,11 @@ export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: p
   async function fetchNotes() {
     try {
       setLoading(true)
-      const res = await fetch(`/api/vehicle/note?inventoryItemId=${inventoryItemId}`)
+      let url = `/api/vehicle/note?inventoryItemId=${inventoryItemId}`
+      if (sourceProcess && refDocNo) {
+        url += `&sourceProcess=${encodeURIComponent(sourceProcess)}&refDocNo=${encodeURIComponent(refDocNo)}`
+      }
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to load notes')
       const json = await res.json()
       if (json.vehicleNotes) {
@@ -201,7 +224,7 @@ export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: p
     if (inventoryItemId) {
       fetchNotes()
     }
-  }, [inventoryItemId])
+  }, [inventoryItemId, sourceProcess, refDocNo])
 
   useEffect(() => {
     fetchMentionUsers()
@@ -262,7 +285,9 @@ export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: p
           noteDetail: noteText,
           registerNo,
           lineUserId: resolvedLineUserId,
-          attachments // Pass attachments list
+          attachments, // Pass attachments list
+          sourceProcess,
+          refDocNo
         })
       })
 
@@ -297,14 +322,14 @@ export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: p
         <div className="relative">
           <textarea
             ref={textareaRef}
-            rows={3}
+            rows={6}
             value={noteText}
             onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart)}
             onKeyUp={(e: any) => handleTextChange(e.target.value, e.target.selectionStart)}
             onClick={(e: any) => handleTextChange(e.target.value, e.target.selectionStart)}
             onPaste={handlePaste}
             placeholder="ระบุรายละเอียด เช่น พบจอดที่ปั๊ม ปตท., ยางหลังซ้ายอ่อน, ไฟหน้าฝั่งซ้ายไม่ติด (วางภาพที่นี่เพื่อแนบได้)"
-            className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-800 focus:outline-none placeholder-slate-400 transition resize-none dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-100"
+            className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white rounded-2xl px-4 py-3 text-sm text-slate-800 focus:outline-none placeholder-slate-400 transition resize-none min-h-[140px] dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-100"
           />
 
           {/* Mentions Dropdown */}
@@ -417,8 +442,15 @@ export function VehicleNotesSection({ inventoryItemId, registerNo, lineUserId: p
             {notes.map((note) => (
               <div key={note.VehicleNoteID} className="relative text-xxs space-y-1">
                 <span className="absolute -left-[12.5px] top-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
-                <div className="flex justify-between text-slate-400 dark:text-zinc-500 font-semibold">
-                  <span>{formatTime(note.CreateDate)}</span>
+                <div className="flex justify-between text-slate-400 dark:text-zinc-500 font-semibold items-center">
+                  <div className="flex items-center gap-1.5">
+                    <span>{formatTime(note.CreateDate)}</span>
+                    {note.SourceProcess === 'VEHICLE_RETURN' && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/30 text-[9px] text-amber-700 dark:text-amber-400 font-bold border border-amber-200/50">
+                        🔄 คืนรถ {note.RefDocNo ? `(${note.RefDocNo})` : ''}
+                      </span>
+                    )}
+                  </div>
                   <span className="font-bold">{note.CreateUserName}</span>
                 </div>
                 <p className="text-xs text-slate-700 dark:text-zinc-200 mt-1 leading-relaxed bg-slate-50 dark:bg-zinc-950 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-800 break-words">

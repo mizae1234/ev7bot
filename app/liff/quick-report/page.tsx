@@ -118,6 +118,7 @@ export default function QuickReportPage() {
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [currentUserFullName, setCurrentUserFullName] = useState<string>('')
 
   // Search and selection
   const [selectedCar, setSelectedCar] = useState<DbCar | null>(null)
@@ -226,6 +227,10 @@ export default function QuickReportPage() {
 
         // Auth passed!
         setUserRole(data.role || 'USER')
+        setCurrentUserFullName(data.ev7UserName || '')
+        if (data.spacesCdn) {
+          localStorage.setItem('spaces_cdn', data.spacesCdn)
+        }
         setAuthChecking(false)
       } catch (err) {
         console.error('[Quick Report Auth Error]', err)
@@ -3981,6 +3986,13 @@ export default function QuickReportPage() {
           <InspectionTab
             getLineUserId={getLineUserId}
             sharedSelectedCar={selectedCar}
+            carDetails={selectedCarDetails}
+            locationMap={locationMap}
+            activeContractNo={activeContractNo}
+            setActiveContractNo={setActiveContractNo}
+            onDeselect={handleDeselectCar}
+            onSelectCar={handleSelectCar}
+            currentUserFullName={currentUserFullName}
           />
         )}
 

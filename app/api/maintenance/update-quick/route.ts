@@ -268,54 +268,6 @@ export async function POST(req: NextRequest) {
         `)
         console.log(`[Follow-up User Fix] MaintenanceItemID=${maintenanceId}: set creator user ID to ${dbUserId}`)
       }
-      
-      // 3. Location changed? Create EV_VehicleNote and LocationLog
-      console.log(`[LOC CHANGE] SP path: serviceLocationCode=${serviceLocationCode}, inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', match=${oldLocCode === serviceLocationCode}`)
-      if (serviceLocationCode !== undefined && inventoryItemId && oldLocCode !== serviceLocationCode) {
-        console.log(`[LOC CHANGE] SP path ENTERING location change block!`)
-
-        let oldName = oldLocCode || 'ไม่ระบุ'
-        let newName = serviceLocationName || serviceLocationCode || 'ไม่ระบุ'
-        try {
-          if (oldLocCode) {
-            const nameRes = await pool.request()
-              .input('code', sql.NVarChar, oldLocCode)
-              .query(`SELECT TOP 1 StatusName FROM dbo.CM_StatusMaster WHERE StatusCode = @code AND StatusGroup = 'SERVICE_LOCATION'`)
-            if (nameRes.recordset[0]?.StatusName) oldName = nameRes.recordset[0].StatusName
-          }
-        } catch (e) { /* ignore name lookup error */ }
-
-        // 3a. LocationLog — independent
-        try {
-          await insertLocationLog({
-            inventoryItemId: Number(inventoryItemId),
-            oldLocation: oldLocCode || null,
-            newLocation: serviceLocationCode || null,
-            actionCode: 'QUICK_REPORT_EDIT',
-            refType: 'EV_MaintenanceItem',
-            refId: maintenanceId,
-            createUserId: dbUserId
-          })
-        } catch (logErr) {
-          console.error('[LocationLog Error - SP path]', logErr)
-        }
-
-        // 3b. VehicleNote — independent (always runs)
-        try {
-          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
-          await pool.request()
-            .input('itemId', sql.Int, Number(inventoryItemId))
-            .input('note', sql.NVarChar, noteDetail)
-            .input('userId', sql.Int, dbUserId)
-            .query(`
-              INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
-              VALUES (@itemId, @note, GETDATE(), @userId, 1)
-            `)
-          console.log(`[VehicleNote] ✅ SP path: inserted note for itemId=${inventoryItemId}`)
-        } catch (noteErr) {
-          console.error('[VehicleNote Error - SP path]', noteErr)
-        }
-      }
     } catch (fixErr) {
       console.error('[Post-Update Tasks Error]', fixErr)
     }
@@ -629,6 +581,21 @@ export async function POST(req: NextRequest) {
                 VALUES (@itemId, @note, GETDATE(), @userId, 1)
               `)
             console.log(`[Maintenance Location Log] InventoryItemID=${inventoryItemId}: ${noteDetail}`)
+
+            // Also insert location log
+            try {
+              await insertLocationLog({
+                inventoryItemId: Number(inventoryItemId),
+                oldLocation: oldLocationCode || null,
+                newLocation: locationToUpdate || null,
+                actionCode: 'QUICK_REPORT_LOC_UPDATE',
+                refType: 'EV_MaintenanceItem',
+                refId: maintenanceId || null,
+                createUserId: dbUserId
+              })
+            } catch (lLogErr) {
+              console.error('[LocationLog Error - update-quick]', lLogErr)
+            }
           } catch (logErr) {
             console.error('[Maintenance Location Log Error]', logErr)
           }
@@ -662,6 +629,7 @@ export async function POST(req: NextRequest) {
             UPDATE dbo.EV_ReplacementItem
             SET ReplacementReturnDate = COALESCE(@retDate, ReplacementReturnDate),
                 Location = COALESCE(@loc, Location),
+                IsActive = CASE WHEN @retDate IS NOT NULL THEN 0 ELSE IsActive END,
                 UpdateUserID = @userId,
                 UpdateDate = GETDATE()
             WHERE ReplacementItemID = @repId
@@ -673,10 +641,15 @@ export async function POST(req: NextRequest) {
             try {
               const revertRepCarReq = pool.request()
               revertRepCarReq.input('repVin', sql.VarChar, repVinNo)
+              revertRepCarReq.input('loc', sql.NVarChar, replacementLocation || null)
               revertRepCarReq.input('userId', sql.Int, dbUserId)
               await revertRepCarReq.query(`
                 UPDATE dbo.EV_InventoryItem
-                SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_AVAILABLE', UpdateUserID = @userId, UpdateDate = GETDATE()
+                SET Status = 'REPLACEMENT', 
+                    StatusType = 'REPLACEMENT_AVAILABLE', 
+                    CurrentLocation = COALESCE(@loc, CurrentLocation),
+                    UpdateUserID = @userId, 
+                    UpdateDate = GETDATE()
                 WHERE VinNo = @repVin AND IsActive = 1
               `)
               console.log(`[Replacement Car Status Revert] VinNo=${repVinNo}: set Status=REPLACEMENT, StatusType=REPLACEMENT_AVAILABLE`)

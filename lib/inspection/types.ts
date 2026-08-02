@@ -94,6 +94,14 @@ export interface InspectionData {
   remark: string | null
   items: InspectionItemData[]
   photos: InspectionPhotoData[]
+  returnDate?: string
+  location?: string
+  rentItemId?: number | null
+  contractNo?: string | null
+  returnReason?: string | null
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }
 
 /** Inspection list item (สำหรับแสดงรายการ) */
@@ -137,6 +145,13 @@ export interface CreateInspectionRequest {
   remark?: string
   items: InspectionItemData[]
   lineUserId?: string       // จะ resolve เป็น ev7UserId ใน API
+  returnDate?: string
+  location?: string
+  inspectorName?: string
+  returnReason?: string
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }
 
 export interface UpdateInspectionRequest {
@@ -146,4 +161,11 @@ export interface UpdateInspectionRequest {
   status?: InspectionStatus
   items: InspectionItemData[]
   lineUserId?: string
+  returnDate?: string
+  location?: string
+  inspectorName?: string
+  returnReason?: string
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }

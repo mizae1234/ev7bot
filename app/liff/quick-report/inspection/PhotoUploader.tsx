@@ -15,6 +15,9 @@ interface PhotoUploaderProps {
   }>
   disabled?: boolean
   onPhotosChange?: (category: string, itemCode: string | null, files: File[], position?: string | null) => void
+  onUploadSuccess?: (photos: any[]) => void
+  onPhotoDeleted?: (photoId: number) => void
+  lineUserId?: string | null
 }
 
 const POSITION_LABELS: Record<string, string> = {
@@ -24,7 +27,9 @@ const POSITION_LABELS: Record<string, string> = {
   RIGHT: '📷 ด้านขวา',
 }
 
-const SPACES_CDN = 'https://space-ev7tracking-prod.sgp1.cdn.digitaloceanspaces.com'
+const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
+const spacesBucket = 'space-ev7tracking-prod'
+const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
 
 export default function PhotoUploader({
   inspectionId,
@@ -35,6 +40,9 @@ export default function PhotoUploader({
   existingPhotos = [],
   disabled = false,
   onPhotosChange,
+  onUploadSuccess,
+  onPhotoDeleted,
+  lineUserId,
 }: PhotoUploaderProps) {
   // Track pending files per position (or null for no-position)
   const [pendingFiles, setPendingFiles] = useState<Record<string, File[]>>({})
@@ -42,26 +50,74 @@ export default function PhotoUploader({
   const [uploadedPhotos, setUploadedPhotos] = useState(existingPhotos)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+
   // Sync existing photos when prop changes
   useEffect(() => {
     setUploadedPhotos(existingPhotos)
   }, [existingPhotos])
 
-  const handleFileSelect = useCallback((position: string | null, files: FileList | null) => {
+  const handleDeleteExistingPhoto = useCallback(async (photoId: number) => {
+    try {
+      const url = lineUserId 
+        ? `/api/inspection/photo/${photoId}?lineUserId=${encodeURIComponent(lineUserId)}`
+        : `/api/inspection/photo/${photoId}`
+      const res = await fetch(url, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error('Delete failed')
+      if (onPhotoDeleted) {
+        onPhotoDeleted(photoId)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [onPhotoDeleted, lineUserId])
+
+  const handleFileSelect = useCallback(async (position: string | null, files: FileList | null) => {
     if (!files || files.length === 0) return
     const key = position || '_default'
     const newFiles = Array.from(files)
 
-    setPendingFiles(prev => ({
-      ...prev,
-      [key]: [...(prev[key] || []), ...newFiles],
-    }))
+    if (inspectionId) {
+      setUploading(true)
+      try {
+        const formData = new FormData()
+        newFiles.forEach(f => formData.append('files', f))
+        formData.append('inspectionId', String(inspectionId))
+        formData.append('category', category)
+        if (itemCode) formData.append('itemCode', itemCode)
+        if (position) formData.append('photoPosition', position)
+        if (lineUserId) formData.append('lineUserId', lineUserId)
 
-    // Notify parent
-    if (onPhotosChange) {
-      onPhotosChange(category, itemCode, newFiles, position)
+        const res = await fetch('/api/inspection/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        if (!res.ok) throw new Error('Upload failed')
+        const data = await res.json()
+        const newPhotos = data.photos || []
+        setUploadedPhotos(prev => [...prev, ...newPhotos])
+        if (onUploadSuccess) {
+          onUploadSuccess(newPhotos)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setUploading(false)
+      }
+    } else {
+      setPendingFiles(prev => ({
+        ...prev,
+        [key]: [...(prev[key] || []), ...newFiles],
+      }))
+
+      // Notify parent
+      if (onPhotosChange) {
+        onPhotosChange(category, itemCode, newFiles, position)
+      }
     }
-  }, [category, itemCode, onPhotosChange])
+  }, [category, itemCode, inspectionId, lineUserId, onPhotosChange, onUploadSuccess])
 
   const removePendingFile = useCallback((posKey: string, index: number) => {
     setPendingFiles(prev => {
@@ -84,6 +140,7 @@ export default function PhotoUploader({
       formData.append('category', category)
       if (itemCode) formData.append('itemCode', itemCode)
       if (position) formData.append('photoPosition', position)
+      if (lineUserId) formData.append('lineUserId', lineUserId)
 
       const res = await fetch('/api/inspection/upload', {
         method: 'POST',
@@ -95,14 +152,19 @@ export default function PhotoUploader({
       const data = await res.json()
 
       // Add to uploaded list & clear pending
-      setUploadedPhotos(prev => [...prev, ...(data.photos || [])])
+      const newPhotos = data.photos || []
+      setUploadedPhotos(prev => [...prev, ...newPhotos])
       setPendingFiles(prev => ({ ...prev, [key]: [] }))
+
+      if (onUploadSuccess) {
+        onUploadSuccess(newPhotos)
+      }
     } catch (err) {
       console.error('Photo upload error:', err)
     } finally {
       setUploading(false)
     }
-  }, [pendingFiles, inspectionId, category, itemCode])
+  }, [pendingFiles, inspectionId, category, itemCode, lineUserId, onUploadSuccess])
 
   // Auto-upload when inspectionId becomes available and there are pending files
   useEffect(() => {
@@ -135,13 +197,47 @@ export default function PhotoUploader({
           {existingForPos.map((photo, i) => (
             <div
               key={`existing-${i}`}
-              className="w-16 h-16 rounded-xl overflow-hidden border border-emerald-200 bg-emerald-50"
+              className="relative w-16 h-16 rounded-xl overflow-hidden border border-emerald-200 bg-emerald-50"
             >
               <img
                 src={`${SPACES_CDN}/${photo.s3Key}`}
                 alt=""
                 className="w-full h-full object-cover"
               />
+              {!disabled && photo.inspectionPhotoId && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(photo.inspectionPhotoId!)}
+                  className="absolute top-0 right-0 bg-rose-500 text-white w-4 h-4 rounded-full text-[9px] flex items-center justify-center active:scale-90 transition shadow-sm z-10"
+                  title="ลบรูปภาพ"
+                >
+                  ✕
+                </button>
+              )}
+              {confirmDeleteId === photo.inspectionPhotoId && (
+                <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center z-20 transition-all duration-200">
+                  <span className="text-[9px] font-bold text-white mb-1 leading-none">ลบรูป?</span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDeleteExistingPhoto(photo.inspectionPhotoId!)
+                        setConfirmDeleteId(null)
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white text-[8px] px-1 py-0.5 rounded font-bold"
+                    >
+                      ลบ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="bg-slate-600 hover:bg-slate-700 text-white text-[8px] px-1 py-0.5 rounded font-bold"
+                    >
+                      เลิก
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -185,7 +281,6 @@ export default function PhotoUploader({
           ref={el => { fileInputRefs.current[key] = el }}
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           className="hidden"
           onChange={e => {
@@ -193,17 +288,6 @@ export default function PhotoUploader({
             e.target.value = '' // reset so same file can be selected again
           }}
         />
-
-        {/* Upload button (if inspectionId exists and has pending) */}
-        {inspectionId && pendingForPos.length > 0 && !uploading && (
-          <button
-            type="button"
-            onClick={() => handleUpload(position)}
-            className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg transition"
-          >
-            อัปโหลด {pendingForPos.length} รูป
-          </button>
-        )}
       </div>
     )
   }

@@ -16,8 +16,20 @@ const BOOLEAN_OPTIONS = [
 
 const BODY_CONDITION_OPTIONS = [
   { value: 'NORMAL', label: 'ปกติ' },
-  { value: 'SCRATCH', label: 'มีรอยเฉื่อย/ขีดข่วน' },
+  { value: 'SCRATCH', label: 'มีรอยเฉี่ยว/ขีดข่วน' },
   { value: 'DENT', label: 'บุบ-แตก' },
+]
+
+const TIRE_CONDITION_OPTIONS = [
+  { value: 'NORMAL', label: 'ปกติ' },
+  { value: 'SCRATCH', label: 'ชำรุด' },
+  { value: 'DENT', label: 'ต้องเปลี่ยน' },
+]
+
+const UNDERBODY_CONDITION_OPTIONS = [
+  { value: 'NORMAL', label: 'ปกติ' },
+  { value: 'SCRATCH', label: 'มีรอยครูด' },
+  { value: 'DENT', label: 'มีความเสียหาย' },
 ]
 
 const LICENSE_PLATE_OPTIONS = [
@@ -71,12 +83,12 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
     ],
   },
   {
-    category: 'TAX_METER',
+    category: 'TAX_VEHICLE',
     label: 'ภาษีรถ',
     icon: '📄',
     items: [
       {
-        category: 'TAX_METER',
+        category: 'TAX_VEHICLE',
         itemCode: 'STATUS',
         label: 'มีภาษี',
         inputType: 'boolean_expiry',
@@ -87,14 +99,14 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
     ],
   },
   {
-    category: 'INSURANCE',
-    label: 'ประกันรถยนต์',
-    icon: '🛡️',
+    category: 'TAX_METER',
+    label: 'ภาษีมิเตอร์',
+    icon: '📄',
     items: [
       {
-        category: 'INSURANCE',
+        category: 'TAX_METER',
         itemCode: 'STATUS',
-        label: 'มีประกัน',
+        label: 'มีภาษีมิเตอร์',
         inputType: 'boolean_expiry',
         options: BOOLEAN_OPTIONS,
         hasExpiry: true,
@@ -148,7 +160,7 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
       {
         category: 'CONDITION',
         itemCode: 'HEAD_LIGHT',
-        label: 'โปะไฟ',
+        label: 'โป๊ะไฟ',
         inputType: 'boolean',
         options: BOOLEAN_OPTIONS,
         hasPhoto: true,
@@ -216,6 +228,22 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
         options: BODY_CONDITION_OPTIONS,
         hasPhoto: true,
       },
+      {
+        category: 'BODY',
+        itemCode: 'TIRE',
+        label: 'สภาพยางรถ',
+        inputType: 'three_way',
+        options: TIRE_CONDITION_OPTIONS,
+        hasPhoto: true,
+      },
+      {
+        category: 'BODY',
+        itemCode: 'UNDERBODY',
+        label: 'สภาพใต้ท้องรถ',
+        inputType: 'three_way',
+        options: UNDERBODY_CONDITION_OPTIONS,
+        hasPhoto: true,
+      },
     ],
   },
   {
@@ -270,8 +298,9 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
       {
         category: 'ACCIDENT',
         itemCode: 'PHOTOS',
-        label: 'รูปถ่ายรอยอุบัติเหตุ (ถ้ามี)',
-        inputType: 'photos_only',
+        label: 'มีรอยอุบัติเหตุหรือไม่?',
+        inputType: 'boolean',
+        options: BOOLEAN_OPTIONS,
         hasPhoto: true,
       },
     ],
@@ -318,16 +347,14 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
 
 export function createEmptyItemsFromTemplate(): import('./types').InspectionItemData[] {
   return CHECKLIST_SECTIONS.flatMap(section =>
-    section.items
-      .filter(item => item.inputType !== 'photos_only') // photos_only ไม่มี item data
-      .map(item => ({
-        category: item.category,
-        itemCode: item.itemCode,
-        value: null,
-        detail: null,
-        numericValue: null,
-        expiryDate: null,
-      }))
+    section.items.map(item => ({
+      category: item.category,
+      itemCode: item.itemCode,
+      value: null,
+      detail: null,
+      numericValue: null,
+      expiryDate: null,
+    }))
   )
 }
 

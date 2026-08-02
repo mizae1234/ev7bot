@@ -5,6 +5,7 @@ import {
   listInspections,
   resolveEv7User,
 } from '@/lib/inspection/inspection-service'
+import { saveErrorLog } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,15 +30,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ inspections })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    const stack = error instanceof Error ? error.stack : null
     console.error('[Inspection GET Error]', message)
+
+    await saveErrorLog({
+      functionName: 'API_INSPECTION_GET',
+      errorMessage: message,
+      stackTrace: stack,
+      pageUrl: '/api/inspection',
+    })
+
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
 // POST: สร้าง inspection ใหม่ หรืออัปเดต inspection ที่มีอยู่
 export async function POST(request: NextRequest) {
+  let ev7User: any = null
+  let body: any = null
   try {
-    const body = await request.json()
+    body = await request.json()
     const {
       inspectionId,   // ถ้ามี = อัปเดต, ไม่มี = สร้างใหม่
       vinNo,
@@ -51,10 +63,31 @@ export async function POST(request: NextRequest) {
       status,
       items = [],
       lineUserId,
+      returnDate,
+      parkLocation, // maps to location in DB
+      inspectorName,
+      inspectorUserId,
+      returnReason,
+      carStatus,
+      carStatusType,
+      assessmentResult,
+      customerName,
+      customerContact,
+      contractCancellationDate,
     } = body
 
+    console.log('[API POST /api/inspection] Payload parsed:', {
+      inspectionId,
+      vinNo,
+      returnReason,
+      assessmentResult,
+      customerName,
+      customerContact,
+      contractCancellationDate,
+    })
+
     // Resolve LINE user → EV_User
-    const ev7User = await resolveEv7User(lineUserId)
+    ev7User = await resolveEv7User(lineUserId)
 
     if (inspectionId) {
       // ---- UPDATE existing ----
@@ -65,6 +98,17 @@ export async function POST(request: NextRequest) {
         status,
         items,
         ev7UserId: ev7User.userId,
+        returnDate,
+        location: parkLocation,
+        inspectorName,
+        inspectorUserId: inspectorUserId ? parseInt(inspectorUserId) : undefined,
+        returnReason,
+        carStatus,
+        carStatusType,
+        assessmentResult,
+        customerName,
+        customerContact,
+        contractCancellationDate,
       })
 
       return NextResponse.json({ success: true, inspectionId })
@@ -90,12 +134,34 @@ export async function POST(request: NextRequest) {
       items,
       ev7UserId: ev7User.userId,
       ev7UserName: ev7User.name,
+      returnDate,
+      location: parkLocation,
+      inspectorName,
+      inspectorUserId: inspectorUserId ? parseInt(inspectorUserId) : undefined,
+      returnReason,
+      carStatus,
+      carStatusType,
+      assessmentResult,
+      customerName,
+      customerContact,
+      contractCancellationDate,
     })
 
     return NextResponse.json({ success: true, inspectionId: newId })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    const stack = error instanceof Error ? error.stack : null
     console.error('[Inspection POST Error]', message)
+
+    await saveErrorLog({
+      functionName: 'API_INSPECTION_POST',
+      errorMessage: message,
+      stackTrace: stack,
+      pageUrl: '/api/inspection',
+      payload: body,
+      userId: ev7User?.userId,
+    })
+
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

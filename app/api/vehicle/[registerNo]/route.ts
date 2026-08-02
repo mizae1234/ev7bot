@@ -433,6 +433,7 @@ export async function GET(
           FirstName: activeRentRow.FirstName || '-',
           LastName: activeRentRow.LastName || '',
           PhoneNo: maskPhone(activeRentRow.PhoneNo),
+          CustomerName: (activeRentRow.FirstName + (activeRentRow.LastName ? ' ' + activeRentRow.LastName : '')).trim() || 'ลูกค้าทั่วไป',
         }
       : null
 
