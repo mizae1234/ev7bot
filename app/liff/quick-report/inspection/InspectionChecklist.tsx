@@ -238,6 +238,45 @@ export default function InspectionChecklist({
     setSignaturePhotos(existingPhotos.filter(p => p.category === 'SIGNATURE' && p.itemCode === 'CUSTOMER_SIGNATURE'))
   }, [existingPhotos])
 
+  const [localPhotos, setLocalPhotos] = useState<Array<{
+    category: string
+    itemCode: string | null
+    photoPosition: string | null
+    file: File
+  }>>([])
+
+  const allPhotos = useMemo(() => {
+    const combined = [...existingPhotos]
+    for (const local of localPhotos) {
+      const exists = combined.some(p => p.category === local.category && p.itemCode === local.itemCode && p.photoPosition === local.photoPosition)
+      if (!exists) {
+        combined.push({
+          s3Key: '',
+          category: local.category,
+          itemCode: local.itemCode,
+          photoPosition: local.photoPosition,
+          isActive: 1,
+        })
+      }
+    }
+    return combined
+  }, [existingPhotos, localPhotos])
+
+  useEffect(() => {
+    if (existingPhotos.length > 0) {
+      setLocalPhotos(prev =>
+        prev.filter(local =>
+          !existingPhotos.some(
+            p =>
+              p.category === local.category &&
+              p.itemCode === local.itemCode &&
+              p.photoPosition === local.photoPosition
+          )
+        )
+      )
+    }
+  }, [existingPhotos])
+
   const hasSignature = signaturePhotos.length > 0 || screenSignatureFile !== null
 
   const triggerAlert = useCallback((text: string, type: 'success' | 'error' = 'success') => {
@@ -285,11 +324,11 @@ export default function InspectionChecklist({
         if (itemDef.inputType === 'photos_only') {
           if (itemDef.photoPositions && itemDef.photoPositions.length > 0) {
             const hasAllPositions = itemDef.photoPositions.every(pos =>
-              existingPhotos.some(p => p.category === section.category && p.itemCode === itemDef.itemCode && p.photoPosition === pos)
+              allPhotos.some(p => p.category === section.category && p.itemCode === itemDef.itemCode && p.photoPosition === pos)
             )
             if (hasAllPositions) count++
           } else {
-            const hasPhoto = existingPhotos.some(p => p.category === section.category && p.itemCode === itemDef.itemCode)
+            const hasPhoto = allPhotos.some(p => p.category === section.category && p.itemCode === itemDef.itemCode)
             if (hasPhoto) count++
           }
         } else {
@@ -301,7 +340,7 @@ export default function InspectionChecklist({
       }
     }
     return count
-  }, [itemsMap, existingPhotos, CHECKLIST_SECTIONS])
+  }, [itemsMap, allPhotos, CHECKLIST_SECTIONS])
 
   const totalCount = useMemo(() => {
     return CHECKLIST_SECTIONS.reduce((sum, s) => sum + s.items.length, 0)
@@ -454,14 +493,23 @@ export default function InspectionChecklist({
     files: File[],
     position?: string | null
   ) => {
-    // Photos are handled by PhotoUploader directly via API
+    setLocalPhotos(prev => {
+      const filtered = prev.filter(p => !(p.category === category && p.itemCode === itemCode && p.photoPosition === (position || null)))
+      const added = files.map(file => ({
+        category,
+        itemCode,
+        photoPosition: position || null,
+        file
+      }))
+      return [...filtered, ...added]
+    })
   }, [])
 
   const handleSave = useCallback(async () => {
     const rawItems = Object.values(itemsMap)
     const items = rawItems.map(item => {
       if (item.category === 'CAR_PHOTOS' && item.itemCode === 'AROUND') {
-        const carPhotos = existingPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
+        const carPhotos = allPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
         const hasFront = carPhotos.some(p => p.photoPosition === 'FRONT')
         const hasBack = carPhotos.some(p => p.photoPosition === 'BACK')
         const hasLeft = carPhotos.some(p => p.photoPosition === 'LEFT')
@@ -514,7 +562,7 @@ export default function InspectionChecklist({
         console.error(err)
       }
     }
-  }, [itemsMap, existingPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, onSave])
+  }, [itemsMap, allPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, onSave])
 
   const handleCompleteClick = useCallback(async () => {
     if (!returnDate) {
@@ -547,7 +595,7 @@ export default function InspectionChecklist({
     }
 
     // Validate that all 4 sides of the car are uploaded (รูปรถรอบคัน FRONT, BACK, LEFT, RIGHT)
-    const carPhotos = existingPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
+    const carPhotos = allPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
     const hasFront = carPhotos.some(p => p.photoPosition === 'FRONT')
     const hasBack = carPhotos.some(p => p.photoPosition === 'BACK')
     const hasLeft = carPhotos.some(p => p.photoPosition === 'LEFT')
@@ -574,7 +622,7 @@ export default function InspectionChecklist({
         }
 
         if (isDamaged) {
-          const photos = existingPhotos.filter(
+          const photos = allPhotos.filter(
             p => p.category === section.category && p.itemCode === itemDef.itemCode
           )
           if (photos.length === 0) {
@@ -589,7 +637,7 @@ export default function InspectionChecklist({
       const rawItems = Object.values(itemsMap)
       const items = rawItems.map(item => {
         if (item.category === 'CAR_PHOTOS' && item.itemCode === 'AROUND') {
-          const carPhotos = existingPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
+          const carPhotos = allPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
           const hasFront = carPhotos.some(p => p.photoPosition === 'FRONT')
           const hasBack = carPhotos.some(p => p.photoPosition === 'BACK')
           const hasLeft = carPhotos.some(p => p.photoPosition === 'LEFT')
