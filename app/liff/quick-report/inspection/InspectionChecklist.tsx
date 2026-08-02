@@ -166,9 +166,32 @@ export default function InspectionChecklist({
       {/* Action buttons (Temporarily disabled for user review) */}
       {!disabled && (
         <div className="space-y-2 pb-6">
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-semibold text-center leading-relaxed">
-            🚧 ระบบเปิดให้ตรวจสอบรายการบันทึกคืนรถก่อนชั่วคราว ปุ่มบันทึกข้อมูลจะเปิดใช้งานในภายหลัง
-          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50"
+          >
+            {saving ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                กำลังบันทึก...
+              </span>
+            ) : (
+              `💾 บันทึกฉบับร่าง (${filledCount}/${totalCount} ข้อ)`
+            )}
+          </button>
+
+          {status === 'DRAFT' && onComplete && filledCount > 0 && (
+            <button
+              type="button"
+              onClick={onComplete}
+              disabled={saving}
+              className="w-full py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+            >
+              ✅ ยืนยัน — ตรวจสภาพเสร็จสิ้น
+            </button>
+          )}
         </div>
       )}
     </div>

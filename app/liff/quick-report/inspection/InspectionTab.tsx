@@ -214,13 +214,6 @@ export default function InspectionTab({ getLineUserId, sharedSelectedCar }: Insp
             onSelectCar={(car: any) => handleSelectCar(car)}
             placeholder="ค้นหาทะเบียน หรือ เลข VIN"
           />
-
-          {/* Hint: ถ้าเลือกรถจาก tab แจ้งซ่อม แล้วกลับมา tab นี้ จะเข้า checklist อัตโนมัติ */}
-          {!sharedSelectedCar && (
-            <p className="text-[11px] text-slate-400 mt-3 text-center">
-              💡 หรือเลือกรถจาก tab แจ้งซ่อม แล้วกด tab รถคืน
-            </p>
-          )}
         </div>
       )}
 

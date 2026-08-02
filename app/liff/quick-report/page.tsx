@@ -115,6 +115,7 @@ const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) 
 export default function QuickReportPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'report' | 'history' | 'chat' | 'contact' | 'dashboard' | 'guide' | 'inspection'>('report')
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
 
@@ -4029,16 +4030,6 @@ export default function QuickReportPage() {
         </button>
 
         <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center w-full h-full transition ${
-            activeTab === 'dashboard' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <span className="text-lg">📊</span>
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">ภาพรวม</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('inspection')}
           className={`flex flex-col items-center justify-center w-full h-full transition ${
             activeTab === 'inspection' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
@@ -4049,14 +4040,57 @@ export default function QuickReportPage() {
         </button>
 
         <button
-          onClick={() => setActiveTab('guide')}
+          onClick={() => setShowMoreMenu(!showMoreMenu)}
           className={`flex flex-col items-center justify-center w-full h-full transition ${
-            activeTab === 'guide' ? 'text-indigo-650' : 'text-slate-400 hover:text-slate-600'
+            activeTab === 'dashboard' || activeTab === 'guide' || showMoreMenu
+              ? 'text-indigo-650'
+              : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          <span className="text-lg">📖</span>
-          <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">คู่มือ</span>
+          <span className="text-lg font-bold tracking-widest leading-none">•••</span>
+          <span className="text-[10px] font-bold mt-1.5 whitespace-nowrap">เมนูเพิ่ม</span>
         </button>
+
+        {showMoreMenu && (
+          <>
+            <div 
+              className="fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px]" 
+              onClick={() => setShowMoreMenu(false)}
+            />
+            <div className="fixed bottom-20 right-4 z-50 bg-white border border-slate-150 rounded-2xl shadow-xl p-1.5 min-w-[150px] animate-scale-up flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('dashboard');
+                  setShowMoreMenu(false);
+                }}
+                className={`flex items-center gap-2.5 w-full px-4 py-3 text-xs font-bold rounded-xl transition ${
+                  activeTab === 'dashboard'
+                    ? 'bg-indigo-50 text-indigo-650'
+                    : 'text-slate-650 hover:bg-slate-50 active:scale-98'
+                }`}
+              >
+                <span className="text-base">📊</span>
+                <span>ภาพรวม</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('guide');
+                  setShowMoreMenu(false);
+                }}
+                className={`flex items-center gap-2.5 w-full px-4 py-3 text-xs font-bold rounded-xl transition ${
+                  activeTab === 'guide'
+                    ? 'bg-indigo-50 text-indigo-650'
+                    : 'text-slate-650 hover:bg-slate-50 active:scale-98'
+                }`}
+              >
+                <span className="text-base">📖</span>
+                <span>คู่มือ</span>
+              </button>
+            </div>
+          </>
+        )}
       </nav>
 
       {/* Custom Alert Modal */}
