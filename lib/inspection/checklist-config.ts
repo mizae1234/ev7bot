@@ -384,3 +384,56 @@ export function getValueLabel(category: string, itemCode: string, value: string 
   }
   return value
 }
+
+export interface MasterItemDef {
+  Category: string
+  ItemCode: string
+  Label: string
+  InputType: string
+  SortOrder: number
+}
+
+export function buildDynamicSections(masterItems: MasterItemDef[]): ChecklistSectionDef[] {
+  if (!masterItems || masterItems.length === 0) return []
+
+  const sectionsMap = new Map<string, ChecklistSectionDef>()
+
+  for (const master of masterItems) {
+    const staticSection = CHECKLIST_SECTIONS.find(s => s.category === master.Category)
+    const staticItem = staticSection?.items.find(i => i.itemCode === master.ItemCode)
+
+    if (!sectionsMap.has(master.Category)) {
+      sectionsMap.set(master.Category, {
+        category: master.Category,
+        label: staticSection?.label || master.Category,
+        icon: staticSection?.icon || '🔍',
+        items: []
+      })
+    }
+
+    const section = sectionsMap.get(master.Category)!
+    section.items.push({
+      category: master.Category,
+      itemCode: master.ItemCode,
+      label: master.Label || staticItem?.label || master.ItemCode,
+      inputType: (master.InputType as any) || staticItem?.inputType || 'boolean',
+      options: staticItem?.options || (master.InputType === 'select' ? LICENSE_PLATE_OPTIONS : BOOLEAN_OPTIONS),
+      hasPhoto: staticItem?.hasPhoto ?? true,
+      hasExpiry: staticItem?.hasExpiry,
+      photoPositions: staticItem?.photoPositions,
+    })
+  }
+
+  return Array.from(sectionsMap.values())
+}
+
+export function createEmptyItemsFromMaster(masterItems: MasterItemDef[]): import('./types').InspectionItemData[] {
+  return masterItems.map(item => ({
+    category: item.Category,
+    itemCode: item.ItemCode,
+    value: null,
+    detail: null,
+    numericValue: null,
+    expiryDate: null,
+  }))
+}

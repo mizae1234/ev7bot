@@ -58,6 +58,24 @@ export default function InspectionTab({
   const [historyList, setHistoryList] = useState<InspectionListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
 
+  // ---- Master Items ----
+  const [masterItems, setMasterItems] = useState<any[]>([])
+
+  useEffect(() => {
+    async function loadMaster() {
+      try {
+        const res = await fetch('/api/inspection/master')
+        if (res.ok) {
+          const data = await res.json()
+          setMasterItems(data.masterItems || [])
+        }
+      } catch (err) {
+        console.error('Failed to load master items:', err)
+      }
+    }
+    loadMaster()
+  }, [])
+
   // ---- Alert ----
   const [alertMsg, setAlertMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -435,8 +453,9 @@ export default function InspectionTab({
           )}
 
           {/* Checklist form */}
-          {!isNotAllowedStatus && !showDraftSelectionNotice && (
+          {!isNotAllowedStatus && !showDraftSelectionNotice && masterItems.length > 0 && (
             <InspectionChecklist
+              masterItems={masterItems}
               inspectionId={inspectionId}
               existingItems={inspectionDetail?.items || []}
               existingPhotos={inspectionDetail?.photos || []}

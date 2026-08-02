@@ -72,8 +72,12 @@
 | **เบอร์ติดต่อลูกค้า** | Text Input | เริ่มต้นเป็นค่าว่าง, **กรอกได้เฉพาะตัวเลข `0-9` เท่านั้น** |
 | **ชื่อเจ้าหน้าที่ผู้ตรวจเช็ค** | Text Input | ดึงชื่อเต็มของเจ้าหน้าที่ LINE User ที่ล็อกอินระบบ ณ ขณะนั้นมาเป็นค่าเริ่มต้น |
 
-### จำนวนข้อตรวจสภาพและการบันทึกเพื่ออกรายงาน (25 ข้อ)
-ในฝั่งหน้าจอ (UI) มีเช็คลิสต์ตรวจสภาพทั้งหมด **25 ข้อ** ซึ่งระบบบันทึกลงในตาราง `dbo.EV_InspectionItem` ครบถ้วนทั้งหมด 25 รายการ เพื่อให้ออกรายงานได้ง่ายและเป็นระบบ (ไม่ต้องเขียนเคสพิเศษ)
+### การดึงรายการข้อตรวจแบบไดนามิกจากฐานข้อมูล (Dynamic Checklist Master)
+หน้าจอรับคืนรถบน LINE LIFF ได้เปลี่ยนโครงสร้างจากการ Hardcode รายการในไฟล์ Config มาเป็น **การดึงรายการข้อตรวจทั้งหมดแบบไดนามิกจาก Master Table (`dbo.EV_InspectionItemMaster`) ในฐานข้อมูล** เพื่อป้องกันปัญหาข้อมูลรายงานคลาดเคลื่อน:
+* **การโหลดข้อมูลมาสเตอร์:** เมื่อเจ้าหน้าที่เปิดหน้าจอรับคืนรถ หน้าบ้านจะยิง Request ไปที่ API `/api/inspection/master` เพื่อดึงข้อมูลข้อตรวจสภาพที่ Active (`IsActive = 1`) มาแสดงผลทั้งหมด
+* **การคำนวณข้อตรวจสภาพ:**
+  * จำนวนข้อในเช็คลิสต์และคีย์ข้อตรวจย่อย (`category`, `itemCode`) ทั้งหมดจะขึ้นตรงกับมาสเตอร์บน Database 100%
+  * หน้าบ้านจะแมปรายละเอียดประเภทอินพุตและตัวเลือกคำตอบอ้างอิงตามค่ามาสเตอร์โดยอัตโนมัติ ทำให้การออกรายงานมีจำนวนข้อที่สอดคล้องกับโครงสร้างฐานข้อมูลเสมอ
 * **กรณีการถ่ายรูปรอบคัน 4 ด้าน (`CAR_PHOTOS` / `AROUND`):**
   * ในฐานข้อมูล (ตาราง `EV_InspectionItem`) จะเก็บค่าเป็น **`YES`** หากถ่ายรูปรถครบถ้วนทั้ง 4 ด้านหลัก (หน้า, หลัง, ซ้าย, ขวา)
   * หากยังถ่ายไม่ครบ จะเก็บค่าเป็น **`NO`** (ในฉบับร่าง)
@@ -89,6 +93,7 @@
 ## 4. โครงสร้างไฟล์โค้ดและ API
 
 * **Data Types**: [types.ts](file:///Users/kanittamac/web/ev7dashboard/lib/inspection/types.ts)
+* **API Route (ข้อมูลมาสเตอร์)**: [route.ts](file:///Users/kanittamac/web/ev7dashboard/app/api/inspection/master/route.ts)
 * **API Route (ตรวจคืนรถทั่วไป)**: [route.ts](file:///Users/kanittamac/web/ev7dashboard/app/api/inspection/route.ts)
 * **API Route (ตรวจคืนรายเครื่อง)**: [route.ts](file:///Users/kanittamac/web/ev7dashboard/app/api/inspection/%5Bid%5D/route.ts)
 * **Backend Services**: [inspection-service.ts](file:///Users/kanittamac/web/ev7dashboard/lib/inspection/inspection-service.ts)

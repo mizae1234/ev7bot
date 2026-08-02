@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import type { InspectionItemData, InspectionPhotoData } from '@/lib/inspection/types'
-import { CHECKLIST_SECTIONS, createEmptyItemsFromTemplate } from '@/lib/inspection/checklist-config'
+import { buildDynamicSections, createEmptyItemsFromMaster } from '@/lib/inspection/checklist-config'
 import ChecklistSection from './ChecklistSection'
 import SignaturePad from './SignaturePad'
 import PhotoUploader from './PhotoUploader'
@@ -13,6 +13,7 @@ const spacesBucket = 'space-ev7tracking-prod'
 const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
 
 interface InspectionChecklistProps {
+  masterItems: any[]
   inspectionId: number | null
   existingItems?: InspectionItemData[]
   existingPhotos?: InspectionPhotoData[]
@@ -67,6 +68,7 @@ interface InspectionChecklistProps {
 }
 
 export default function InspectionChecklist({
+  masterItems,
   inspectionId,
   existingItems = [],
   existingPhotos = [],
@@ -94,11 +96,15 @@ export default function InspectionChecklist({
   onPhotoUploaded,
 }: InspectionChecklistProps) {
   // ---- State: items as a flat map (category_itemCode → data) ----
+  const CHECKLIST_SECTIONS = useMemo(() => {
+    return buildDynamicSections(masterItems)
+  }, [masterItems])
+
   const [itemsMap, setItemsMap] = useState<Record<string, InspectionItemData>>(() => {
     const map: Record<string, InspectionItemData> = {}
 
     // First, populate from template (all empty)
-    const emptyItems = createEmptyItemsFromTemplate()
+    const emptyItems = createEmptyItemsFromMaster(masterItems)
     for (const item of emptyItems) {
       map[`${item.category}_${item.itemCode}`] = { ...item }
     }

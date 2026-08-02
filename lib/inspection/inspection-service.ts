@@ -825,3 +825,17 @@ export async function deleteInspectionPhoto(photoId: number, updateUserId?: numb
 
   return true
 }
+
+/** ดึงข้อมูลรายการเช็คลิสต์ตรวจสภาพรถจาก Master Table */
+export async function getInspectionItemMaster(): Promise<any[]> {
+  const pool = await getMSSQLPool()
+  if (!pool) throw new Error('Database connection failed')
+
+  const result = await pool.request().query(`
+    SELECT Category, ItemCode, Label, InputType, SortOrder
+    FROM dbo.EV_InspectionItemMaster
+    WHERE IsActive = 1
+    ORDER BY SortOrder
+  `)
+  return result.recordset
+}
