@@ -348,18 +348,14 @@ export default function InspectionChecklist({
 
   // ---- Auto Assessment Summary ----
   const autoAssessment = useMemo(() => {
-    if (totalCount === 0 || filledCount < totalCount) {
-      return 'รอผลการตรวจ'
-    }
-
     let hasIssues = false
     Object.values(itemsMap).forEach((item: any) => {
       // 1. check three_way items (like body condition, tire, underbody)
       if (item.value === 'SCRATCH' || item.value === 'DENT') {
         hasIssues = true
       }
-      // 2. check boolean items (for ACCIDENT, YES is an issue; for others, NO is an issue)
-      if (item.value === 'NO' && item.category !== 'ACCIDENT') {
+      // 2. check boolean items (for ACCIDENT, YES is an issue; for others, NO is an issue, except CAR_PHOTOS)
+      if (item.value === 'NO' && item.category !== 'ACCIDENT' && item.category !== 'CAR_PHOTOS') {
         hasIssues = true
       }
       if (item.value === 'YES' && item.category === 'ACCIDENT') {
@@ -370,7 +366,16 @@ export default function InspectionChecklist({
         hasIssues = true
       }
     })
-    return hasIssues ? 'ต้องส่งเข้าซ่อม' : 'ปกติ'
+
+    if (hasIssues) {
+      return 'ต้องส่งเข้าซ่อม'
+    }
+
+    if (totalCount === 0 || filledCount < totalCount) {
+      return 'รอผลการตรวจ'
+    }
+
+    return 'ปกติ'
   }, [itemsMap, filledCount, totalCount])
 
   const damagedItems = useMemo(() => {
@@ -383,7 +388,7 @@ export default function InspectionChecklist({
         let isDamaged = false
         if (section.category === 'ACCIDENT') {
           isDamaged = data.value === 'YES'
-        } else {
+        } else if (section.category !== 'CAR_PHOTOS') {
           isDamaged = data.value === 'SCRATCH' || data.value === 'DENT' || data.value === 'NO' ||
                       data.value === 'NONE' || data.value === 'FRONT_ONLY' || data.value === 'BACK_ONLY'
         }
@@ -398,7 +403,7 @@ export default function InspectionChecklist({
       }
     }
     return list
-  }, [itemsMap])
+  }, [itemsMap, CHECKLIST_SECTIONS])
 
   // ---- Fetch locations ----
   useEffect(() => {
