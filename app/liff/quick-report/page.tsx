@@ -1207,6 +1207,11 @@ export default function QuickReportPage() {
       }
     }
 
+    if ((editDetailFields.carStatusCode === 'WAITING_FOR_MAINTENANCE' || editDetailFields.carStatusCode === 'IN_MAINTENANCE') && !editDetailFields.serviceLocationCode) {
+      alert('กรุณาระบุสถานที่/อู่ที่ซ่อม')
+      return
+    }
+
     setSavingDetailEdit(true)
     try {
       const res = await fetch('/api/maintenance/update-quick', {
@@ -1682,7 +1687,9 @@ export default function QuickReportPage() {
 
             {/* Service Location */}
             <div>
-              <label className="text-xs font-bold text-slate-600 block mb-1.5">📍 สถานที่นำส่งซ่อม</label>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">
+                📍 สถานที่นำส่งซ่อม {(editDetailFields.carStatusCode === 'WAITING_FOR_MAINTENANCE' || editDetailFields.carStatusCode === 'IN_MAINTENANCE') && <span className="text-rose-500">*</span>}
+              </label>
               <select
                 value={editDetailFields.serviceLocationCode}
                 onChange={(e) => setEditDetailFields(prev => ({ ...prev, serviceLocationCode: e.target.value }))}
