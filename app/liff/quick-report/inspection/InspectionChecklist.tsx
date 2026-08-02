@@ -301,15 +301,15 @@ export default function InspectionChecklist({
       }
     }
     return count
-  }, [itemsMap, existingPhotos])
+  }, [itemsMap, existingPhotos, CHECKLIST_SECTIONS])
 
   const totalCount = useMemo(() => {
     return CHECKLIST_SECTIONS.reduce((sum, s) => sum + s.items.length, 0)
-  }, [])
+  }, [CHECKLIST_SECTIONS])
 
   // ---- Auto Assessment Summary ----
   const autoAssessment = useMemo(() => {
-    if (filledCount < totalCount) {
+    if (totalCount === 0 || filledCount < totalCount) {
       return 'รอผลการตรวจ'
     }
 
