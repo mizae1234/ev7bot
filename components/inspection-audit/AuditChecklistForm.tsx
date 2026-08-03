@@ -123,7 +123,7 @@ export function AuditChecklistForm({
         </div>
         <button
           onClick={onCancel}
-          className="hidden md:block text-xs text-slate-450 hover:text-slate-650 transition font-bold"
+          className="hidden md:block text-xs text-slate-450 hover:text-slate-655 transition font-bold"
         >
           ปิดหน้านี้ ✕
         </button>
@@ -335,7 +335,7 @@ export function AuditChecklistForm({
 
                         {/* Pending photos */}
                         {(() => {
-                          const posKey = `${section.category}_${itemDef.itemCode}_default`
+                          const posKey = `${section.category}::${itemDef.itemCode}::default`
                           const files = pendingPhotos[posKey] || []
                           return files.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
@@ -461,7 +461,7 @@ export function AuditChecklistForm({
             type="button"
             disabled={saving}
             onClick={onSave}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm"
+            className="px-4 py-2 rounded-lg bg-indigo-650 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm"
           >
             {saving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลตรวจสภาพ'}
           </button>

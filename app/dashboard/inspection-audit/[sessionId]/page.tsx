@@ -384,7 +384,7 @@ export default function SessionWorkspacePage() {
 
   const handlePhotoSelect = (category: string, itemCode: string, files: FileList | null) => {
     if (!files || files.length === 0) return
-    const posKey = `${category}_${itemCode}_default`
+    const posKey = `${category}::${itemCode}::default`
     const addedFiles = Array.from(files)
 
     setPendingPhotos(prev => ({
@@ -480,7 +480,7 @@ export default function SessionWorkspacePage() {
         const files = pendingPhotos[posKey]
         if (files.length === 0) continue
 
-        const [cat, code, pos] = posKey.split('_')
+        const [cat, code, pos] = posKey.split('::')
         const itemCode = code === 'null' ? null : code
         const photoPosition = pos === 'default' ? null : pos
 

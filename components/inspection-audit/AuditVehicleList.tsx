@@ -21,6 +21,8 @@ interface AuditedVehicle {
   status: string
   inspectionDate: string
   inspectorName?: string
+  assessmentResult?: string
+  itemCount?: number
 }
 
 interface AuditVehicleListProps {
@@ -106,7 +108,7 @@ export function AuditVehicleList({
                   >
                     <div>
                       <p className="font-bold text-slate-900">{vehicle.RegisterNo || 'ไม่มีป้ายทะเบียน'}</p>
-                      <p className="text-[10px] font-mono text-slate-500 mt-0.5">{vehicle.VinNo}</p>
+                      <p className="text-[10px] font-mono text-slate-505 mt-0.5">{vehicle.VinNo}</p>
                     </div>
                     <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[9px] font-medium">
                       {vehicle.Model}
@@ -133,28 +135,46 @@ export function AuditVehicleList({
       </div>
 
       {/* List Body */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 pr-1">
+      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 pr-1 space-y-2">
         {auditedVehicles.length > 0 ? (
           auditedVehicles.map(item => {
             const isActive = activeVin === item.vinNo
+            
+            // Map assessment label & styling
+            const resVal = item.assessmentResult
+            const resLabel = resVal === 'NORMAL' ? 'ปกติ' : resVal === 'NEED_REPAIR' ? 'ต้องส่งเข้าซ่อม' : 'รอผลการตรวจ'
+
             return (
               <div
                 key={item.vinNo}
                 onClick={() => onSelectVehicle(item)}
-                className={`p-3.5 rounded-xl cursor-pointer transition flex justify-between items-center border ${
+                className={`p-3.5 rounded-xl cursor-pointer transition flex flex-col gap-1.5 border ${
                   isActive
                     ? 'bg-indigo-50 border-indigo-250 shadow-sm'
-                    : 'hover:bg-slate-50 border-transparent active:bg-slate-100'
+                    : 'hover:bg-slate-50 border-transparent active:bg-slate-100 bg-white'
                 }`}
               >
-                <div>
-                  <h4 className="font-bold text-slate-900 text-xs">{item.registerNo || 'ทะเบียน -'}</h4>
-                  <p className="text-[9px] font-mono text-slate-400 mt-0.5">{item.vinNo}</p>
-                  <p className="text-[9px] text-slate-500 mt-0.5">ผู้ตรวจ: {item.inspectorName || '-'}</p>
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs">{item.registerNo || 'ทะเบียน -'}</h4>
+                    <p className="text-[9px] font-mono text-slate-400 mt-0.5">{item.vinNo}</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                    resVal === 'NORMAL'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : resVal === 'NEED_REPAIR'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-slate-550/10 text-slate-600 border-slate-200'
+                  }`}>
+                    <span>{resVal === 'NORMAL' ? '✅' : resVal === 'NEED_REPAIR' ? '⚠️' : '⏳'}</span>
+                    {resLabel}
+                  </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9px] font-extrabold">
-                  ✓ ตรวจแล้ว
-                </span>
+
+                <div className="flex justify-between items-center text-[10px] text-slate-500 pt-1.5 border-t border-slate-100/60">
+                  <span>ผู้ตรวจ: <strong className="text-slate-700 font-semibold">{item.inspectorName || '-'}</strong></span>
+                  <span>ข้อที่ตรวจ: <strong className="text-slate-800 font-mono font-bold">{item.itemCount ?? 25}/25</strong></span>
+                </div>
               </div>
             )
           })
