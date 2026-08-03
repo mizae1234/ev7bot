@@ -10,6 +10,24 @@ const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
 const spacesBucket = 'space-ev7tracking-prod'
 const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
 
+const LICENSE_PLATE_OPTIONS = [
+  { value: 'FRONT_BACK', label: 'ป้ายทะเบียนหน้า-หลัง' },
+  { value: 'FRONT_ONLY', label: 'ป้ายทะเบียนหน้า' },
+  { value: 'BACK_ONLY', label: 'ป้ายทะเบียนหลัง' },
+  { value: 'NONE', label: 'ไม่มีป้ายทะเบียนรถมา' },
+]
+
+const BOOLEAN_OPTIONS = [
+  { value: 'YES', label: 'มี' },
+  { value: 'NO', label: 'ไม่มี' },
+]
+
+const BODY_CONDITION_OPTIONS = [
+  { value: 'NORMAL', label: 'ปกติ' },
+  { value: 'SCRATCH', label: 'มีรอยขีดข่วน' },
+  { value: 'DENT', label: 'บุบ-แตก' },
+]
+
 function getThaiDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   try {
@@ -662,64 +680,137 @@ export default function ReturnsMonitorPage() {
                               </div>
 
                               {/* Section Items */}
-                              <div className="divide-y divide-slate-100">
+                              <div className="divide-y divide-slate-100 bg-white">
                                 {section.items.map(itemDef => {
                                   const savedItem = inspectionDetail.items.find(
                                     i => i.category === section.category && i.itemCode === itemDef.itemCode
                                   )
-                                  const hasSavedValue = !!savedItem
-                                  
-                                  // Style values
-                                  let valLabel = '-'
-                                  let valStyle = 'text-slate-400'
+                                  const itemPhotos = inspectionDetail.photos.filter(
+                                    p => p.category === section.category && p.itemCode === itemDef.itemCode
+                                  )
 
-                                  if (hasSavedValue) {
-                                    if (itemDef.inputType === 'select') {
-                                      const opt = itemDef.options?.find(o => o.value === savedItem.value)
-                                      valLabel = opt ? opt.label : (savedItem.value || '-')
-                                      valStyle = 'text-slate-800 font-bold'
-                                    } else if (itemDef.inputType === 'three_way') {
-                                      if (savedItem.value === 'NORMAL') {
-                                        valLabel = 'ปกติ'
-                                        valStyle = 'text-emerald-600 font-bold'
-                                      } else if (savedItem.value === 'SCRATCH') {
-                                        valLabel = 'มีรอยขีดข่วน ⚠️'
-                                        valStyle = 'text-amber-600 font-bold'
-                                      } else if (savedItem.value === 'DENT') {
-                                        valLabel = 'บุบ-แตก ⚠️'
-                                        valStyle = 'text-rose-600 font-bold'
-                                      }
-                                    } else if (itemDef.inputType === 'number') {
-                                      valLabel = savedItem.numericValue != null ? String(savedItem.numericValue) : '-'
-                                      valStyle = 'text-slate-800 font-mono font-bold'
-                                    } else {
-                                      // Boolean / Expiry type
-                                      if (savedItem.value === 'YES') {
-                                        valLabel = section.category === 'ACCIDENT' ? 'มี ⚠️' : 'มี'
-                                        valStyle = section.category === 'ACCIDENT' ? 'text-rose-600 font-bold animate-pulse' : 'text-emerald-600 font-bold'
-                                      } else if (savedItem.value === 'NO') {
-                                        valLabel = section.category === 'ACCIDENT' ? 'ไม่มี' : 'ไม่มี ⚠️'
-                                        valStyle = section.category === 'ACCIDENT' ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'
-                                      }
-                                    }
+                                  // Determine option list
+                                  let options = itemDef.options
+                                  if (!options || options.length === 0) {
+                                    options = itemDef.inputType === 'select'
+                                      ? LICENSE_PLATE_OPTIONS
+                                      : itemDef.inputType === 'three_way'
+                                      ? BODY_CONDITION_OPTIONS
+                                      : BOOLEAN_OPTIONS
                                   }
 
                                   return (
-                                    <div key={itemDef.itemCode} className="px-4 py-3 flex items-center justify-between gap-4">
-                                      <div className="space-y-0.5">
-                                        <p className="text-xs font-semibold text-slate-700">{itemDef.label}</p>
-                                        {savedItem?.detail && (
-                                          <p className="text-[10px] text-slate-500 italic bg-slate-50 px-2 py-0.5 rounded border border-slate-200 mt-1 inline-block">
-                                            โน้ต: {savedItem.detail}
-                                          </p>
-                                        )}
-                                        {savedItem?.expiryDate && (
-                                          <p className="text-[9px] text-slate-400 font-medium">วันหมดอายุ: {getThaiDate(savedItem.expiryDate)}</p>
-                                        )}
-                                      </div>
-                                      <div className="text-right">
-                                        <span className={`text-xs ${valStyle}`}>{valLabel}</span>
-                                      </div>
+                                    <div key={itemDef.itemCode} className="px-4 py-3.5 space-y-2 text-slate-700 bg-white">
+                                      {/* Item Title */}
+                                      <p className="text-xs font-semibold text-slate-800">{itemDef.label}</p>
+
+                                      {/* Buttons group for selection representation */}
+                                      {itemDef.inputType === 'select' && (
+                                        <div className="flex flex-wrap gap-2">
+                                          {options.map(opt => (
+                                            <button
+                                              key={opt.value}
+                                              type="button"
+                                              disabled
+                                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-default ${
+                                                savedItem?.value === opt.value
+                                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold opacity-100'
+                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
+                                              }`}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {itemDef.inputType === 'three_way' && (
+                                        <div className="flex gap-1.5 max-w-md">
+                                          {options.map(opt => (
+                                            <button
+                                              key={opt.value}
+                                              type="button"
+                                              disabled
+                                              className={`flex-1 px-2 py-2 rounded-lg text-[11px] font-medium border transition text-center leading-tight cursor-default ${
+                                                savedItem?.value === opt.value
+                                                  ? opt.value === 'NORMAL'
+                                                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold opacity-100'
+                                                    : opt.value === 'SCRATCH'
+                                                    ? 'bg-amber-500 text-white border-amber-500 font-bold opacity-100'
+                                                    : 'bg-rose-500 text-white border-rose-500 font-bold opacity-100'
+                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
+                                              }`}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {(itemDef.inputType === 'boolean' || itemDef.inputType === 'boolean_expiry') && (
+                                        <div className="flex gap-2 max-w-xs">
+                                          {options.map(opt => (
+                                            <button
+                                              key={opt.value}
+                                              type="button"
+                                              disabled
+                                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition text-center cursor-default ${
+                                                savedItem?.value === opt.value
+                                                  ? opt.value === 'YES'
+                                                    ? (section.category === 'ACCIDENT' ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-600 text-white border-emerald-600') + ' font-bold opacity-100'
+                                                    : (section.category === 'ACCIDENT' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-500 text-white border-rose-500') + ' font-bold opacity-100'
+                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
+                                              }`}
+                                            >
+                                              {opt.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {itemDef.inputType === 'number' && (
+                                        <div className="w-full max-w-[150px] px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-mono font-bold">
+                                          {savedItem?.numericValue ?? '-'}
+                                        </div>
+                                      )}
+
+                                      {/* Expiry Date */}
+                                      {itemDef.hasExpiry && savedItem?.value === 'YES' && savedItem?.expiryDate && (
+                                        <div className="text-[10px] text-slate-550 font-medium mt-1">
+                                          วันหมดอายุ: {getThaiDate(savedItem.expiryDate)}
+                                        </div>
+                                      )}
+
+                                      {/* Detail Notes */}
+                                      {savedItem?.detail && (
+                                        <div className="text-[10px] text-slate-500 italic bg-slate-50 px-2 py-1 rounded border border-slate-200 inline-block mt-1">
+                                          📝 โน้ต: {savedItem.detail}
+                                        </div>
+                                      )}
+
+                                      {/* Item Photos */}
+                                      {itemPhotos.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-1.5">
+                                          {itemPhotos.map((photo, index) => (
+                                            <div
+                                              key={index}
+                                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-pointer hover:border-indigo-500 transition shadow-sm"
+                                              onClick={() => setLightboxUrl(`${SPACES_CDN}/${photo.s3Key}`)}
+                                            >
+                                              <img
+                                                src={`${SPACES_CDN}/${photo.s3Key}`}
+                                                alt=""
+                                                className="w-full h-full object-cover"
+                                              />
+                                              {photo.photoPosition && (
+                                                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[7px] text-center font-extrabold py-0.5 leading-none">
+                                                  {photo.photoPosition}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   )
                                 })}
