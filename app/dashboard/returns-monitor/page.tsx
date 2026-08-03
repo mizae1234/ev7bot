@@ -187,30 +187,30 @@ export default function ReturnsMonitorPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
+      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
         
         {/* Navigation / Header */}
-        <div className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-xl">
+        <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="p-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 transition active:scale-95 text-xs text-slate-300 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition active:scale-95 text-xs flex items-center gap-1 shadow-sm font-medium"
               >
                 <span>⬅</span> แดชบอร์ด
               </button>
               <div>
-                <h1 className="text-lg font-extrabold text-slate-100">
+                <h1 className="text-lg font-bold text-slate-900">
                   🚗 Vehicle Return Monitor
                 </h1>
-                <p className="text-[10px] text-slate-400 font-medium">ระบบตรวจสอบสถานะการรับคืนรถและการตรวจสภาพยนต์ไฟฟ้า</p>
+                <p className="text-[10px] text-slate-500 font-medium">ระบบตรวจสอบสถานะการรับคืนรถและการตรวจสภาพยนต์ไฟฟ้า</p>
               </div>
             </div>
 
             <button
               onClick={fetchData}
               disabled={loading}
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-xs font-bold transition active:scale-95 flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 shadow-sm"
             >
               {loading ? (
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -228,60 +228,60 @@ export default function ReturnsMonitorPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             
             {/* Total */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-lg">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-lg">
                 📦
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">คืนรถทั้งหมด</p>
-                <h3 className="text-xl font-black mt-0.5 text-slate-100">{stats.total} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
+                <h3 className="text-xl font-black mt-0.5 text-slate-800">{stats.total} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
               </div>
             </div>
 
             {/* Normal */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-lg">
                 ✅
               </div>
               <div>
-                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">สภาพปกติ</p>
-                <h3 className="text-xl font-black mt-0.5 text-emerald-300">{stats.normal} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">สภาพปกติ</p>
+                <h3 className="text-xl font-black mt-0.5 text-emerald-600">{stats.normal} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
               </div>
             </div>
 
             {/* Repair */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-lg">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-lg">
                 ⚠️
               </div>
               <div>
-                <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">ส่งเข้าซ่อม</p>
-                <h3 className="text-xl font-black mt-0.5 text-rose-300">{stats.repair} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
+                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">ส่งเข้าซ่อม</p>
+                <h3 className="text-xl font-black mt-0.5 text-rose-600">{stats.repair} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
               </div>
             </div>
 
             {/* Pending */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-lg">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-lg">
                 ⏳
               </div>
               <div>
-                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">รอผลตรวจ</p>
-                <h3 className="text-xl font-black mt-0.5 text-amber-300">{stats.pending} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">รอผลตรวจ</p>
+                <h3 className="text-xl font-black mt-0.5 text-amber-600">{stats.pending} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
               </div>
             </div>
 
           </div>
 
           {/* Filters / Search Bar Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
                 <span>🔍</span> ค้นหาและกรองข้อมูล
               </h4>
               <button
                 onClick={handleResetFilters}
-                className="text-[10px] font-bold text-slate-400 hover:text-slate-200 transition active:scale-95"
+                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition active:scale-95"
               >
                 ล้างตัวกรองทั้งหมด ✖
               </button>
@@ -296,7 +296,7 @@ export default function ReturnsMonitorPage() {
                   placeholder="ทะเบียน, VIN, ลูกค้า, ผู้ตรวจ..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 placeholder-slate-650 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                 />
               </div>
 
@@ -306,7 +306,7 @@ export default function ReturnsMonitorPage() {
                 <select
                   value={selectedLocation}
                   onChange={e => setSelectedLocation(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 >
                   <option value="">-- ทั้งหมด --</option>
                   {locations.map(loc => (
@@ -321,7 +321,7 @@ export default function ReturnsMonitorPage() {
                 <select
                   value={selectedAssessment}
                   onChange={e => setSelectedAssessment(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 >
                   <option value="">-- ทั้งหมด --</option>
                   <option value="ปกติ">ปกติ (Normal)</option>
@@ -336,7 +336,7 @@ export default function ReturnsMonitorPage() {
                 <select
                   value={selectedDocStatus}
                   onChange={e => setSelectedDocStatus(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 >
                   <option value="">-- ทั้งหมด --</option>
                   <option value="DRAFT">ฉบับร่าง (DRAFT)</option>
@@ -351,7 +351,7 @@ export default function ReturnsMonitorPage() {
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 />
               </div>
 
@@ -362,18 +362,18 @@ export default function ReturnsMonitorPage() {
                   type="date"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
-                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-800 bg-slate-950 text-slate-200 focus:ring-1 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
                 />
               </div>
             </div>
           </div>
 
           {/* Results Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
                     <th className="px-5 py-4">ทะเบียน / เลขตัวถัง (VIN)</th>
                     <th className="px-5 py-4">ผู้เช่า / เบอร์โทร</th>
                     <th className="px-5 py-4">สถานที่รับคืน</th>
@@ -384,7 +384,7 @@ export default function ReturnsMonitorPage() {
                     <th className="px-5 py-4 text-center">กิโลเมตร</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-850 text-slate-300">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredInspections.length > 0 ? (
                     filteredInspections.map((item) => {
                       const isDraft = item.status === 'DRAFT'
@@ -399,27 +399,27 @@ export default function ReturnsMonitorPage() {
                         <tr
                           key={item.inspectionId}
                           onClick={() => setSelectedInspectionId(item.inspectionId)}
-                          className="hover:bg-slate-800/50 transition duration-150 cursor-pointer active:bg-slate-800"
+                          className="hover:bg-slate-50 transition duration-150 cursor-pointer active:bg-slate-100"
                         >
                           {/* Register No & VIN */}
                           <td className="px-5 py-4">
-                            <p className="font-bold text-slate-100 text-sm">{item.registerNo || '-'}</p>
-                            <p className="font-mono text-[9px] text-slate-500 mt-0.5">{item.vinNo}</p>
+                            <p className="font-bold text-slate-900 text-sm">{item.registerNo || '-'}</p>
+                            <p className="font-mono text-[9px] text-slate-400 mt-0.5">{item.vinNo}</p>
                           </td>
 
                           {/* Customer */}
                           <td className="px-5 py-4">
-                            <p className="font-medium text-slate-250">{item.customerName || '-'}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{item.customerContact || '-'}</p>
+                            <p className="font-medium text-slate-800">{item.customerName || '-'}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{item.customerContact || '-'}</p>
                           </td>
 
                           {/* Location */}
-                          <td className="px-5 py-4 font-medium text-slate-300">
+                          <td className="px-5 py-4 font-medium text-slate-600">
                             {item.locationName || item.location || '-'}
                           </td>
 
                           {/* Date */}
-                          <td className="px-5 py-4 font-medium text-slate-300">
+                          <td className="px-5 py-4 font-medium text-slate-600">
                             {getThaiDate(item.inspectionDate)}
                           </td>
 
@@ -427,8 +427,8 @@ export default function ReturnsMonitorPage() {
                           <td className="px-5 py-4 text-center">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold border uppercase tracking-wider ${
                               isDraft
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             }`}>
                               {isDraft ? 'DRAFT' : 'SUBMIT'}
                             </span>
@@ -438,10 +438,10 @@ export default function ReturnsMonitorPage() {
                           <td className="px-5 py-4 text-center">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
                               mappedAssessment === 'ปกติ'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : mappedAssessment === 'ต้องส่งเข้าซ่อม'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                : 'bg-slate-800 text-slate-400 border-slate-750'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
                             }`}>
                               <span>
                                 {mappedAssessment === 'ปกติ' ? '✅' : mappedAssessment === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
@@ -451,12 +451,12 @@ export default function ReturnsMonitorPage() {
                           </td>
 
                           {/* Inspector */}
-                          <td className="px-5 py-4 font-medium text-slate-300">
+                          <td className="px-5 py-4 font-medium text-slate-600">
                             {item.inspectorName || '-'}
                           </td>
 
                           {/* Mileage */}
-                          <td className="px-5 py-4 text-center font-mono font-bold text-slate-100 text-[11px]">
+                          <td className="px-5 py-4 text-center font-mono font-bold text-slate-900 text-[11px]">
                             {item.mileage != null ? `${item.mileage.toLocaleString()} กม.` : '-'}
                           </td>
                         </tr>
@@ -464,7 +464,7 @@ export default function ReturnsMonitorPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="px-5 py-12 text-center text-slate-500 font-medium">
+                      <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
                         ไม่พบข้อมูลรายการคืนรถที่ตรงตามตัวกรอง
                       </td>
                     </tr>
@@ -478,22 +478,22 @@ export default function ReturnsMonitorPage() {
 
         {/* Detailed Modal Drawer */}
         {selectedInspectionId && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 transition-all duration-300">
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs transition-all duration-300">
             {/* Backdrop click to close */}
             <div className="absolute inset-0" onClick={() => setSelectedInspectionId(null)} />
 
             {/* Drawer Content */}
-            <div className="relative w-full max-w-2xl h-full bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col">
+            <div className="relative w-full max-w-2xl h-full bg-white border-l border-slate-200 shadow-2xl flex flex-col">
               
               {/* Header */}
-              <div className="p-4 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-100">📋 รายงานผลการตรวจรับคืนรถ</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">เลขรายงานอ้างอิง: #{selectedInspectionId}</p>
+                  <h3 className="text-sm font-bold text-slate-900">📋 รายงานผลการตรวจรับคืนรถ</h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">เลขรายงานอ้างอิง: #{selectedInspectionId}</p>
                 </div>
                 <button
                   onClick={() => setSelectedInspectionId(null)}
-                  className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center hover:bg-slate-705 hover:text-slate-200 transition"
+                  className="w-7 h-7 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 transition"
                 >
                   ✕
                 </button>
@@ -502,19 +502,19 @@ export default function ReturnsMonitorPage() {
               {/* Loader */}
               {loadingDetail || !inspectionDetail ? (
                 <div className="flex-1 flex flex-col items-center justify-center space-y-3">
-                  <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                   <p className="text-xs text-slate-500">กำลังโหลดรายละเอียดการประเมินสภาพ...</p>
                 </div>
               ) : (
                 <>
                   {/* Tabs */}
-                  <div className="flex border-b border-slate-800 bg-slate-950/20 px-2 py-1 gap-1">
+                  <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1 gap-1">
                     <button
                       onClick={() => setActiveTab('info')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         activeTab === 'info'
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                       }`}
                     >
                       ℹ️ ข้อมูลรับคืน
@@ -523,8 +523,8 @@ export default function ReturnsMonitorPage() {
                       onClick={() => setActiveTab('checklist')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         activeTab === 'checklist'
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                       }`}
                     >
                       ✏️ เช็คลิสต์ ({inspectionDetail.items?.length || 0})
@@ -533,8 +533,8 @@ export default function ReturnsMonitorPage() {
                       onClick={() => setActiveTab('photos')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         activeTab === 'photos'
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                       }`}
                     >
                       📷 ภาพแนบ ({inspectionDetail.photos?.filter(p => p.category !== 'SIGNATURE').length || 0})
@@ -549,80 +549,80 @@ export default function ReturnsMonitorPage() {
                       <div className="space-y-4">
                         
                         {/* Auto Assessment Hero Banner */}
-                        <div className={`p-4 rounded-2xl border text-center space-y-1.5 shadow-lg ${
+                        <div className={`p-4 rounded-2xl border text-center space-y-1.5 shadow-sm ${
                           inspectionDetail.assessmentResult === 'NORMAL'
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                            ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
                             : inspectionDetail.assessmentResult === 'NEED_REPAIR'
-                            ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                            : 'bg-slate-800/80 border-slate-700 text-slate-400'
+                            ? 'bg-rose-50 border-rose-100 text-rose-800'
+                            : 'bg-slate-100 border-slate-200 text-slate-750'
                         }`}>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">ผลการประเมินสภาพรถอัตโนมัติ</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ผลการประเมินสภาพรถอัตโนมัติ</p>
                           <h4 className="text-lg font-black flex items-center justify-center gap-1.5">
                             <span>
                               {inspectionDetail.assessmentResult === 'NORMAL' ? '✅ ปกติเรียบร้อย' : inspectionDetail.assessmentResult === 'NEED_REPAIR' ? '⚠️ ต้องส่งเข้าซ่อมแซม' : '⏳ รอตรวจสภาพ'}
                             </span>
                           </h4>
                           {inspectionDetail.assessmentResult === 'NEED_REPAIR' && (
-                            <p className="text-[10px] text-rose-400 font-medium">ตรวจพบรอยเสียหายหรือสภาพไม่ปกติในเช็คลิสต์ด้านล่าง</p>
+                            <p className="text-[10px] text-rose-600 font-medium">ตรวจพบรอยเสียหายหรือสภาพไม่ปกติในเช็คลิสต์ด้านล่าง</p>
                           )}
                         </div>
 
                         {/* Return details card */}
-                        <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4 space-y-3">
-                          <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                          <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                             <span>📅</span> รายละเอียดการคืนรถ
                           </h4>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">ทะเบียนรถ</span>
-                              <p className="font-bold text-slate-100">{inspectionDetail.registerNo || '-'}</p>
+                              <span className="text-[10px] text-slate-400">ทะเบียนรถ</span>
+                              <p className="font-bold text-slate-800">{inspectionDetail.registerNo || '-'}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">เลขตัวถัง (VIN)</span>
-                              <p className="font-mono text-slate-100">{inspectionDetail.vinNo}</p>
+                              <span className="text-[10px] text-slate-400">เลขตัวถัง (VIN)</span>
+                              <p className="font-mono text-slate-800">{inspectionDetail.vinNo}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">ชื่อลูกค้าที่คืนรถ</span>
-                              <p className="font-bold text-slate-100">{inspectionDetail.customerName || '-'}</p>
+                              <span className="text-[10px] text-slate-400">ชื่อลูกค้าที่คืนรถ</span>
+                              <p className="font-bold text-slate-800">{inspectionDetail.customerName || '-'}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">เบอร์โทรศัพท์ติดต่อ</span>
-                              <p className="font-mono text-slate-100">{inspectionDetail.customerContact || '-'}</p>
+                              <span className="text-[10px] text-slate-400">เบอร์โทรศัพท์ติดต่อ</span>
+                              <p className="font-mono text-slate-800">{inspectionDetail.customerContact || '-'}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">วันที่รับคืนจริง</span>
-                              <p className="font-bold text-slate-100">{getThaiDate(inspectionDetail.returnDate || inspectionDetail.inspectionDate)}</p>
+                              <span className="text-[10px] text-slate-400">วันที่รับคืนจริง</span>
+                              <p className="font-bold text-slate-800">{getThaiDate(inspectionDetail.returnDate || inspectionDetail.inspectionDate)}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">วันที่ยกเลิกสัญญา</span>
-                              <p className="font-bold text-slate-100">{getThaiDate(inspectionDetail.contractCancellationDate)}</p>
+                              <span className="text-[10px] text-slate-400">วันที่ยกเลิกสัญญา</span>
+                              <p className="font-bold text-slate-800">{getThaiDate(inspectionDetail.contractCancellationDate)}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">สถานที่จอดคืน</span>
-                              <p className="font-bold text-slate-100">{inspectionDetail.locationName || inspectionDetail.location || '-'}</p>
+                              <span className="text-[10px] text-slate-400">สถานที่จอดคืน</span>
+                              <p className="font-bold text-slate-800">{inspectionDetail.locationName || inspectionDetail.location || '-'}</p>
                             </div>
                             <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-500">เลขไมล์สะสม</span>
-                              <p className="font-mono font-bold text-slate-100">{inspectionDetail.mileage != null ? `${inspectionDetail.mileage.toLocaleString()} กม.` : '-'}</p>
+                              <span className="text-[10px] text-slate-400">เลขไมล์สะสม</span>
+                              <p className="font-mono font-bold text-slate-800">{inspectionDetail.mileage != null ? `${inspectionDetail.mileage.toLocaleString()} กม.` : '-'}</p>
                             </div>
                             <div className="space-y-0.5 col-span-2">
-                              <span className="text-[10px] text-slate-500">เหตุผลในการคืนรถ</span>
-                              <p className="font-medium text-slate-100">{getReasonLabel(inspectionDetail.returnReason)}</p>
+                              <span className="text-[10px] text-slate-400">เหตุผลในการคืนรถ</span>
+                              <p className="font-medium text-slate-800">{getReasonLabel(inspectionDetail.returnReason)}</p>
                             </div>
-                            <div className="space-y-0.5 col-span-2 border-t border-slate-800/80 pt-2 mt-1">
-                              <span className="text-[10px] text-slate-500">เจ้าหน้าที่ผู้ตรวจเช็ค</span>
-                              <p className="font-bold text-indigo-300">{inspectionDetail.inspectorName || '-'}</p>
+                            <div className="space-y-0.5 col-span-2 border-t border-slate-200 pt-2 mt-1">
+                              <span className="text-[10px] text-slate-400">เจ้าหน้าที่ผู้ตรวจเช็ค</span>
+                              <p className="font-bold text-indigo-600">{inspectionDetail.inspectorName || '-'}</p>
                             </div>
                             <div className="space-y-0.5 col-span-2">
-                              <span className="text-[10px] text-slate-500">หมายเหตุเพิ่มเติม</span>
-                              <p className="text-slate-300 whitespace-pre-line bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 mt-1">{inspectionDetail.remark || 'ไม่มีบันทึกข้อความ'}</p>
+                              <span className="text-[10px] text-slate-400">หมายเหตุเพิ่มเติม</span>
+                              <p className="text-slate-700 whitespace-pre-line bg-white p-2.5 rounded-lg border border-slate-200 mt-1">{inspectionDetail.remark || 'ไม่มีบันทึกข้อความ'}</p>
                             </div>
                           </div>
                         </div>
 
                         {/* Customer signature card */}
-                        <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4 space-y-2">
-                          <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                          <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                             <span>✍️</span> ลายเซ็นลูกค้า (ยืนยันส่งคืน)
                           </h4>
                           <div className="bg-white rounded-xl p-3 border border-slate-200 max-w-[240px] mx-auto">
@@ -634,7 +634,7 @@ export default function ReturnsMonitorPage() {
                                     key={i}
                                     src={`${SPACES_CDN}/${sig.s3Key}`}
                                     alt="Customer Signature"
-                                    className="max-h-28 mx-auto object-contain cursor-pointer hover:opacity-90 animate-fade-in"
+                                    className="max-h-28 mx-auto object-contain cursor-pointer hover:opacity-90 transition"
                                     onClick={() => setLightboxUrl(`${SPACES_CDN}/${sig.s3Key}`)}
                                   />
                                 ))
@@ -654,15 +654,15 @@ export default function ReturnsMonitorPage() {
                       <div className="space-y-4">
                         {dynamicSections.map(section => {
                           return (
-                            <div key={section.category} className="bg-slate-950/30 border border-slate-800 rounded-2xl overflow-hidden">
+                            <div key={section.category} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                               {/* Section Header */}
-                              <div className="bg-slate-900/80 px-4 py-2.5 border-b border-slate-800 flex items-center gap-2">
+                              <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center gap-2">
                                 <span className="text-sm">{section.icon}</span>
-                                <h4 className="text-xs font-bold text-slate-200">{section.label}</h4>
+                                <h4 className="text-xs font-bold text-slate-700">{section.label}</h4>
                               </div>
 
                               {/* Section Items */}
-                              <div className="divide-y divide-slate-800/40">
+                              <div className="divide-y divide-slate-100">
                                 {section.items.map(itemDef => {
                                   const savedItem = inspectionDetail.items.find(
                                     i => i.category === section.category && i.itemCode === itemDef.itemCode
@@ -671,35 +671,35 @@ export default function ReturnsMonitorPage() {
                                   
                                   // Style values
                                   let valLabel = '-'
-                                  let valStyle = 'text-slate-500'
+                                  let valStyle = 'text-slate-400'
 
                                   if (hasSavedValue) {
                                     if (itemDef.inputType === 'select') {
                                       const opt = itemDef.options?.find(o => o.value === savedItem.value)
                                       valLabel = opt ? opt.label : (savedItem.value || '-')
-                                      valStyle = 'text-slate-100 font-bold'
+                                      valStyle = 'text-slate-800 font-bold'
                                     } else if (itemDef.inputType === 'three_way') {
                                       if (savedItem.value === 'NORMAL') {
                                         valLabel = 'ปกติ'
-                                        valStyle = 'text-emerald-400 font-bold'
+                                        valStyle = 'text-emerald-600 font-bold'
                                       } else if (savedItem.value === 'SCRATCH') {
                                         valLabel = 'มีรอยขีดข่วน ⚠️'
-                                        valStyle = 'text-amber-400 font-bold'
+                                        valStyle = 'text-amber-600 font-bold'
                                       } else if (savedItem.value === 'DENT') {
                                         valLabel = 'บุบ-แตก ⚠️'
-                                        valStyle = 'text-rose-400 font-bold'
+                                        valStyle = 'text-rose-600 font-bold'
                                       }
                                     } else if (itemDef.inputType === 'number') {
                                       valLabel = savedItem.numericValue != null ? String(savedItem.numericValue) : '-'
-                                      valStyle = 'text-slate-100 font-mono font-bold'
+                                      valStyle = 'text-slate-800 font-mono font-bold'
                                     } else {
                                       // Boolean / Expiry type
                                       if (savedItem.value === 'YES') {
                                         valLabel = section.category === 'ACCIDENT' ? 'มี ⚠️' : 'มี'
-                                        valStyle = section.category === 'ACCIDENT' ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'
+                                        valStyle = section.category === 'ACCIDENT' ? 'text-rose-600 font-bold animate-pulse' : 'text-emerald-600 font-bold'
                                       } else if (savedItem.value === 'NO') {
                                         valLabel = section.category === 'ACCIDENT' ? 'ไม่มี' : 'ไม่มี ⚠️'
-                                        valStyle = section.category === 'ACCIDENT' ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'
+                                        valStyle = section.category === 'ACCIDENT' ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'
                                       }
                                     }
                                   }
@@ -707,9 +707,9 @@ export default function ReturnsMonitorPage() {
                                   return (
                                     <div key={itemDef.itemCode} className="px-4 py-3 flex items-center justify-between gap-4">
                                       <div className="space-y-0.5">
-                                        <p className="text-xs font-semibold text-slate-300">{itemDef.label}</p>
+                                        <p className="text-xs font-semibold text-slate-700">{itemDef.label}</p>
                                         {savedItem?.detail && (
-                                          <p className="text-[10px] text-slate-500 italic bg-slate-900 px-2 py-0.5 rounded border border-slate-800 mt-1 inline-block">
+                                          <p className="text-[10px] text-slate-500 italic bg-slate-50 px-2 py-0.5 rounded border border-slate-200 mt-1 inline-block">
                                             โน้ต: {savedItem.detail}
                                           </p>
                                         )}
@@ -745,9 +745,9 @@ export default function ReturnsMonitorPage() {
                                 return (
                                   <div
                                     key={photo.inspectionPhotoId || i}
-                                    className="bg-slate-950/40 border border-slate-800 rounded-xl overflow-hidden flex flex-col group hover:border-slate-700 transition"
+                                    className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-slate-300 transition shadow-sm"
                                   >
-                                    <div className="relative aspect-square bg-slate-950 overflow-hidden">
+                                    <div className="relative aspect-square bg-slate-100 overflow-hidden border-b border-slate-200">
                                       <img
                                         src={`${SPACES_CDN}/${photo.s3Key}`}
                                         alt=""
@@ -755,10 +755,10 @@ export default function ReturnsMonitorPage() {
                                         onClick={() => setLightboxUrl(`${SPACES_CDN}/${photo.s3Key}`)}
                                       />
                                     </div>
-                                    <div className="p-2 space-y-0.5 bg-slate-950/20 text-[9px] leading-tight">
-                                      <p className="font-bold text-slate-300 truncate">{itemLabel}</p>
+                                    <div className="p-2 space-y-0.5 text-[9px] leading-tight bg-white">
+                                      <p className="font-bold text-slate-700 truncate">{itemLabel}</p>
                                       {photo.photoPosition && (
-                                        <span className="px-1 py-0.5 bg-slate-800 rounded text-slate-400 font-extrabold">{photo.photoPosition}</span>
+                                        <span className="px-1 py-0.5 bg-slate-100 rounded text-slate-500 font-extrabold inline-block mt-0.5">{photo.photoPosition}</span>
                                       )}
                                     </div>
                                   </div>
@@ -766,7 +766,7 @@ export default function ReturnsMonitorPage() {
                               })}
                           </div>
                         ) : (
-                          <div className="py-12 text-center text-xs text-slate-500 font-medium bg-slate-950/20 border border-slate-800/85 rounded-2xl">
+                          <div className="py-12 text-center text-xs text-slate-400 font-medium bg-slate-50 border border-slate-200 rounded-2xl">
                             ไม่มีรูปภาพตรวจสภาพประกอบเอกสารนี้
                           </div>
                         )}
@@ -776,16 +776,16 @@ export default function ReturnsMonitorPage() {
                   </div>
 
                   {/* Print / Save PDF Actions footer */}
-                  <div className="p-4 border-t border-slate-800 bg-slate-950/40 flex items-center justify-end gap-2">
+                  <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
                     <button
                       onClick={() => window.print()}
-                      className="px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-bold transition active:scale-95 flex items-center gap-1"
+                      className="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-350 hover:text-slate-800 text-xs font-bold transition active:scale-95 flex items-center gap-1 shadow-sm"
                     >
                       <span>🖨️</span> พิมพ์เอกสารรายงาน
                     </button>
                     <button
                       onClick={() => setSelectedInspectionId(null)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition active:scale-95"
+                      className="px-3.5 py-1.5 rounded-lg bg-indigo-650 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
                     >
                       ปิดหน้ารายงาน
                     </button>
@@ -807,7 +807,7 @@ export default function ReturnsMonitorPage() {
               <img
                 src={lightboxUrl}
                 alt="Enlarged view"
-                className="max-w-full max-h-[85vh] object-contain rounded-lg border border-slate-800"
+                className="max-w-full max-h-[85vh] object-contain rounded-lg border border-slate-850"
               />
               <button
                 onClick={() => setLightboxUrl(null)}
