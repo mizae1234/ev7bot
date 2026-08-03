@@ -118,11 +118,20 @@ export default function SessionWorkspacePage() {
   const [uploadedPhotos, setUploadedPhotos] = useState<AuditedVehicle['photos']>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string
+    message: string
+    onConfirm: () => void
+  } | null>(null)
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type })
     const timer = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(timer)
+  }, [])
+
+  const askConfirmation = useCallback((title: string, message: string, onConfirm: () => void) => {
+    setConfirmModal({ title, message, onConfirm })
   }, [])
 
   useEffect(() => {
@@ -342,19 +351,24 @@ export default function SessionWorkspacePage() {
     }
   }
 
-  const handleCloseSession = async () => {
-    if (!window.confirm('คุณยืนยันที่จะปิดรอบการตรวจสภาพรถคันนี้ใช่หรือไม่? (หลังจากปิดแล้วจะไม่สามารถตรวจบันทึกเพิ่มในรอบนี้ได้)')) return
-    try {
-      const res = await fetch('/api/inspection/session', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
-      })
-      if (!res.ok) throw new Error('ปิดรอบตรวจล้มเหลว')
-      fetchSessionData()
-    } catch (err: any) {
-      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
-    }
+  const handleCloseSession = () => {
+    askConfirmation(
+      'ยืนยันการปิดรอบตรวจ',
+      'คุณยืนยันที่จะปิดรอบการตรวจสภาพรถรอบนี้ใช่หรือไม่? (หลังจากปิดแล้วจะไม่สามารถตรวจบันทึกเพิ่มในรอบนี้ได้)',
+      async () => {
+        try {
+          const res = await fetch('/api/inspection/session', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+          })
+          if (!res.ok) throw new Error('ปิดรอบตรวจล้มเหลว')
+          fetchSessionData()
+        } catch (err: any) {
+          showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
+        }
+      }
+    )
   }
 
   const handleChecklistValueChange = (category: string, itemCode: string, value: string | null) => {
@@ -410,15 +424,20 @@ export default function SessionWorkspacePage() {
     })
   }
 
-  const deleteUploadedPhoto = async (photoId: number) => {
-    if (!window.confirm('คุณต้องการลบรูปภาพนี้ใช่หรือไม่?')) return
-    try {
-      const res = await fetch(`/api/inspection/photo/${photoId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('ลบรูปภาพล้มเหลว')
-      setUploadedPhotos(prev => prev.filter(p => p.inspectionPhotoId !== photoId))
-    } catch (err: any) {
-      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
-    }
+  const deleteUploadedPhoto = (photoId: number) => {
+    askConfirmation(
+      'ยืนยันการลบรูปภาพ',
+      'คุณต้องการลบรูปภาพนี้ใช่หรือไม่?',
+      async () => {
+        try {
+          const res = await fetch(`/api/inspection/photo/${photoId}`, { method: 'DELETE' })
+          if (!res.ok) throw new Error('ลบรูปภาพล้มเหลว')
+          setUploadedPhotos(prev => prev.filter(p => p.inspectionPhotoId !== photoId))
+        } catch (err: any) {
+          showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
+        }
+      }
+    )
   }
 
   const handleSaveAuditItem = async () => {
@@ -519,10 +538,14 @@ export default function SessionWorkspacePage() {
   }
 
   const handleCancelAuditItem = () => {
-    if (window.confirm('ยกเลิกการแก้ไขและปิดฟอร์มนี้ใช่หรือไม่?')) {
-      setActiveVehicle(null)
-      setPendingPhotos({})
-    }
+    askConfirmation(
+      'ยกเลิกการแก้ไข',
+      'ยกเลิกการแก้ไขและปิดฟอร์มนี้ใช่หรือไม่?',
+      () => {
+        setActiveVehicle(null)
+        setPendingPhotos({})
+      }
+    )
   }
 
   return (
@@ -640,6 +663,36 @@ export default function SessionWorkspacePage() {
         }`}>
           <span className="text-base">{toast.type === 'success' ? '✅' : '❌'}</span>
           <span className="text-xs font-bold">{toast.message}</span>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-sm w-full space-y-4 animate-scale-in">
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-bold text-slate-900">{confirmModal.title}</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">{confirmModal.message}</p>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-3.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition active:scale-95"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm()
+                  setConfirmModal(null)
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
+              >
+                ตกลง
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </AuthGuard>
