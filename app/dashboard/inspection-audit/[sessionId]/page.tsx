@@ -603,6 +603,7 @@ export default function SessionWorkspacePage() {
                 sessionStatus={session.status}
                 auditedVehicles={auditedVehicles}
                 activeVin={activeVehicle?.vinNo}
+                totalChecklistItems={masterItems.length}
                 onSelectVehicle={selectAuditedVehicle}
                 onAddVehicle={handleSelectSearchVehicle}
               />

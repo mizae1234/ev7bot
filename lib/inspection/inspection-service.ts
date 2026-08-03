@@ -660,7 +660,7 @@ export async function listInspections(filters: {
       i.CustomerName AS customerName,
       i.CustomerContact AS customerContact,
       i.ContractCancellationDate AS contractCancellationDate,
-      (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID) AS itemCount,
+      (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID AND (Value IS NOT NULL OR NumericValue IS NOT NULL)) AS itemCount,
       (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
     FROM dbo.EV_Inspection i
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
