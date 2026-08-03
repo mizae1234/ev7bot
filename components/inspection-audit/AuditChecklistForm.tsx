@@ -206,7 +206,7 @@ export function AuditChecklistForm({
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                               stateItem.value === opt.value
                                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold opacity-100'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 opacity-60'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                             }`}
                           >
                             {opt.label}
@@ -231,7 +231,7 @@ export function AuditChecklistForm({
                                   : opt.value === 'SCRATCH'
                                   ? 'bg-amber-500 text-white border-amber-500 font-bold opacity-100'
                                   : 'bg-rose-500 text-white border-rose-500 font-bold opacity-100'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 opacity-60'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                             }`}
                           >
                             {opt.label}
@@ -254,7 +254,7 @@ export function AuditChecklistForm({
                                 ? opt.value === 'YES'
                                   ? (section.category === 'ACCIDENT' ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-600 text-white border-emerald-600') + ' font-bold opacity-100'
                                   : (section.category === 'ACCIDENT' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-500 text-white border-rose-500') + ' font-bold opacity-100'
-                                : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 opacity-60'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                             }`}
                           >
                             {opt.label}
