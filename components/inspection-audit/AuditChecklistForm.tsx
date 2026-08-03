@@ -108,7 +108,7 @@ export function AuditChecklistForm({
         <div className="flex items-center">
           <button
             onClick={onCancel}
-            className="md:hidden mr-3 p-2 bg-slate-200 text-slate-705 hover:bg-slate-350 text-xs font-bold rounded-lg transition"
+            className="md:hidden mr-3 p-2 bg-slate-200 text-slate-700 hover:bg-slate-300 text-xs font-bold rounded-lg transition"
           >
             ⬅ กลับ
           </button>
@@ -116,14 +116,14 @@ export function AuditChecklistForm({
             <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
               📝 บันทึกผลการตรวจ: {activeVehicle.registerNo || 'ไม่มีทะเบียน'}
             </h3>
-            <p className="text-[9px] sm:text-[10px] text-slate-505 font-medium mt-0.5">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium mt-0.5">
               VIN: {activeVehicle.vinNo} • {activeVehicle.model || '-'}
             </p>
           </div>
         </div>
         <button
           onClick={onCancel}
-          className="hidden md:block text-xs text-slate-450 hover:text-slate-655 transition font-bold"
+          className="hidden md:block text-xs text-slate-400 hover:text-slate-600 transition font-bold"
         >
           ปิดหน้านี้ ✕
         </button>
@@ -153,7 +153,7 @@ export function AuditChecklistForm({
               placeholder="ชื่อผู้บันทึกข้อมูล..."
               value={inspectorName}
               onChange={e => onInspectorNameChange(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-450 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
             />
           </div>
         </div>
@@ -191,7 +191,7 @@ export function AuditChecklistForm({
                 }
 
                 return (
-                  <div key={itemDef.itemCode} className="px-4 py-3.5 space-y-2 text-slate-705 bg-white">
+                  <div key={itemDef.itemCode} className="px-4 py-3.5 space-y-2 text-slate-700 bg-white">
                     <p className="text-xs font-semibold text-slate-800">{itemDef.label}</p>
 
                     {/* SELECT TYPE */}
@@ -206,7 +206,7 @@ export function AuditChecklistForm({
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                               stateItem.value === opt.value
                                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold opacity-100'
-                                : 'bg-slate-50 text-slate-405 border-slate-200 hover:bg-slate-100 opacity-60'
+                                : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 opacity-60'
                             }`}
                           >
                             {opt.label}
@@ -280,13 +280,13 @@ export function AuditChecklistForm({
                     {/* EXPIRY DATE */}
                     {itemDef.hasExpiry && stateItem.value === 'YES' && (
                       <div className="space-y-0.5 mt-1 max-w-xs">
-                        <span className="text-[9px] font-bold text-slate-505">วันหมดอายุของเอกสาร/อุปกรณ์</span>
+                        <span className="text-[9px] font-bold text-slate-500">วันหมดอายุของเอกสาร/อุปกรณ์</span>
                         <input
                           type="date"
                           disabled={sessionStatus === 'CLOSED'}
                           value={stateItem.expiryDate ? stateItem.expiryDate.slice(0, 10) : ''}
                           onChange={e => onChecklistExpiryChange(section.category, itemDef.itemCode, e.target.value)}
-                          className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-750 outline-none"
+                          className="w-full px-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 outline-none"
                         />
                       </div>
                     )}
@@ -323,7 +323,7 @@ export function AuditChecklistForm({
                                   <button
                                     type="button"
                                     onClick={() => onDeleteUploadedPhoto(photo.inspectionPhotoId)}
-                                    className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white text-[8px] flex items-center justify-center rounded-bl hover:bg-rose-650 transition"
+                                    className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white text-[8px] flex items-center justify-center rounded-bl hover:bg-rose-600 transition"
                                   >
                                     ✕
                                   </button>
@@ -350,7 +350,7 @@ export function AuditChecklistForm({
                                     <button
                                       type="button"
                                       onClick={() => onRemovePendingPhoto(posKey, idx)}
-                                      className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white text-[8px] flex items-center justify-center rounded-bl hover:bg-rose-650 transition"
+                                      className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white text-[8px] flex items-center justify-center rounded-bl hover:bg-rose-600 transition"
                                     >
                                       ✕
                                     </button>
@@ -364,7 +364,7 @@ export function AuditChecklistForm({
                         {/* Choose file uploader */}
                         {sessionStatus === 'OPEN' && (
                           <div>
-                            <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] text-slate-655 font-bold cursor-pointer transition active:scale-95 shadow-sm">
+                            <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[10px] text-slate-600 font-bold cursor-pointer transition active:scale-95 shadow-sm">
                               <span>📷</span> แนบภาพถ่ายตรวจสภาพ
                               <input
                                 type="file"
@@ -419,7 +419,7 @@ export function AuditChecklistForm({
                   📋 ดึงลงช่องโน้ต
                 </button>
               </div>
-              <ul className="list-disc list-inside space-y-0.5 text-[10px] text-rose-750 font-medium">
+              <ul className="list-disc list-inside space-y-0.5 text-[10px] text-rose-700 font-medium">
                 {damagedItems.map((item, idx) => (
                   <li key={idx}>
                     {item.label}: <span className="font-bold">{item.valueLabel}</span>
@@ -432,7 +432,7 @@ export function AuditChecklistForm({
 
         {/* General Remark */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-1.5 shadow-sm">
-          <label className="text-xs font-bold text-slate-705 flex items-center gap-1">
+          <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
             <span>📝</span> โน้ตรายละเอียดเพิ่มเติม (General Remark)
           </label>
           <textarea
@@ -461,7 +461,7 @@ export function AuditChecklistForm({
             type="button"
             disabled={saving}
             onClick={onSave}
-            className="px-4 py-2 rounded-lg bg-indigo-650 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm"
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm"
           >
             {saving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลตรวจสภาพ'}
           </button>

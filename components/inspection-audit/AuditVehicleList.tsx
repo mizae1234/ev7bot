@@ -87,7 +87,7 @@ export function AuditVehicleList({
               setShowDropdown(true)
             }}
             onFocus={() => setShowDropdown(true)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-450 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
           />
 
           {/* Autocomplete Dropdown */}
@@ -108,7 +108,7 @@ export function AuditVehicleList({
                   >
                     <div>
                       <p className="font-bold text-slate-900">{vehicle.RegisterNo || 'ไม่มีป้ายทะเบียน'}</p>
-                      <p className="text-[10px] font-mono text-slate-505 mt-0.5">{vehicle.VinNo}</p>
+                      <p className="text-[10px] font-mono text-slate-500 mt-0.5">{vehicle.VinNo}</p>
                     </div>
                     <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[9px] font-medium">
                       {vehicle.Model}
@@ -150,7 +150,7 @@ export function AuditVehicleList({
                 onClick={() => onSelectVehicle(item)}
                 className={`p-3.5 rounded-xl cursor-pointer transition flex flex-col gap-1.5 border ${
                   isActive
-                    ? 'bg-indigo-50 border-indigo-250 shadow-sm'
+                    ? 'bg-indigo-50 border-indigo-200 shadow-sm'
                     : 'hover:bg-slate-50 border-transparent active:bg-slate-100 bg-white'
                 }`}
               >
@@ -164,7 +164,7 @@ export function AuditVehicleList({
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : resVal === 'NEED_REPAIR'
                       ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-slate-550/10 text-slate-600 border-slate-200'
+                      : 'bg-slate-500/10 text-slate-600 border-slate-200'
                   }`}>
                     <span>{resVal === 'NORMAL' ? '✅' : resVal === 'NEED_REPAIR' ? '⚠️' : '⏳'}</span>
                     {resLabel}
