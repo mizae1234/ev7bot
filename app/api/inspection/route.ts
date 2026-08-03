@@ -19,12 +19,20 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get('sessionId')!)
       : undefined
     const status = searchParams.get('status') || undefined
+    const location = searchParams.get('location') || undefined
+    const startDate = searchParams.get('startDate') || undefined
+    const endDate = searchParams.get('endDate') || undefined
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
 
     const inspections = await listInspections({
       vinNo,
       inspectionType,
       inspectionSessionId,
       status,
+      location,
+      startDate,
+      endDate,
+      limit,
     })
 
     return NextResponse.json({ inspections })

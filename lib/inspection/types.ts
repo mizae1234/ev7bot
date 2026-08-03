@@ -117,6 +117,13 @@ export interface InspectionListItem {
   itemCount: number
   photoCount: number
   createDate: string
+  location?: string | null
+  locationName?: string
+  returnReason?: string | null
+  assessmentResult?: string | null
+  customerName?: string | null
+  customerContact?: string | null
+  contractCancellationDate?: string | null
 }
 
 /** Audit Session */

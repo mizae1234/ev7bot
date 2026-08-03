@@ -600,6 +600,9 @@ export async function listInspections(filters: {
   inspectionSessionId?: number
   status?: string
   limit?: number
+  location?: string
+  startDate?: string
+  endDate?: string
 }): Promise<InspectionListItem[]> {
   const pool = await getMSSQLPool()
   if (!pool) throw new Error('Database connection failed')
@@ -623,6 +626,18 @@ export async function listInspections(filters: {
     req.input('status', sql.VarChar, filters.status)
     conditions.push('i.Status = @status')
   }
+  if (filters.location) {
+    req.input('location', sql.VarChar, filters.location)
+    conditions.push('i.Location = @location')
+  }
+  if (filters.startDate) {
+    req.input('startDate', sql.Date, filters.startDate)
+    conditions.push('i.InspectionDate >= @startDate')
+  }
+  if (filters.endDate) {
+    req.input('endDate', sql.Date, filters.endDate)
+    conditions.push('i.InspectionDate <= @endDate')
+  }
 
   const limit = filters.limit || 50
   req.input('limit', sql.Int, limit)
@@ -638,9 +653,17 @@ export async function listInspections(filters: {
       i.Status AS status,
       i.Mileage AS mileage,
       i.CreateDate AS createDate,
+      i.Location AS location,
+      sub.StatusName AS locationName,
+      i.ReturnReason AS returnReason,
+      i.AssessmentResult AS assessmentResult,
+      i.CustomerName AS customerName,
+      i.CustomerContact AS customerContact,
+      i.ContractCancellationDate AS contractCancellationDate,
       (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID) AS itemCount,
       (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
     FROM dbo.EV_Inspection i
+    LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
     WHERE ${conditions.join(' AND ')}
     ORDER BY i.CreateDate DESC
   `)
