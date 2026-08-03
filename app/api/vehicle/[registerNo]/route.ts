@@ -496,6 +496,33 @@ export async function GET(
       CustomerName: maskFullName(r.CustomerName as string),
     }))
 
+    // Fetch active replacement reservation for this car (by its VinNo)
+    let replacementReserved = null
+    try {
+      const reservedRes = await pool.request()
+        .input('targetVin', sql.VarChar, car.VinNo)
+        .query(`
+          SELECT TOP 1 
+            ReplacementReservedID,
+            VinNo AS ReservedReplacementVinNo,
+            Type,
+            TargetVinNo,
+            ReleaseDate,
+            Remark,
+            IsActive
+          FROM dbo.EV_ReplacementReserved
+          WHERE TargetVinNo = @targetVin 
+            AND IsActive = 1
+            AND ClosedByMaintenanceItemID IS NULL
+          ORDER BY CreateDate DESC
+        `)
+      if (reservedRes.recordset.length > 0) {
+        replacementReserved = reservedRes.recordset[0]
+      }
+    } catch (reservedErr) {
+      console.error('[Vehicle API] Error fetching replacement reservation:', reservedErr)
+    }
+
     return NextResponse.json({
       car: maskedCar,
       currentRent: maskedRent,
@@ -505,7 +532,8 @@ export async function GET(
       carStatuses: carStatusesResult.recordset,
       insuranceOptions: insuranceResult.recordset,
       problemTypes: problemTypesResult.recordset,
-      vehicleNotes
+      vehicleNotes,
+      replacementReserved
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)

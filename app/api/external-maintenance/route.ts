@@ -158,6 +158,24 @@ export async function POST(req: NextRequest) {
           SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
           WHERE VinNo = @vin AND IsActive = 1
         `)
+        // 3. Update EV_ReplacementReserved if exists
+        const updResReq = pool.request()
+        updResReq.input('targetVin', sql.VarChar, vinNo)
+        updResReq.input('replVin', sql.VarChar, body.replacementVin)
+        updResReq.input('maintId', sql.Int, newMaintenanceId)
+        updResReq.input('userId', sql.Int, dbUserId)
+        await updResReq.query(`
+          UPDATE dbo.EV_ReplacementReserved
+          SET IsActive = 0,
+              ClosedByMaintenanceItemID = @maintId,
+              ClosedByReplacementVinNo = @replVin,
+              UpdateUserID = @userId,
+              UpdateDate = GETDATE()
+          WHERE TargetVinNo = @targetVin 
+            AND IsActive = 1
+            AND ClosedByMaintenanceItemID IS NULL
+        `)
+        console.log(`[Replacement Reservation Closed] For target vehicle ${vinNo} mapped to replacement ${body.replacementVin} on Ticket #${newMaintenanceId}`)
       } catch (replErr) {
         console.error('[New Ticket Replacement Assignment Error]', replErr)
       }

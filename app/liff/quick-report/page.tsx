@@ -284,6 +284,7 @@ export default function QuickReportPage() {
   // Replacement Car Search and Selection States
   const [hasReplacement, setHasReplacement] = useState(false)
   const [replacementVin, setReplacementVin] = useState('')
+  const [replacementReserved, setReplacementReserved] = useState<any>(null)
   const [replacementLocation, setReplacementLocation] = useState('')
   const [replacementStartDate, setReplacementStartDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [replacementCars, setReplacementCars] = useState<any[]>([])
@@ -543,6 +544,19 @@ export default function QuickReportPage() {
           } else {
             setSelectedMaintId(0)
           }
+        }
+
+        // 3. Check if there is an active replacement reservation
+        if (data.replacementReserved) {
+          setReplacementReserved(data.replacementReserved)
+          setHasReplacement(true)
+          setReplacementVin(data.replacementReserved.ReservedReplacementVinNo)
+          setReplCarSearch(data.replacementReserved.ReservedReplacementVinNo)
+        } else {
+          setReplacementReserved(null)
+          setHasReplacement(false)
+          setReplacementVin('')
+          setReplCarSearch('')
         }
       }
     } catch (err) {
@@ -1174,7 +1188,14 @@ export default function QuickReportPage() {
       ? ticket.replacements.find((r: any) => r.IsActive !== false)
       : null
 
-    setEditReplCarSearch(activeRepl ? activeRepl.VinNo : '')
+    const hasRepl = !!activeRepl || !!replacementReserved
+    const replVin = activeRepl ? activeRepl.VinNo : (replacementReserved ? replacementReserved.ReservedReplacementVinNo : '')
+    const replLoc = activeRepl ? (activeRepl.Location || '') : ''
+    const replStart = activeRepl && activeRepl.ReplacementStartDate
+      ? new Date(activeRepl.ReplacementStartDate).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
+
+    setEditReplCarSearch(replVin)
     setEditDetailTicket(ticket)
     setEditDetailFields({
       driverName: ticket.DriverName || '',
@@ -1188,12 +1209,10 @@ export default function QuickReportPage() {
       insurance: ticket.InsuranceCode || '',
       claimNumber: ticket.ClaimNumber || '',
       contractNo: (ticket as any).ContractNo || activeContractNo || '',
-      hasReplacement: !!activeRepl,
-      replacementVin: activeRepl ? activeRepl.VinNo : '',
-      replacementLocation: activeRepl ? (activeRepl.Location || '') : '',
-      replacementStartDate: activeRepl && activeRepl.ReplacementStartDate
-        ? new Date(activeRepl.ReplacementStartDate).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10)
+      hasReplacement: hasRepl,
+      replacementVin: replVin,
+      replacementLocation: replLoc,
+      replacementStartDate: replStart
     })
     setEditDetailAttachments([])
     setEditDetailDeletedPhotoIds([])

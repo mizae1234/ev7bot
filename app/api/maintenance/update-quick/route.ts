@@ -165,12 +165,13 @@ export async function POST(req: NextRequest) {
     let vehicleStatusType: string | null = null
     let oldCarStatusCode: string | null = null
     let oldLocCode: string | null = null
+    let vinNo: string | null = null
 
     try {
       const vehicleInfoReq = pool.request()
       vehicleInfoReq.input('maintId', sql.Int, maintenanceId)
       const vehicleInfoRes = await vehicleInfoReq.query(`
-        SELECT m.InventoryItemID, m.CarStatusCode, i.StatusType, i.CurrentLocation
+        SELECT m.InventoryItemID, m.CarStatusCode, i.StatusType, i.CurrentLocation, i.VinNo
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.MaintenanceItemID = @maintId
@@ -181,6 +182,7 @@ export async function POST(req: NextRequest) {
         vehicleStatusType = vehicleInfoRes.recordset[0].StatusType
         oldCarStatusCode = vehicleInfoRes.recordset[0].CarStatusCode
         oldLocCode = vehicleInfoRes.recordset[0].CurrentLocation
+        vinNo = vehicleInfoRes.recordset[0].VinNo
         console.log(`[Location Debug] inventoryItemId=${inventoryItemId}, oldLocCode='${oldLocCode}', serviceLocationCode='${serviceLocationCode}'`)
 
         // If carStatusCode is not provided in body, default to the existing one from database
@@ -360,6 +362,27 @@ export async function POST(req: NextRequest) {
               WHERE VinNo = @newVin AND IsActive = 1
             `)
             console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}`)
+          }
+
+          // Close reservation in EV_ReplacementReserved if exists
+          if (replacementVin && vinNo) {
+            const updResReq = pool.request()
+            updResReq.input('targetVin', sql.VarChar, vinNo)
+            updResReq.input('replVin', sql.VarChar, replacementVin)
+            updResReq.input('maintId', sql.Int, maintenanceId)
+            updResReq.input('userId', sql.Int, dbUserId)
+            await updResReq.query(`
+              UPDATE dbo.EV_ReplacementReserved
+              SET IsActive = 0,
+                  ClosedByMaintenanceItemID = @maintId,
+                  ClosedByReplacementVinNo = @replVin,
+                  UpdateUserID = @userId,
+                  UpdateDate = GETDATE()
+              WHERE TargetVinNo = @targetVin 
+                AND IsActive = 1
+                AND ClosedByMaintenanceItemID IS NULL
+            `)
+            console.log(`[Replacement Reservation Closed - Update] Target vehicle ${vinNo} mapped to replacement ${replacementVin} on Ticket #${maintenanceId}`)
           }
         } else {
           // Unchecked or hasReplacement is false/null, deactivate any existing replacement
