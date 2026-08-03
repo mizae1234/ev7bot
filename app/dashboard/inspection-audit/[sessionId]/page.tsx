@@ -117,6 +117,13 @@ export default function SessionWorkspacePage() {
   const [pendingPhotos, setPendingPhotos] = useState<Record<string, File[]>>({})
   const [uploadedPhotos, setUploadedPhotos] = useState<AuditedVehicle['photos']>([])
   const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -219,7 +226,7 @@ export default function SessionWorkspacePage() {
       setPendingPhotos({})
       setUploadedPhotos(inspDetail.photos || [])
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด')
+      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setLoading(false)
     }
@@ -346,7 +353,7 @@ export default function SessionWorkspacePage() {
       if (!res.ok) throw new Error('ปิดรอบตรวจล้มเหลว')
       fetchSessionData()
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด')
+      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
     }
   }
 
@@ -410,14 +417,14 @@ export default function SessionWorkspacePage() {
       if (!res.ok) throw new Error('ลบรูปภาพล้มเหลว')
       setUploadedPhotos(prev => prev.filter(p => p.inspectionPhotoId !== photoId))
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด')
+      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
     }
   }
 
   const handleSaveAuditItem = async () => {
     if (!activeVehicle) return
     if (!inspectorName.trim()) {
-      alert('กรุณากรอกชื่อผู้ตรวจสอบก่อนบันทึก')
+      showToast('กรุณากรอกชื่อผู้ตรวจสอบก่อนบันทึก', 'error')
       return
     }
 
@@ -500,12 +507,12 @@ export default function SessionWorkspacePage() {
         }
       }
 
-      alert('บันทึกผลการตรวจสอบสภาพคันนี้สำเร็จ!')
+      showToast('บันทึกผลการตรวจสอบสภาพคันนี้สำเร็จ!', 'success')
       setPendingPhotos({})
       setActiveVehicle(null)
       fetchSessionData()
     } catch (err: any) {
-      alert(err.message || 'เกิดข้อผิดพลาด')
+      showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setSaving(false)
     }
@@ -624,6 +631,17 @@ export default function SessionWorkspacePage() {
         </div>
 
       </div>
+
+      {toast && (
+        <div className={`fixed bottom-5 right-5 z-[100] px-4 py-3 rounded-xl shadow-xl border flex items-center gap-2.5 transition-all duration-300 ${
+          toast.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-100/50'
+            : 'bg-rose-50 border-rose-200 text-rose-800 shadow-rose-100/50'
+        }`}>
+          <span className="text-base">{toast.type === 'success' ? '✅' : '❌'}</span>
+          <span className="text-xs font-bold">{toast.message}</span>
+        </div>
+      )}
     </AuthGuard>
   )
 }
