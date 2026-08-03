@@ -96,7 +96,7 @@ export default function ReturnsMonitorPage() {
       const locData = locRes.ok ? await locRes.json() : { locations: [] }
 
       setInspections(inspData.inspections || [])
-      setMasterItems(masterData.items || [])
+      setMasterItems(masterData.masterItems || [])
       setLocations(locData.locations || [])
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล')
@@ -876,7 +876,7 @@ export default function ReturnsMonitorPage() {
                     </button>
                     <button
                       onClick={() => setSelectedInspectionId(null)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-650 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
+                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
                     >
                       ปิดหน้ารายงาน
                     </button>
