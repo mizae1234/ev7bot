@@ -102,6 +102,11 @@ export interface InspectionData {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean | null
+  model?: string | null
+  project?: string | null
+  locationName?: string | null
+  assessmentResult?: string | null
 }
 
 /** Inspection list item (สำหรับแสดงรายการ) */
@@ -124,6 +129,7 @@ export interface InspectionListItem {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean | null
 }
 
 /** Audit Session */
@@ -159,6 +165,7 @@ export interface CreateInspectionRequest {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean
 }
 
 export interface UpdateInspectionRequest {
@@ -175,4 +182,7 @@ export interface UpdateInspectionRequest {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean
 }
+
+export type { MasterItemDef } from './checklist-config'

@@ -168,6 +168,7 @@ export default function InspectionTab({
     customerName?: string | null
     customerContact?: string | null
     contractCancellationDate?: string | null
+    isPendingChecklist?: boolean
   }) => {
     if (!selectedCar) return
     setSaving(true)
@@ -193,6 +194,7 @@ export default function InspectionTab({
         customerName: data.customerName,
         customerContact: data.customerContact,
         contractCancellationDate: data.contractCancellationDate,
+        isPendingChecklist: data.isPendingChecklist,
       }
 
       if (inspectionId) {
@@ -243,6 +245,7 @@ export default function InspectionTab({
     customerName?: string | null
     customerContact?: string | null
     contractCancellationDate?: string | null
+    isPendingChecklist?: boolean
   }) => {
     if (!inspectionId) {
       showAlert('กรุณาบันทึกฉบับร่างก่อน', 'error')
@@ -271,6 +274,7 @@ export default function InspectionTab({
           customerName: data.customerName,
           customerContact: data.customerContact,
           contractCancellationDate: data.contractCancellationDate,
+          isPendingChecklist: data.isPendingChecklist,
         }),
       })
 
@@ -462,7 +466,8 @@ export default function InspectionTab({
               mileage={inspectionDetail?.mileage}
               remark={inspectionDetail?.remark}
               status={inspectionDetail?.status || 'DRAFT'}
-              disabled={inspectionDetail?.status === 'COMPLETED'}
+              disabled={inspectionDetail?.status === 'COMPLETED' && !inspectionDetail?.isPendingChecklist}
+              existingIsPendingChecklist={inspectionDetail?.isPendingChecklist}
               existingReturnDate={inspectionDetail?.returnDate}
               existingParkLocation={inspectionDetail?.location}
               onSave={handleSave}

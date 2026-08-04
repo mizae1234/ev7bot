@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       customerName,
       customerContact,
       contractCancellationDate,
+      isPendingChecklist,
     } = body
 
     console.log('[API POST /api/inspection] Payload parsed:', {
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       customerName,
       customerContact,
       contractCancellationDate,
+      isPendingChecklist,
     })
 
     // Resolve LINE user → EV_User
@@ -117,6 +119,7 @@ export async function POST(request: NextRequest) {
         customerName,
         customerContact,
         contractCancellationDate,
+        isPendingChecklist,
       })
 
       return NextResponse.json({ success: true, inspectionId })
@@ -153,6 +156,7 @@ export async function POST(request: NextRequest) {
       customerName,
       customerContact,
       contractCancellationDate,
+      isPendingChecklist,
     })
 
     return NextResponse.json({ success: true, inspectionId: newId })

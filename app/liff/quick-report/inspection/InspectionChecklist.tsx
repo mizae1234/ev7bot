@@ -45,6 +45,7 @@ interface InspectionChecklistProps {
     customerName?: string | null
     customerContact?: string | null
     contractCancellationDate?: string | null
+    isPendingChecklist?: boolean
   }) => Promise<number | undefined>
   onComplete?: (data: {
     items: InspectionItemData[]
@@ -59,12 +60,14 @@ interface InspectionChecklistProps {
     customerName?: string | null
     customerContact?: string | null
     contractCancellationDate?: string | null
+    isPendingChecklist?: boolean
   }) => Promise<void>
   saving?: boolean
   status?: string
   showAlert?: (text: string, type?: 'success' | 'error') => void
   onPhotoDeleted?: (photoId: number) => void
   onPhotoUploaded?: (photos: any[]) => void
+  existingIsPendingChecklist?: boolean | null
 }
 
 export default function InspectionChecklist({
@@ -94,6 +97,7 @@ export default function InspectionChecklist({
   showAlert,
   onPhotoDeleted,
   onPhotoUploaded,
+  existingIsPendingChecklist = false,
 }: InspectionChecklistProps) {
   // ---- State: items as a flat map (category_itemCode → data) ----
   const CHECKLIST_SECTIONS = useMemo(() => {
@@ -219,6 +223,16 @@ export default function InspectionChecklist({
   // ---- Note Text Sync State ----
   const [initialNoteText, setInitialNoteText] = useState('')
 
+  const [isPendingChecklist, setIsPendingChecklist] = useState<boolean>(() => {
+    return existingIsPendingChecklist || false
+  })
+
+  useEffect(() => {
+    if (existingIsPendingChecklist !== undefined && existingIsPendingChecklist !== null) {
+      setIsPendingChecklist(existingIsPendingChecklist)
+    }
+  }, [existingIsPendingChecklist])
+
   useEffect(() => {
     if (defaultInspectorName && !inspectorName) {
       setInspectorName(defaultInspectorName)
@@ -255,7 +269,9 @@ export default function InspectionChecklist({
           category: local.category,
           itemCode: local.itemCode,
           photoPosition: local.photoPosition,
-          isActive: 1,
+          fileName: '',
+          fileSize: null,
+          contentType: null,
         })
       }
     }
@@ -543,6 +559,7 @@ export default function InspectionChecklist({
       customerName: customerName || null,
       customerContact: customerContact || null,
       contractCancellationDate: contractCancellationDate || null,
+      isPendingChecklist,
     })
 
     if (screenSignatureFile && !inspectionId && newId) {
@@ -567,7 +584,7 @@ export default function InspectionChecklist({
         console.error(err)
       }
     }
-  }, [itemsMap, allPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, onSave])
+  }, [itemsMap, allPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave])
 
   const handleCompleteClick = useCallback(async () => {
     if (!returnDate) {
@@ -583,7 +600,7 @@ export default function InspectionChecklist({
       return
     }
     if (!inspectorName) {
-      triggerAlert('กรุณากรอกชื่อผู้ตรวจเช็ค/เจ้าหน้าที่', 'error')
+      triggerAlert('กรุณากรอกชื่อผู้ตรวจเช็ค/เจ้าหน้าที่รับคืน', 'error')
       return
     }
     if (!customerName) {
@@ -599,40 +616,42 @@ export default function InspectionChecklist({
       return
     }
 
-    // Validate that all 4 sides of the car are uploaded (รูปรถรอบคัน FRONT, BACK, LEFT, RIGHT)
-    const carPhotos = allPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
-    const hasFront = carPhotos.some(p => p.photoPosition === 'FRONT')
-    const hasBack = carPhotos.some(p => p.photoPosition === 'BACK')
-    const hasLeft = carPhotos.some(p => p.photoPosition === 'LEFT')
-    const hasRight = carPhotos.some(p => p.photoPosition === 'RIGHT')
+    if (!isPendingChecklist) {
+      // Validate that all 4 sides of the car are uploaded (รูปรถรอบคัน FRONT, BACK, LEFT, RIGHT)
+      const carPhotos = allPhotos.filter(p => p.category === 'CAR_PHOTOS' && p.itemCode === 'AROUND')
+      const hasFront = carPhotos.some(p => p.photoPosition === 'FRONT')
+      const hasBack = carPhotos.some(p => p.photoPosition === 'BACK')
+      const hasLeft = carPhotos.some(p => p.photoPosition === 'LEFT')
+      const hasRight = carPhotos.some(p => p.photoPosition === 'RIGHT')
 
-    if (!hasFront || !hasBack || !hasLeft || !hasRight) {
-      triggerAlert('กรุณาอัปโหลดรูปรถรอบคันให้ครบทั้ง 4 ด้าน (หน้า, หลัง, ซ้าย, ขวา)', 'error')
-      return
-    }
+      if (!hasFront || !hasBack || !hasLeft || !hasRight) {
+        triggerAlert('กรุณาอัปโหลดรูปรถรอบคันให้ครบทั้ง 4 ด้าน (หน้า, หลัง, ซ้าย, ขวา)', 'error')
+        return
+      }
 
-    // Validate that any damaged item has at least one photo uploaded
-    for (const section of CHECKLIST_SECTIONS) {
-      for (const itemDef of section.items) {
-        if (itemDef.hasPhoto === false) continue
+      // Validate that any damaged item has at least one photo uploaded
+      for (const section of CHECKLIST_SECTIONS) {
+        for (const itemDef of section.items) {
+          if (itemDef.hasPhoto === false) continue
 
-        const data = itemsMap[`${section.category}_${itemDef.itemCode}`]
-        if (!data) continue
+          const data = itemsMap[`${section.category}_${itemDef.itemCode}`]
+          if (!data) continue
 
-        let isDamaged = false
-        if (section.category === 'ACCIDENT') {
-          isDamaged = data.value === 'YES'
-        } else if (itemDef.inputType === 'three_way') {
-          isDamaged = data.value === 'SCRATCH' || data.value === 'DENT'
-        }
+          let isDamaged = false
+          if (section.category === 'ACCIDENT') {
+            isDamaged = data.value === 'YES'
+          } else if (itemDef.inputType === 'three_way') {
+            isDamaged = data.value === 'SCRATCH' || data.value === 'DENT'
+          }
 
-        if (isDamaged) {
-          const photos = allPhotos.filter(
-            p => p.category === section.category && p.itemCode === itemDef.itemCode
-          )
-          if (photos.length === 0) {
-            triggerAlert(`กรุณาแนบรูปภาพสำหรับหัวข้อที่มีความเสียหาย: ${itemDef.label}`, 'error')
-            return
+          if (isDamaged) {
+            const photos = allPhotos.filter(
+              p => p.category === section.category && p.itemCode === itemDef.itemCode
+            )
+            if (photos.length === 0) {
+              triggerAlert(`กรุณาแนบรูปภาพสำหรับหัวข้อที่มีความเสียหาย: ${itemDef.label}`, 'error')
+              return
+            }
           }
         }
       }
@@ -673,6 +692,7 @@ export default function InspectionChecklist({
           customerName: customerName || null,
           customerContact: customerContact || null,
           contractCancellationDate: contractCancellationDate || null,
+          isPendingChecklist,
         })
         if (!newId) return
         activeId = newId
@@ -709,9 +729,10 @@ export default function InspectionChecklist({
         customerName: customerName || null,
         customerContact: customerContact || null,
         contractCancellationDate: contractCancellationDate || null,
+        isPendingChecklist,
       })
     }
-  }, [itemsMap, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, signaturePhotos, existingPhotos, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, onSave, onComplete])
+  }, [itemsMap, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, signaturePhotos, existingPhotos, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onComplete])
 
 
 
@@ -805,37 +826,54 @@ export default function InspectionChecklist({
           </div>
 
           <div className="space-y-1 col-span-2">
-            <label className="text-[10px] font-bold text-slate-500">เจ้าหน้าที่ตรวจเช็ค (ชื่อผู้ตรวจเช็ค) <span className="text-rose-500">*</span></label>
+            <label className="text-[10px] font-bold text-slate-500">เจ้าหน้าที่ตรวจเช็ค (ชื่อผู้ตรวจเช็ค)/เจ้าหน้าที่รับคืน <span className="text-rose-500">*</span></label>
             <input
               type="text"
               value={inspectorName}
               onChange={e => setInspectorName(e.target.value)}
-              placeholder="พิมพ์ชื่อเจ้าหน้าที่หรือช่างผู้ตรวจเช็ค"
+              placeholder="พิมพ์ชื่อเจ้าหน้าที่ หรือช่างผู้ตรวจเช็ค/ผู้รับคืน"
               disabled={disabled}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
             />
+          </div>
+
+          {/* Checkbox: ตรวจสภาพรถภายหลัง */}
+          <div className="pt-3 border-t border-slate-100 flex items-center gap-2 col-span-2">
+            <input
+              type="checkbox"
+              id="isPendingChecklist"
+              checked={isPendingChecklist}
+              onChange={e => setIsPendingChecklist(e.target.checked)}
+              disabled={disabled && !existingIsPendingChecklist}
+              className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500"
+            />
+            <label htmlFor="isPendingChecklist" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+              ตรวจสภาพรถภายหลัง (ยังไม่สะดวกตรวจ ณ ตอนนี้)
+            </label>
           </div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 shadow-sm">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-slate-500">ความคืบหน้า</span>
-          <span className="text-xs font-bold text-emerald-600">
-            {filledCount}/{totalCount} ข้อ
-          </span>
+      {!isPendingChecklist && (
+        <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500">ความคืบหน้า</span>
+            <span className="text-xs font-bold text-emerald-600">
+              {filledCount}/{totalCount} ข้อ
+            </span>
+          </div>
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-300"
+              style={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%` }}
+            />
+          </div>
         </div>
-        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-300"
-            style={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%` }}
-          />
-        </div>
-      </div>
+      )}
 
       {/* Checklist sections */}
-      {CHECKLIST_SECTIONS.map(section => (
+      {!isPendingChecklist && CHECKLIST_SECTIONS.map(section => (
         <ChecklistSection
           key={section.category}
           section={section}
@@ -1103,14 +1141,15 @@ export default function InspectionChecklist({
             )}
           </button>
 
-          {status === 'DRAFT' && onComplete && filledCount === totalCount && (
+          {((status === 'DRAFT' && (isPendingChecklist || filledCount === totalCount)) || 
+            (status === 'COMPLETED' && existingIsPendingChecklist)) && onComplete && (
             <button
               type="button"
               onClick={handleCompleteClick}
               disabled={saving}
               className="w-full py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
             >
-              ✅ ยืนยัน — ตรวจสภาพเสร็จสิ้น
+              {status === 'COMPLETED' ? '✅ ยืนยันผลการตรวจสภาพเสร็จสมบูรณ์' : '✅ ยืนยัน — ตรวจสภาพเสร็จสิ้น'}
             </button>
           )}
         </div>

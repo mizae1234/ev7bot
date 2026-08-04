@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { MasterItemDef, ChecklistSectionDef } from '@/lib/inspection/types'
+import type { ChecklistSectionDef } from '@/lib/inspection/types'
 
 interface FormItemState {
   category: string
@@ -13,7 +13,7 @@ interface FormItemState {
 }
 
 interface UploadedPhoto {
-  inspectionPhotoId: number
+  inspectionPhotoId?: number
   category: string
   itemCode: string | null
   photoPosition: string | null
@@ -322,7 +322,7 @@ export function AuditChecklistForm({
                                 {sessionStatus === 'OPEN' && (
                                   <button
                                     type="button"
-                                    onClick={() => onDeleteUploadedPhoto(photo.inspectionPhotoId)}
+                                    onClick={() => photo.inspectionPhotoId && onDeleteUploadedPhoto(photo.inspectionPhotoId)}
                                     className="absolute top-0 right-0 w-4 h-4 bg-black/60 text-white text-[8px] flex items-center justify-center rounded-bl hover:bg-rose-600 transition"
                                   >
                                     ✕

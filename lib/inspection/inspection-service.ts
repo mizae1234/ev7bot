@@ -10,7 +10,6 @@ import type {
   InspectionData,
   InspectionListItem,
   InspectionItemData,
-  InspectionPhotoData,
   AuditSessionData,
   InspectionStatus,
 } from './types'
@@ -77,6 +76,7 @@ export async function createInspection(params: {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean | null
 }): Promise<number> {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Database connection failed')
@@ -129,6 +129,7 @@ export async function createInspection(params: {
       .input('customerName', sql.NVarChar, resolvedCustomerName)
       .input('customerContact', sql.VarChar, resolvedCustomerContact)
       .input('contractCancellationDate', sql.Date, params.contractCancellationDate || null)
+      .input('isPendingChecklist', sql.Bit, params.isPendingChecklist ? 1 : 0)
       .query(`
         INSERT INTO dbo.EV_Inspection (
           VinNo, RegisterNo, InspectionType, ReturnItemID, InspectionSessionID,
@@ -136,7 +137,7 @@ export async function createInspection(params: {
           Status, Remark, IsActive, CreateDate, CreateUserID,
           ReturnDate, Location, RentItemID, ContractNo, ReturnReason,
           CarStatus, CarStatusType, AssessmentResult, CustomerName, CustomerContact,
-          ContractCancellationDate
+          ContractCancellationDate, IsPendingChecklist
         )
         VALUES (
           @vinNo, @registerNo, @inspectionType, @returnItemId, @inspectionSessionId,
@@ -144,7 +145,7 @@ export async function createInspection(params: {
           'DRAFT', @remark, 1, GETDATE(), @createUserID,
           @returnDate, @location, @rentItemId, @contractNo, @returnReason,
           @carStatus, @carStatusType, @assessmentResult, @customerName, @customerContact,
-          @contractCancellationDate
+          @contractCancellationDate, @isPendingChecklist
         );
         SELECT SCOPE_IDENTITY() AS InspectionID;
       `)
@@ -182,6 +183,7 @@ export async function updateInspection(params: {
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
+  isPendingChecklist?: boolean
 }): Promise<void> {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Database connection failed')
@@ -249,6 +251,7 @@ export async function updateInspection(params: {
       .input('customerName', sql.NVarChar, params.customerName ?? null)
       .input('customerContact', sql.VarChar, params.customerContact ?? null)
       .input('contractCancellationDate', sql.Date, params.contractCancellationDate || null)
+      .input('isPendingChecklist', sql.Bit, params.isPendingChecklist !== undefined ? (params.isPendingChecklist ? 1 : 0) : null)
       .query(`
         UPDATE dbo.EV_Inspection
         SET Mileage = COALESCE(@mileage, Mileage),
@@ -267,6 +270,7 @@ export async function updateInspection(params: {
             CustomerName = COALESCE(@customerName, CustomerName),
             CustomerContact = COALESCE(@customerContact, CustomerContact),
             ContractCancellationDate = COALESCE(@contractCancellationDate, ContractCancellationDate),
+            IsPendingChecklist = COALESCE(@isPendingChecklist, IsPendingChecklist),
             UpdateDate = GETDATE(),
             UpdateUserID = @updateUserID
         WHERE InspectionID = @inspectionId
@@ -608,7 +612,7 @@ export async function listInspections(filters: {
   if (!pool) throw new Error('Database connection failed')
 
   const req = pool.request()
-  let conditions = ['i.IsActive = 1']
+  const conditions = ['i.IsActive = 1']
 
   if (filters.vinNo) {
     req.input('vinNo', sql.NVarChar, filters.vinNo)
@@ -660,6 +664,7 @@ export async function listInspections(filters: {
       i.CustomerName AS customerName,
       i.CustomerContact AS customerContact,
       i.ContractCancellationDate AS contractCancellationDate,
+      i.IsPendingChecklist AS isPendingChecklist,
       (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID AND (Value IS NOT NULL OR NumericValue IS NOT NULL)) AS itemCount,
       (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
     FROM dbo.EV_Inspection i
@@ -691,7 +696,8 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
              IsDistributed AS isDistributed, DistributionDate AS distributionDate,
              DistributionUserID AS distributionUserID,
              CustomerName AS customerName, CustomerContact AS customerContact,
-             ContractCancellationDate AS contractCancellationDate
+             ContractCancellationDate AS contractCancellationDate,
+             IsPendingChecklist AS isPendingChecklist
       FROM dbo.EV_Inspection
       WHERE InspectionID = @inspectionId AND IsActive = 1
     `),

@@ -57,7 +57,7 @@ export async function PUT(
     }
 
     body = await request.json()
-    const { status, mileage, remark, items = [], lineUserId, returnDate, parkLocation, inspectorName, inspectorUserId, returnReason, carStatus, carStatusType, assessmentResult, customerName, customerContact, contractCancellationDate } = body
+    const { status, mileage, remark, items = [], lineUserId, returnDate, parkLocation, inspectorName, inspectorUserId, returnReason, carStatus, carStatusType, assessmentResult, customerName, customerContact, contractCancellationDate, isPendingChecklist } = body
 
     console.log('[API PUT /api/inspection/:id] Payload parsed:', {
       inspectionId,
@@ -67,6 +67,7 @@ export async function PUT(
       customerName,
       customerContact,
       contractCancellationDate,
+      isPendingChecklist,
     })
 
     const ev7User = await resolveEv7User(lineUserId)
@@ -90,6 +91,7 @@ export async function PUT(
       customerName,
       customerContact,
       contractCancellationDate,
+      isPendingChecklist,
     })
 
     return NextResponse.json({ success: true })

@@ -41,13 +41,7 @@ interface AuditedVehicle {
     numericValue: number | null
     expiryDate: string | null
   }>
-  photos: Array<{
-    inspectionPhotoId: number
-    category: string
-    itemCode: string | null
-    photoPosition: string | null
-    s3Key: string
-  }>
+  photos: import('@/lib/inspection/types').InspectionPhotoData[]
 }
 
 interface SearchVehicle {
@@ -210,8 +204,8 @@ export default function SessionWorkspacePage() {
         inspectionId: inspDetail.inspectionId,
         vinNo: inspDetail.vinNo,
         registerNo: inspDetail.registerNo,
-        model: inspDetail.model,
-        project: inspDetail.project,
+        model: inspDetail.model ?? null,
+        project: inspDetail.project ?? null,
       })
 
       const itemsMap: Record<string, any> = {}
