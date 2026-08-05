@@ -866,5 +866,13 @@ export async function getInspectionItemMaster(): Promise<any[]> {
     WHERE IsActive = 1
     ORDER BY SortOrder
   `)
-  return result.recordset
+  return result.recordset.map((item: any) => {
+    if (item.Category === 'BATTERY_HV' && item.ItemCode === 'LEVEL') {
+      return {
+        ...item,
+        Label: 'แบต 12 volt (%)',
+      }
+    }
+    return item
+  })
 }

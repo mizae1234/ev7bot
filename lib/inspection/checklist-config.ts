@@ -40,8 +40,8 @@ const LICENSE_PLATE_OPTIONS = [
 ]
 
 const AIR_CON_OPTIONS = [
-  { value: 'YES', label: 'ใช่' },
-  { value: 'NO', label: 'ไม่ใช่' },
+  { value: 'YES', label: 'ปกติ' },
+  { value: 'NO', label: 'ไม่ปกติ' },
 ]
 
 const CLAIM_COMPLETE_OPTIONS = [
@@ -244,6 +244,22 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
         options: UNDERBODY_CONDITION_OPTIONS,
         hasPhoto: true,
       },
+      {
+        category: 'BODY',
+        itemCode: 'WHEEL_RIM',
+        label: 'สภาพล้อแม็ก',
+        inputType: 'three_way',
+        options: BODY_CONDITION_OPTIONS,
+        hasPhoto: true,
+      },
+      {
+        category: 'BODY',
+        itemCode: 'WINDOW_FILM',
+        label: 'ฟิล์มกรองแสง',
+        inputType: 'boolean',
+        options: AIR_CON_OPTIONS,
+        hasPhoto: true,
+      },
     ],
   },
   {
@@ -263,13 +279,13 @@ export const CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
   },
   {
     category: 'BATTERY_HV',
-    label: 'ปริมาณแบต High Volt',
+    label: 'แบต 12 volt',
     icon: '🔋',
     items: [
       {
         category: 'BATTERY_HV',
         itemCode: 'LEVEL',
-        label: 'ปริมาณแบต (%)',
+        label: 'แบต 12 volt (%)',
         inputType: 'number',
         hasPhoto: true,
       },
