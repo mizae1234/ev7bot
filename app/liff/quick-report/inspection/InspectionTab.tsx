@@ -215,21 +215,27 @@ export default function InspectionTab({
       const result = await res.json()
       const resolvedId = result.inspectionId || inspectionId
       setInspectionId(resolvedId)
-
-      if (resolvedId) {
-        await handleViewDetail(resolvedId)
-      }
-
-      showAlert('บันทึกฉบับร่างเรียบร้อย ✅')
-
-      await fetchHistory(selectedCar.VinNo)
       return resolvedId as number
+    } catch (err: any) {
+      showAlert(err.message || 'เกิดข้อผิดพลาด', 'error')
+      setSaving(false)
+    }
+  }, [selectedCar, inspectionId, getLineUserId, showAlert])
+
+  // ---- Save inspection complete callback ----
+  const handleSaveComplete = useCallback(async (id: number) => {
+    try {
+      await handleViewDetail(id)
+      if (selectedCar) {
+        await fetchHistory(selectedCar.VinNo)
+      }
+      showAlert('บันทึกฉบับร่างเรียบร้อย ✅')
     } catch (err: any) {
       showAlert(err.message || 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setSaving(false)
     }
-  }, [selectedCar, inspectionId, getLineUserId, fetchHistory, showAlert, handleViewDetail])
+  }, [handleViewDetail, fetchHistory, selectedCar, showAlert])
 
   // ---- Complete inspection ----
   const handleComplete = useCallback(async (data: {
@@ -246,15 +252,17 @@ export default function InspectionTab({
     customerContact?: string | null
     contractCancellationDate?: string | null
     isPendingChecklist?: boolean
+    inspectionId?: number | null
   }) => {
-    if (!inspectionId) {
+    const activeInspectionId = data.inspectionId || inspectionId
+    if (!activeInspectionId) {
       showAlert('กรุณาบันทึกฉบับร่างก่อน', 'error')
       return
     }
 
     setSaving(true)
     try {
-      const res = await fetch(`/api/inspection/${inspectionId}`, {
+      const res = await fetch(`/api/inspection/${activeInspectionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -471,6 +479,7 @@ export default function InspectionTab({
               existingReturnDate={inspectionDetail?.returnDate}
               existingParkLocation={inspectionDetail?.location}
               onSave={handleSave}
+              onSaveComplete={handleSaveComplete}
               onComplete={handleComplete}
               saving={saving}
               defaultInspectorName={inspectionDetail?.inspectorName || currentUserFullName}

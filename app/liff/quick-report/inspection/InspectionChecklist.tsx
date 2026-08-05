@@ -47,6 +47,7 @@ interface InspectionChecklistProps {
     contractCancellationDate?: string | null
     isPendingChecklist?: boolean
   }) => Promise<number | undefined>
+  onSaveComplete?: (id: number) => Promise<void>
   onComplete?: (data: {
     items: InspectionItemData[]
     mileage: number | null
@@ -61,6 +62,7 @@ interface InspectionChecklistProps {
     customerContact?: string | null
     contractCancellationDate?: string | null
     isPendingChecklist?: boolean
+    inspectionId?: number | null
   }) => Promise<void>
   saving?: boolean
   status?: string
@@ -91,6 +93,7 @@ export default function InspectionChecklist({
   lineUserId,
   contractNo,
   onSave,
+  onSaveComplete,
   onComplete,
   saving = false,
   status = 'DRAFT',
@@ -562,29 +565,65 @@ export default function InspectionChecklist({
       isPendingChecklist,
     })
 
-    if (screenSignatureFile && !inspectionId && newId) {
-      try {
-        const formData = new FormData()
-        formData.append('files', screenSignatureFile)
-        formData.append('inspectionId', String(newId))
-        formData.append('category', 'SIGNATURE')
-        formData.append('itemCode', 'CUSTOMER_SIGNATURE')
+    if (newId) {
+      if (screenSignatureFile && !inspectionId) {
+        try {
+          const formData = new FormData()
+          formData.append('files', screenSignatureFile)
+          formData.append('inspectionId', String(newId))
+          formData.append('category', 'SIGNATURE')
+          formData.append('itemCode', 'CUSTOMER_SIGNATURE')
 
-        const res = await fetch('/api/inspection/upload', {
-          method: 'POST',
-          body: formData,
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setSignaturePhotos(data.photos || [])
-          setScreenSignatureFile(null)
-          setScreenSignaturePreview(null)
+          const res = await fetch('/api/inspection/upload', {
+            method: 'POST',
+            body: formData,
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setSignaturePhotos(data.photos || [])
+            setScreenSignatureFile(null)
+            setScreenSignaturePreview(null)
+          }
+        } catch (err) {
+          console.error(err)
         }
-      } catch (err) {
-        console.error(err)
+      }
+
+      // Upload local photos
+      const pendingUploads = localPhotos.filter(p => p.file)
+      if (pendingUploads.length > 0) {
+        for (const local of pendingUploads) {
+          try {
+            const formData = new FormData()
+            formData.append('files', local.file)
+            formData.append('inspectionId', String(newId))
+            formData.append('category', local.category)
+            if (local.itemCode) formData.append('itemCode', local.itemCode)
+            if (local.photoPosition) formData.append('photoPosition', local.photoPosition)
+            if (lineUserId) formData.append('lineUserId', lineUserId)
+
+            const res = await fetch('/api/inspection/upload', {
+              method: 'POST',
+              body: formData,
+            })
+            if (res.ok) {
+              const data = await res.json()
+              if (onPhotoUploaded) {
+                onPhotoUploaded(data.photos || [])
+              }
+            }
+          } catch (err) {
+            console.error('Failed to upload local photo:', err)
+          }
+        }
+        setLocalPhotos([])
+      }
+
+      if (onSaveComplete) {
+        await onSaveComplete(newId)
       }
     }
-  }, [itemsMap, allPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave])
+  }, [itemsMap, allPhotos, localPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onSaveComplete, onPhotoUploaded, lineUserId])
 
   const handleCompleteClick = useCallback(async () => {
     if (!returnDate) {
@@ -679,7 +718,7 @@ export default function InspectionChecklist({
       const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
 
       let activeId = inspectionId
-      if (screenSignatureFile && !inspectionId) {
+      if (!activeId) {
         const newId = await onSave({
           items,
           mileage,
@@ -696,24 +735,60 @@ export default function InspectionChecklist({
         })
         if (!newId) return
         activeId = newId
+      }
 
-        try {
-          const formData = new FormData()
-          formData.append('files', screenSignatureFile)
-          formData.append('inspectionId', String(newId))
-          formData.append('category', 'SIGNATURE')
-          formData.append('itemCode', 'CUSTOMER_SIGNATURE')
+      if (activeId) {
+        if (screenSignatureFile && !inspectionId) {
+          try {
+            const formData = new FormData()
+            formData.append('files', screenSignatureFile)
+            formData.append('inspectionId', String(activeId))
+            formData.append('category', 'SIGNATURE')
+            formData.append('itemCode', 'CUSTOMER_SIGNATURE')
 
-          const res = await fetch('/api/inspection/upload', {
-            method: 'POST',
-            body: formData,
-          })
-          if (res.ok) {
-            setScreenSignatureFile(null)
-            setScreenSignaturePreview(null)
+            const res = await fetch('/api/inspection/upload', {
+              method: 'POST',
+              body: formData,
+            })
+            if (res.ok) {
+              const data = await res.json()
+              setSignaturePhotos(data.photos || [])
+              setScreenSignatureFile(null)
+              setScreenSignaturePreview(null)
+            }
+          } catch (err) {
+            console.error(err)
           }
-        } catch (err) {
-          console.error(err)
+        }
+
+        // Upload local photos
+        const pendingUploads = localPhotos.filter(p => p.file)
+        if (pendingUploads.length > 0) {
+          for (const local of pendingUploads) {
+            try {
+              const formData = new FormData()
+              formData.append('files', local.file)
+              formData.append('inspectionId', String(activeId))
+              formData.append('category', local.category)
+              if (local.itemCode) formData.append('itemCode', local.itemCode)
+              if (local.photoPosition) formData.append('photoPosition', local.photoPosition)
+              if (lineUserId) formData.append('lineUserId', lineUserId)
+
+              const res = await fetch('/api/inspection/upload', {
+                method: 'POST',
+                body: formData,
+              })
+              if (res.ok) {
+                const data = await res.json()
+                if (onPhotoUploaded) {
+                  onPhotoUploaded(data.photos || [])
+                }
+              }
+            } catch (err) {
+              console.error('Failed to upload local photo:', err)
+            }
+          }
+          setLocalPhotos([])
         }
       }
 
@@ -730,9 +805,10 @@ export default function InspectionChecklist({
         customerContact: customerContact || null,
         contractCancellationDate: contractCancellationDate || null,
         isPendingChecklist,
+        inspectionId: activeId,
       })
     }
-  }, [itemsMap, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, signaturePhotos, existingPhotos, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onComplete])
+  }, [itemsMap, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, signaturePhotos, existingPhotos, localPhotos, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onComplete, onPhotoUploaded, lineUserId])
 
 
 
