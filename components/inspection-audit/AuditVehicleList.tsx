@@ -175,7 +175,7 @@ export function AuditVehicleList({
 
                 <div className="flex justify-between items-center text-[10px] text-slate-500 pt-1.5 border-t border-slate-100/60">
                   <span>ผู้ตรวจ: <strong className="text-slate-700 font-semibold">{item.inspectorName || '-'}</strong></span>
-                  <span>ข้อที่ตรวจ: <strong className="text-slate-800 font-mono font-bold">{item.itemCount ?? 0}/{totalChecklistItems || 25}</strong></span>
+                  <span>ข้อที่ตรวจ: <strong className="text-slate-800 font-mono font-bold">{item.itemCount ?? 0}/{totalChecklistItems || 27}</strong></span>
                 </div>
               </div>
             )
