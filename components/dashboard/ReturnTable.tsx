@@ -108,7 +108,9 @@ export function ReturnTable({ records = [], periodLabel = '' }: ReturnTableProps
                   <td className="py-3.5 pr-2 font-semibold text-zinc-900 dark:text-zinc-100">{rec.register_no || '-'}</td>
                   <td className="py-3.5 pr-2">{rec.model}</td>
                   <td className="py-3.5 pr-2 font-mono text-zinc-500 dark:text-zinc-400">{rec.vin}</td>
-                  <td className="py-3.5 pr-2 font-mono">{rec.mileage.toLocaleString()} กม.</td>
+                  <td className="py-3.5 pr-2 font-mono">
+                    {rec.mileage != null ? `${rec.mileage.toLocaleString()} กม.` : '-'}
+                  </td>
                   <td className="py-3.5 pr-2 font-medium">{rec.park_location || '-'}</td>
                   <td className="py-3.5 text-right font-semibold text-zinc-900 dark:text-zinc-100">
                     {formatDate(rec.receive_date || rec.return_date)}
