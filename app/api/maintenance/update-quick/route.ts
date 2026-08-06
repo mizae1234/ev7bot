@@ -19,7 +19,7 @@ const carStatusMap: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, contractNo, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate } = body
+    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, contractNo, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate, isRepossessed, repossessDate, repossessLocation, repossessRemark, rentItemId } = body
 
     if (!maintenanceId && !bodyInventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม หรือรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
@@ -88,13 +88,81 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // 1. SELECT old location before update
+      // 1. SELECT old location and VinNo before update
       const oldLocRes = await pool.request()
         .input('itemId', sql.Int, bodyInventoryItemId)
-        .query(`SELECT CurrentLocation FROM dbo.EV_InventoryItem WHERE InventoryItemID = @itemId`)
+        .query(`SELECT CurrentLocation, VinNo FROM dbo.EV_InventoryItem WHERE InventoryItemID = @itemId`)
       const oldLocationCode = oldLocRes.recordset[0]?.CurrentLocation || null
+      const vinNo = oldLocRes.recordset[0]?.VinNo || null
 
-      // 2. UPDATE CurrentLocation (same as before)
+      if (isRepossessed) {
+        // 1a. Query active rental contract details if not passed from client or to verify
+        let finalRentItemId = rentItemId ? Number(rentItemId) : null
+        let finalContractNo = contractNo || null
+        
+        if (!finalRentItemId) {
+          try {
+            const rentRes = await pool.request()
+              .input('itemId', sql.Int, bodyInventoryItemId)
+              .query(`
+                SELECT TOP 1 RentItemID, ContractNo 
+                FROM dbo.EV_RentItem 
+                WHERE InventoryItemID = @itemId AND IsActive = 1
+              `)
+            if (rentRes.recordset.length > 0) {
+              finalRentItemId = Number(rentRes.recordset[0].RentItemID)
+              finalContractNo = rentRes.recordset[0].ContractNo
+            }
+          } catch (rentErr) {
+            console.error('[Repossess] Error querying active contract:', rentErr)
+          }
+        }
+
+        // 1b. Insert record into dbo.EV_VehicleRepossess
+        const repossessReq = pool.request()
+        repossessReq.input('itemId', sql.Int, bodyInventoryItemId)
+        repossessReq.input('vin', sql.VarChar, vinNo)
+        repossessReq.input('rentId', sql.BigInt, finalRentItemId)
+        repossessReq.input('contract', sql.VarChar, finalContractNo)
+        repossessReq.input('date', sql.DateTime, repossessDate)
+        repossessReq.input('location', sql.NVarChar, repossessLocation)
+        repossessReq.input('remark', sql.NVarChar, repossessRemark || null)
+        repossessReq.input('userId', sql.Int, dbUserId)
+
+        await repossessReq.query(`
+          INSERT INTO dbo.EV_VehicleRepossess (
+            InventoryItemID, VinNo, RentItemID, ContractNo, RepossessDate, RepossessLocation, Remark, IsActive, CreateDate, CreateUserID
+          )
+          VALUES (
+            @itemId, @vin, @rentId, @contract, @date, @location, @remark, 1, GETDATE(), @userId
+          )
+        `)
+        console.log(`[Repossess] ✅ Inserted transaction into EV_VehicleRepossess for itemId=${bodyInventoryItemId}`)
+
+        // 1c. Insert note in dbo.EV_VehicleNote
+        try {
+          const thaiDateStr = new Date(repossessDate).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC'
+          })
+          const noteDetail = `📍 ยึดคืนรถยนต์ | สถานที่ยึด: ${repossessLocation} | วันที่ยึด: ${thaiDateStr} | หมายเหตุ: ${repossessRemark || '-'}`
+          await pool.request()
+            .input('itemId', sql.Int, Number(bodyInventoryItemId))
+            .input('note', sql.NVarChar, noteDetail)
+            .input('userId', sql.Int, dbUserId)
+            .query(`
+              INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+              VALUES (@itemId, @note, GETDATE(), @userId, 1)
+            `)
+          console.log(`[Repossess] ✅ Inserted vehicle note for itemId=${bodyInventoryItemId}`)
+        } catch (noteErr) {
+          console.error('[Repossess] Error inserting vehicle note:', noteErr)
+        }
+      }
+
+      // 2. UPDATE CurrentLocation
       const updateLocReq = pool.request()
       updateLocReq.input('itemId', sql.Int, bodyInventoryItemId)
       updateLocReq.input('locCode', sql.NVarChar, serviceLocationCode || '')
@@ -129,33 +197,35 @@ export async function POST(req: NextRequest) {
             inventoryItemId: Number(bodyInventoryItemId),
             oldLocation: oldLocationCode || null,
             newLocation: serviceLocationCode || null,
-            actionCode: 'QUICK_REPORT_LOC',
+            actionCode: isRepossessed ? 'QUICK_REPORT_REPOSS_LOC' : 'QUICK_REPORT_LOC',
             createUserId: dbUserId
           })
         } catch (logErr) {
           console.error('[LocationLog Error - direct]', logErr)
         }
 
-        // 3b. VehicleNote — independent try-catch (always runs even if log fails)
-        try {
-          const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
-          await pool.request()
-            .input('itemId', sql.Int, Number(bodyInventoryItemId))
-            .input('note', sql.NVarChar, noteDetail)
-            .input('userId', sql.Int, dbUserId)
-            .query(`
-              INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
-              VALUES (@itemId, @note, GETDATE(), @userId, 1)
-            `)
-          console.log(`[VehicleNote] ✅ Inserted note for itemId=${bodyInventoryItemId}`)
-        } catch (noteErr) {
-          console.error('[VehicleNote Error - direct]', noteErr)
+        // 3b. VehicleNote — independent try-catch (only if NOT repossessed to avoid double notes)
+        if (!isRepossessed) {
+          try {
+            const noteDetail = `📍 ย้ายสถานที่: ${oldName} → ${newName} | โดย: ${senderName}`
+            await pool.request()
+              .input('itemId', sql.Int, Number(bodyInventoryItemId))
+              .input('note', sql.NVarChar, noteDetail)
+              .input('userId', sql.Int, dbUserId)
+              .query(`
+                INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
+                VALUES (@itemId, @note, GETDATE(), @userId, 1)
+              `)
+            console.log(`[VehicleNote] ✅ Inserted note for itemId=${bodyInventoryItemId}`)
+          } catch (noteErr) {
+            console.error('[VehicleNote Error - direct]', noteErr)
+          }
         }
       }
 
       return NextResponse.json({
         success: true,
-        message: 'อัปเดตสถานที่ปัจจุบันของรถยนต์เรียบร้อยแล้ว'
+        message: isRepossessed ? 'บันทึกรายการยึดรถและอัปเดตสถานที่จอดเรียบร้อยแล้ว' : 'อัปเดตสถานที่ปัจจุบันของรถยนต์เรียบร้อยแล้ว'
       })
     }
 

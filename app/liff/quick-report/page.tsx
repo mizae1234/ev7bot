@@ -352,6 +352,18 @@ export default function QuickReportPage() {
   const [showLocDropdown, setShowLocDropdown] = useState(false)
   const [updatingLocation, setUpdatingLocation] = useState(false)
 
+  const [isRepossessed, setIsRepossessed] = useState(false)
+  const [repossessDate, setRepossessDate] = useState(() => {
+    const d = new Date()
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const date = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${date}`
+  })
+  const [repossessLocation, setRepossessLocation] = useState('')
+  const [repossessRemark, setRepossessRemark] = useState('')
+  const [activeRentItemId, setActiveRentItemId] = useState<number | null>(null)
+
   // Sync selectedLocCode and locSearchTerm when locationOptions, vehicleHistory, selectedMaintId, selectedCar, or selectedCarDetails changes
   useEffect(() => {
     if (locationOptions.length > 0) {
@@ -528,10 +540,12 @@ export default function QuickReportPage() {
           setContractorName(name)
           setDriverName(name)
           setActiveContractNo(data.currentRent.ContractNo || '')
+          setActiveRentItemId(data.currentRent.RentItemID ? Number(data.currentRent.RentItemID) : null)
         } else {
           setContractorName('')
           setDriverName('')
           setActiveContractNo('')
+          setActiveRentItemId(null)
         }
 
         // 2. Set maintenance history & prepopulate location states for Tab 3
@@ -1348,6 +1362,7 @@ export default function QuickReportPage() {
     e.preventDefault()
 
     const isDirectInventoryUpdate = 
+      isRepossessed ||
       !selectedMaintId || 
       selectedMaintId === 0 || 
       (selectedCar && (selectedCar.Status === 'AVAILABLE' || selectedCar.StatusType === 'REPLACEMENT_AVAILABLE' || pendingTickets.length === 0))
@@ -1360,6 +1375,17 @@ export default function QuickReportPage() {
     if (!isDirectInventoryUpdate && !targetMaintId) {
       alert('ไม่สามารถอัปเดตสถานที่ได้ เนื่องจากรถคันนี้ไม่มีประวัติใบงานซ่อมในระบบ (กรุณาแจ้งเหตุใหม่เพื่อเปิดเคสก่อน)')
       return
+    }
+
+    if (isRepossessed) {
+      if (!repossessLocation || !repossessLocation.trim()) {
+        alert('กรุณากรอกสถานที่ที่ไปยึดรถ')
+        return
+      }
+      if (!repossessDate) {
+        alert('กรุณาเลือกวันที่ที่ไปยึดรถ')
+        return
+      }
     }
 
     if (!selectedLocCode || !selectedLocCode.trim()) {
@@ -1383,6 +1409,15 @@ export default function QuickReportPage() {
         payload.maintenanceId = targetMaintId
       }
 
+      if (isRepossessed) {
+        payload.isRepossessed = true
+        payload.repossessDate = repossessDate
+        payload.repossessLocation = repossessLocation
+        payload.repossessRemark = repossessRemark
+        payload.rentItemId = activeRentItemId
+        payload.contractNo = activeContractNo
+      }
+
       const res = await fetch('/api/maintenance/update-quick', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1396,6 +1431,11 @@ export default function QuickReportPage() {
       const result = await res.json()
       alert(result.message || 'อัปเดตสถานที่ปัจจุบันเรียบร้อยแล้ว')
       
+      // Reset repossess states on success
+      setIsRepossessed(false)
+      setRepossessLocation('')
+      setRepossessRemark('')
+
       // Refresh list
       if (selectedCar) {
         handleSelectCar(selectedCar)
@@ -1493,6 +1533,10 @@ export default function QuickReportPage() {
     setSelectedCarDetails(null)
     setContractorName('')
     setVehicleHistory([])
+    setIsRepossessed(false)
+    setRepossessLocation('')
+    setRepossessRemark('')
+    setActiveRentItemId(null)
   }, [])
 
   // Group vehicles at location from Mobile Dashboard Data
@@ -3656,10 +3700,68 @@ export default function QuickReportPage() {
                   </div>
                 )}
 
+                {/* Repossession UI for ON_RENT vehicles */}
+                {selectedCar.Status === 'ON_RENT' && (
+                  <div className="space-y-3 animate-fade-in-up">
+                    <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-2xl">
+                      <input
+                        type="checkbox"
+                        id="isRepossessed"
+                        checked={isRepossessed}
+                        onChange={(e) => {
+                          setIsRepossessed(e.target.checked)
+                          if (!e.target.checked) {
+                            setRepossessLocation('')
+                            setRepossessRemark('')
+                          }
+                        }}
+                        className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-slate-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor="isRepossessed" className="text-xs font-bold text-rose-900 select-none cursor-pointer">
+                        🚨 เป็นรถยึด (บันทึกข้อมูลยึดคืนรถ)
+                      </label>
+                    </div>
+
+                    {isRepossessed && (
+                      <div className="space-y-3.5 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl animate-fade-in">
+                        <div>
+                          <label className="text-xxs font-bold text-slate-500 block mb-1">📅 วันที่ยึด <span className="text-rose-500">*</span></label>
+                          <input
+                            type="date"
+                            value={repossessDate}
+                            onChange={(e) => setRepossessDate(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xxs font-bold text-slate-500 block mb-1">📍 สถานที่ยึด (Freetext) <span className="text-rose-500">*</span></label>
+                          <input
+                            type="text"
+                            value={repossessLocation}
+                            onChange={(e) => setRepossessLocation(e.target.value)}
+                            placeholder="ระบุสถานที่ยึด เช่น หน้าห้างสรรพสินค้า..."
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xxs font-bold text-slate-500 block mb-1">📝 หมายเหตุเพิ่มเติม</label>
+                          <input
+                            type="text"
+                            value={repossessRemark}
+                            onChange={(e) => setRepossessRemark(e.target.value)}
+                            placeholder="หมายเหตุ (ถ้ามี)..."
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Searchable Location Selection */}
                 <div className="relative">
                   <label className="text-xs font-bold text-slate-600 block mb-1.5">📍 สถานที่ล่าสุด</label>
-                  {selectedCar.Status === 'ON_RENT' ? (
+                  {selectedCar.Status === 'ON_RENT' && !isRepossessed ? (
                     <div className="flex items-center bg-slate-100 border border-slate-200 rounded-2xl px-3.5 py-3.5">
                       <span className="text-slate-400 mr-2">🔒</span>
                       <span className="text-sm font-bold text-slate-500">Onrent</span>
@@ -3736,10 +3838,18 @@ export default function QuickReportPage() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={updatingLocation || selectedCar.Status === 'ON_RENT'}
+                    disabled={updatingLocation || (selectedCar.Status === 'ON_RENT' && !isRepossessed)}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transition duration-150 active:scale-[0.98] flex items-center justify-center text-xs"
                   >
-                    {selectedCar.Status === 'ON_RENT' ? '🔒 รถอยู่ระหว่างเช่า (ไม่สามารถแก้ไขได้)' : (updatingLocation ? '⏳ กำลังอัปเดตสถานที่...' : '💾 บันทึกเปลี่ยนสถานที่')}
+                    {selectedCar.Status === 'ON_RENT' && !isRepossessed ? (
+                      '🔒 รถอยู่ระหว่างเช่า (ไม่สามารถแก้ไขได้)'
+                    ) : updatingLocation ? (
+                      '⏳ กำลังอัปเดตสถานที่...'
+                    ) : isRepossessed ? (
+                      '💾 บันทึกรายการยึดรถ'
+                    ) : (
+                      '💾 บันทึกเปลี่ยนสถานที่'
+                    )}
                   </button>
                 </div>
               </form>
