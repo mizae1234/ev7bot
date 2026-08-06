@@ -3700,8 +3700,8 @@ export default function QuickReportPage() {
                   </div>
                 )}
 
-                {/* Repossession UI for ON_RENT vehicles */}
-                {selectedCar.Status === 'ON_RENT' && (
+                {/* Repossession UI */}
+                {selectedCar && (
                   <div className="space-y-3 animate-fade-in-up">
                     <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-2xl">
                       <input
