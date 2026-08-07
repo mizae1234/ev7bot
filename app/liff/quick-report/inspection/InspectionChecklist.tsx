@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import type { InspectionItemData, InspectionPhotoData } from '@/lib/inspection/types'
 import { buildDynamicSections, createEmptyItemsFromMaster } from '@/lib/inspection/checklist-config'
 import ChecklistSection from './ChecklistSection'
@@ -106,6 +106,26 @@ export default function InspectionChecklist({
   const CHECKLIST_SECTIONS = useMemo(() => {
     return buildDynamicSections(masterItems)
   }, [masterItems])
+
+  // ---- Step Wizard: group sections into 5 steps ----
+  const STEP_GROUPS = useMemo(() => [
+    { label: 'เอกสาร & ทะเบียน', icon: '📋', categories: ['LICENSE_PLATE', 'ROAD_TAX', 'TAX_VEHICLE', 'TAX_METER', 'KEY_REMOTE'] },
+    { label: 'ตรวจสภาพรถ', icon: '🔍', categories: ['CONDITION'] },
+    { label: 'สภาพตัวถัง', icon: '🚗', categories: ['BODY'] },
+    { label: 'ระบบ & อุปกรณ์', icon: '⚙️', categories: ['AIR_CON', 'BATTERY_HV', 'MILEAGE', 'CLAIM_DOCS'] },
+    { label: 'รูปรถ & อุบัติเหตุ', icon: '📸', categories: ['CAR_PHOTOS', 'ACCIDENT'] },
+  ], [])
+
+  const [currentStep, setCurrentStep] = useState(0)
+  const totalSteps = STEP_GROUPS.length
+  const isLastStep = currentStep === totalSteps - 1
+  const stepIndicatorRef = useRef<HTMLDivElement>(null)
+
+  // Sections visible in the current step
+  const currentSections = useMemo(() => {
+    const cats = STEP_GROUPS[currentStep]?.categories || []
+    return CHECKLIST_SECTIONS.filter(s => cats.includes(s.category))
+  }, [CHECKLIST_SECTIONS, STEP_GROUPS, currentStep])
 
   const [itemsMap, setItemsMap] = useState<Record<string, InspectionItemData>>(() => {
     const map: Record<string, InspectionItemData> = {}
@@ -625,6 +645,34 @@ export default function InspectionChecklist({
     }
   }, [itemsMap, allPhotos, localPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onSaveComplete, onPhotoUploaded, lineUserId])
 
+  // ---- Step Wizard Navigation ----
+  const [stepSaving, setStepSaving] = useState(false)
+
+  const handleNextStep = useCallback(async () => {
+    if (isLastStep) return
+    setStepSaving(true)
+    try {
+      await handleSave()
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps - 1))
+      setTimeout(() => stepIndicatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    } catch (err) {
+      console.error('Auto-save on next step failed:', err)
+    } finally {
+      setStepSaving(false)
+    }
+  }, [isLastStep, totalSteps, handleSave])
+
+  const handlePrevStep = useCallback(() => {
+    setCurrentStep(prev => Math.max(prev - 1, 0))
+    setTimeout(() => stepIndicatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+  }, [])
+
+  const handleStepClick = useCallback((stepIndex: number) => {
+    if (stepIndex === currentStep) return
+    setCurrentStep(stepIndex)
+    setTimeout(() => stepIndicatorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+  }, [currentStep])
+
   const handleCompleteClick = useCallback(async () => {
     if (!returnDate) {
       triggerAlert('กรุณากรอกวันที่คืนรถ', 'error')
@@ -930,10 +978,10 @@ export default function InspectionChecklist({
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar + Step Indicator */}
       {!isPendingChecklist && (
-        <div className="bg-white rounded-2xl border border-slate-200 px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
+        <div ref={stepIndicatorRef} className="bg-white rounded-2xl border border-slate-200 px-4 py-3 shadow-sm space-y-3">
+          <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-medium text-slate-500">ความคืบหน้า</span>
             <span className="text-xs font-bold text-emerald-600">
               {filledCount}/{totalCount} ข้อ
@@ -945,11 +993,35 @@ export default function InspectionChecklist({
               style={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%` }}
             />
           </div>
+
+          {/* Step Indicator */}
+          <div className="flex items-center gap-1 pt-1">
+            {STEP_GROUPS.map((step, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleStepClick(idx)}
+                className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all duration-200 border active:scale-95 cursor-pointer ${
+                  idx === currentStep
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm scale-[1.02]'
+                    : idx < currentStep
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span className="block">{step.icon}</span>
+                <span className="block leading-tight mt-0.5">{idx + 1}/{totalSteps}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-center text-[11px] font-bold text-slate-700">
+            {STEP_GROUPS[currentStep]?.icon} {STEP_GROUPS[currentStep]?.label}
+          </p>
         </div>
       )}
 
-      {/* Checklist sections */}
-      {!isPendingChecklist && CHECKLIST_SECTIONS.map(section => (
+      {/* Checklist sections — current step only */}
+      {!isPendingChecklist && currentSections.map(section => (
         <ChecklistSection
           key={section.category}
           section={section}
@@ -974,7 +1046,42 @@ export default function InspectionChecklist({
         />
       ))}
 
+      {/* Step Navigation: Back / Next */}
+      {!isPendingChecklist && !disabled && (
+        <div className="flex gap-2">
+          {currentStep > 0 && (
+            <button
+              type="button"
+              onClick={handlePrevStep}
+              className="flex-1 py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            >
+              ← ย้อนกลับ
+            </button>
+          )}
+          {!isLastStep && (
+            <button
+              type="button"
+              onClick={handleNextStep}
+              disabled={saving || stepSaving}
+              className="flex-1 py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+            >
+              {stepSaving ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  กำลังบันทึก...
+                </span>
+              ) : (
+                `ถัดไป → (บันทึกฉบับร่าง)`
+              )}
+            </button>
+          )}
+        </div>
+      )}
 
+
+      {/* === Below sections visible only on last step === */}
+      {isLastStep && (
+      <>
       {/* Customer Signature Card */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
         <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
@@ -1201,6 +1308,15 @@ export default function InspectionChecklist({
       {/* Action buttons */}
       {!disabled && (
         <div className="space-y-2 pb-6 pt-2">
+          {currentStep > 0 && (
+            <button
+              type="button"
+              onClick={handlePrevStep}
+              className="w-full py-3 rounded-2xl font-bold text-sm transition shadow-sm active:scale-[0.98] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            >
+              ← ย้อนกลับ
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -1229,6 +1345,8 @@ export default function InspectionChecklist({
             </button>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   )
