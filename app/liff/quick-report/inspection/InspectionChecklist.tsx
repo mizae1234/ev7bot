@@ -244,6 +244,15 @@ export default function InspectionChecklist({
     }
   }, [defaultCustomerName, customerName, existingCustomerName])
 
+  // iOS user agent detection
+  const [isIOSUser, setIsIOSUser] = useState(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent.toLowerCase()
+      setIsIOSUser(/iphone|ipad|ipod/.test(ua))
+    }
+  }, [])
+
   // ---- Note Text Sync State ----
   const [initialNoteText, setInitialNoteText] = useState('')
 
@@ -1020,6 +1029,18 @@ export default function InspectionChecklist({
           <p className="text-center text-[11px] font-bold text-slate-700">
             {STEP_GROUPS[currentStep]?.icon} {STEP_GROUPS[currentStep]?.label}
           </p>
+
+          {isIOSUser && (
+            <div className="bg-sky-50 border border-sky-100 rounded-xl p-2.5 text-sky-950 text-[10px] flex items-start gap-2 shadow-sm animate-scale-up mt-1">
+              <span className="text-xs">💡</span>
+              <div className="flex-1 leading-normal">
+                <p className="font-bold">ถ่ายรูปสดไม่ได้?</p>
+                <p className="text-slate-600 mt-0.5">
+                  แนะนำไปที่: <span className="font-bold">ตั้งค่า (Settings) iPhone &gt; LINE &gt; กล้องถ่ายรูป (อนุญาต)</span> หรือกดปุ่ม 3 จุดมุมขวาบนเลือก <span className="font-bold">"เปิดใน Safari"</span> แทนครับ
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
