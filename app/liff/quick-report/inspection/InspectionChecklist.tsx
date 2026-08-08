@@ -102,6 +102,7 @@ export default function InspectionChecklist({
   onPhotoUploaded,
   existingIsPendingChecklist = false,
 }: InspectionChecklistProps) {
+  console.log('[InspectionChecklist Render] disabled:', disabled, 'existingIsPendingChecklist:', existingIsPendingChecklist)
   // ---- State: items as a flat map (category_itemCode → data) ----
   const CHECKLIST_SECTIONS = useMemo(() => {
     return buildDynamicSections(masterItems)
