@@ -48,7 +48,8 @@ export default function PhotoUploader({
   const [pendingFiles, setPendingFiles] = useState<Record<string, File[]>>({})
   const [uploading, setUploading] = useState(false)
   const [uploadedPhotos, setUploadedPhotos] = useState(existingPhotos)
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const cameraInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const galleryInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
@@ -264,28 +265,54 @@ export default function PhotoUploader({
             </div>
           ))}
 
-          {/* Add button */}
+          {/* Add buttons */}
           {!disabled && (
-            <button
-              type="button"
-              onClick={() => fileInputRefs.current[key]?.click()}
-              className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center text-slate-400 transition active:scale-95"
-            >
-              <span className="text-lg">📷</span>
-              <span className="text-[9px]">เพิ่มรูป</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => cameraInputRefs.current[key]?.click()}
+                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-350 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center text-slate-500 transition active:scale-95"
+                title="ถ่ายรูปสด"
+              >
+                <span className="text-lg">📸</span>
+                <span className="text-[9px] font-bold">ถ่ายรูป</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => galleryInputRefs.current[key]?.click()}
+                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-350 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center text-slate-500 transition active:scale-95"
+                title="เลือกจากคลังภาพ"
+              >
+                <span className="text-lg">🖼️</span>
+                <span className="text-[9px] font-bold">อัลบั้ม</span>
+              </button>
+            </>
           )}
         </div>
 
+        {/* Camera Input */}
         <input
-          ref={el => { fileInputRefs.current[key] = el }}
+          ref={el => { cameraInputRefs.current[key] = el }}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={e => {
+            handleFileSelect(position, e.target.files)
+            e.target.value = ''
+          }}
+        />
+
+        {/* Gallery Input */}
+        <input
+          ref={el => { galleryInputRefs.current[key] = el }}
           type="file"
           accept="image/*"
           multiple
           className="hidden"
           onChange={e => {
             handleFileSelect(position, e.target.files)
-            e.target.value = '' // reset so same file can be selected again
+            e.target.value = ''
           }}
         />
       </div>

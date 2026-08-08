@@ -582,7 +582,7 @@ export default function InspectionChecklist({
       customerName: customerName || null,
       customerContact: customerContact || null,
       contractCancellationDate: contractCancellationDate || null,
-      isPendingChecklist,
+      isPendingChecklist: status === 'COMPLETED' ? true : isPendingChecklist,
     })
 
     if (newId) {
@@ -618,8 +618,10 @@ export default function InspectionChecklist({
             formData.append('files', local.file)
             formData.append('inspectionId', String(newId))
             formData.append('category', local.category)
-            if (local.itemCode) formData.append('itemCode', local.itemCode)
-            if (local.photoPosition) formData.append('photoPosition', local.photoPosition)
+            formData.append('itemCode', local.itemCode || '')
+            if (local.photoPosition) {
+              formData.append('photoPosition', local.photoPosition)
+            }
             if (lineUserId) formData.append('lineUserId', lineUserId)
 
             const res = await fetch('/api/inspection/upload', {
@@ -643,7 +645,7 @@ export default function InspectionChecklist({
         await onSaveComplete(newId)
       }
     }
-  }, [itemsMap, allPhotos, localPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, onSave, onSaveComplete, onPhotoUploaded, lineUserId])
+  }, [itemsMap, allPhotos, localPhotos, mileage, remark, returnDate, parkLocation, inspectorName, screenSignatureFile, inspectionId, autoAssessment, returnReason, customerName, customerContact, contractCancellationDate, isPendingChecklist, status, onSave, onSaveComplete, onPhotoUploaded, lineUserId])
 
   // ---- Step Wizard Navigation ----
   const [stepSaving, setStepSaving] = useState(false)

@@ -1923,7 +1923,6 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-1.5">📷 แนบรูปภาพเพิ่มเติม</label>
               <input
                 type="file"
-                multiple
                 accept="image/*"
                 onChange={(e) => {
                   if (e.target.files) {
@@ -2146,11 +2145,10 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-1.5">📷 แนบรูปภาพเพิ่มเติม (สามารถแนบได้หลายภาพ)</label>
               <input
                 type="file"
-                multiple
                 accept="image/*"
                 onChange={(e) => {
                   if (e.target.files) {
-                    setEditAttachments(Array.from(e.target.files))
+                    setEditAttachments(prev => [...prev, ...Array.from(e.target.files!)])
                   }
                 }}
                 className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
@@ -2754,26 +2752,47 @@ export default function QuickReportPage() {
 
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 block mb-1">แนบรูปภาพ/ไฟล์ <span className="text-rose-500">*</span></label>
-                          <div className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer hover:bg-slate-50 transition relative ${
+                          <div className={`border-2 border-dashed rounded-2xl p-4 text-center hover:bg-slate-50 transition ${
                             closeFormSubmitted && closeAttachments.length === 0
                               ? 'border-rose-500 bg-rose-50/10'
                               : 'border-slate-200'
                           }`}>
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*"
-                              onChange={(e) => {
-                                if (e.target.files) {
-                                  setCloseAttachments(Array.from(e.target.files))
-                                }
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            />
                             <div className="flex flex-col items-center justify-center space-y-2">
                               <span className="text-2xl text-blue-500">☁️</span>
-                              <p className="text-xs font-bold text-slate-700">คลิกหรือลากไฟล์มาวางเพื่ออัปโหลด</p>
-                              <p className="text-[9px] text-slate-400">รองรับการอัปโหลดหลายไฟล์ ทั้งรูปภาพและไฟล์เอกสาร</p>
+                              <p className="text-xs font-bold text-slate-700">แนบหลักฐานการรับรถ / ปิดงาน</p>
+                              <div className="flex gap-2 w-full max-w-xs mt-1">
+                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
+                                  <span>📸 ถ่ายรูปสด</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files) {
+                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                      }
+                                      e.target.value = ''
+                                    }}
+                                  />
+                                </label>
+                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
+                                  <span>🖼️ คลังภาพ</span>
+                                  <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files) {
+                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                      }
+                                      e.target.value = ''
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-[9px] text-slate-400 mt-1">รองรับทั้งการถ่ายรูปสดและการเลือกจากอัลบั้มหลายรูป</p>
                             </div>
                           </div>
                           {closeFormSubmitted && closeAttachments.length === 0 && (
@@ -3319,19 +3338,32 @@ export default function QuickReportPage() {
                 </div>
 
                 {/* Quick Upload Buttons */}
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
-                    <span>📸 ถ่ายรูป/แนบรูป</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload(e, 'image')}
-                      className="hidden"
-                    />
-                  </label>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
+                      <span>📸 ถ่ายภาพเลย</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => handleFileUpload(e, 'image')}
+                        className="hidden"
+                      />
+                    </label>
 
-                  <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
+                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
+                      <span>🖼️ อัลบั้มรูป</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(e, 'image')}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 w-full block text-center">
                     <span>📄 แนบไฟล์เอกสาร</span>
                     <input
                       type="file"
