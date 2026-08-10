@@ -79,32 +79,56 @@ const isMaintComplete = (ticket: any): boolean => {
 }
 
 // locationOptions is now fetched dynamically from the /api/maintenance/locations API
-
-
 const ImagePreview = ({ file, onRemove }: { file: File; onRemove: () => void }) => {
   const [previewUrl, setPreviewUrl] = useState<string>('')
+  const [isImage, setIsImage] = useState(false)
 
   useEffect(() => {
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-    return () => {
-      URL.revokeObjectURL(url)
+    console.log('🔍 [ImagePreview] Processing file:', file.name, 'type:', file.type, 'size:', file.size)
+    const isImg = file.type.startsWith('image/')
+    setIsImage(isImg)
+    
+    if (isImg) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          console.log('🔍 [ImagePreview] FileReader loaded base64 for:', file.name)
+          setPreviewUrl(e.target.result as string)
+        }
+      }
+      reader.onerror = (err) => {
+        console.error('🔍 [ImagePreview] FileReader error:', err)
+        setIsImage(false)
+      }
+      reader.readAsDataURL(file)
+    } else {
+      console.log('🔍 [ImagePreview] File is not an image, showing doc icon:', file.name)
     }
   }, [file])
 
-  if (!previewUrl) return null
+  const fileSizeText = (file.size / (1024 * 1024)).toFixed(2) + ' MB'
 
   return (
-    <div className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 shadow-sm">
-      <img
-        src={previewUrl}
-        alt={file.name}
-        className="w-full h-full object-cover"
-      />
+    <div className="relative group flex items-center gap-2.5 border border-slate-200 bg-white p-2 rounded-2xl text-xs overflow-hidden shadow-sm">
+      <div className="w-10 h-10 rounded-xl overflow-hidden border border-slate-100 shrink-0 bg-slate-50 flex items-center justify-center text-lg">
+        {isImage && previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={file.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-xl">📄</span>
+        )}
+      </div>
+      <div className="overflow-hidden flex-1 pr-5">
+        <p className="font-bold text-slate-800 truncate leading-snug">{file.name}</p>
+        <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">{fileSizeText}</p>
+      </div>
       <button
         type="button"
         onClick={onRemove}
-        className="absolute top-1 right-1 bg-rose-500 hover:bg-rose-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm transition active:scale-90"
+        className="absolute top-1/2 -translate-y-1/2 right-2 text-slate-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-lg transition"
       >
         ✕
       </button>
@@ -1934,7 +1958,7 @@ export default function QuickReportPage() {
               {editDetailAttachments.length > 0 && (
                 <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
                   <span>📸 เลือกรูปภาพเพิ่มเติม {editDetailAttachments.length} รูป:</span>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
                     {editDetailAttachments.map((f, i) => (
                       <ImagePreview
                         key={i}
@@ -2157,7 +2181,7 @@ export default function QuickReportPage() {
               {editAttachments.length > 0 && (
                 <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
                   <span>📸 เลือกรูปภาพเพิ่มเติมแล้ว {editAttachments.length} รูป:</span>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
                     {editAttachments.map((f, i) => (
                       <ImagePreview
                         key={i}
@@ -2765,12 +2789,19 @@ export default function QuickReportPage() {
                                   <span>📸 ถ่ายรูปสด</span>
                                   <input
                                     type="file"
-                                    accept="image/*"
+                                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                                     capture="environment"
                                     className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                     onChange={(e) => {
+                                      console.log('📸 [Camera Input] files selected:', e.target.files)
                                       if (e.target.files) {
-                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                        const fileArray = Array.from(e.target.files)
+                                        console.log('📸 [Camera Input] fileArray:', fileArray)
+                                        setCloseAttachments(prev => {
+                                          const next = [...prev, ...fileArray]
+                                          console.log('📸 [Camera Input] next state:', next)
+                                          return next
+                                        })
                                       }
                                       e.target.value = ''
                                     }}
@@ -2781,18 +2812,25 @@ export default function QuickReportPage() {
                                   <input
                                     type="file"
                                     multiple
-                                    accept="image/*"
+                                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                                     className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                     onChange={(e) => {
+                                      console.log('🖼️ [Gallery Input] files selected:', e.target.files)
                                       if (e.target.files) {
-                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                        const fileArray = Array.from(e.target.files)
+                                        console.log('🖼️ [Gallery Input] fileArray:', fileArray)
+                                        setCloseAttachments(prev => {
+                                          const next = [...prev, ...fileArray]
+                                          console.log('🖼️ [Gallery Input] next state:', next)
+                                          return next
+                                        })
                                       }
                                       e.target.value = ''
                                     }}
                                   />
                                 </div>
                               </div>
-                              <p className="text-[9px] text-slate-400 mt-1">รองรับทั้งการถ่ายรูปสดและการเลือกจากอัลบั้มหลายรูป</p>
+                              <p className="text-[9px] text-slate-400 mt-1">รองรับการถ่ายรูปสดและการเลือกไฟล์/รูปภาพจากอัลบั้มได้หลายไฟล์</p>
                             </div>
                           </div>
                           {closeFormSubmitted && closeAttachments.length === 0 && (
@@ -2800,8 +2838,8 @@ export default function QuickReportPage() {
                           )}
                           {closeAttachments.length > 0 && (
                             <div className="mt-3 text-xs text-slate-600 font-bold space-y-2">
-                              <span>📸 เลือกรูปภาพแล้ว {closeAttachments.length} รูป:</span>
-                              <div className="grid grid-cols-3 gap-2">
+                              <span>📸 เลือกไฟล์/รูปภาพแล้ว {closeAttachments.length} รายการ:</span>
+                              <div className="space-y-2">
                                 {closeAttachments.map((f, i) => (
                                   <ImagePreview
                                     key={i}
