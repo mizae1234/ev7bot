@@ -128,6 +128,13 @@ export default function QuickReportPage() {
   const editFollowUpRef = useRef<HTMLTextAreaElement>(null)
   const quickLogRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
+  // Refs for file uploads to bypass iOS/WebView label hidden input click issues
+  const closeCameraInputRef = useRef<HTMLInputElement>(null)
+  const closeGalleryInputRef = useRef<HTMLInputElement>(null)
+  const reportCameraInputRef = useRef<HTMLInputElement>(null)
+  const reportGalleryInputRef = useRef<HTMLInputElement>(null)
+  const reportDocInputRef = useRef<HTMLInputElement>(null)
+
   // Form Fields
   const [contractorName, setContractorName] = useState('')
   const [driverName, setDriverName] = useState('')
@@ -2761,36 +2768,46 @@ export default function QuickReportPage() {
                               <span className="text-2xl text-blue-500">☁️</span>
                               <p className="text-xs font-bold text-slate-700">แนบหลักฐานการรับรถ / ปิดงาน</p>
                               <div className="flex gap-2 w-full max-w-xs mt-1">
-                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
-                                  <span>📸 ถ่ายรูปสด</span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    capture="environment"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                      if (e.target.files) {
-                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
-                                      }
-                                      e.target.value = ''
-                                    }}
-                                  />
-                                </label>
-                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
-                                  <span>🖼️ คลังภาพ</span>
-                                  <input
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                      if (e.target.files) {
-                                        setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
-                                      }
-                                      e.target.value = ''
-                                    }}
-                                  />
-                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => closeCameraInputRef.current?.click()}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm"
+                                >
+                                  📸 ถ่ายรูปสด
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => closeGalleryInputRef.current?.click()}
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm"
+                                >
+                                  🖼️ คลังภาพ
+                                </button>
+                                <input
+                                  ref={closeCameraInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files) {
+                                      setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                    }
+                                    e.target.value = ''
+                                  }}
+                                />
+                                <input
+                                  ref={closeGalleryInputRef}
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files) {
+                                      setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
+                                    }
+                                    e.target.value = ''
+                                  }}
+                                />
                               </div>
                               <p className="text-[9px] text-slate-400 mt-1">รองรับทั้งการถ่ายรูปสดและการเลือกจากอัลบั้มหลายรูป</p>
                             </div>
@@ -3340,39 +3357,55 @@ export default function QuickReportPage() {
                 {/* Quick Upload Buttons */}
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
-                      <span>📸 ถ่ายภาพเลย</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handleFileUpload(e, 'image')}
-                        className="hidden"
-                      />
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() => reportCameraInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705"
+                    >
+                      📸 ถ่ายภาพเลย
+                    </button>
 
-                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
-                      <span>🖼️ อัลบั้มรูป</span>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={(e) => handleFileUpload(e, 'image')}
-                        className="hidden"
-                      />
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() => reportGalleryInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705"
+                    >
+                      🖼️ อัลบั้มรูป
+                    </button>
                   </div>
 
-                  <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 w-full block text-center">
-                    <span>📄 แนบไฟล์เอกสาร</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
-                      onChange={(e) => handleFileUpload(e, 'document')}
-                      className="hidden"
-                    />
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => reportDocInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 w-full block text-center"
+                  >
+                    📄 แนบไฟล์เอกสาร
+                  </button>
+
+                  <input
+                    ref={reportCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handleFileUpload(e, 'image')}
+                    className="hidden"
+                  />
+                  <input
+                    ref={reportGalleryInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e, 'image')}
+                    className="hidden"
+                  />
+                  <input
+                    ref={reportDocInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
+                    onChange={(e) => handleFileUpload(e, 'document')}
+                    className="hidden"
+                  />
                 </div>
 
                 {/* Attachments List */}
