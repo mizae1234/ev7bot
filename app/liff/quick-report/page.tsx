@@ -2761,13 +2761,13 @@ export default function QuickReportPage() {
                               <span className="text-2xl text-blue-500">☁️</span>
                               <p className="text-xs font-bold text-slate-700">แนบหลักฐานการรับรถ / ปิดงาน</p>
                               <div className="flex gap-2 w-full max-w-xs mt-1">
-                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
+                                <div className="relative flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm overflow-hidden">
                                   <span>📸 ถ่ายรูปสด</span>
                                   <input
                                     type="file"
                                     accept="image/*"
                                     capture="environment"
-                                    className="sr-only"
+                                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                     onChange={(e) => {
                                       if (e.target.files) {
                                         setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
@@ -2775,14 +2775,14 @@ export default function QuickReportPage() {
                                       e.target.value = ''
                                     }}
                                   />
-                                </label>
-                                <label className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm">
+                                </div>
+                                <div className="relative flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 cursor-pointer transition active:scale-[0.98] text-xs font-bold text-slate-700 shadow-sm overflow-hidden">
                                   <span>🖼️ คลังภาพ</span>
                                   <input
                                     type="file"
                                     multiple
                                     accept="image/*"
-                                    className="sr-only"
+                                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                     onChange={(e) => {
                                       if (e.target.files) {
                                         setCloseAttachments(prev => [...prev, ...Array.from(e.target.files!)])
@@ -2790,7 +2790,7 @@ export default function QuickReportPage() {
                                       e.target.value = ''
                                     }}
                                   />
-                                </label>
+                                </div>
                               </div>
                               <p className="text-[9px] text-slate-400 mt-1">รองรับทั้งการถ่ายรูปสดและการเลือกจากอัลบั้มหลายรูป</p>
                             </div>
@@ -3340,39 +3340,39 @@ export default function QuickReportPage() {
                 {/* Quick Upload Buttons */}
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
+                    <div className="relative flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 overflow-hidden">
                       <span>📸 ถ่ายภาพเลย</span>
                       <input
                         type="file"
                         accept="image/*"
                         capture="environment"
                         onChange={(e) => handleFileUpload(e, 'image')}
-                        className="sr-only"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       />
-                    </label>
+                    </div>
 
-                    <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705">
+                    <div className="relative flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 overflow-hidden">
                       <span>🖼️ อัลบั้มรูป</span>
                       <input
                         type="file"
                         multiple
                         accept="image/*"
                         onChange={(e) => handleFileUpload(e, 'image')}
-                        className="sr-only"
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       />
-                    </label>
+                    </div>
                   </div>
 
-                  <label className="flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 w-full block text-center">
+                  <div className="relative flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition active:scale-98 text-xs font-bold text-slate-705 w-full block text-center overflow-hidden">
                     <span>📄 แนบไฟล์เอกสาร</span>
                     <input
                       type="file"
                       multiple
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
                       onChange={(e) => handleFileUpload(e, 'document')}
-                      className="sr-only"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
                     />
-                  </label>
+                  </div>
                 </div>
 
                 {/* Attachments List */}
