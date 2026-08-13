@@ -131,7 +131,7 @@ export default function ReturnsMonitorPage() {
       item.locationName || item.location || '-',
       getThaiDate(item.inspectionDate),
       item.status === 'DRAFT' ? 'ฉบับร่าง' : 'เสร็จสมบูรณ์',
-      getAssessmentLabel(item.assessmentResult),
+      item.isPendingChecklist ? 'รอตรวจภายหลัง' : getAssessmentLabel(item.assessmentResult),
       item.isPendingChecklist ? 'ใช่' : '-',
       item.inspectorName || '-',
       item.mileage != null ? item.mileage : '-',
