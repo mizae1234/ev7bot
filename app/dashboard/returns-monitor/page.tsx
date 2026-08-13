@@ -3,45 +3,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
-import { buildDynamicSections } from '@/lib/inspection/checklist-config'
-import type { InspectionListItem, InspectionData, MasterItemDef } from '@/lib/inspection/types'
+import type { InspectionListItem, MasterItemDef } from '@/lib/inspection/types'
+import { exportToExcel, ExportButton } from '@/lib/exportExcel'
+import { getAssessmentLabel, getThaiDate, getThaiDateTime, getReasonLabel } from '@/components/returns-monitor/constants'
 
-const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
-const spacesBucket = 'space-ev7tracking-prod'
-const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
-
-const LICENSE_PLATE_OPTIONS = [
-  { value: 'FRONT_BACK', label: 'ป้ายทะเบียนหน้า-หลัง' },
-  { value: 'FRONT_ONLY', label: 'ป้ายทะเบียนหน้า' },
-  { value: 'BACK_ONLY', label: 'ป้ายทะเบียนหลัง' },
-  { value: 'NONE', label: 'ไม่มีป้ายทะเบียนรถมา' },
-]
-
-const BOOLEAN_OPTIONS = [
-  { value: 'YES', label: 'มี' },
-  { value: 'NO', label: 'ไม่มี' },
-]
-
-const BODY_CONDITION_OPTIONS = [
-  { value: 'NORMAL', label: 'ปกติ' },
-  { value: 'SCRATCH', label: 'มีรอยขีดข่วน' },
-  { value: 'DENT', label: 'บุบ-แตก' },
-]
-
-function getThaiDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-'
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('th-TH', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC'
-    })
-  } catch {
-    return String(dateStr)
-  }
-}
+import StatsCards from '@/components/returns-monitor/StatsCards'
+import FilterBar from '@/components/returns-monitor/FilterBar'
+import InspectionTable from '@/components/returns-monitor/InspectionTable'
+import InspectionDrawer from '@/components/returns-monitor/InspectionDrawer'
 
 export default function ReturnsMonitorPage() {
   const router = useRouter()
@@ -59,14 +28,8 @@ export default function ReturnsMonitorPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Detailed Modal/Drawer state
+  // Drawer state
   const [selectedInspectionId, setSelectedInspectionId] = useState<number | null>(null)
-  const [inspectionDetail, setInspectionDetail] = useState<InspectionData | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [activeTab, setActiveTab] = useState<'info' | 'checklist' | 'photos'>('info')
-
-  // Image Lightbox state
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   // Fetch initial data
   const fetchData = useCallback(async () => {
@@ -76,7 +39,7 @@ export default function ReturnsMonitorPage() {
       // Build query string
       const params = new URLSearchParams()
       params.append('type', 'RETURN')
-      params.append('limit', '200') // fetch more for monitoring
+      params.append('limit', '200')
       if (selectedLocation) params.append('location', selectedLocation)
       if (selectedDocStatus) params.append('status', selectedDocStatus)
       if (startDate) params.append('startDate', startDate)
@@ -85,7 +48,7 @@ export default function ReturnsMonitorPage() {
       const [inspRes, masterRes, locRes] = await Promise.all([
         fetch(`/api/inspection?${params.toString()}`),
         fetch('/api/inspection/master'),
-        fetch('/api/liff/locations')
+        fetch('/api/maintenance/locations'),
       ])
 
       if (!inspRes.ok) throw new Error('ไม่สามารถดึงข้อมูลรายการคืนรถได้')
@@ -109,33 +72,7 @@ export default function ReturnsMonitorPage() {
     fetchData()
   }, [fetchData])
 
-  // Fetch Inspection details when selected
-  useEffect(() => {
-    if (!selectedInspectionId) {
-      setInspectionDetail(null)
-      return
-    }
-
-    const fetchDetail = async () => {
-      setLoadingDetail(true)
-      try {
-        const res = await fetch(`/api/inspection/${selectedInspectionId}`)
-        if (!res.ok) throw new Error('ไม่สามารถดึงรายละเอียดการตรวจสภาพได้')
-        const data = await res.json()
-        setInspectionDetail(data.inspection)
-        setActiveTab('info')
-      } catch (err: any) {
-        alert(err.message || 'เกิดข้อผิดพลาด')
-        setSelectedInspectionId(null)
-      } finally {
-        setLoadingDetail(false)
-      }
-    }
-
-    fetchDetail()
-  }, [selectedInspectionId])
-
-  // Filtered Inspections client-side search
+  // Filtered Inspections — client-side search + assessment filter
   const filteredInspections = useMemo(() => {
     return inspections.filter(item => {
       const matchSearch =
@@ -144,15 +81,8 @@ export default function ReturnsMonitorPage() {
         (item.customerName || '').toLowerCase().includes(search.toLowerCase()) ||
         (item.inspectorName || '').toLowerCase().includes(search.toLowerCase())
 
-      // Auto assessment mapping
-      const mappedAssessment =
-        item.assessmentResult === 'NORMAL'
-          ? 'ปกติ'
-          : item.assessmentResult === 'NEED_REPAIR'
-          ? 'ต้องส่งเข้าซ่อม'
-          : 'รอผลการตรวจ'
-
-      const matchAssessment = !selectedAssessment || mappedAssessment === selectedAssessment
+      const assessmentLabel = getAssessmentLabel(item.assessmentResult)
+      const matchAssessment = !selectedAssessment || assessmentLabel === selectedAssessment
 
       return matchSearch && matchAssessment
     })
@@ -184,29 +114,57 @@ export default function ReturnsMonitorPage() {
     setEndDate('')
   }
 
-  // Dynamic sections generator from masterItems
-  const dynamicSections = useMemo(() => {
-    return buildDynamicSections(masterItems)
-  }, [masterItems])
+  // ─── Export Excel Handler ────────────────────────────
+  const handleExportExcel = () => {
+    const headers = [
+      'ทะเบียน', 'เลขตัวถัง (VIN)', 'ผู้เช่า', 'เบอร์โทร',
+      'สถานที่รับคืน', 'วันที่คืนรถ', 'สถานะเอกสาร', 'ผลการประเมิน',
+      'รอตรวจภายหลัง', 'ผู้ตรวจเช็ค', 'กิโลเมตร', 'เหตุผลคืนรถ',
+      'วันที่สร้าง', 'ผู้บันทึก (สร้าง)', 'วันที่อัพเดตล่าสุด', 'ผู้อัพเดตล่าสุด',
+    ]
 
-  // Map reasons to readable Thai labels
-  const getReasonLabel = (code: string | null | undefined): string => {
-    if (!code) return '-'
-    const reasons: Record<string, string> = {
-      RETURN_CONTRACT_END: 'คืนรถครบสัญญาเช่า',
-      RETURN_REPOSSESSED: 'ยึดคืนรถยนต์เนื่องจากค้างค่างวด',
-      RETURN_ACCIDENT: 'คืนเนื่องจากอุบัติเหตุหนัก/ทุนประกันชำรุด',
-      RETURN_VOLUNTARY: 'ยกเลิกสัญญาก่อนกำหนด/คืนสมัครใจ',
-      RETURN_UPGRADE: 'คืนเพื่อเปลี่ยนรุ่นรถยนต์ (Upgrade)',
-      RETURN_MAINTENANCE: 'คืนรถสับเปลี่ยนเพื่อตรวจสภาพเช็คระยะ',
+    const rows = filteredInspections.map(item => [
+      item.registerNo || '-',
+      item.vinNo,
+      item.customerName || '-',
+      item.customerContact || '-',
+      item.locationName || item.location || '-',
+      getThaiDate(item.inspectionDate),
+      item.status === 'DRAFT' ? 'ฉบับร่าง' : 'เสร็จสมบูรณ์',
+      getAssessmentLabel(item.assessmentResult),
+      item.isPendingChecklist ? 'ใช่' : '-',
+      item.inspectorName || '-',
+      item.mileage != null ? item.mileage : '-',
+      getReasonLabel(item.returnReason),
+      getThaiDateTime(item.createDate),
+      item.createdByName || '-',
+      getThaiDateTime(item.updateDate),
+      item.updatedByName || '-',
+    ])
+
+    // Build period label
+    let periodLabel = 'ทั้งหมด'
+    if (startDate && endDate) {
+      periodLabel = `${getThaiDate(startDate)} - ${getThaiDate(endDate)}`
+    } else if (startDate) {
+      periodLabel = `ตั้งแต่ ${getThaiDate(startDate)}`
+    } else if (endDate) {
+      periodLabel = `ถึง ${getThaiDate(endDate)}`
     }
-    return reasons[code] || code
+
+    exportToExcel({
+      reportName: 'รายการรับคืนรถ',
+      periodLabel,
+      headers,
+      rows,
+      fileName: 'Returns_Monitor',
+    })
   }
 
   return (
     <AuthGuard>
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
-        
+
         {/* Navigation / Header */}
         <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -225,689 +183,63 @@ export default function ReturnsMonitorPage() {
               </div>
             </div>
 
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 shadow-sm"
-            >
-              {loading ? (
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <span>🔄</span>
-              )}
-              รีเฟรชข้อมูล
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportButton onClick={handleExportExcel} label="📥 Export Excel" />
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 text-xs font-bold transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+              >
+                {loading ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span>🔄</span>
+                )}
+                รีเฟรชข้อมูล
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
 
-          {/* Stats Cards Section */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Total */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-lg">
-                📦
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">คืนรถทั้งหมด</p>
-                <h3 className="text-xl font-black mt-0.5 text-slate-800">{stats.total} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
-              </div>
+          {/* Error Banner */}
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-700 font-medium">
+              ⚠️ {error}
             </div>
+          )}
 
-            {/* Normal */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-lg">
-                ✅
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">สภาพปกติ</p>
-                <h3 className="text-xl font-black mt-0.5 text-emerald-600">{stats.normal} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
-              </div>
-            </div>
+          {/* Stats Cards */}
+          <StatsCards stats={stats} />
 
-            {/* Repair */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-lg">
-                ⚠️
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">ส่งเข้าซ่อม</p>
-                <h3 className="text-xl font-black mt-0.5 text-rose-600">{stats.repair} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
-              </div>
-            </div>
+          {/* Filters */}
+          <FilterBar
+            search={search} onSearchChange={setSearch}
+            selectedLocation={selectedLocation} onLocationChange={setSelectedLocation}
+            selectedAssessment={selectedAssessment} onAssessmentChange={setSelectedAssessment}
+            selectedDocStatus={selectedDocStatus} onDocStatusChange={setSelectedDocStatus}
+            startDate={startDate} onStartDateChange={setStartDate}
+            endDate={endDate} onEndDateChange={setEndDate}
+            locations={locations}
+            onReset={handleResetFilters}
+          />
 
-            {/* Pending */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-lg">
-                ⏳
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">รอผลตรวจ</p>
-                <h3 className="text-xl font-black mt-0.5 text-amber-600">{stats.pending} <span className="text-xs font-medium text-slate-500">คัน</span></h3>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Filters / Search Bar Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                <span>🔍</span> ค้นหาและกรองข้อมูล
-              </h4>
-              <button
-                onClick={handleResetFilters}
-                className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition active:scale-95"
-              >
-                ล้างตัวกรองทั้งหมด ✖
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* Search text */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">คำค้นหา</label>
-                <input
-                  type="text"
-                  placeholder="ทะเบียน, VIN, ลูกค้า, ผู้ตรวจ..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                />
-              </div>
-
-              {/* Location filter */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">สถานที่คืนรถ</label>
-                <select
-                  value={selectedLocation}
-                  onChange={e => setSelectedLocation(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
-                >
-                  <option value="">-- ทั้งหมด --</option>
-                  {locations.map(loc => (
-                    <option key={loc.code} value={loc.code}>{loc.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Assessment filter */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">ผลการประเมินรถ</label>
-                <select
-                  value={selectedAssessment}
-                  onChange={e => setSelectedAssessment(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
-                >
-                  <option value="">-- ทั้งหมด --</option>
-                  <option value="ปกติ">ปกติ (Normal)</option>
-                  <option value="ต้องส่งเข้าซ่อม">ต้องส่งเข้าซ่อม (Needs Repair)</option>
-                  <option value="รอผลการตรวจ">รอผลการตรวจ (Pending)</option>
-                </select>
-              </div>
-
-              {/* Document Status filter */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">สถานะเอกสาร</label>
-                <select
-                  value={selectedDocStatus}
-                  onChange={e => setSelectedDocStatus(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
-                >
-                  <option value="">-- ทั้งหมด --</option>
-                  <option value="DRAFT">ฉบับร่าง (DRAFT)</option>
-                  <option value="SUBMIT">เสร็จสมบูรณ์ (SUBMIT)</option>
-                </select>
-              </div>
-
-              {/* Date Start */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">ตั้งแต่วันที่</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
-                />
-              </div>
-
-              {/* Date End */}
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-slate-500">ถึงวันที่</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                  className="w-full px-3 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none transition"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Results Table */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
-                    <th className="px-5 py-4">ทะเบียน / เลขตัวถัง (VIN)</th>
-                    <th className="px-5 py-4">ผู้เช่า / เบอร์โทร</th>
-                    <th className="px-5 py-4">สถานที่รับคืน</th>
-                    <th className="px-5 py-4">วันที่คืนรถ</th>
-                    <th className="px-5 py-4 text-center">สถานะเอกสาร</th>
-                    <th className="px-5 py-4 text-center">การประเมินสภาพ</th>
-                    <th className="px-5 py-4">ผู้ตรวจเช็ค</th>
-                    <th className="px-5 py-4 text-center">กิโลเมตร</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredInspections.length > 0 ? (
-                    filteredInspections.map((item) => {
-                      const isDraft = item.status === 'DRAFT'
-                      const mappedAssessment =
-                        item.assessmentResult === 'NORMAL'
-                          ? 'ปกติ'
-                          : item.assessmentResult === 'NEED_REPAIR'
-                          ? 'ต้องส่งเข้าซ่อม'
-                          : 'รอผลการตรวจ'
-
-                      return (
-                        <tr
-                          key={item.inspectionId}
-                          onClick={() => setSelectedInspectionId(item.inspectionId)}
-                          className="hover:bg-slate-50 transition duration-150 cursor-pointer active:bg-slate-100"
-                        >
-                          {/* Register No & VIN */}
-                          <td className="px-5 py-4">
-                            <p className="font-bold text-slate-900 text-sm">{item.registerNo || '-'}</p>
-                            <p className="font-mono text-[9px] text-slate-400 mt-0.5">{item.vinNo}</p>
-                          </td>
-
-                          {/* Customer */}
-                          <td className="px-5 py-4">
-                            <p className="font-medium text-slate-800">{item.customerName || '-'}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{item.customerContact || '-'}</p>
-                          </td>
-
-                          {/* Location */}
-                          <td className="px-5 py-4 font-medium text-slate-600">
-                            {item.locationName || item.location || '-'}
-                          </td>
-
-                          {/* Date */}
-                          <td className="px-5 py-4 font-medium text-slate-600">
-                            {getThaiDate(item.inspectionDate)}
-                          </td>
-
-                          {/* Document status */}
-                          <td className="px-5 py-4 text-center">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold border uppercase tracking-wider ${
-                              isDraft
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            }`}>
-                              {isDraft ? 'DRAFT' : 'SUBMIT'}
-                            </span>
-                          </td>
-
-                          {/* Assessment Badge */}
-                          <td className="px-5 py-4 text-center">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
-                              mappedAssessment === 'ปกติ'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : mappedAssessment === 'ต้องส่งเข้าซ่อม'
-                                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
-                              <span>
-                                {mappedAssessment === 'ปกติ' ? '✅' : mappedAssessment === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
-                              </span>
-                              {mappedAssessment}
-                            </span>
-                          </td>
-
-                          {/* Inspector */}
-                          <td className="px-5 py-4 font-medium text-slate-600">
-                            {item.inspectorName || '-'}
-                          </td>
-
-                          {/* Mileage */}
-                          <td className="px-5 py-4 text-center font-mono font-bold text-slate-900 text-[11px]">
-                            {item.mileage != null ? `${item.mileage.toLocaleString()} กม.` : '-'}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
-                        ไม่พบข้อมูลรายการคืนรถที่ตรงตามตัวกรอง
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Results Table with Pagination */}
+          <InspectionTable
+            inspections={filteredInspections}
+            onSelectInspection={setSelectedInspectionId}
+          />
 
         </div>
 
-        {/* Detailed Modal Drawer */}
+        {/* Detailed Drawer */}
         {selectedInspectionId && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs transition-all duration-300">
-            {/* Backdrop click to close */}
-            <div className="absolute inset-0" onClick={() => setSelectedInspectionId(null)} />
-
-            {/* Drawer Content */}
-            <div className="relative w-full max-w-2xl h-full bg-white border-l border-slate-200 shadow-2xl flex flex-col">
-              
-              {/* Header */}
-              <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">📋 รายงานผลการตรวจรับคืนรถ</h3>
-                  <p className="text-[10px] text-slate-500 mt-0.5">เลขรายงานอ้างอิง: #{selectedInspectionId}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedInspectionId(null)}
-                  className="w-7 h-7 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 transition"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Loader */}
-              {loadingDetail || !inspectionDetail ? (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-3">
-                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs text-slate-500">กำลังโหลดรายละเอียดการประเมินสภาพ...</p>
-                </div>
-              ) : (
-                <>
-                  {/* Tabs */}
-                  <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1 gap-1">
-                    <button
-                      onClick={() => setActiveTab('info')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        activeTab === 'info'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                      }`}
-                    >
-                      ℹ️ ข้อมูลรับคืน
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('checklist')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        activeTab === 'checklist'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                      }`}
-                    >
-                      ✏️ เช็คลิสต์ ({inspectionDetail.items?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('photos')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        activeTab === 'photos'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                      }`}
-                    >
-                      📷 ภาพแนบ ({inspectionDetail.photos?.filter(p => p.category !== 'SIGNATURE').length || 0})
-                    </button>
-                  </div>
-
-                  {/* Tab Body */}
-                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                    
-                    {/* INFO TAB */}
-                    {activeTab === 'info' && (
-                      <div className="space-y-4">
-                        
-                        {/* Auto Assessment Hero Banner */}
-                        <div className={`p-4 rounded-2xl border text-center space-y-1.5 shadow-sm ${
-                          inspectionDetail.assessmentResult === 'NORMAL'
-                            ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
-                            : inspectionDetail.assessmentResult === 'NEED_REPAIR'
-                            ? 'bg-rose-50 border-rose-100 text-rose-800'
-                            : 'bg-slate-100 border-slate-200 text-slate-750'
-                        }`}>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">ผลการประเมินสภาพรถอัตโนมัติ</p>
-                          <h4 className="text-lg font-black flex items-center justify-center gap-1.5">
-                            <span>
-                              {inspectionDetail.assessmentResult === 'NORMAL' ? '✅ ปกติเรียบร้อย' : inspectionDetail.assessmentResult === 'NEED_REPAIR' ? '⚠️ ต้องส่งเข้าซ่อมแซม' : '⏳ รอตรวจสภาพ'}
-                            </span>
-                          </h4>
-                          {inspectionDetail.assessmentResult === 'NEED_REPAIR' && (
-                            <p className="text-[10px] text-rose-600 font-medium">ตรวจพบรอยเสียหายหรือสภาพไม่ปกติในเช็คลิสต์ด้านล่าง</p>
-                          )}
-                        </div>
-
-                        {/* Return details card */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
-                          <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <span>📅</span> รายละเอียดการคืนรถ
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">ทะเบียนรถ</span>
-                              <p className="font-bold text-slate-800">{inspectionDetail.registerNo || '-'}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">เลขตัวถัง (VIN)</span>
-                              <p className="font-mono text-slate-800">{inspectionDetail.vinNo}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">ชื่อลูกค้าที่คืนรถ</span>
-                              <p className="font-bold text-slate-800">{inspectionDetail.customerName || '-'}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">เบอร์โทรศัพท์ติดต่อ</span>
-                              <p className="font-mono text-slate-800">{inspectionDetail.customerContact || '-'}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">วันที่รับคืนจริง</span>
-                              <p className="font-bold text-slate-800">{getThaiDate(inspectionDetail.returnDate || inspectionDetail.inspectionDate)}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">วันที่ยกเลิกสัญญา</span>
-                              <p className="font-bold text-slate-800">{getThaiDate(inspectionDetail.contractCancellationDate)}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">สถานที่จอดคืน</span>
-                              <p className="font-bold text-slate-800">{inspectionDetail.locationName || inspectionDetail.location || '-'}</p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="text-[10px] text-slate-400">เลขไมล์สะสม</span>
-                              <p className="font-mono font-bold text-slate-800">{inspectionDetail.mileage != null ? `${inspectionDetail.mileage.toLocaleString()} กม.` : '-'}</p>
-                            </div>
-                            <div className="space-y-0.5 col-span-2">
-                              <span className="text-[10px] text-slate-400">เหตุผลในการคืนรถ</span>
-                              <p className="font-medium text-slate-800">{getReasonLabel(inspectionDetail.returnReason)}</p>
-                            </div>
-                            <div className="space-y-0.5 col-span-2 border-t border-slate-200 pt-2 mt-1">
-                              <span className="text-[10px] text-slate-400">เจ้าหน้าที่ผู้ตรวจเช็ค</span>
-                              <p className="font-bold text-indigo-600">{inspectionDetail.inspectorName || '-'}</p>
-                            </div>
-                            <div className="space-y-0.5 col-span-2">
-                              <span className="text-[10px] text-slate-400">หมายเหตุเพิ่มเติม</span>
-                              <p className="text-slate-700 whitespace-pre-line bg-white p-2.5 rounded-lg border border-slate-200 mt-1">{inspectionDetail.remark || 'ไม่มีบันทึกข้อความ'}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Customer signature card */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                          <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <span>✍️</span> ลายเซ็นลูกค้า (ยืนยันส่งคืน)
-                          </h4>
-                          <div className="bg-white rounded-xl p-3 border border-slate-200 max-w-[240px] mx-auto">
-                            {inspectionDetail.photos.some(p => p.category === 'SIGNATURE') ? (
-                              inspectionDetail.photos
-                                .filter(p => p.category === 'SIGNATURE')
-                                .map((sig, i) => (
-                                  <img
-                                    key={i}
-                                    src={`${SPACES_CDN}/${sig.s3Key}`}
-                                    alt="Customer Signature"
-                                    className="max-h-28 mx-auto object-contain cursor-pointer hover:opacity-90 transition"
-                                    onClick={() => setLightboxUrl(`${SPACES_CDN}/${sig.s3Key}`)}
-                                  />
-                                ))
-                            ) : (
-                              <div className="py-8 text-center text-xs text-slate-400 font-medium">
-                                ไม่พบลายเซ็นลูกค้าในระบบ
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                      </div>
-                    )}
-
-                    {/* CHECKLIST TAB */}
-                    {activeTab === 'checklist' && (
-                      <div className="space-y-4">
-                        {dynamicSections.map(section => {
-                          return (
-                            <div key={section.category} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                              {/* Section Header */}
-                              <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center gap-2">
-                                <span className="text-sm">{section.icon}</span>
-                                <h4 className="text-xs font-bold text-slate-700">{section.label}</h4>
-                              </div>
-
-                              {/* Section Items */}
-                              <div className="divide-y divide-slate-100 bg-white">
-                                {section.items.map(itemDef => {
-                                  const savedItem = inspectionDetail.items.find(
-                                    i => i.category === section.category && i.itemCode === itemDef.itemCode
-                                  )
-                                  const itemPhotos = inspectionDetail.photos.filter(
-                                    p => p.category === section.category && p.itemCode === itemDef.itemCode
-                                  )
-
-                                  // Determine option list
-                                  let options = itemDef.options
-                                  if (!options || options.length === 0) {
-                                    options = itemDef.inputType === 'select'
-                                      ? LICENSE_PLATE_OPTIONS
-                                      : itemDef.inputType === 'three_way'
-                                      ? BODY_CONDITION_OPTIONS
-                                      : BOOLEAN_OPTIONS
-                                  }
-
-                                  return (
-                                    <div key={itemDef.itemCode} className="px-4 py-3.5 space-y-2 text-slate-700 bg-white">
-                                      {/* Item Title */}
-                                      <p className="text-xs font-semibold text-slate-800">{itemDef.label}</p>
-
-                                      {/* Buttons group for selection representation */}
-                                      {itemDef.inputType === 'select' && (
-                                        <div className="flex flex-wrap gap-2">
-                                          {options.map(opt => (
-                                            <button
-                                              key={opt.value}
-                                              type="button"
-                                              disabled
-                                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-default ${
-                                                savedItem?.value === opt.value
-                                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold opacity-100'
-                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
-                                              }`}
-                                            >
-                                              {opt.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      {itemDef.inputType === 'three_way' && (
-                                        <div className="flex gap-1.5 max-w-md">
-                                          {options.map(opt => (
-                                            <button
-                                              key={opt.value}
-                                              type="button"
-                                              disabled
-                                              className={`flex-1 px-2 py-2 rounded-lg text-[11px] font-medium border transition text-center leading-tight cursor-default ${
-                                                savedItem?.value === opt.value
-                                                  ? opt.value === 'NORMAL'
-                                                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold opacity-100'
-                                                    : opt.value === 'SCRATCH'
-                                                    ? 'bg-amber-500 text-white border-amber-500 font-bold opacity-100'
-                                                    : 'bg-rose-500 text-white border-rose-500 font-bold opacity-100'
-                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
-                                              }`}
-                                            >
-                                              {opt.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      {(itemDef.inputType === 'boolean' || itemDef.inputType === 'boolean_expiry') && (
-                                        <div className="flex gap-2 max-w-xs">
-                                          {options.map(opt => (
-                                            <button
-                                              key={opt.value}
-                                              type="button"
-                                              disabled
-                                              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition text-center cursor-default ${
-                                                savedItem?.value === opt.value
-                                                  ? opt.value === 'YES'
-                                                    ? (section.category === 'ACCIDENT' ? 'bg-rose-500 text-white border-rose-500' : 'bg-emerald-600 text-white border-emerald-600') + ' font-bold opacity-100'
-                                                    : (section.category === 'ACCIDENT' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-500 text-white border-rose-500') + ' font-bold opacity-100'
-                                                  : 'bg-slate-50 text-slate-350 border-slate-200 opacity-60'
-                                              }`}
-                                            >
-                                              {opt.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-
-                                      {itemDef.inputType === 'number' && (
-                                        <div className="w-full max-w-[150px] px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-mono font-bold">
-                                          {savedItem?.numericValue ?? '-'}
-                                        </div>
-                                      )}
-
-                                      {/* Expiry Date */}
-                                      {itemDef.hasExpiry && savedItem?.value === 'YES' && savedItem?.expiryDate && (
-                                        <div className="text-[10px] text-slate-550 font-medium mt-1">
-                                          วันหมดอายุ: {getThaiDate(savedItem.expiryDate)}
-                                        </div>
-                                      )}
-
-                                      {/* Detail Notes */}
-                                      {savedItem?.detail && (
-                                        <div className="text-[10px] text-slate-500 italic bg-slate-50 px-2 py-1 rounded border border-slate-200 inline-block mt-1">
-                                          📝 โน้ต: {savedItem.detail}
-                                        </div>
-                                      )}
-
-                                      {/* Item Photos */}
-                                      {itemPhotos.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-1.5">
-                                          {itemPhotos.map((photo, index) => (
-                                            <div
-                                              key={index}
-                                              className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 cursor-pointer hover:border-indigo-500 transition shadow-sm"
-                                              onClick={() => setLightboxUrl(`${SPACES_CDN}/${photo.s3Key}`)}
-                                            >
-                                              <img
-                                                src={`${SPACES_CDN}/${photo.s3Key}`}
-                                                alt=""
-                                                className="w-full h-full object-cover"
-                                              />
-                                              {photo.photoPosition && (
-                                                <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[7px] text-center font-extrabold py-0.5 leading-none">
-                                                  {photo.photoPosition}
-                                                </span>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-
-                    {/* PHOTOS TAB */}
-                    {activeTab === 'photos' && (
-                      <div className="space-y-4">
-                        {inspectionDetail.photos.filter(p => p.category !== 'SIGNATURE').length > 0 ? (
-                          <div className="grid grid-cols-3 gap-3">
-                            {inspectionDetail.photos
-                              .filter(p => p.category !== 'SIGNATURE')
-                              .map((photo, i) => {
-                                const matchedSection = dynamicSections.find(s => s.category === photo.category)
-                                const matchedItem = matchedSection?.items.find(item => item.itemCode === photo.itemCode)
-                                const itemLabel = matchedItem ? matchedItem.label : photo.category
-
-                                return (
-                                  <div
-                                    key={photo.inspectionPhotoId || i}
-                                    className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex flex-col group hover:border-slate-300 transition shadow-sm"
-                                  >
-                                    <div className="relative aspect-square bg-slate-100 overflow-hidden border-b border-slate-200">
-                                      <img
-                                        src={`${SPACES_CDN}/${photo.s3Key}`}
-                                        alt=""
-                                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300 cursor-pointer"
-                                        onClick={() => setLightboxUrl(`${SPACES_CDN}/${photo.s3Key}`)}
-                                      />
-                                    </div>
-                                    <div className="p-2 space-y-0.5 text-[9px] leading-tight bg-white">
-                                      <p className="font-bold text-slate-700 truncate">{itemLabel}</p>
-                                      {photo.photoPosition && (
-                                        <span className="px-1 py-0.5 bg-slate-100 rounded text-slate-500 font-extrabold inline-block mt-0.5">{photo.photoPosition}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                          </div>
-                        ) : (
-                          <div className="py-12 text-center text-xs text-slate-400 font-medium bg-slate-50 border border-slate-200 rounded-2xl">
-                            ไม่มีรูปภาพตรวจสภาพประกอบเอกสารนี้
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-
-                  {/* Print / Save PDF Actions footer */}
-                  <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => window.print()}
-                      className="px-3.5 py-1.5 rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-350 hover:text-slate-800 text-xs font-bold transition active:scale-95 flex items-center gap-1 shadow-sm"
-                    >
-                      <span>🖨️</span> พิมพ์เอกสารรายงาน
-                    </button>
-                    <button
-                      onClick={() => setSelectedInspectionId(null)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
-                    >
-                      ปิดหน้ารายงาน
-                    </button>
-                  </div>
-                </>
-              )}
-
-            </div>
-          </div>
-        )}
-
-        {/* Image Lightbox Modal */}
-        {lightboxUrl && (
-          <div
-            className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setLightboxUrl(null)}
-          >
-            <div className="relative max-w-4xl max-h-[85vh]">
-              <img
-                src={lightboxUrl}
-                alt="Enlarged view"
-                className="max-w-full max-h-[85vh] object-contain rounded-lg border border-slate-850"
-              />
-              <button
-                onClick={() => setLightboxUrl(null)}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
+          <InspectionDrawer
+            inspectionId={selectedInspectionId}
+            masterItems={masterItems}
+            onClose={() => setSelectedInspectionId(null)}
+          />
         )}
 
       </div>

@@ -577,7 +577,7 @@ export default function InspectionChecklist({
       return item
     })
     const cleanRem = remark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
-    const finalRemark = `[ผลการประเมิน: ${autoAssessment}] ${cleanRem}`.trim()
+    const finalRemark = cleanRem || null
     const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
     
     const newId = await onSave({ 
@@ -774,7 +774,7 @@ export default function InspectionChecklist({
         return item
       })
       const cleanRem = remark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
-      const finalRemark = `[ผลการประเมิน: ${autoAssessment}] ${cleanRem}`.trim()
+      const finalRemark = cleanRem || null
       const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
 
       let activeId = inspectionId

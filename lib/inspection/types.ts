@@ -122,6 +122,7 @@ export interface InspectionListItem {
   itemCount: number
   photoCount: number
   createDate: string
+  updateDate?: string | null
   location?: string | null
   locationName?: string
   returnReason?: string | null
@@ -130,6 +131,8 @@ export interface InspectionListItem {
   customerContact?: string | null
   contractCancellationDate?: string | null
   isPendingChecklist?: boolean | null
+  createdByName?: string | null
+  updatedByName?: string | null
 }
 
 /** Audit Session */

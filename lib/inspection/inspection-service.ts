@@ -657,6 +657,7 @@ export async function listInspections(filters: {
       i.Status AS status,
       i.Mileage AS mileage,
       i.CreateDate AS createDate,
+      i.UpdateDate AS updateDate,
       i.Location AS location,
       sub.StatusName AS locationName,
       i.ReturnReason AS returnReason,
@@ -665,10 +666,14 @@ export async function listInspections(filters: {
       i.CustomerContact AS customerContact,
       i.ContractCancellationDate AS contractCancellationDate,
       i.IsPendingChecklist AS isPendingChecklist,
+      ISNULL(NULLIF(cu.FirstName + CASE WHEN cu.LastName IS NOT NULL AND cu.LastName != '' THEN ' ' + LEFT(cu.LastName, 1) + '.' ELSE '' END, ''), cu.UserName) AS createdByName,
+      ISNULL(NULLIF(uu.FirstName + CASE WHEN uu.LastName IS NOT NULL AND uu.LastName != '' THEN ' ' + LEFT(uu.LastName, 1) + '.' ELSE '' END, ''), uu.UserName) AS updatedByName,
       (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID AND (Value IS NOT NULL OR NumericValue IS NOT NULL)) AS itemCount,
       (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
     FROM dbo.EV_Inspection i
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
+    LEFT JOIN dbo.EV_User uu ON i.UpdateUserID = uu.UserID
     WHERE ${conditions.join(' AND ')}
     ORDER BY i.CreateDate DESC
   `)
