@@ -586,6 +586,17 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       detectedStatus = 'MISMATCH'
     }
 
+    // Check: slot already occupied? (block if not double-parked)
+    if (auditRow && auditSlot && !isDoubleParked && !isOutsideSlot) {
+      const conflict = scannedItems.find(
+        s => s.AuditRow === auditRow && s.AuditSlot === auditSlot
+      )
+      if (conflict) {
+        alert(`❌ ${auditRow} ช่อง ${auditSlot} มีรถจอดอยู่แล้ว (${conflict.RegisterNo || conflict.VinNo})\n\nกรุณาเปลี่ยนเลขช่อง หรือติ๊ก "ซ้อนคัน" ถ้าจอดซ้อนจริง`)
+        return
+      }
+    }
+
     setSavingItem(true)
     try {
       const res = await fetch('/api/audit/item', {
@@ -624,9 +635,10 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
 
       if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ')
 
-      // Clear preview and notes
+      // Clear preview, notes, and search
       setPreviewVehicle(null)
       setPreviewNotes('')
+      setSearchKeyword('')
 
       // Auto-increment slot (unless double-parked)
       if (!isDoubleParked) {
@@ -707,7 +719,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
             <h1 className="text-sm font-bold text-slate-100">{session.LocationName || session.Location}</h1>
             <p className="text-[10px] text-slate-400">{new Date(session.AuditDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
           </div>
-          <div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push(`/audit/${session.AuditSessionID}/parking-map`)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
+            >
+              📊 ผัง
+            </button>
             {session.Status === 'DRAFT' ? (
               <button
                 onClick={handleCloseSession}
