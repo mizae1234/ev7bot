@@ -586,6 +586,12 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       detectedStatus = 'MISMATCH'
     }
 
+    // Warning: no row selected
+    if (!auditRow) {
+      const ok = window.confirm('⚠️ ยังไม่ได้เลือกแถวจอดรถ\n\nต้องการบันทึกโดยไม่ระบุแถวใช่หรือไม่?')
+      if (!ok) return
+    }
+
     // Check: slot already occupied? (block if not double-parked)
     if (auditRow && auditSlot && !isDoubleParked && !isOutsideSlot) {
       const conflict = scannedItems.find(
@@ -787,8 +793,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
         </div>
 
-        {/* Status Hierarchy Chart (Collapsible) */}
-        {scannedItems.length > 0 && (
+        {/* Status Hierarchy Chart (Hidden for now) */}
+        {false && scannedItems.length > 0 && (
           <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl backdrop-blur-sm overflow-hidden">
             <button
               type="button"
@@ -810,31 +816,45 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
         {session.Status === 'DRAFT' && (
           <div className="space-y-4">
             {/* Row/Slot Selector (Collapsible) */}
-            <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl backdrop-blur-sm overflow-hidden">
+            <div className={`rounded-2xl backdrop-blur-md overflow-hidden transition-all duration-300 ${
+              auditRow 
+                ? 'bg-gradient-to-b from-slate-800/80 to-slate-900/80 border border-cyan-500/40 shadow-lg shadow-cyan-950/20' 
+                : 'bg-gradient-to-b from-amber-950/20 to-slate-900/80 border border-amber-500/40 shadow-lg shadow-amber-950/20'
+            }`}>
               {/* Header - always visible, click to toggle */}
               <button
                 type="button"
                 onClick={() => setRowSlotExpanded(!rowSlotExpanded)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/30"
+                className="w-full flex items-center justify-between px-4 py-3.5 text-left transition hover:bg-slate-800/40"
               >
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📍 ตำแหน่งจอด</span>
-                  {auditRow && (
-                    <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/15 px-2 py-0.5 rounded-full">
-                      {auditRow}{!isOutsideSlot && auditSlot ? ` → ช่อง ${auditSlot}` : ''}{isDoubleParked ? ' (ซ้อนคัน)' : ''}{isOutsideSlot ? ' (นอกช่อง)' : ''}
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <span className="text-sm">📍</span>
+                    <span className="text-slate-100 font-extrabold tracking-wide">ตำแหน่งจอดรถ</span>
+                  </div>
+                  {auditRow ? (
+                    <span className="text-[11px] font-black text-cyan-300 bg-cyan-500/15 border border-cyan-400/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                      📍 {auditRow}{!isOutsideSlot && auditSlot ? ` • ช่อง ${auditSlot}` : ''}{isDoubleParked ? ' (🚗 ซ้อนคัน)' : ''}{isOutsideSlot ? ' (🚫 นอกช่อง)' : ''}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
+                      ⚠️ ยังไม่เลือกแถว
                     </span>
                   )}
                 </div>
-                <span className={`text-slate-500 text-xs transition-transform duration-200 ${rowSlotExpanded ? 'rotate-180' : ''}`}>▼</span>
+                <span className={`text-slate-400 text-xs transition-transform duration-200 ${rowSlotExpanded ? 'rotate-180' : ''}`}>▼</span>
               </button>
 
               {/* Expandable content */}
               {rowSlotExpanded && (
-                <div className="px-4 pb-4 space-y-3 border-t border-slate-700/30 pt-3">
+                <div className="px-4 pb-4 space-y-3.5 border-t border-slate-800/80 pt-3.5">
                   <div className="grid grid-cols-2 gap-3">
                     {/* Row Selector */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500">แถว</label>
+                      <label className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
+                        <span>แถว</span>
+                        {!auditRow && <span className="text-[9px] text-amber-400 font-semibold">* จำเป็น</span>}
+                      </label>
                       <select
                         value={auditRow}
                         onChange={(e) => {
@@ -842,11 +862,15 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                           setAuditRow(newRow)
                           if (newRow) fetchMaxSlot(newRow)
                         }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 font-bold focus:outline-none focus:border-cyan-400 transition"
+                        className={`w-full bg-slate-900/90 rounded-xl px-3 py-2.5 text-sm font-black transition focus:outline-none ${
+                          auditRow 
+                            ? 'text-cyan-200 border border-cyan-500/50 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400' 
+                            : 'text-amber-200 border-2 border-amber-500/60 focus:border-amber-400'
+                        }`}
                       >
-                        <option value="">เลือกแถว...</option>
+                        <option value="" className="text-slate-500">เลือกแถว...</option>
                         {ROW_OPTIONS.map((row) => (
-                          <option key={row} value={row}>{row}</option>
+                          <option key={row} value={row} className="bg-slate-900 text-slate-100">{row}</option>
                         ))}
                       </select>
                     </div>
@@ -1316,17 +1340,17 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                           {item.DetectedStatus === 'MATCHED' ? 'ตรงพิกัด' : item.DetectedStatus === 'MISMATCH' ? 'ผิดพิกัด' : 'ไม่มีในระบบ'}
                         </span>
                         {(item.AuditRow || item.AuditSlot) && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/25 text-violet-200 border border-violet-400/40">
                             📍 {item.AuditRow || ''}{item.AuditSlot ? ` ช่อง ${item.AuditSlot}` : ' (นอกช่อง)'}
                           </span>
                         )}
                         {item.AuditRow && !item.AuditSlot && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/25 text-rose-200 border border-rose-400/40">
                             🚫 นอกช่อง
                           </span>
                         )}
                         {isDoubleParkedItem && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-200 border border-amber-400/40">
                             🚗🚗 ซ้อนคัน
                           </span>
                         )}
