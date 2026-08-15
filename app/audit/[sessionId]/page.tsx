@@ -37,7 +37,13 @@ interface ScannedItem {
   VehicleStatusType?: string
   StatusTypeName?: string
   ProjectType?: string
+  AuditRow?: string
+  AuditSlot?: string
+  SlotPosition?: number | null
 }
+
+// Pre-defined row options: แถว 1 - แถว 20
+const ROW_OPTIONS = Array.from({ length: 20 }, (_, i) => `แถว ${i + 1}`)
 
 interface VehiclePreview {
   VinNo: string
@@ -125,6 +131,104 @@ function ScanSessionContent() {
 
   // Filter state for scanned items list
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM'>('ALL')
+
+  // Row/Slot state
+  const [auditRow, setAuditRow] = useState('')
+  const [auditSlot, setAuditSlot] = useState('1')
+  const [isDoubleParked, setIsDoubleParked] = useState(false)
+  const [isOutsideSlot, setIsOutsideSlot] = useState(false)
+  const [rowSlotExpanded, setRowSlotExpanded] = useState(true)
+  const [chartExpanded, setChartExpanded] = useState(false)
+  const [statsExpanded, setStatsExpanded] = useState(false)
+
+  // Edit item state
+  const [editingItem, setEditingItem] = useState<ScannedItem | null>(null)
+  const [editRow, setEditRow] = useState('')
+  const [editSlot, setEditSlot] = useState('')
+  const [editDoubleParked, setEditDoubleParked] = useState(false)
+  const [editNotes, setEditNotes] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
+  // Fetch max slot for a given row in this session
+  const fetchMaxSlot = async (row: string) => {
+    if (!row) return
+    try {
+      const res = await fetch(`/api/audit/item?sessionId=${sessionId}&row=${encodeURIComponent(row)}`)
+      if (res.ok) {
+        const data = await res.json()
+        const nextSlot = (data.maxSlot || 0) + 1
+        setAuditSlot(String(nextSlot))
+      }
+    } catch (e) {
+      console.error('Failed to fetch max slot', e)
+    }
+  }
+
+  // Open edit modal for an item
+  const openEditModal = (item: ScannedItem) => {
+    setEditingItem(item)
+    setEditRow(item.AuditRow || '')
+    setEditSlot(item.AuditSlot || '')
+    setEditDoubleParked(item.SlotPosition === 1)
+    setEditNotes(item.Notes || '')
+  }
+
+  // Save edited item
+  const handleEditItem = async () => {
+    if (!editingItem) return
+
+    // Check duplicate: another car already in the same Row+Slot (and not marking as double-parked)
+    if (editRow && editSlot && !editDoubleParked) {
+      const conflict = scannedItems.find(
+        s => s.AuditItemID !== editingItem.AuditItemID
+          && s.AuditRow === editRow
+          && s.AuditSlot === editSlot
+      )
+      if (conflict) {
+        alert(`❌ ${editRow} ช่อง ${editSlot} มีรถจอดอยู่แล้ว (${conflict.RegisterNo || conflict.VinNo})\n\nกรุณาเปลี่ยนเลขช่อง หรือติ๊ก "ซ้อนคัน" ถ้าจอดซ้อนจริง`)
+        return
+      }
+    }
+
+    setEditSaving(true)
+    try {
+      const res = await fetch('/api/audit/item', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auditItemId: editingItem.AuditItemID,
+          auditRow: editRow || null,
+          auditSlot: editSlot || null,
+          isDoubleParked: editDoubleParked,
+          notes: editNotes
+        })
+      })
+      if (!res.ok) throw new Error('แก้ไขไม่สำเร็จ')
+      setEditingItem(null)
+      fetchSessionDetails()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  // Soft delete item
+  const handleDeleteItem = async (item: ScannedItem) => {
+    const confirmed = window.confirm(`ต้องการลบ "${item.RegisterNo || item.VinNo}" ออกจากรายการใช่หรือไม่?`)
+    if (!confirmed) return
+    try {
+      const res = await fetch('/api/audit/item', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auditItemId: item.AuditItemID })
+      })
+      if (!res.ok) throw new Error('ลบไม่สำเร็จ')
+      fetchSessionDetails()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+    }
+  }
 
   // Operator
   const [operatorName, setOperatorName] = useState('พนักงานตรวจเช็ก')
@@ -498,7 +602,10 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           notes: previewNotes,
           forceSave: force,
           vehicleStatus: previewVehicle.Status || null,
-          vehicleStatusType: previewVehicle.StatusType || null
+          vehicleStatusType: previewVehicle.StatusType || null,
+          auditRow: auditRow || null,
+          auditSlot: isOutsideSlot ? null : (auditSlot || null),
+          isDoubleParked: isDoubleParked
         })
       })
 
@@ -520,6 +627,15 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       // Clear preview and notes
       setPreviewVehicle(null)
       setPreviewNotes('')
+
+      // Auto-increment slot (unless double-parked)
+      if (!isDoubleParked) {
+        const currentSlotNum = parseInt(auditSlot)
+        if (!isNaN(currentSlotNum)) {
+          setAuditSlot(String(currentSlotNum + 1))
+        }
+      }
+
       // Refresh list
       fetchSessionDetails()
     } catch (err: unknown) {
@@ -609,47 +725,195 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
       </div>
 
       <div className="flex-1 max-w-md w-full mx-auto px-4 py-6 space-y-6">
-        {/* Session Stats Summary Card */}
-        <div className="bg-slate-800/40 border border-slate-800/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
-            <span className="text-xs font-black text-slate-300 uppercase tracking-wider">📊 สรุปผลการตรวจเช็กในรอบนี้</span>
-            <span className="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
-              ทั้งหมด {scannedItems.length} คัน
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            {/* Matched */}
-            <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
-              <span className="text-[10px] font-bold text-emerald-400">ตรงพิกัด</span>
-              <span className="text-lg font-black text-emerald-300 mt-0.5">
-                {scannedItems.filter(item => item.DetectedStatus === 'MATCHED').length}
+        {/* Session Stats Summary Card (Collapsible) */}
+        <div className="bg-slate-800/40 border border-slate-800/80 rounded-2xl shadow-lg backdrop-blur-sm overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setStatsExpanded(!statsExpanded)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/30"
+          >
+            <span className="text-xs font-black text-slate-300 uppercase tracking-wider">📊 สรุปผลการตรวจเช็ก</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
+                ทั้งหมด {scannedItems.length} คัน
               </span>
+              <span className={`text-slate-500 text-xs transition-transform duration-200 ${statsExpanded ? 'rotate-180' : ''}`}>▼</span>
             </div>
-            {/* Mismatched */}
-            <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
-              <span className="text-[10px] font-bold text-amber-400">ผิดพิกัด</span>
-              <span className="text-lg font-black text-amber-300 mt-0.5">
-                {scannedItems.filter(item => item.DetectedStatus === 'MISMATCH').length}
-              </span>
+          </button>
+          {statsExpanded && (
+            <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                {/* Matched */}
+                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+                  <span className="text-[10px] font-bold text-emerald-400">ตรงพิกัด</span>
+                  <span className="text-lg font-black text-emerald-300 mt-0.5">
+                    {scannedItems.filter(item => item.DetectedStatus === 'MATCHED').length}
+                  </span>
+                </div>
+                {/* Mismatched */}
+                <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+                  <span className="text-[10px] font-bold text-amber-400">ผิดพิกัด</span>
+                  <span className="text-lg font-black text-amber-300 mt-0.5">
+                    {scannedItems.filter(item => item.DetectedStatus === 'MISMATCH').length}
+                  </span>
+                </div>
+                {/* Not in system */}
+                <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
+                  <span className="text-[10px] font-bold text-rose-400">ไม่มีในระบบ</span>
+                  <span className="text-lg font-black text-rose-300 mt-0.5">
+                    {scannedItems.filter(item => item.DetectedStatus === 'NOT_IN_SYSTEM').length}
+                  </span>
+                </div>
+              </div>
             </div>
-            {/* Not in system */}
-            <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
-              <span className="text-[10px] font-bold text-rose-400">ไม่มีในระบบ</span>
-              <span className="text-lg font-black text-rose-300 mt-0.5">
-                {scannedItems.filter(item => item.DetectedStatus === 'NOT_IN_SYSTEM').length}
-              </span>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Status Hierarchy Chart */}
+        {/* Status Hierarchy Chart (Collapsible) */}
         {scannedItems.length > 0 && (
-          <StatusHierarchyChart items={scannedItems} />
+          <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl backdrop-blur-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setChartExpanded(!chartExpanded)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/30"
+            >
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🏗️ สถานะรถแยกตามประเภท</span>
+              <span className={`text-slate-500 text-xs transition-transform duration-200 ${chartExpanded ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+            {chartExpanded && (
+              <div className="border-t border-slate-700/30">
+                <StatusHierarchyChart items={scannedItems} />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Only allow scanning if the session is DRAFT */}
         {session.Status === 'DRAFT' && (
           <div className="space-y-4">
+            {/* Row/Slot Selector (Collapsible) */}
+            <div className="bg-slate-800/40 border border-indigo-500/10 rounded-2xl backdrop-blur-sm overflow-hidden">
+              {/* Header - always visible, click to toggle */}
+              <button
+                type="button"
+                onClick={() => setRowSlotExpanded(!rowSlotExpanded)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/30"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📍 ตำแหน่งจอด</span>
+                  {auditRow && (
+                    <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/10 border border-indigo-500/15 px-2 py-0.5 rounded-full">
+                      {auditRow}{!isOutsideSlot && auditSlot ? ` → ช่อง ${auditSlot}` : ''}{isDoubleParked ? ' (ซ้อนคัน)' : ''}{isOutsideSlot ? ' (นอกช่อง)' : ''}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-slate-500 text-xs transition-transform duration-200 ${rowSlotExpanded ? 'rotate-180' : ''}`}>▼</span>
+              </button>
+
+              {/* Expandable content */}
+              {rowSlotExpanded && (
+                <div className="px-4 pb-4 space-y-3 border-t border-slate-700/30 pt-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Row Selector */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">แถว</label>
+                      <select
+                        value={auditRow}
+                        onChange={(e) => {
+                          const newRow = e.target.value
+                          setAuditRow(newRow)
+                          if (newRow) fetchMaxSlot(newRow)
+                        }}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 font-bold focus:outline-none focus:border-cyan-400 transition"
+                      >
+                        <option value="">เลือกแถว...</option>
+                        {ROW_OPTIONS.map((row) => (
+                          <option key={row} value={row}>{row}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Slot Input */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">ช่อง</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={isOutsideSlot ? '' : auditSlot}
+                          onChange={(e) => setAuditSlot(e.target.value)}
+                          disabled={isOutsideSlot}
+                          placeholder={isOutsideSlot ? 'นอกช่อง' : 'เลขช่อง'}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 font-bold focus:outline-none focus:border-cyan-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentSlotNum = parseInt(auditSlot)
+                            if (!isNaN(currentSlotNum)) {
+                              setAuditSlot(String(currentSlotNum + 1))
+                            }
+                          }}
+                          disabled={isOutsideSlot}
+                          className="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-xs px-3 rounded-xl transition whitespace-nowrap disabled:opacity-40"
+                        >
+                          ⏭️ ข้าม
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Checkboxes + Next Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isDoubleParked}
+                          onChange={(e) => {
+                            setIsDoubleParked(e.target.checked)
+                            if (e.target.checked) setIsOutsideSlot(false)
+                          }}
+                          className="w-4 h-4 rounded accent-amber-500"
+                        />
+                        <span className="text-xs font-bold text-amber-400">ซ้อนคัน</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isOutsideSlot}
+                          onChange={(e) => {
+                            setIsOutsideSlot(e.target.checked)
+                            if (e.target.checked) setIsDoubleParked(false)
+                          }}
+                          className="w-4 h-4 rounded accent-rose-500"
+                        />
+                        <span className="text-xs font-bold text-rose-400">จอดนอกช่อง</span>
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Try to increment row number (cap at 20)
+                        const match = auditRow.match(/^(.*?)(\d+)$/)
+                        if (match) {
+                          const prefix = match[1]
+                          const num = parseInt(match[2]) + 1
+                          if (num > 20) return // Don't exceed max row
+                          const newRow = `${prefix}${num}`
+                          setAuditRow(newRow)
+                          fetchMaxSlot(newRow)
+                        }
+                      }}
+                      disabled={!auditRow}
+                      className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 px-2.5 py-1 rounded-lg transition disabled:opacity-40"
+                    >
+                      ➡️ แถวถัดไป
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Live Camera Scanner Box */}
             {isOcrScannerOpen ? (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-4 relative overflow-hidden shadow-2xl">
@@ -910,6 +1174,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   }
                   const rows = scannedItems.map((item, idx) => ({
                     'ลำดับ': scannedItems.length - idx,
+                    'แถว': item.AuditRow || '-',
+                    'ช่อง': item.AuditSlot || '(นอกช่อง)',
                     'ทะเบียน': item.RegisterNo || '-',
                     'VinNo': item.VinNo,
                     'รุ่น': item.Model || '-',
@@ -1009,6 +1275,9 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   minute: '2-digit',
                   timeZone: 'UTC'
                 }) + ' น.'
+
+                // Detect double-parked from DB flag (SlotPosition = 1)
+                const isDoubleParkedItem = item.SlotPosition === 1
                 
                 return (
                   <div
@@ -1016,7 +1285,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                     className="bg-slate-800/20 border border-slate-800 rounded-xl p-3 flex justify-between items-center transition hover:bg-slate-800/30"
                   >
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[10px] font-bold text-slate-500">#{scannedItems.length - idx}</span>
                         <span className="text-sm font-bold text-slate-200">{item.RegisterNo || 'ไม่มีทะเบียน'}</span>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
@@ -1028,6 +1297,21 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                         }`}>
                           {item.DetectedStatus === 'MATCHED' ? 'ตรงพิกัด' : item.DetectedStatus === 'MISMATCH' ? 'ผิดพิกัด' : 'ไม่มีในระบบ'}
                         </span>
+                        {(item.AuditRow || item.AuditSlot) && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                            📍 {item.AuditRow || ''}{item.AuditSlot ? ` ช่อง ${item.AuditSlot}` : ' (นอกช่อง)'}
+                          </span>
+                        )}
+                        {item.AuditRow && !item.AuditSlot && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                            🚫 นอกช่อง
+                          </span>
+                        )}
+                        {isDoubleParkedItem && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                            🚗🚗 ซ้อนคัน
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-slate-400 font-medium">
                         Model: {item.Model || 'ไม่ระบุ'} • VIN: <span className="font-mono text-[9px] text-slate-500">{item.VinNo}</span>
@@ -1051,10 +1335,28 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                       )}
                     </div>
 
-                    <div className="text-right text-[10px] text-slate-500 font-medium">
+                    <div className="text-right text-[10px] text-slate-500 font-medium space-y-0.5">
                       <div>🕒 {scanTimeStr}</div>
                       <div>👤 {item.CreatedBy}</div>
-                      <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mt-0.5">{item.ScanMethod}</div>
+                      <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider">{item.ScanMethod}</div>
+                      {session.Status === 'DRAFT' && (
+                        <div className="flex gap-1.5 justify-end mt-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(item)}
+                            className="text-[9px] font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 px-1.5 py-0.5 rounded transition"
+                          >
+                            ✏️ แก้ไข
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item)}
+                            className="text-[9px] font-bold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-1.5 py-0.5 rounded transition"
+                          >
+                            🗑️ ลบ
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -1064,6 +1366,46 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           })()}
         </div>
       </div>
+
+      {/* Edit Item Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-slate-900 border border-cyan-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-cyan-300">✏️ แก้ไขข้อมูลการจอด</h3>
+              <button onClick={() => setEditingItem(null)} className="text-slate-400 hover:text-slate-200 text-xl font-bold">×</button>
+            </div>
+            <div className="text-xs text-slate-300 font-bold">{editingItem.RegisterNo || editingItem.VinNo}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500">แถว</label>
+                <select value={editRow} onChange={(e) => setEditRow(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-bold">
+                  <option value="">ไม่ระบุ</option>
+                  {ROW_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500">ช่อง</label>
+                <input type="number" inputMode="numeric" value={editSlot} onChange={(e) => setEditSlot(e.target.value)} placeholder="เลขช่อง" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-bold" />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={editDoubleParked} onChange={(e) => setEditDoubleParked(e.target.checked)} className="w-4 h-4 rounded accent-amber-500" />
+              <span className="text-xs font-bold text-amber-400">ซ้อนคัน</span>
+            </label>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500">หมายเหตุ</label>
+              <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="เขียนบันทึก..." className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" onClick={() => setEditingItem(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition">ยกเลิก</button>
+              <button type="button" onClick={handleEditItem} disabled={editSaving} className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs py-2.5 rounded-xl transition disabled:opacity-50">
+                {editSaving ? 'กำลังบันทึก...' : '✅ บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Permission Denied Help Modal */}
       {showPermissionHelp && (

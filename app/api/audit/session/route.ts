@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         .query(`
           SELECT ai.AuditItemID, ai.AuditSessionID, ai.VinNo, ai.ScanTime, ai.ScanMethod,
                  ai.DetectedStatus, ai.PreviousLocation, ai.IsConfirmed, ai.CreatedBy, ai.Notes,
-                 ai.VehicleStatus, ai.VehicleStatusType,
+                 ai.VehicleStatus, ai.VehicleStatusType, ai.AuditRow, ai.AuditSlot, ai.SlotPosition,
                  ii.RegisterNo, ii.Model, ii.Exterior_Color, ii.ProjectType,
                  sub_prev.StatusName AS PreviousLocationName,
                  sub_st.StatusName AS StatusTypeName
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
           LEFT JOIN dbo.EV_InventoryItem ii ON ai.VinNo = ii.VinNo AND ii.IsActive = 1
           LEFT JOIN dbo.EV_MsSubStatus sub_prev ON ai.PreviousLocation = sub_prev.StatusCode AND sub_prev.Type = 'LOCATION'
           LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
-          WHERE ai.AuditSessionID = @sessionId
+          WHERE ai.AuditSessionID = @sessionId AND ai.IsActive = 1
           ORDER BY ai.ScanTime DESC
         `)
 
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
              COUNT(i.AuditItemID) AS CheckedCount
       FROM dbo.EV_AuditSession s
       LEFT JOIN dbo.EV_MsSubStatus sub ON s.Location = sub.StatusCode AND sub.Type = 'LOCATION'
-      LEFT JOIN dbo.EV_AuditItem i ON s.AuditSessionID = i.AuditSessionID
+      LEFT JOIN dbo.EV_AuditItem i ON s.AuditSessionID = i.AuditSessionID AND i.IsActive = 1
       GROUP BY s.AuditSessionID, s.AuditDate, s.Location, s.Status, s.CreatedBy, s.CreateDate, sub.StatusName
       ORDER BY s.AuditDate DESC, s.CreateDate DESC
     `)
@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
       FROM dbo.EV_AuditItem ai
       LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus sub_s ON ai.VehicleStatus = sub_s.StatusCode AND sub_s.Type = 'STATUS'
+      WHERE ai.IsActive = 1
       GROUP BY ai.AuditSessionID, COALESCE(ISNULL(sub_st.DescriptionStatus, sub_st.StatusName), ISNULL(sub_s.DescriptionStatus, sub_s.StatusName), ai.VehicleStatusType, ai.VehicleStatus, N'ไม่ทราบสถานะ')
       ORDER BY ai.AuditSessionID, Count DESC
     `)
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
       FROM dbo.EV_AuditItem ai
       LEFT JOIN dbo.EV_MsSubStatus sub_st ON ai.VehicleStatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus sub_s ON ai.VehicleStatus = sub_s.StatusCode AND sub_s.Type = 'STATUS'
-      WHERE ai.DetectedStatus = 'MISMATCH'
+      WHERE ai.DetectedStatus = 'MISMATCH' AND ai.IsActive = 1
       GROUP BY ai.AuditSessionID, COALESCE(ISNULL(sub_st.DescriptionStatus, sub_st.StatusName), ISNULL(sub_s.DescriptionStatus, sub_s.StatusName), ai.VehicleStatusType, ai.VehicleStatus, N'ไม่ทราบสถานะ')
       ORDER BY ai.AuditSessionID, Count DESC
     `)
