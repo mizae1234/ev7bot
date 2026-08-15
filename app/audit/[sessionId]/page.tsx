@@ -128,14 +128,14 @@ function ScanSessionContent() {
   const [previewMode, setPreviewMode] = useState<'OCR' | 'BARCODE' | 'MANUAL'>('OCR')
   const [previewNotes, setPreviewNotes] = useState('')
   const [savingItem, setSavingItem] = useState(false)
-  const previewNotesRef = useRef<HTMLInputElement>(null)
+  const confirmSaveBtnRef = useRef<HTMLButtonElement>(null)
 
-  // Auto scroll & focus on remark input when vehicle preview appears
+  // Auto scroll & focus on Confirm Save Button when vehicle preview appears
   useEffect(() => {
     if (previewVehicle) {
       setTimeout(() => {
-        previewNotesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        previewNotesRef.current?.focus()
+        confirmSaveBtnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        confirmSaveBtnRef.current?.focus()
       }, 120)
     }
   }, [previewVehicle])
@@ -1185,7 +1185,6 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
 
             {/* Optional scan notes */}
             <input
-              ref={previewNotesRef}
               type="text"
               placeholder="เขียนบันทึกเพิ่มเติมสำหรับรถคันนี้ (ถ้ามี)..."
               value={previewNotes}
@@ -1203,10 +1202,11 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 ยกเลิก (ไม่บันทึก)
               </button>
               <button
+                ref={confirmSaveBtnRef}
                 type="button"
                 onClick={() => handleSaveAuditItem(false)}
                 disabled={savingItem}
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs py-2.5 rounded-xl transition disabled:opacity-50"
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs py-2.5 rounded-xl transition disabled:opacity-50 focus:ring-2 focus:ring-cyan-300 focus:outline-none shadow-md shadow-indigo-500/20"
               >
                 {savingItem ? 'กำลังบันทึก...' : '➕ ยืนยันและบันทึกพิกัด'}
               </button>
