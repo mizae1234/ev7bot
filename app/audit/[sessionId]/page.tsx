@@ -1135,8 +1135,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 <span className="font-bold text-slate-300">{previewVehicle.Model}</span>
               </div>
               <div>
-                <span className="text-slate-500 block">สีภายนอก (Color)</span>
-                <span className="font-bold text-slate-300">{previewVehicle.Exterior_Color || '-'}</span>
+                <span className="text-slate-500 block">ทะเบียนรถ (License Plate)</span>
+                <span className="font-extrabold text-cyan-300 text-sm">{previewVehicle.RegisterNo || 'ไม่มีทะเบียน'}</span>
               </div>
               <div>
                 <span className="text-slate-500 block">สถานะปัจจุบันในระบบ</span>
@@ -1208,7 +1208,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 disabled={savingItem}
                 className="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs py-2.5 rounded-xl transition disabled:opacity-50 focus:ring-2 focus:ring-cyan-300 focus:outline-none shadow-md shadow-indigo-500/20"
               >
-                {savingItem ? 'กำลังบันทึก...' : '➕ ยืนยันและบันทึกพิกัด'}
+                {savingItem ? 'กำลังบันทึก...' : `➕ ยืนยันบันทึก (${previewVehicle.RegisterNo || previewVehicle.VinNo})`}
               </button>
             </div>
           </div>
