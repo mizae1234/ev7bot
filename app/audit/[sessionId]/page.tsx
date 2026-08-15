@@ -128,6 +128,17 @@ function ScanSessionContent() {
   const [previewMode, setPreviewMode] = useState<'OCR' | 'BARCODE' | 'MANUAL'>('OCR')
   const [previewNotes, setPreviewNotes] = useState('')
   const [savingItem, setSavingItem] = useState(false)
+  const previewNotesRef = useRef<HTMLInputElement>(null)
+
+  // Auto scroll & focus on remark input when vehicle preview appears
+  useEffect(() => {
+    if (previewVehicle) {
+      setTimeout(() => {
+        previewNotesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        previewNotesRef.current?.focus()
+      }, 120)
+    }
+  }, [previewVehicle])
 
   // Filter state for scanned items list
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM'>('ALL')
@@ -1174,6 +1185,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
 
             {/* Optional scan notes */}
             <input
+              ref={previewNotesRef}
               type="text"
               placeholder="เขียนบันทึกเพิ่มเติมสำหรับรถคันนี้ (ถ้ามี)..."
               value={previewNotes}
