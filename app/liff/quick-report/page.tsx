@@ -67,6 +67,9 @@ interface MaintenanceTicket {
 
 const isMaintComplete = (ticket: any): boolean => {
   if (!ticket) return false
+  if (ticket.IsActive === false || ticket.IsActive === 0) {
+    return true
+  }
   const status = ticket.CarStatusCode
   const desc = ticket.CarStatusDescription
   if (status === 'COMPLETE') {
