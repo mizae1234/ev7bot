@@ -1086,6 +1086,26 @@ ORDER BY StatusCode
      * `WAITING_FOR_MAINTENANCE` (เข้าซ่อม/รอเข้าซ่อม)
    * **อื่น ๆ / ไม่มีข้อมูล**: แสดงสัญลักษณ์ ⚪
 
+3. **ลำดับความสำคัญของสถานะใบงานซ่อมที่ยังไม่ปิด (Priority Ranking for Unclosed Tickets)**:
+   กรณีที่รถ 1 คันมีใบงานซ่อมที่ยังเปิดค้างอยู่ (`IsActive = 1`) มากกว่า 1 ใบงาน ให้ประเมินสถานะรถโดยจัดลำดับความสำคัญดังนี้:
+   * **Priority 1 (งดใช้งาน/ติดซ่อมจริง)**: `IN_MAINTENANCE`, `WAITING_FOR_MAINTENANCE` (หากมีใบงานกลุ่มนี้ ตัวรถจะถือว่ากำลังซ่อมอยู่ทันที ไม่ถือว่าพร้อมรับรถ)
+   * **Priority 2 (ซ่อมเสร็จ/พร้อมรับรถ)**: `READY_PICKUP_MAINTENANCE` (หากรถมีใบงานพร้อมรับรถ และใบงานอื่นๆ มีเพียง `STILL_WORK` หรือไม่มีใบงานติดซ่อมจริง รถคันนี้จะถือเป็น **"รถซ่อมเสร็จ รอลูกค้ามารับ"**)
+   * **Priority 3 (รถยังวิ่งงานได้)**: `STILL_WORK` (มีเฉพาะเคสที่ยังขับใช้งานได้)
+   * **Query จัดลำดับมาตรฐาน**:
+     ```sql
+     ROW_NUMBER() OVER (
+       PARTITION BY m.InventoryItemID 
+       ORDER BY 
+         CASE 
+           WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+           WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+           WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+           ELSE 4
+         END ASC,
+         m.MaintenanceItemID DESC
+     ) AS rn
+     ```
+
 การอ้างอิงวิธีนี้จะช่วยให้น้อง Butter และแดชบอร์ดแสดงผลเป็นมาตรฐานเดียวกัน และมีความยืดหยุ่นสูงเมื่อชื่อสถานะในฐานข้อมูลถูกเปลี่ยนแก้ไข
 
 ## 15. การจัดกลุ่มสถานะรถสำหรับ Dashboard (Vehicle Status Hierarchy)

@@ -144,7 +144,17 @@ export async function GET(req: NextRequest) {
           SELECT 
             m.InventoryItemID,
             m.CarStatusCode,
-            ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) AS rn
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) AS rn
           FROM dbo.EV_MaintenanceItem m
           WHERE m.IsActive = 1
         ),
@@ -177,7 +187,17 @@ export async function GET(req: NextRequest) {
             m.InventoryItemID,
             m.ServiceLocationCode,
             m.CarStatusCode,
-            ROW_NUMBER() OVER (PARTITION BY m.InventoryItemID ORDER BY m.MaintenanceItemID DESC) as rn
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) as rn
           FROM dbo.EV_MaintenanceItem m
           JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1

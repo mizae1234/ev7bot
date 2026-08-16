@@ -155,6 +155,31 @@ CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.Use
 - หากถามเรื่องอู่ซ่อมเฉพาะพื้นที่/เจาะจงสถานที่ (เช่น "ซ่อม ศาลายา", "รถซ่อมที่อู่บางนา") ให้ค้นหาจาก ServiceLocationCode:
   SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode LIKE '%ศาลายา%'
 
+### ถามจำนวนรถพร้อมรับรถ / รถซ่อมเสร็จ รอลูกค้ามารับ (Ready to pickup)
+- รถพร้อมรับรถ (Ready to pickup) คือรถใน EV_InventoryItem (Status = 'MAINTENANCE') ที่มีใบงานค้างสถานะ 'READY_PICKUP_MAINTENANCE' (IsActive = 1) โดยที่ไม่มีใบงานอื่นค้างที่กำลังเข้าซ่อมหรือรอเข้าซ่อมจริง ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
+- หากมีใบงานอื่นเป็น STILL_WORK (รถยังวิ่งได้) ร่วมด้วย ก็ให้นับเข้าพร้อมรับรถเช่นกัน (ยกเว้นมีใบงานติดซ่อมจริง)
+- Query มาตรฐาน (ให้ตัวเลขตรงกับ Dashboard 100%):
+  WITH RankedTickets AS (
+    SELECT m.InventoryItemID, m.CarStatusCode,
+      ROW_NUMBER() OVER (
+        PARTITION BY m.InventoryItemID 
+        ORDER BY 
+          CASE 
+            WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+            WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+            WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+            ELSE 4
+          END ASC,
+          m.MaintenanceItemID DESC
+      ) AS rn
+    FROM dbo.EV_MaintenanceItem m
+    WHERE m.IsActive = 1
+  )
+  SELECT COUNT(*) AS ReadyPickupCount
+  FROM dbo.EV_InventoryItem i
+  JOIN RankedTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+  WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1 AND t.CarStatusCode = 'READY_PICKUP_MAINTENANCE'
+
 ### ถามจำนวนรถที่จอดอยู่ตามสถานที่ (เช่น "รถจอดที่วิภา กี่คัน", "รถที่ศาลายา", "รถที่พระประแดง")
 - ข้อมูลสถานที่จอดปัจจุบันอยู่ใน EV_InventoryItem.CurrentLocation ซึ่งเก็บเป็นรหัส (StatusCode)
 - ⚠️ กฎสำคัญเรื่อง Location กับรถ ON_RENT: หากถาม Location ของรถเฉพาะคัน แล้วพบว่า Status = 'ON_RENT' (อยู่ระหว่างเช่า) ให้ตอบประมาณว่า:

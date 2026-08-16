@@ -757,31 +757,29 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Update EV_InventoryItem Status & StatusType if no pending tickets remain OR all are STILL_WORK ───
-    if ((carStatusCode === 'COMPLETE' || carStatusCode === 'STILL_WORK') && inventoryItemId) {
+    if ((carStatusCode === 'COMPLETE' || carStatusCode === 'STILL_WORK' || resolvedCarStatusCode === 'COMPLETE' || resolvedCarStatusCode === 'STILL_WORK') && inventoryItemId) {
       try {
-        // Query remaining pending tickets
+        // Query remaining active tickets for this vehicle
         const countReq = pool.request()
         countReq.input('invId', sql.Int, inventoryItemId)
         const countRes = await countReq.query(`
           SELECT CarStatusCode 
           FROM dbo.EV_MaintenanceItem 
           WHERE InventoryItemID = @invId 
-            AND CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
             AND IsActive = 1
         `)
-        const pendingItems = countRes.recordset
-        const pendingCount = pendingItems.length
-        
-        let allStillWork = true
-        for (const item of pendingItems) {
-          if (item.CarStatusCode !== 'STILL_WORK') {
-            allStillWork = false
-            break
-          }
-        }
+        const activeTickets = countRes.recordset
+        const hasReadyPickup = activeTickets.some(item => item.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
+        const hasInRepair = activeTickets.some(item => ['IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE'].includes(item.CarStatusCode))
+        const allStillWork = activeTickets.length > 0 && activeTickets.every(item => item.CarStatusCode === 'STILL_WORK')
+        const allClosed = activeTickets.length === 0 || activeTickets.every(item => ['COMPLETE', 'GARAGE_COMPLETE'].includes(item.CarStatusCode))
 
-        const shouldRevertToAvailable = isLastPending || pendingCount === 0 || (pendingCount > 0 && allStillWork)
-        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Remaining Pending Count=${pendingCount}, allStillWork=${allStillWork}, isLastPending=${isLastPending}`)
+        // รถจะกลับไป ON_RENT หรือ AVAILABLE ได้ ก็ต่อเมื่อ:
+        // 1. ไม่มีใบงาน READY_PICKUP_MAINTENANCE ค้างอยู่เด็ดขาด (เพราะรถยังต้องอยู่ที่อู่ รอลูกค้ามารับ/รอปิดเคส)
+        // 2. ไม่มีใบงานติดซ่อม (IN_MAINTENANCE / WAITING_FOR_MAINTENANCE)
+        // 3. ปิดเคสครบทั้งหมด (allClosed) หรือทุกใบที่เหลือเป็น STILL_WORK ทั้งหมด (allStillWork)
+        const shouldRevertToAvailable = !hasReadyPickup && !hasInRepair && (isLastPending || allClosed || allStillWork)
+        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Total Active=${activeTickets.length}, hasReadyPickup=${hasReadyPickup}, hasInRepair=${hasInRepair}, allStillWork=${allStillWork}, allClosed=${allClosed}, shouldRevert=${shouldRevertToAvailable}`)
 
         if (shouldRevertToAvailable) {
           let newStatus: string | null = null
@@ -789,22 +787,20 @@ export async function POST(req: NextRequest) {
           let shouldUpdate = false
 
           if (vehicleStatusType === 'ON_RENT_MAINTENANCE') {
-            if (resolvedCarStatusCode === 'COMPLETE' || resolvedCarStatusCode === 'STILL_WORK') {
+            if (allClosed || allStillWork) {
               newStatus = 'ON_RENT'
               newStatusType = null
               shouldUpdate = true
-            } else {
-              shouldUpdate = false
             }
-          } else if (vehicleStatusType === 'USE_MAINTENANCE') {
+          } else if (allClosed && vehicleStatusType === 'USE_MAINTENANCE') {
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE_USE'
             shouldUpdate = true
-          } else if (vehicleStatusType === 'NEW_MAINTENANCE') {
+          } else if (allClosed && vehicleStatusType === 'NEW_MAINTENANCE') {
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE'
             shouldUpdate = true
-          } else if (vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
+          } else if (allClosed && vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
             newStatus = 'REPLACEMENT'
             newStatusType = 'REPLACEMENT_AVAILABLE'
             shouldUpdate = true
@@ -838,7 +834,9 @@ export async function POST(req: NextRequest) {
             if (newStatus === 'ON_RENT' && newStatusType === null) {
               try {
                 // 1. Vehicle Note
-                const vehicleNoteDetail = `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                const vehicleNoteDetail = allStillWork
+                  ? `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                  : `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากปิดเคสงานซ่อมบำรุงครบถ้วนแล้ว`
                 await pool.request()
                   .input('itemId', sql.Int, inventoryItemId)
                   .input('note', sql.NVarChar, vehicleNoteDetail)
@@ -874,7 +872,7 @@ export async function POST(req: NextRequest) {
             }
           }
         } else {
-          console.log(`[Inventory Update Skipped] There are still ${pendingCount} pending tickets.`)
+          console.log(`[Inventory Update Skipped] Vehicle still has active maintenance tickets (${activeTickets.length} active).`)
         }
       } catch (invErr) {
         console.error('[Inventory Status Update Error]', invErr)
