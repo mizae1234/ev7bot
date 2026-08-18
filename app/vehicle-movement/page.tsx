@@ -83,8 +83,6 @@ function VehicleMovementContent() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Modal item
-  const [selectedItem, setSelectedItem] = useState<VehicleLocationMovementItem | null>(null)
   const [exportLoading, setExportLoading] = useState(false)
 
   // Debounce search
@@ -367,8 +365,7 @@ function VehicleMovementContent() {
                       return (
                         <tr
                           key={r.movementId}
-                          onClick={() => setSelectedItem(r)}
-                          className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                          className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                         >
                           <td className="py-3.5 px-4 text-center font-mono text-zinc-400 text-[11px]">
                             {rowNum}
@@ -380,7 +377,6 @@ function VehicleMovementContent() {
                               <div className="flex items-center gap-1.5">
                                 <Link
                                   href={`/vehicle/${r.registerNo || r.vinNo}`}
-                                  onClick={(e) => e.stopPropagation()}
                                   className="font-bold text-zinc-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors hover:underline text-xs"
                                 >
                                   {r.registerNo || <span className="text-zinc-400 italic">ไม่มีทะเบียน</span>}
@@ -456,15 +452,13 @@ function VehicleMovementContent() {
                 return (
                   <div
                     key={r.movementId}
-                    onClick={() => setSelectedItem(r)}
-                    className="p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-2.5 active:bg-zinc-50 dark:active:bg-zinc-800/60 transition-colors"
+                    className="p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-2.5 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs text-zinc-400">#{rowNum}</span>
                         <Link
                           href={`/vehicle/${r.registerNo || r.vinNo}`}
-                          onClick={(e) => e.stopPropagation()}
                           className="font-bold text-sm text-zinc-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400"
                         >
                           {r.registerNo || 'ไม่มีทะเบียน'}
@@ -524,101 +518,6 @@ function VehicleMovementContent() {
           </div>
         )}
       </div>
-
-      {/* Detail Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl max-w-lg w-full p-6 space-y-4 overflow-hidden"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📍</span>
-                <div>
-                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
-                    รายละเอียดการย้ายสถานที่รถ
-                  </h3>
-                  <p className="text-[11px] text-zinc-400">ID: {selectedItem.movementId}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedItem(null)}
-                className="p-1 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-xl space-y-1.5 border border-zinc-200/50 dark:border-zinc-700/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">ทะเบียนรถ:</span>
-                  <Link
-                    href={`/vehicle/${selectedItem.registerNo || selectedItem.vinNo}`}
-                    className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    🚗 {selectedItem.registerNo || 'ไม่มีทะเบียน'} ↗
-                  </Link>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">VIN:</span>
-                  <span className="font-mono font-semibold">{selectedItem.vinNo}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">รุ่น / โครงการ:</span>
-                  <span>{selectedItem.model || '-'} ({selectedItem.project || '-'})</span>
-                </div>
-              </div>
-
-              {/* Route box */}
-              <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 space-y-1">
-                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                  เส้นทางการย้ายสถานที่:
-                </span>
-                <div className="flex items-center justify-between font-bold text-xs pt-1">
-                  <span className="text-zinc-700 dark:text-zinc-300">
-                    {selectedItem.fromLocation || 'ไม่ระบุต้นทาง'}
-                  </span>
-                  <span className="text-emerald-600">➔</span>
-                  <span className="text-emerald-700 dark:text-emerald-300">
-                    {selectedItem.toLocation || 'ไม่ระบุปลายทาง'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-zinc-400 text-[11px] font-semibold">ข้อความบันทึกเต็ม:</span>
-                <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">
-                  {selectedItem.movementDetail || '-'}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-zinc-600 dark:text-zinc-400 text-[11px] pt-1">
-                <div>
-                  <span className="text-zinc-400">วันที่ย้ายสถานที่:</span>
-                  <p className="font-semibold text-zinc-800 dark:text-zinc-200">{formatThaiDateTime(selectedItem.movementDate)}</p>
-                </div>
-                <div>
-                  <span className="text-zinc-400">ผู้ดำเนินการย้าย:</span>
-                  <p className="font-semibold text-zinc-800 dark:text-zinc-200">{selectedItem.createUserName || '-'}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedItem(null)}
-                className="px-4 py-1.5 text-xs font-bold rounded-xl bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 hover:opacity-90 transition-opacity cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
