@@ -434,9 +434,9 @@ function VehicleMovementContent() {
                             </div>
                           </td>
 
-                          {/* Full Detail */}
-                          <td className="py-3.5 px-4">
-                            <div className="text-zinc-600 dark:text-zinc-400 text-[11.5px] max-w-[360px] line-clamp-1 leading-relaxed" title={r.movementDetail || '-'}>
+                          {/* Full Detail (Wrap Message) */}
+                          <td className="py-3.5 px-4 min-w-[280px] max-w-[500px]">
+                            <div className="text-zinc-700 dark:text-zinc-300 text-xs leading-relaxed whitespace-pre-wrap break-words">
                               {r.movementDetail || '-'}
                             </div>
                           </td>
@@ -492,11 +492,12 @@ function VehicleMovementContent() {
                           {r.toLocation || '-'}
                         </span>
                       </div>
-                    ) : (
-                      <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 text-xs text-zinc-700 dark:text-zinc-300">
-                        {r.movementDetail}
-                      </div>
-                    )}
+                    ) : null}
+
+                    {/* Message Detail Wrap */}
+                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap break-words">
+                      {r.movementDetail || '-'}
+                    </div>
 
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
                       <span className="font-mono select-all">VIN: {r.vinNo}</span>
