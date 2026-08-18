@@ -6,6 +6,8 @@ interface PolicyFiltersProps {
   onSearchChange: (val: string) => void
   expiryFilter: string
   onExpiryFilterChange: (val: string) => void
+  missingFilter: string
+  onMissingFilterChange: (val: string) => void
   typeFilter: string
   onTypeFilterChange: (val: string) => void
   projectFilter: string
@@ -24,6 +26,8 @@ export function PolicyFilters({
   onSearchChange,
   expiryFilter,
   onExpiryFilterChange,
+  missingFilter,
+  onMissingFilterChange,
   typeFilter,
   onTypeFilterChange,
   projectFilter,
@@ -50,7 +54,7 @@ export function PolicyFilters({
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์, ผู้เช่า..."
+            placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์..."
             className="w-full pl-9.5 pr-4 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
           />
           {search && (
@@ -89,21 +93,44 @@ export function PolicyFilters({
 
       {/* Filter Dropdowns */}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-        {/* Expiry Status */}
+        {/* 1. Missing / Completeness Filter (ความครบถ้วนของเอกสาร) */}
+        <select
+          value={missingFilter}
+          onChange={(e) => onMissingFilterChange(e.target.value)}
+          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
+            missingFilter !== 'ALL'
+              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 ring-1 ring-rose-400'
+              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+          }`}
+        >
+          <option value="ALL">ความครบถ้วนของเอกสาร: ทั้งหมด</option>
+          <option value="MISSING_INSURANCE">🛡️ ไม่มีข้อมูลประกันภัย (PLMV)</option>
+          <option value="MISSING_ACT">📜 ไม่มีข้อมูล พ.ร.บ. (PLMC)</option>
+          <option value="MISSING_VEHICLE_TAX">🚗 ไม่มีข้อมูลภาษีรถยนต์</option>
+          <option value="MISSING_METER_TAX">📟 ไม่มีข้อมูลภาษีมิเตอร์</option>
+          <option value="MISSING_ANY">⚪ ขาดเอกสารอย่างใดอย่างหนึ่ง</option>
+          <option value="MISSING_ALL">❌ ไม่มีข้อมูลเอกสารใดๆ เลย</option>
+          <option value="COMPLETE">✅ ข้อมูลเอกสารครบถ้วน</option>
+        </select>
+
+        {/* 2. Expiry Status */}
         <select
           value={expiryFilter}
           onChange={(e) => onExpiryFilterChange(e.target.value)}
-          className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
+            expiryFilter !== 'ALL'
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 ring-1 ring-amber-400'
+              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+          }`}
         >
           <option value="ALL">สถานะวันหมดอายุ: ทั้งหมด</option>
           <option value="EXPIRING_30">⚠️ ใกล้หมดอายุ (≤ 30 วัน)</option>
           <option value="EXPIRING_60">🟡 ใกล้หมดอายุ (31-60 วัน)</option>
           <option value="EXPIRED">🔴 หมดอายุแล้ว (เลยกำหนด)</option>
           <option value="ACTIVE">🟢 ความคุ้มครองปกติ</option>
-          <option value="MISSING">⚪ ยังไม่มีข้อมูล</option>
         </select>
 
-        {/* Insurance Type */}
+        {/* 3. Insurance Type */}
         <select
           value={typeFilter}
           onChange={(e) => onTypeFilterChange(e.target.value)}
@@ -117,7 +144,7 @@ export function PolicyFilters({
           ))}
         </select>
 
-        {/* Project */}
+        {/* 4. Project */}
         {projects.length > 0 && (
           <select
             value={projectFilter}
@@ -131,7 +158,7 @@ export function PolicyFilters({
           </select>
         )}
 
-        {/* Model */}
+        {/* 5. Model */}
         {models.length > 0 && (
           <select
             value={modelFilter}
@@ -146,12 +173,13 @@ export function PolicyFilters({
         )}
 
         {/* Clear Filters button */}
-        {(search || expiryFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || modelFilter !== 'ALL') && (
+        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || modelFilter !== 'ALL') && (
           <button
             type="button"
             onClick={() => {
               onSearchChange('')
               onExpiryFilterChange('ALL')
+              onMissingFilterChange('ALL')
               onTypeFilterChange('ALL')
               onProjectFilterChange('ALL')
               onModelFilterChange('ALL')

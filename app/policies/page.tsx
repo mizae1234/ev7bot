@@ -30,16 +30,22 @@ function PolicyPageContent() {
     insuranceExpiring30: 0,
     insuranceExpiring60: 0,
     insuranceExpired: 0,
+    insuranceMissing: 0,
     actExpiring30: 0,
     actExpiring60: 0,
     actExpired: 0,
+    actMissing: 0,
     taxExpiring30: 0,
     taxExpiring60: 0,
     taxExpired: 0,
+    taxMissing: 0,
     meterExpiring30: 0,
     meterExpiring60: 0,
     meterExpired: 0,
-    totalWithPolicy: 0
+    meterMissing: 0,
+    totalWithPolicy: 0,
+    totalMissingAll: 0,
+    totalMissingAny: 0
   })
   const [masterTypes, setMasterTypes] = useState<InsuranceMasterType[]>([])
   const [companies, setCompanies] = useState<InsuranceCompanyOption[]>([])
@@ -55,6 +61,7 @@ function PolicyPageContent() {
   // Filters
   const [search, setSearch] = useState('')
   const [expiryFilter, setExpiryFilter] = useState('ALL')
+  const [missingFilter, setMissingFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [projectFilter, setProjectFilter] = useState('ALL')
   const [modelFilter, setModelFilter] = useState('ALL')
@@ -105,6 +112,7 @@ function PolicyPageContent() {
       })
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
+      if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
@@ -131,7 +139,7 @@ function PolicyPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, expiryFilter, typeFilter, projectFilter, modelFilter])
+  }, [page, search, expiryFilter, missingFilter, typeFilter, projectFilter, modelFilter])
 
   useEffect(() => {
     fetchPolicies()
@@ -144,6 +152,10 @@ function PolicyPageContent() {
   }
   const handleExpiryFilterChange = (val: string) => {
     setExpiryFilter(val)
+    setPage(1)
+  }
+  const handleMissingFilterChange = (val: string) => {
+    setMissingFilter(val)
     setPage(1)
   }
   const handleTypeFilterChange = (val: string) => {
@@ -170,6 +182,7 @@ function PolicyPageContent() {
       })
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
+      if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
@@ -273,7 +286,12 @@ function PolicyPageContent() {
       <PolicyStatsCards
         stats={stats}
         activeExpiryFilter={expiryFilter}
-        onSelectFilter={handleExpiryFilterChange}
+        activeMissingFilter={missingFilter}
+        onSelectFilter={(exp, miss) => {
+          setExpiryFilter(exp)
+          setMissingFilter(miss)
+          setPage(1)
+        }}
       />
 
       {/* Tab 1: All Policies Table */}
@@ -284,6 +302,8 @@ function PolicyPageContent() {
             onSearchChange={handleSearchChange}
             expiryFilter={expiryFilter}
             onExpiryFilterChange={handleExpiryFilterChange}
+            missingFilter={missingFilter}
+            onMissingFilterChange={handleMissingFilterChange}
             typeFilter={typeFilter}
             onTypeFilterChange={handleTypeFilterChange}
             projectFilter={projectFilter}

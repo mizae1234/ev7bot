@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search') || undefined
     const expiryFilter = searchParams.get('expiryFilter') || undefined
+    const missingFilter = searchParams.get('missingFilter') || undefined
     const typeFilter = searchParams.get('typeFilter') || undefined
     const categoryFilter = searchParams.get('categoryFilter') || undefined
     const projectFilter = searchParams.get('projectFilter') || undefined
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
     const data = await getPolicyList({
       search,
       expiryFilter,
+      missingFilter,
       typeFilter,
       categoryFilter,
       projectFilter,

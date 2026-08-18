@@ -4,13 +4,20 @@ import { PolicyStatsSummary } from '@/lib/policy/policy-types'
 interface PolicyStatsCardsProps {
   stats: PolicyStatsSummary
   activeExpiryFilter?: string
-  onSelectFilter: (filter: string) => void
+  activeMissingFilter?: string
+  onSelectFilter: (expiryFilter: string, missingFilter: string) => void
 }
 
-export function PolicyStatsCards({ stats, activeExpiryFilter = 'ALL', onSelectFilter }: PolicyStatsCardsProps) {
+export function PolicyStatsCards({
+  stats,
+  activeExpiryFilter = 'ALL',
+  activeMissingFilter = 'ALL',
+  onSelectFilter
+}: PolicyStatsCardsProps) {
   const cards = [
     {
       id: 'EXPIRING_30',
+      type: 'EXPIRY',
       title: 'ใกล้หมดอายุ (≤ 30 วัน)',
       desc: 'ต้องรีบดำเนินการต่ออายุ',
       count: stats.insuranceExpiring30 + stats.actExpiring30 + stats.taxExpiring30 + stats.meterExpiring30,
@@ -31,6 +38,7 @@ export function PolicyStatsCards({ stats, activeExpiryFilter = 'ALL', onSelectFi
     },
     {
       id: 'EXPIRED',
+      type: 'EXPIRY',
       title: 'ขาดต่ออายุ / หมดอายุแล้ว',
       desc: 'เลยกำหนดวันคุ้มครอง',
       count: stats.insuranceExpired + stats.actExpired + stats.taxExpired + stats.meterExpired,
@@ -51,6 +59,7 @@ export function PolicyStatsCards({ stats, activeExpiryFilter = 'ALL', onSelectFi
     },
     {
       id: 'EXPIRING_60',
+      type: 'EXPIRY',
       title: 'ใกล้หมดอายุ (31 - 60 วัน)',
       desc: 'เตรียมวางแผนต่ออายุล่วงหน้า',
       count: stats.insuranceExpiring60 + stats.actExpiring60 + stats.taxExpiring60 + stats.meterExpiring60,
@@ -70,34 +79,56 @@ export function PolicyStatsCards({ stats, activeExpiryFilter = 'ALL', onSelectFi
       badgeColor: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
     },
     {
-      id: 'ALL',
-      title: 'รถทั้งหมดในระบบ',
-      desc: `มีข้อมูลเอกสารแล้ว ${stats.totalWithPolicy} คัน`,
-      count: stats.totalVehicles,
+      id: 'MISSING_ANY',
+      type: 'MISSING',
+      title: 'ยังขาดข้อมูลเอกสาร',
+      desc: `ไม่มีเอกสารอย่างน้อย 1 รายการ`,
+      count: stats.totalMissingAny,
       breakdown: [
-        { label: 'มีเอกสาร', val: stats.totalWithPolicy },
-        { label: 'ยังไม่มี', val: Math.max(0, stats.totalVehicles - stats.totalWithPolicy) }
+        { label: 'ขาดประกัน', val: stats.insuranceMissing },
+        { label: 'ขาด พ.ร.บ.', val: stats.actMissing },
+        { label: 'ขาดภาษีรถ', val: stats.taxMissing },
+        { label: 'ขาดมิเตอร์', val: stats.meterMissing }
       ],
       icon: (
-        <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
-      bg: 'from-indigo-500/10 to-indigo-600/5 hover:border-indigo-500/50',
-      activeBorder: 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-500/10',
-      badgeColor: 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10'
+      bg: 'from-slate-500/10 to-slate-600/5 hover:border-slate-500/50',
+      activeBorder: 'border-slate-500 ring-2 ring-slate-500/20 bg-slate-500/10',
+      badgeColor: 'text-slate-700 dark:text-slate-300 bg-slate-200/60 dark:bg-slate-800'
     }
   ]
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(card => {
-        const isSelected = activeExpiryFilter === card.id
+        const isSelected = card.type === 'EXPIRY'
+          ? (activeExpiryFilter === card.id && activeMissingFilter === 'ALL')
+          : (activeMissingFilter === card.id)
+
+        const handleClick = () => {
+          if (card.type === 'EXPIRY') {
+            if (activeExpiryFilter === card.id) {
+              onSelectFilter('ALL', 'ALL')
+            } else {
+              onSelectFilter(card.id, 'ALL')
+            }
+          } else {
+            if (activeMissingFilter === card.id) {
+              onSelectFilter('ALL', 'ALL')
+            } else {
+              onSelectFilter('ALL', card.id)
+            }
+          }
+        }
+
         return (
           <button
             key={card.id}
             type="button"
-            onClick={() => onSelectFilter(card.id === activeExpiryFilter && card.id !== 'ALL' ? 'ALL' : card.id)}
+            onClick={handleClick}
             className={`text-left relative p-4.5 rounded-2xl border transition-all duration-200 bg-gradient-to-br backdrop-blur-sm ${card.bg} ${
               isSelected ? card.activeBorder : 'border-zinc-200/80 dark:border-zinc-800'
             } shadow-sm hover:shadow-md cursor-pointer`}

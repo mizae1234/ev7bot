@@ -61,8 +61,9 @@ export async function getInsuranceCompanies(): Promise<InsuranceCompanyOption[]>
  */
 export async function getPolicyList(params: {
   search?: string
-  expiryFilter?: string // 'ALL' | 'EXPIRING_30' | 'EXPIRING_60' | 'EXPIRED' | 'MISSING'
-  typeFilter?: string   // 'ALL' | 'DV1' | 'DV2' | 'DV3' | 'DV5' | 'DAC'
+  expiryFilter?: string  // 'ALL' | 'EXPIRING_30' | 'EXPIRING_60' | 'EXPIRED' | 'ACTIVE' | 'MISSING'
+  missingFilter?: string // 'ALL' | 'MISSING_INSURANCE' | 'MISSING_ACT' | 'MISSING_VEHICLE_TAX' | 'MISSING_METER_TAX' | 'MISSING_ANY' | 'MISSING_ALL' | 'COMPLETE'
+  typeFilter?: string    // 'ALL' | 'DV1' | 'DV2' | 'DV3' | 'DV5' | 'DAC'
   categoryFilter?: string // 'ALL' | 'INSURANCE' | 'ACT' | 'TAX' | 'METER'
   projectFilter?: string
   modelFilter?: string
@@ -93,9 +94,8 @@ export async function getPolicyList(params: {
       OR i.RegisterNo LIKE @search
       OR p.InsurancePolicyNo LIKE @search
       OR p.ActPolicyNo LIKE @search
-      OR r.FirstName LIKE @search
-      OR r.LastName LIKE @search
-      OR r.ContractNo LIKE @search
+      OR p.InsuranceCompany LIKE @search
+      OR p.ActCompany LIKE @search
     )`
   }
 
@@ -114,7 +114,7 @@ export async function getPolicyList(params: {
     whereClause += ' AND (p.InsuranceType = @insType OR (p.ActPolicyNo IS NOT NULL AND @insType = \'DAC\'))'
   }
 
-  // Base Query joining EV_InventoryItem with EV_Policy and active EV_RentItem
+  // Base Query joining EV_InventoryItem with EV_Policy
   const query = `
     WITH VehicleData AS (
       SELECT
@@ -180,16 +180,26 @@ export async function getPolicyList(params: {
   let insuranceExpiring30 = 0
   let insuranceExpiring60 = 0
   let insuranceExpired = 0
+  let insuranceMissing = 0
+
   let actExpiring30 = 0
   let actExpiring60 = 0
   let actExpired = 0
+  let actMissing = 0
+
   let taxExpiring30 = 0
   let taxExpiring60 = 0
   let taxExpired = 0
+  let taxMissing = 0
+
   let meterExpiring30 = 0
   let meterExpiring60 = 0
   let meterExpired = 0
+  let meterMissing = 0
+
   let totalWithPolicy = 0
+  let totalMissingAll = 0
+  let totalMissingAny = 0
 
   const processed: PolicyVehicleRecord[] = allRows.map(row => {
     const ins = computeExpiryStatus(row.insuranceEndDate)
@@ -197,25 +207,36 @@ export async function getPolicyList(params: {
     const tax = computeExpiryStatus(row.vehicleTaxEndDate)
     const meter = computeExpiryStatus(row.meterTaxEndDate)
 
-    if (row.insurancePolicyNo || row.actPolicyNo || row.vehicleTaxEndDate || row.meterTaxEndDate) {
+    const hasAnyDoc = !!(row.insurancePolicyNo || row.actPolicyNo || row.vehicleTaxEndDate || row.meterTaxEndDate)
+    if (hasAnyDoc) {
       totalWithPolicy++
     }
 
     if (ins.status === 'EXPIRED') insuranceExpired++
     else if (ins.status === 'WARNING_30') insuranceExpiring30++
     else if (ins.status === 'WARNING_60') insuranceExpiring60++
+    else if (ins.status === 'MISSING') insuranceMissing++
 
     if (act.status === 'EXPIRED') actExpired++
     else if (act.status === 'WARNING_30') actExpiring30++
     else if (act.status === 'WARNING_60') actExpiring60++
+    else if (act.status === 'MISSING') actMissing++
 
     if (tax.status === 'EXPIRED') taxExpired++
     else if (tax.status === 'WARNING_30') taxExpiring30++
     else if (tax.status === 'WARNING_60') taxExpiring60++
+    else if (tax.status === 'MISSING') taxMissing++
 
     if (meter.status === 'EXPIRED') meterExpired++
     else if (meter.status === 'WARNING_30') meterExpiring30++
     else if (meter.status === 'WARNING_60') meterExpiring60++
+    else if (meter.status === 'MISSING') meterMissing++
+
+    const isMissingAll = ins.status === 'MISSING' && act.status === 'MISSING' && tax.status === 'MISSING' && meter.status === 'MISSING'
+    const isMissingAny = ins.status === 'MISSING' || act.status === 'MISSING' || tax.status === 'MISSING' || meter.status === 'MISSING'
+
+    if (isMissingAll) totalMissingAll++
+    if (isMissingAny) totalMissingAny++
 
     return {
       ...row,
@@ -230,10 +251,11 @@ export async function getPolicyList(params: {
     }
   })
 
-  // Post-filter by expiry status if requested
+  // Post-filter by expiry status and/or missing status
   let filtered = processed
+
   if (params.expiryFilter && params.expiryFilter !== 'ALL') {
-    filtered = processed.filter(r => {
+    filtered = filtered.filter(r => {
       if (params.expiryFilter === 'EXPIRING_30') {
         return r.insuranceStatus === 'WARNING_30' || r.actStatus === 'WARNING_30' || r.vehicleTaxStatus === 'WARNING_30' || r.meterTaxStatus === 'WARNING_30'
       }
@@ -244,10 +266,52 @@ export async function getPolicyList(params: {
         return r.insuranceStatus === 'EXPIRED' || r.actStatus === 'EXPIRED' || r.vehicleTaxStatus === 'EXPIRED' || r.meterTaxStatus === 'EXPIRED'
       }
       if (params.expiryFilter === 'ACTIVE') {
-        return r.insuranceStatus === 'ACTIVE' && r.actStatus === 'ACTIVE'
+        return r.insuranceStatus === 'ACTIVE' || r.actStatus === 'ACTIVE'
       }
-      if (params.expiryFilter === 'MISSING') {
-        return r.insuranceStatus === 'MISSING' || r.actStatus === 'MISSING'
+      if (params.expiryFilter === 'MISSING' || params.expiryFilter === 'MISSING_ANY') {
+        return r.insuranceStatus === 'MISSING' || r.actStatus === 'MISSING' || r.vehicleTaxStatus === 'MISSING' || r.meterTaxStatus === 'MISSING'
+      }
+      if (params.expiryFilter === 'MISSING_INSURANCE') {
+        return r.insuranceStatus === 'MISSING'
+      }
+      if (params.expiryFilter === 'MISSING_ACT') {
+        return r.actStatus === 'MISSING'
+      }
+      if (params.expiryFilter === 'MISSING_VEHICLE_TAX') {
+        return r.vehicleTaxStatus === 'MISSING'
+      }
+      if (params.expiryFilter === 'MISSING_METER_TAX') {
+        return r.meterTaxStatus === 'MISSING'
+      }
+      if (params.expiryFilter === 'MISSING_ALL') {
+        return r.insuranceStatus === 'MISSING' && r.actStatus === 'MISSING' && r.vehicleTaxStatus === 'MISSING' && r.meterTaxStatus === 'MISSING'
+      }
+      return true
+    })
+  }
+
+  if (params.missingFilter && params.missingFilter !== 'ALL') {
+    filtered = filtered.filter(r => {
+      if (params.missingFilter === 'MISSING_INSURANCE') {
+        return r.insuranceStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'MISSING_ACT') {
+        return r.actStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'MISSING_VEHICLE_TAX') {
+        return r.vehicleTaxStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'MISSING_METER_TAX') {
+        return r.meterTaxStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'MISSING_ANY') {
+        return r.insuranceStatus === 'MISSING' || r.actStatus === 'MISSING' || r.vehicleTaxStatus === 'MISSING' || r.meterTaxStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'MISSING_ALL') {
+        return r.insuranceStatus === 'MISSING' && r.actStatus === 'MISSING' && r.vehicleTaxStatus === 'MISSING' && r.meterTaxStatus === 'MISSING'
+      }
+      if (params.missingFilter === 'COMPLETE') {
+        return r.insuranceStatus !== 'MISSING' && r.actStatus !== 'MISSING' && r.vehicleTaxStatus !== 'MISSING'
       }
       return true
     })
@@ -263,16 +327,22 @@ export async function getPolicyList(params: {
     insuranceExpiring30,
     insuranceExpiring60,
     insuranceExpired,
+    insuranceMissing,
     actExpiring30,
     actExpiring60,
     actExpired,
+    actMissing,
     taxExpiring30,
     taxExpiring60,
     taxExpired,
+    taxMissing,
     meterExpiring30,
     meterExpiring60,
     meterExpired,
-    totalWithPolicy
+    meterMissing,
+    totalWithPolicy,
+    totalMissingAll,
+    totalMissingAny
   }
 
   return {

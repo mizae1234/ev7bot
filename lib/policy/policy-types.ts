@@ -77,16 +77,22 @@ export interface PolicyStatsSummary {
   insuranceExpiring30: number
   insuranceExpiring60: number
   insuranceExpired: number
+  insuranceMissing: number
   actExpiring30: number
   actExpiring60: number
   actExpired: number
+  actMissing: number
   taxExpiring30: number
   taxExpiring60: number
   taxExpired: number
+  taxMissing: number
   meterExpiring30: number
   meterExpiring60: number
   meterExpired: number
+  meterMissing: number
   totalWithPolicy: number
+  totalMissingAll: number
+  totalMissingAny: number
 }
 
 export interface ParsedPolicyFile {
