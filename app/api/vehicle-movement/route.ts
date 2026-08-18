@@ -39,35 +39,6 @@ export interface MovementStats {
   uniqueVehicles: number
 }
 
-function cleanLocationName(raw: string | null, locMap: Map<string, string>): string | null {
-  if (!raw) return null
-  const trimmed = raw.trim()
-  // Remove any trailing action tag like (QUICK_REPORT_LOC)
-  const stripped = trimmed.replace(/\s*\([A-Z0-9_ -]+\)\s*$/i, '').trim()
-  return locMap.get(stripped) || locMap.get(trimmed) || stripped || trimmed
-}
-
-function parseLocationNote(noteDetail: string | null, locMap: Map<string, string>): {
-  fromLocation: string | null
-  toLocation: string | null
-  actor: string | null
-} {
-  if (!noteDetail) return { fromLocation: null, toLocation: null, actor: null }
-  
-  const arrowMatch = noteDetail.match(/(?:ย้ายสถานที่|เปลี่ยนสถานที่)[:\s]+([^→\->|]+)\s*(?:→|->)\s*([^|]+)(?:\s*\|\s*โดย:\s*(.*))?/i)
-  if (arrowMatch) {
-    const rawFrom = arrowMatch[1]?.trim() || null
-    const rawTo = arrowMatch[2]?.trim() || null
-    const rawActor = arrowMatch[3]?.trim() || null
-
-    const fromLoc = cleanLocationName(rawFrom, locMap)
-    const toLoc = cleanLocationName(rawTo, locMap)
-    return { fromLocation: fromLoc, toLocation: toLoc, actor: rawActor }
-  }
-
-  return { fromLocation: null, toLocation: null, actor: null }
-}
-
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
@@ -83,51 +54,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // 1. Fetch location masters for code-to-name translation
-    const locMasterReq = pool.request()
-    const locMasterRes = await locMasterReq.query(`
-      SELECT StatusCode, StatusName 
-      FROM dbo.EV_MsSubStatus 
-      WHERE Type = 'LOCATION'
-    `).catch(() => ({ recordset: [] }))
-
-    const locMap = new Map<string, string>()
-    locMasterRes.recordset.forEach((row: { StatusCode: string; StatusName: string }) => {
-      if (row.StatusCode && row.StatusName) {
-        locMap.set(row.StatusCode.trim(), row.StatusName.trim())
-      }
-    })
-
-    // 2. High performance optimized CTE (Strictly from EV_VehicleNote to avoid duplicate DB trigger logs)
+    // 1. Query strictly from dbo.EV_VehicleLocationLog joined with dbo.EV_MsSubStatus for Thai names
     const baseCte = `
-      WITH LocationMovements AS (
+      WITH MovementView AS (
         SELECT
-          CONCAT('NOTE-', n.VehicleNoteID) AS movementId,
-          n.InventoryItemID AS inventoryItemId,
-          i.VinNo AS vinNo,
+          CONCAT('LOC-', ISNULL(CAST(l.InventoryItemID AS VARCHAR(20)), '0'), '-', CONVERT(VARCHAR(30), l.CreateDate, 126)) AS movementId,
+          l.InventoryItemID AS inventoryItemId,
+          l.VinNo AS vinNo,
           i.RegisterNo AS registerNo,
           i.Model AS model,
           i.Project AS project,
-          i.CurrentLocation AS currentLocation,
-          n.NoteDetail AS movementDetail,
-          n.CreateDate AS movementDate,
-          n.CreateDate AS createDate,
-          n.CreateUserID AS createUserId,
+          l.NewLocation AS currentLocation,
+          ISNULL(locTo.StatusName, l.NewLocation) AS currentLocationName,
+          ISNULL(locFrom.StatusName, l.OldLocation) AS fromLocation,
+          ISNULL(locTo.StatusName, l.NewLocation) AS toLocation,
+          CONCAT(
+            N'📍 ย้ายสถานที่: ', 
+            ISNULL(locFrom.StatusName, ISNULL(l.OldLocation, '-')), 
+            N' → ', 
+            ISNULL(locTo.StatusName, ISNULL(l.NewLocation, '-'))
+          ) AS movementDetail,
+          l.CreateDate AS movementDate,
+          l.CreateDate AS createDate,
+          l.CreateUserID AS createUserId,
           ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
-        FROM dbo.EV_VehicleNote n
-        INNER JOIN dbo.EV_InventoryItem i ON n.InventoryItemID = i.InventoryItemID
-        LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
-        WHERE (
-          n.NoteDetail LIKE N'%ย้ายสถานที่%' 
-          OR n.NoteDetail LIKE N'%เปลี่ยนสถานที่%'
-        ) AND n.IsActive = 1
-      ),
-      MovementView AS (
-        SELECT
-          m.*,
-          ISNULL(loc.StatusName, m.currentLocation) AS currentLocationName
-        FROM LocationMovements m
-        LEFT JOIN dbo.EV_MsSubStatus loc ON m.currentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+        FROM dbo.EV_VehicleLocationLog l
+        LEFT JOIN dbo.EV_InventoryItem i ON l.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
+        LEFT JOIN dbo.EV_MsSubStatus locFrom ON l.OldLocation = locFrom.StatusCode AND locFrom.Type = 'LOCATION'
+        LEFT JOIN dbo.EV_MsSubStatus locTo ON l.NewLocation = locTo.StatusCode AND locTo.Type = 'LOCATION'
       )
     `
 
@@ -144,8 +99,9 @@ export async function GET(req: NextRequest) {
         vinNo LIKE @search OR
         registerNo LIKE @search OR
         model LIKE @search OR
+        fromLocation LIKE @search OR
+        toLocation LIKE @search OR
         movementDetail LIKE @search OR
-        currentLocationName LIKE @search OR
         createUserName LIKE @search
       )`)
     }
@@ -154,8 +110,9 @@ export async function GET(req: NextRequest) {
       dataReq.input('locFilter', sql.NVarChar, `%${location}%`)
       countReq.input('locFilter', sql.NVarChar, `%${location}%`)
       whereConditions.push(`(
-        currentLocationName LIKE @locFilter OR
-        movementDetail LIKE @locFilter
+        fromLocation LIKE @locFilter OR
+        toLocation LIKE @locFilter OR
+        currentLocationName LIKE @locFilter
       )`)
     }
 
@@ -173,7 +130,7 @@ export async function GET(req: NextRequest) {
 
     const whereSql = whereConditions.join(' AND ')
 
-    // Execute Count and Data in Parallel
+    // Execute Count, Data, and Stats in Parallel
     const offset = (page - 1) * limit
     dataReq.input('offset', sql.Int, offset)
     dataReq.input('limit', sql.Int, limit)
@@ -207,15 +164,8 @@ export async function GET(req: NextRequest) {
     const total = countRes.recordset[0]?.total || 0
     const statRow = statsRes.recordset[0] || {}
 
-    // Map records with parsed From/To and masked user names
+    // Map records with masked staff names
     const records: VehicleLocationMovementItem[] = (dataRes.recordset || []).map((row: Record<string, unknown>) => {
-      const detail = (row.movementDetail as string) || ''
-      const parsed = parseLocationNote(detail, locMap)
-
-      const fromLoc = parsed.fromLocation || (row.originLocation as string) || null
-      const toLoc = parsed.toLocation || (row.destinationLocation as string) || null
-      const effectiveActor = parsed.actor || (row.createUserName as string) || '-'
-
       return {
         movementId: String(row.movementId || ''),
         inventoryItemId: row.inventoryItemId ? Number(row.inventoryItemId) : null,
@@ -225,13 +175,13 @@ export async function GET(req: NextRequest) {
         project: (row.project as string) || null,
         currentLocation: (row.currentLocation as string) || null,
         currentLocationName: (row.currentLocationName as string) || null,
-        fromLocation: fromLoc,
-        toLocation: toLoc,
-        movementDetail: detail,
+        fromLocation: (row.fromLocation as string) || null,
+        toLocation: (row.toLocation as string) || null,
+        movementDetail: (row.movementDetail as string) || '',
         movementDate: row.movementDate ? new Date(row.movementDate as string).toISOString() : new Date().toISOString(),
         createDate: row.createDate ? new Date(row.createDate as string).toISOString() : new Date().toISOString(),
         createUserId: row.createUserId ? Number(row.createUserId) : null,
-        createUserName: maskStaffName(effectiveActor),
+        createUserName: maskStaffName(row.createUserName as string),
       }
     })
 

@@ -159,7 +159,9 @@ export async function GET(
     const inspectReq = pool.request()
     inspectReq.input('vinNo', sql.VarChar, car.VinNo)
 
-    const locationsReq = pool.request()
+    const locationLogsReq = pool.request()
+    locationLogsReq.input('vinNo', sql.VarChar, car.VinNo)
+    locationLogsReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
 
     // Execute all sub-queries concurrently
     const [
@@ -173,7 +175,7 @@ export async function GET(
       repossessResult,
       replPoolResult,
       inspectResult,
-      locationsResult
+      locationLogsResult
     ] = await Promise.all([
       rentReq.query(`
         SELECT
@@ -284,10 +286,18 @@ export async function GET(
         WHERE ir.VinNo = @vinNo
         ORDER BY ir.InspectionDate DESC
       `).catch(() => ({ recordset: [] })),
-      locationsReq.query(`
-        SELECT StatusCode, StatusName
-        FROM dbo.EV_MsSubStatus
-        WHERE Type = 'LOCATION' AND IsActive = 1
+      locationLogsReq.query(`
+        SELECT 
+          l.InventoryItemID, l.VinNo, l.OldLocation, l.NewLocation, l.ActionCode, l.CreateDate,
+          ISNULL(locFrom.StatusName, l.OldLocation) AS FromLocation,
+          ISNULL(locTo.StatusName, l.NewLocation) AS ToLocation,
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS CreateUserName
+        FROM dbo.EV_VehicleLocationLog l
+        LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
+        LEFT JOIN dbo.EV_MsSubStatus locFrom ON l.OldLocation = locFrom.StatusCode AND locFrom.Type = 'LOCATION'
+        LEFT JOIN dbo.EV_MsSubStatus locTo ON l.NewLocation = locTo.StatusCode AND locTo.Type = 'LOCATION'
+        WHERE l.VinNo = @vinNo OR l.InventoryItemID = @inventoryItemId
+        ORDER BY l.CreateDate DESC
       `).catch(() => ({ recordset: [] }))
     ])
 
@@ -858,48 +868,20 @@ export async function GET(
       })
     })
 
-    // 7. Location Movements (เฉพาะประวัติการย้ายสถานที่)
-    const locMap = new Map<string, string>()
-    ;(locationsResult?.recordset || []).forEach((row: { StatusCode: string; StatusName: string }) => {
-      if (row.StatusCode && row.StatusName) {
-        locMap.set(row.StatusCode.trim(), row.StatusName.trim())
-      }
-    })
+    // 7. Location Movements (เฉพาะประวัติการย้ายสถานที่จาก EV_VehicleLocationLog)
+    const locationMovements = (locationLogsResult?.recordset || []).map((l: Record<string, unknown>) => {
+      const fromLoc = (l.FromLocation as string) || null
+      const toLoc = (l.ToLocation as string) || null
+      const detail = `📍 ย้ายสถานที่: ${fromLoc || '-'} → ${toLoc || '-'}`
 
-    const locationMovements: {
-      movementId: string
-      fromLocation: string | null
-      toLocation: string | null
-      movementDetail: string | null
-      movementDate: string
-      createDate: string
-      createUserName: string | null
-    }[] = []
-
-    notesResult.recordset.forEach((n: Record<string, unknown>) => {
-      const detail = String(n.NoteDetail || '')
-      if (detail.includes('ย้ายสถานที่') || detail.includes('เปลี่ยนสถานที่')) {
-        const arrowMatch = detail.match(/(?:ย้ายสถานที่|เปลี่ยนสถานที่)[:\s]+([^→\->|]+)\s*(?:→|->)\s*([^|]+)(?:\s*\|\s*โดย:\s*(.*))?/i)
-        let fromLoc: string | null = null
-        let toLoc: string | null = null
-        let actor: string | null = null
-        if (arrowMatch) {
-          const rawFrom = arrowMatch[1]?.trim() || null
-          const rawTo = arrowMatch[2]?.trim() || null
-          fromLoc = rawFrom ? (locMap.get(rawFrom) || rawFrom) : null
-          toLoc = rawTo ? (locMap.get(rawTo) || rawTo) : null
-          actor = arrowMatch[3]?.trim() || null
-        }
-        const effectiveActor = actor || (n.CreateUserName as string) || '-'
-        locationMovements.push({
-          movementId: `NOTE-${n.VehicleNoteID}`,
-          fromLocation: fromLoc,
-          toLocation: toLoc,
-          movementDetail: detail,
-          movementDate: n.CreateDate ? new Date(n.CreateDate as string).toISOString() : new Date().toISOString(),
-          createDate: n.CreateDate ? new Date(n.CreateDate as string).toISOString() : new Date().toISOString(),
-          createUserName: maskStaffName(effectiveActor),
-        })
+      return {
+        movementId: `LOC-${l.InventoryItemID}-${l.CreateDate}`,
+        fromLocation: fromLoc,
+        toLocation: toLoc,
+        movementDetail: detail,
+        movementDate: l.CreateDate ? new Date(l.CreateDate as string).toISOString() : new Date().toISOString(),
+        createDate: l.CreateDate ? new Date(l.CreateDate as string).toISOString() : new Date().toISOString(),
+        createUserName: maskStaffName(l.CreateUserName as string),
       }
     })
 
