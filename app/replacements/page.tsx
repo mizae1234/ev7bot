@@ -293,7 +293,7 @@ function ReplacementPageContent() {
           <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
             <span className="text-2xl sm:text-3xl">🚗🔄</span>
             <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">
-              ระบบมอนิเตอร์และจัดการรถทดแทน (Replacement Hub)
+              ระบบมอนิเตอร์รถทดแทน
             </h1>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

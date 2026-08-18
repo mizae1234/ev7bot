@@ -38,12 +38,6 @@ const navGroups: NavGroup[] = [
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
         icon: '📋'
-      },
-      {
-        name: 'รายการงานช่าง (Tasks)',
-        href: '/tasks',
-        desc: 'มอบหมายและติดตามภารกิจงานช่างรายวัน',
-        icon: '🛠️'
       }
     ]
   },
@@ -54,14 +48,14 @@ const navGroups: NavGroup[] = [
     isLive: true,
     items: [
       {
-        name: 'มอนิเตอร์รถทดแทน (Replacement Hub)',
+        name: 'มอนิเตอร์รถทดแทน (Replacements)',
         href: '/replacements',
         desc: 'ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ โควตาจอง และรถเข้าซ่อม',
         icon: '🚗🔄',
         badge: 'Live'
       },
       {
-        name: 'มอนิเตอร์ประกันภัย & ภาษี (Policy Hub)',
+        name: 'มอนิเตอร์ประกันภัย & ภาษี (Policies)',
         href: '/policies',
         desc: 'ตรวจสอบความคุ้มครอง วันหมดอายุประกัน/พ.ร.บ./ภาษี และเอกสาร PDF',
         icon: '📑',
@@ -170,14 +164,11 @@ export function Navbar() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
                   <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-zinc-900 via-indigo-950 to-zinc-900 dark:from-white dark:via-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">
-                    EV7 OPS
-                  </span>
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    Hub
+                    EV7 Operations
                   </span>
                 </div>
                 <span className="text-[10px] text-zinc-400 font-medium tracking-tight">
-                  Operations & Fleet Tracking
+                  Fleet & Maintenance Tracking
                 </span>
               </div>
             </Link>
