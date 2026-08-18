@@ -90,18 +90,6 @@ const navGroups: NavGroup[] = [
     icon: '📂',
     items: [
       {
-        name: 'ข้อมูลยานพาหนะ',
-        href: '/vehicle',
-        desc: 'ค้นหาและตรวจสอบข้อมูลรถยนต์ ทะเบียน และสถานะ',
-        icon: '🚘'
-      },
-      {
-        name: 'ระบบเบิกจ่ายอะไหล่',
-        href: '/spare-parts',
-        desc: 'คลังอะไหล่และการเบิกจ่ายอะไหล่ซ่อมบำรุง',
-        icon: '📦'
-      },
-      {
         name: 'งานสัญญา (EV Core)',
         href: '/case-contract',
         desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',
