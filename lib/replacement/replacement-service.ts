@@ -349,10 +349,19 @@ export async function getReplacementPoolCars(
   }
 }
 
+// In-memory cache for Stats Summary (TTL 15 seconds)
+let cachedStats: { data: ReplacementStatsSummary; timestamp: number } | null = null
+const STATS_CACHE_TTL_MS = 15000
+
 /**
  * 3. Get Real-Time Summary Statistics for KPI Cards
  */
 export async function getReplacementStatsSummary(): Promise<ReplacementStatsSummary> {
+  const now = Date.now()
+  if (cachedStats && now - cachedStats.timestamp < STATS_CACHE_TTL_MS) {
+    return cachedStats.data
+  }
+
   const pool = await getMSSQLReadOnlyPool()
   if (!pool) {
     return {
@@ -370,8 +379,8 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
   }
 
   try {
-    // 1. Count Active Replacements and Duration alerts (excluding maintenance)
-    const activeRes = await pool.request().query(`
+    // 1. Run Active query, Pool SP, and Fleet counts in PARALLEL
+    const activeReq = pool.request().query(`
       SELECT 
         r.ReplacementItemID,
         r.ReplacementStartDate,
@@ -383,6 +392,37 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       WHERE r.IsActive = 1 AND (r.ReplacementReturnDate IS NULL OR r.ReplacementReturnDate >= CAST(GETDATE() AS DATE))
     `)
 
+    const poolReq = pool.request()
+      .input('TextSearch', sql.VarChar(50), '')
+      .input('Model', sql.VarChar(250), '')
+      .input('Status', sql.VarChar(100), '')
+      .input('Page', sql.Int, 1)
+      .input('PerPage', sql.Int, 500)
+      .execute('GetEV_CarForReplacement')
+
+    const fleetReq = pool.request().query(`
+      SELECT Status, StatusType, COUNT(*) AS cnt
+      FROM dbo.EV_InventoryItem
+      WHERE Status = 'REPLACEMENT' OR StatusType LIKE '%REPLACEMENT%'
+      GROUP BY Status, StatusType
+    `)
+
+    const [activeRes, poolCars, fleetStatusRes] = await Promise.all([
+      activeReq.catch(err => {
+        console.error('Error fetching active stats:', err)
+        return { recordset: [] }
+      }),
+      poolReq.catch(err => {
+        console.error('Error fetching pool stats:', err)
+        return { recordset: [] }
+      }),
+      fleetReq.catch(err => {
+        console.error('Error fetching fleet status stats:', err)
+        return { recordset: [] }
+      })
+    ])
+
+    // Process Active query
     let activeInUse = 0
     let criticalDurationAlert = 0
     let warningDurationAlert = 0
@@ -404,59 +444,40 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       }
     })
 
-    // 2. Count Fleet Pool cars by calling GetEV_CarForReplacement
+    // Process Pool SP
     let readyToPick = 0
     let availableUseStandby = 0
     let reservedLineman = 0
     let reservedOthers = 0
     let reservedUnassigned = 0
 
-    try {
-      const poolCars = await pool.request()
-        .input('TextSearch', sql.VarChar(50), '')
-        .input('Model', sql.VarChar(250), '')
-        .input('Status', sql.VarChar(100), '')
-        .input('Page', sql.Int, 1)
-        .input('PerPage', sql.Int, 500)
-        .execute('GetEV_CarForReplacement')
+    const cars = (poolCars.recordset || []) as Record<string, unknown>[]
+    cars.forEach((c) => {
+      const sType = ((c.StatusType as string) || '').toLowerCase()
+      const s = ((c.Status as string) || '').toLowerCase()
+      const isReserved = sType.includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
+      const isReady = (sType.includes('replacement available') || (s === 'replacement' && sType.includes('available'))) && !isReserved
+      const isStandby = (sType.includes('available use') || s === 'available') && !isReserved
 
-      const cars = (poolCars.recordset || []) as Record<string, unknown>[]
-      cars.forEach((c) => {
-        const sType = ((c.StatusType as string) || '').toLowerCase()
-        const s = ((c.Status as string) || '').toLowerCase()
-        const isReserved = sType.includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
-        const isReady = (sType.includes('replacement available') || (s === 'replacement' && sType.includes('available'))) && !isReserved
-        const isStandby = (sType.includes('available use') || s === 'available') && !isReserved
-
-        if (isReady) {
-          readyToPick++
-        } else if (isStandby) {
-          availableUseStandby++
-        } else if (isReserved) {
-          const rType = (((c.ReservedType as string) || '') + ' ' + ((c.ReservedRemark as string) || '')).toLowerCase()
-          if (rType.includes('line') || rType.includes('lineman') || rType.includes('ไลน์แมน')) {
-            reservedLineman++
-          } else {
-            reservedOthers++
-          }
-
-          if (!c.ReservedTargetVinNo) {
-            reservedUnassigned++
-          }
+      if (isReady) {
+        readyToPick++
+      } else if (isStandby) {
+        availableUseStandby++
+      } else if (isReserved) {
+        const rType = (((c.ReservedType as string) || '') + ' ' + ((c.ReservedRemark as string) || '')).toLowerCase()
+        if (rType.includes('line') || rType.includes('lineman') || rType.includes('ไลน์แมน')) {
+          reservedLineman++
+        } else {
+          reservedOthers++
         }
-      })
-    } catch (e) {
-      console.error('Error fetching pool stats:', e)
-    }
 
-    // 3. Count Total Fleet & In Maintenance from EV_InventoryItem
-    const fleetStatusRes = await pool.request().query(`
-      SELECT Status, StatusType, COUNT(*) AS cnt
-      FROM dbo.EV_InventoryItem
-      WHERE Status = 'REPLACEMENT' OR StatusType LIKE '%REPLACEMENT%'
-      GROUP BY Status, StatusType
-    `)
+        if (!c.ReservedTargetVinNo) {
+          reservedUnassigned++
+        }
+      }
+    })
 
+    // Process Fleet query
     let inMaintenance = 0
     let totalFleetCount = 0
 
@@ -473,7 +494,7 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
 
     const totalFleet = activeInUse + readyToPick + availableUseStandby + reservedLineman + reservedOthers + inMaintenance
 
-    return {
+    const resultData: ReplacementStatsSummary = {
       totalFleet,
       activeInUse,
       readyToPick,
@@ -485,6 +506,11 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       criticalDurationAlert,
       warningDurationAlert
     }
+
+    // Cache the result
+    cachedStats = { data: resultData, timestamp: Date.now() }
+
+    return resultData
   } catch (err) {
     console.error('Failed to get replacement stats:', err)
     return {

@@ -18,34 +18,30 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
 
-    const stats = await getReplacementStatsSummary()
+    const fetchRecordsPromise = tab === 'POOL'
+      ? getReplacementPoolCars({
+          search,
+          status,
+          location,
+          model,
+          reservationType,
+          page,
+          limit
+        })
+      : getActiveReplacements({
+          search,
+          status,
+          location,
+          model,
+          durationFilter,
+          page,
+          limit
+        })
 
-    if (tab === 'POOL') {
-      const result = await getReplacementPoolCars({
-        search,
-        status,
-        location,
-        model,
-        reservationType,
-        page,
-        limit
-      })
-      return NextResponse.json({
-        ...result,
-        stats
-      })
-    }
-
-    // Default: ACTIVE
-    const result = await getActiveReplacements({
-      search,
-      status,
-      location,
-      model,
-      durationFilter,
-      page,
-      limit
-    })
+    const [stats, result] = await Promise.all([
+      getReplacementStatsSummary(),
+      fetchRecordsPromise
+    ])
 
     return NextResponse.json({
       ...result,
