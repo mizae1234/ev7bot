@@ -483,10 +483,14 @@ export async function GET(
       }
     })
 
-    // ─── Apply Data Masking ────────────────────────────────────
+    // ─── Apply Data Masking & Resolve Single Active Contract ───
     const maskedCar = stripSensitiveFields(car)
  
-    const activeRentRow = rentResult.recordset.find((r: any) => r.IsActive === true)
+    // Find the single true current active contract (IsActive = 1 and NOT cancelled)
+    const activeRentRow = rentResult.recordset.find((r: any) => 
+      (r.IsActive === true || r.IsActive === 1) && !r.ContractCancellationDate
+    )
+
     const maskedRent = activeRentRow
       ? {
           ...stripSensitiveFields(activeRentRow),
@@ -497,11 +501,15 @@ export async function GET(
         }
       : null
 
-    const rentHistory = rentResult.recordset.map((r: any) => ({
-      ...stripSensitiveFields(r),
-      ...maskName(r.FirstName, r.LastName),
-      PhoneNo: maskPhone(r.PhoneNo),
-    }))
+    const rentHistory = rentResult.recordset.map((r: any) => {
+      const isCurrentActive = activeRentRow && activeRentRow.RentItemID === r.RentItemID
+      return {
+        ...stripSensitiveFields(r),
+        ...maskName(r.FirstName, r.LastName),
+        PhoneNo: maskPhone(r.PhoneNo),
+        IsActive: Boolean(isCurrentActive),
+      }
+    })
 
     // ─── Code → Description mapping (from master table) ─────────────────────────────
     const carStatusMap: Record<string, string> = {}
