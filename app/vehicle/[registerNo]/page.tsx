@@ -223,26 +223,24 @@ function VehicleDetailContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-emerald-50/30 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900/40 text-zinc-900 dark:text-zinc-100">
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
-        {/* ── Car Info Card ── */}
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-800 px-5 py-4">
-            <div className="flex items-center justify-between">
+      <main className="max-w-3xl mx-auto px-4 py-4 space-y-3.5">
+        {/* ── Car Info Card (Compact) ── */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-800 px-4 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🚗</span>
               <div>
-                <p className="text-emerald-100 dark:text-emerald-200 text-xs font-medium">
-                  {car.RegisterNo ? 'ทะเบียน' : 'เลข VIN (ยังไม่มีทะเบียน)'}
-                </p>
-                <h2 className="text-2xl font-extrabold text-white tracking-wide">
+                <h2 className="text-base sm:text-lg font-extrabold text-white tracking-wide leading-tight">
                   {car.RegisterNo || car.VinNo || '-'}
                 </h2>
               </div>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${statusInfo.bg} ${statusInfo.color}`}>
-                {statusInfo.icon} {statusInfo.label}
-              </span>
             </div>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusInfo.bg} ${statusInfo.color}`}>
+              {statusInfo.icon} {statusInfo.label}
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-px bg-zinc-100 dark:bg-zinc-800">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-zinc-100 dark:bg-zinc-800 text-xs">
             <InfoCell label="รุ่น" value={car.Model} />
             <InfoCell label="VIN" value={car.VinNo} mono />
             <InfoCell label="Project" value={`${car.Project || '-'} / ${car.ProjectType || '-'}`} />
@@ -252,13 +250,13 @@ function VehicleDetailContent() {
           </div>
 
           {car.MainVehicleRegisterNo && (
-            <div className="bg-amber-50/50 dark:bg-amber-950/10 px-5 py-3.5 border-t border-zinc-200/60 dark:border-zinc-800/85 flex items-center justify-between text-xs animate-fade-in">
-              <span className="font-medium text-amber-800 dark:text-amber-300">🔄 เป็นรถทดแทนของคัน:</span>
+            <div className="bg-amber-50/60 dark:bg-amber-950/20 px-3.5 py-2 border-t border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+              <span className="font-medium text-amber-800 dark:text-amber-300 text-[11.5px]">🔄 เป็นรถทดแทนของคัน:</span>
               <a 
                 href={`/vehicle/${car.MainVehicleRegisterNo}`}
-                className="font-bold text-amber-950 dark:text-amber-250 hover:underline flex items-center gap-1 bg-amber-100/50 dark:bg-amber-900/20 px-2.5 py-1 rounded-lg border border-amber-200/30 transition-all hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                className="font-bold text-amber-900 dark:text-amber-300 hover:underline flex items-center gap-1 bg-amber-100/60 dark:bg-amber-900/30 px-2 py-0.5 rounded-lg border border-amber-200/40 text-[11px]"
               >
-                🚗 {car.MainVehicleRegisterNo} <span className="font-mono font-normal text-amber-800/80 dark:text-amber-400/80 text-[10.5px]">({car.MainVehicleVin})</span>
+                🚗 {car.MainVehicleRegisterNo} <span className="font-mono font-normal text-amber-700/80 dark:text-amber-400/80 text-[10px]">({car.MainVehicleVin})</span>
               </a>
             </div>
           )}
@@ -540,9 +538,11 @@ export default function VehicleDetailPage() {
 
 function InfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 px-4 py-3">
-      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-0.5">{label}</p>
-      <p className={`text-sm font-semibold text-zinc-800 dark:text-zinc-200 ${mono ? 'font-mono text-xs' : ''}`}>{value || '-'}</p>
+    <div className="bg-white dark:bg-zinc-900 px-3.5 py-2">
+      <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mb-0.5">{label}</p>
+      <p className={`text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate ${mono ? 'font-mono text-[11px]' : ''}`} title={value || '-'}>
+        {value || '-'}
+      </p>
     </div>
   )
 }
