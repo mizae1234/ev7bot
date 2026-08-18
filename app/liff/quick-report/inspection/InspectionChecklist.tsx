@@ -579,10 +579,14 @@ export default function InspectionChecklist({
     const cleanRem = remark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
     const finalRemark = cleanRem || null
     const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
+    const mileageFromMap = itemsMap['MILEAGE_VALUE']?.numericValue != null
+      ? Math.round(Number(itemsMap['MILEAGE_VALUE'].numericValue))
+      : null
+    const finalMileage = mileageFromMap ?? mileage
     
     const newId = await onSave({ 
       items, 
-      mileage, 
+      mileage: finalMileage, 
       remark: finalRemark || null, 
       returnDate, 
       parkLocation,
@@ -776,12 +780,16 @@ export default function InspectionChecklist({
       const cleanRem = remark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
       const finalRemark = cleanRem || null
       const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
+      const mileageFromMap = itemsMap['MILEAGE_VALUE']?.numericValue != null
+        ? Math.round(Number(itemsMap['MILEAGE_VALUE'].numericValue))
+        : null
+      const finalMileage = mileageFromMap ?? mileage
 
       let activeId = inspectionId
       if (!activeId) {
         const newId = await onSave({
           items,
-          mileage,
+          mileage: finalMileage,
           remark: finalRemark || null,
           returnDate,
           parkLocation,
@@ -854,7 +862,7 @@ export default function InspectionChecklist({
 
       await onComplete({
         items,
-        mileage,
+        mileage: finalMileage,
         remark: finalRemark || null,
         returnDate,
         parkLocation,

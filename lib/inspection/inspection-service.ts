@@ -105,6 +105,9 @@ export async function createInspection(params: {
     }
     const resolvedCustomerContact = params.customerContact || null
 
+    const mileageFromItems = params.items?.find(it => it.category === 'MILEAGE' && it.itemCode === 'VALUE')?.numericValue
+    const resolvedMileage = params.mileage ?? (mileageFromItems != null ? Math.round(Number(mileageFromItems)) : null)
+
     // 1. Insert header
     const headerResult = await transaction.request()
       .input('vinNo', sql.NVarChar, params.vinNo)
@@ -112,7 +115,7 @@ export async function createInspection(params: {
       .input('inspectionType', sql.VarChar, params.inspectionType)
       .input('returnItemId', sql.Int, params.returnItemId || null)
       .input('inspectionSessionId', sql.Int, params.inspectionSessionId || null)
-      .input('mileage', sql.Int, params.mileage || null)
+      .input('mileage', sql.Int, resolvedMileage)
       .input('inspectionDate', sql.Date, params.inspectionDate)
       .input('inspectorUserID', sql.Int, params.inspectorUserId || params.ev7UserId)
       .input('inspectorName', sql.NVarChar, params.inspectorName || params.ev7UserName)
@@ -231,10 +234,13 @@ export async function updateInspection(params: {
       }
     }
 
+    const mileageFromItems = params.items?.find(it => it.category === 'MILEAGE' && it.itemCode === 'VALUE')?.numericValue
+    const resolvedMileage = params.mileage ?? (mileageFromItems != null ? Math.round(Number(mileageFromItems)) : null)
+
     // 1. Update header
     await transaction.request()
       .input('inspectionId', sql.BigInt, params.inspectionId)
-      .input('mileage', sql.Int, params.mileage ?? null)
+      .input('mileage', sql.Int, resolvedMileage)
       .input('remark', sql.NVarChar, params.remark ?? null)
       .input('status', sql.VarChar, params.status || null)
       .input('updateUserID', sql.Int, params.ev7UserId)
@@ -329,7 +335,7 @@ export async function updateInspection(params: {
 
           const finalReturnDate = params.returnDate || inspect.ReturnDate
           const finalLocation = params.location || inspect.Location
-          const finalMileage = params.mileage || inspect.Mileage
+          const finalMileage = resolvedMileage || params.mileage || inspect.Mileage
           const finalRentItemId = inspect.RentItemID
 
           let targetRentItemId = finalRentItemId
@@ -358,65 +364,55 @@ export async function updateInspection(params: {
               const rentFallbackResult = await transaction.request()
                 .input('vinNo', sql.VarChar, inspect.VinNo)
                 .query(`
-                  SELECT TOP 1 RentItemID, CustomerName, Model, RegisterNo, PhoneNo
-                  FROM (
-                    SELECT r.RentItemID, 
-                           ISNULL(NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), ''), 'ลูกค้าทั่วไป') AS CustomerName,
-                           i.Model, i.RegisterNo, r.PhoneNo, r.ReleaseDate
-                    FROM dbo.EV_RentItem r
-                    LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
-                    WHERE r.VinNo = @vinNo AND r.IsActive = 1
-                  ) t
-                  ORDER BY ReleaseDate DESC, RentItemID DESC
+                  SELECT TOP 1 r.RentItemID, 
+                         ISNULL(NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), ''), 'ลูกค้าทั่วไป') AS CustomerName,
+                         i.Model, i.RegisterNo, r.PhoneNo
+                  FROM dbo.EV_RentItem r
+                  LEFT JOIN dbo.EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID
+                  WHERE r.VinNo = @vinNo AND r.IsActive = 1
+                  ORDER BY r.RentItemID DESC
                 `)
               rent = rentFallbackResult.recordset[0]
             }
 
-            targetRentItemId = rent?.RentItemID || targetRentItemId
-            if (!targetRentItemId) {
-              throw new Error('ไม่พบข้อมูลการเช่ารถ (RentItem) สำหรับรถคันนี้ จึงไม่สามารถบันทึกข้อมูลคืนรถได้')
-            }
-
-            // Insert new ReturnItem row (Status = 'SUBMIT')
+            // Insert new EV_ReturnItem
             const insertReturnResult = await transaction.request()
+              .input('rentItemId', sql.BigInt, rent?.RentItemID || targetRentItemId || null)
               .input('vinNo', sql.VarChar, inspect.VinNo)
-              .input('rentItemId', sql.BigInt, targetRentItemId)
-              .input('model', sql.VarChar, rent?.Model || null)
-              .input('registerNo', sql.VarChar, rent?.RegisterNo || inspect.RegisterNo || null)
-              .input('customerName', sql.VarChar, rent?.CustomerName || null)
-              .input('phoneNo', sql.VarChar, rent?.PhoneNo || null)
+              .input('returnModel', sql.NVarChar, rent?.Model || inspect.Model || null)
+              .input('registerNo', sql.NVarChar, rent?.RegisterNo || inspect.RegisterNo || null)
+              .input('customerName', sql.NVarChar, params.customerName || rent?.CustomerName || inspect.CustomerName || 'ลูกค้าทั่วไป')
+              .input('phoneNo', sql.VarChar, params.customerContact || rent?.PhoneNo || inspect.CustomerContact || null)
               .input('mileage', sql.Int, finalMileage || null)
-              .input('parkLocation', sql.VarChar, finalLocation || null)
+              .input('parkLocation', sql.NVarChar, finalLocation || null)
               .input('returnDate', sql.Date, finalReturnDate || null)
               .input('createUserID', sql.Int, params.ev7UserId)
               .query(`
                 INSERT INTO dbo.EV_ReturnItem (
-                  VinNo, RentItemID, Model, RegisterNo, CustomerName, PhoneNo, 
+                  RentItemID, VinNo, ReturnModel, ReturnRegisterNo, CustomerName, PhoneNo,
                   Mileage, ParkLocation, ReturnDate, Status, IsActive, CreateDate, CreateUserID, IsSentToK2
                 )
                 VALUES (
-                  @vinNo, @rentItemId, @model, @registerNo, @customerName, @phoneNo,
+                  @rentItemId, @vinNo, @returnModel, @registerNo, @customerName, @phoneNo,
                   @mileage, @parkLocation, @returnDate, 'SUBMIT', 1, GETDATE(), @createUserID, 0
                 );
-                SELECT SCOPE_IDENTITY() AS ReturnItemID;
+                SELECT SCOPE_IDENTITY() AS NewReturnItemID;
               `)
-            returnItemId = insertReturnResult.recordset[0]?.ReturnItemID
+            returnItemId = insertReturnResult.recordset[0]?.NewReturnItemID
 
-            // Link to EV_Inspection
-            await transaction.request()
-              .input('inspectionId', sql.BigInt, params.inspectionId)
-              .input('returnItemId', sql.Int, returnItemId)
-              .query(`
-                UPDATE dbo.EV_Inspection
-                SET ReturnItemID = @returnItemId
-                WHERE InspectionID = @inspectionId
-              `)
+            // Link newly created ReturnItemID back to EV_Inspection
+            if (returnItemId) {
+              await transaction.request()
+                .input('inspectionId', sql.BigInt, params.inspectionId)
+                .input('returnItemId', sql.BigInt, returnItemId)
+                .query(`UPDATE dbo.EV_Inspection SET ReturnItemID = @returnItemId WHERE InspectionID = @inspectionId`)
+            }
           } else {
-            // Update existing ReturnItem row to Status = 'SUBMIT'
+            // Update existing EV_ReturnItem
             await transaction.request()
               .input('returnItemId', sql.BigInt, returnItemId)
               .input('mileage', sql.Int, finalMileage || null)
-              .input('parkLocation', sql.VarChar, finalLocation || null)
+              .input('parkLocation', sql.NVarChar, finalLocation || null)
               .input('returnDate', sql.Date, finalReturnDate || null)
               .input('updateUserID', sql.Int, params.ev7UserId)
               .query(`
@@ -430,10 +426,9 @@ export async function updateInspection(params: {
                 WHERE ReturnItemID = @returnItemId
               `)
 
-            // Link to EV_Inspection in case it wasn't
             await transaction.request()
               .input('inspectionId', sql.BigInt, params.inspectionId)
-              .input('returnItemId', sql.Int, returnItemId)
+              .input('returnItemId', sql.BigInt, returnItemId)
               .query(`
                 UPDATE dbo.EV_Inspection
                 SET ReturnItemID = @returnItemId
@@ -655,7 +650,11 @@ export async function listInspections(filters: {
       i.InspectionDate AS inspectionDate,
       i.InspectorName AS inspectorName,
       i.Status AS status,
-      i.Mileage AS mileage,
+      COALESCE(i.Mileage, (
+        SELECT TOP 1 CAST(NumericValue AS INT)
+        FROM dbo.EV_InspectionItem
+        WHERE InspectionID = i.InspectionID AND Category = 'MILEAGE' AND ItemCode = 'VALUE'
+      )) AS mileage,
       i.CreateDate AS createDate,
       i.UpdateDate AS updateDate,
       i.Location AS location,
@@ -686,11 +685,8 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
   const pool = await getMSSQLPool()
   if (!pool) throw new Error('Database connection failed')
 
-  const req = pool.request()
-  req.input('inspectionId', sql.BigInt, inspectionId)
-
   const [headerRes, itemsRes, photosRes] = await Promise.all([
-    req.query(`
+    pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
       SELECT InspectionID AS inspectionId, VinNo AS vinNo, RegisterNo AS registerNo,
              InspectionType AS inspectionType, ReturnItemID AS returnItemId,
              InspectionSessionID AS inspectionSessionId, Mileage AS mileage,
@@ -726,9 +722,14 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
   const header = headerRes.recordset[0]
   if (!header) return null
 
+  const items = itemsRes.recordset
+  const mileageItem = items.find((it: any) => it.category === 'MILEAGE' && it.itemCode === 'VALUE')
+  const mileageFromItems = mileageItem?.numericValue != null ? Math.round(Number(mileageItem.numericValue)) : null
+
   return {
     ...header,
-    items: itemsRes.recordset,
+    mileage: header.mileage ?? mileageFromItems,
+    items,
     photos: photosRes.recordset,
   }
 }

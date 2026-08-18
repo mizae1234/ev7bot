@@ -224,7 +224,10 @@ function InfoTab({
           <DetailField label="วันที่รับคืนจริง" value={getThaiDate(detail.returnDate || detail.inspectionDate)} bold />
           <DetailField label="วันที่ยกเลิกสัญญา" value={getThaiDate(detail.contractCancellationDate)} bold />
           <DetailField label="สถานที่จอดคืน" value={detail.locationName || detail.location || '-'} bold />
-          <DetailField label="เลขไมล์สะสม" value={detail.mileage != null ? `${detail.mileage.toLocaleString()} กม.` : '-'} mono bold />
+          {(() => {
+            const displayMileage = detail.mileage ?? (detail.items?.find(i => i.category === 'MILEAGE' && i.itemCode === 'VALUE')?.numericValue != null ? Math.round(Number(detail.items.find(i => i.category === 'MILEAGE' && i.itemCode === 'VALUE')!.numericValue)) : null)
+            return <DetailField label="เลขไมล์สะสม" value={displayMileage != null ? `${displayMileage.toLocaleString()} กม.` : '-'} mono bold />
+          })()}
           <div className="space-y-0.5 col-span-2">
             <span className="text-[10px] text-slate-400">เหตุผลในการคืนรถ</span>
             <p className="font-medium text-slate-800">{getReasonLabel(detail.returnReason)}</p>
