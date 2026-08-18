@@ -379,10 +379,27 @@ EXEC GetEV_DeliveryCalendar @BeginDate='2026-06-01', @EndDate='2026-06-30'
 
 ---
 
-## 6. Replacement
+## 6. Replacement (ระบบรถทดแทน)
+
+### `GetEV_CarForReplacement` ⭐
+ค้นหารถในคลังรถทดแทน (Fleet Pool) และสถานะความพร้อม/การจอง
+
+**Parameters:**
+| ชื่อ | Type |
+|---|---|
+| `@TextSearch` | varchar(50) |
+| `@Model` | varchar(250) |
+| `@Status` | varchar(100) |
+| `@Page` | int |
+| `@PerPage` | int |
+
+**Output Columns:**
+`InventoryItemID`, `RegisterNo`, `VinNo`, `Model`, `Exterior_Color`, `Interior_Color`, `Status`, `StatusType`, `Location`, `ReservedTargetVinNo`, `ReservedReleaseDate`, `ReservedRemark`, `ReservedType`, `CustomerName`, `TotalCount`
+
+---
 
 ### `GetEv_ReplacementCarDropDown`
-รายการ dropdown รถทดแทน (245 คัน)
+รายการ dropdown รถทดแทน
 
 **Parameters:** ไม่มี
 
@@ -392,12 +409,38 @@ EXEC GetEV_DeliveryCalendar @BeginDate='2026-06-01', @EndDate='2026-06-30'
 ---
 
 ### `GetEV_Report_ReplacementHistory` ⭐
-ประวัติการให้รถทดแทน (215 รายการ)
+ประวัติการให้รถทดแทนย้อนหลังทั้งหมด (407+ รายการ)
 
 **Parameters:** ไม่มี
 
 **Output Columns:**
-`RegisterNo`, `VinNo`, `Model`, `VinNoReplacement`, `ReplacementStartDate`, `ReplacementReturnDate`, `Location`, `Remark`, `IsActive`, `ReplacementStatus`
+`RegisterNo`, `VinNo`, `Model`, `VinNoReplacement`, `ReplacementStartDate`, `ReplacementReturnDate`, `Location`, `Remark`, `IsActive`, `ReplacementStatus`, `CreateDate`, `CreateName`, `UpdateDate`, `UpdateName`
+
+---
+
+### Active Replacement Pairings Query (`dbo.EV_ReplacementItem` + `dbo.EV_MaintenanceItem`)
+การจับคู่รถทดแทนกับรถคันหลักที่เข้าซ่อมแบบ 1-to-1:
+```sql
+SELECT 
+  r.ReplacementItemID,
+  r.MaintenanceItemID,
+  r.VinNo AS ReplacementVin,
+  replCar.RegisterNo AS ReplacementRegisterNo,
+  replCar.Model AS ReplacementModel,
+  mainCar.RegisterNo AS MainRegisterNo,
+  mainCar.VinNo AS MainVinNo,
+  m.IssueTitle,
+  m.MaintenanceStartDate,
+  r.ReplacementStartDate,
+  r.ReplacementReturnDate,
+  r.Location
+FROM dbo.EV_ReplacementItem r
+INNER JOIN dbo.EV_MaintenanceItem m ON r.MaintenanceItemID = m.MaintenanceItemID
+LEFT JOIN dbo.EV_InventoryItem mainCar ON m.InventoryItemID = mainCar.InventoryItemID
+LEFT JOIN dbo.EV_InventoryItem replCar ON r.VinNo = replCar.VinNo
+WHERE r.IsActive = 1 AND (r.ReplacementReturnDate IS NULL OR r.ReplacementReturnDate >= CAST(GETDATE() AS DATE))
+ORDER BY r.ReplacementStartDate DESC;
+```
 
 ---
 
