@@ -471,8 +471,10 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       }
     })
 
+    const totalFleet = activeInUse + readyToPick + availableUseStandby + reservedLineman + reservedOthers + inMaintenance
+
     return {
-      totalFleet: Math.max(totalFleetCount, activeInUse + readyToPick + availableUseStandby + reservedLineman + reservedOthers),
+      totalFleet,
       activeInUse,
       readyToPick,
       availableUseStandby,

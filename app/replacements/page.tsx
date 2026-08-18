@@ -330,7 +330,7 @@ function ReplacementPageContent() {
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
-            🚗 คลังรถ & การจอง ({stats.totalFleet})
+            🚗 คลังรถ & การจอง ({stats.readyToPick + (stats.availableUseStandby || 0) + stats.reservedLineman + stats.reservedOthers + stats.inMaintenance})
           </button>
           <button
             type="button"
