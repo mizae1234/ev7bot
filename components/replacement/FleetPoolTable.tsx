@@ -44,8 +44,10 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
           {records.map((car) => {
             const badge = getPoolCarBadge(
               car.isReadyToPick,
+              car.isStandbyAvailable,
               car.isReserved,
-              car.reservedType || car.reservedRemark,
+              car.reservedType,
+              car.reservedTargetVinNo,
               car.status,
               car.statusType
             )
@@ -53,9 +55,7 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
             return (
               <tr
                 key={car.vinNo}
-                className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50 transition-colors ${
-                  car.isReadyToPick ? 'bg-emerald-50/20 dark:bg-emerald-950/10' : ''
-                }`}
+                className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
               >
                 {/* 1. Vehicle Info */}
                 <td className="py-3 px-4">
@@ -85,12 +85,17 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
 
                 {/* 3. Status Badge */}
                 <td className="py-3 px-4">
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
                     {badge.label}
                   </span>
-                  <div className="text-[10px] text-zinc-400 mt-1">
-                    สถานะระบบ: {car.statusType || car.status}
+                  {badge.subLabel && (
+                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      {badge.subLabel}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-zinc-400 mt-0.5 font-mono">
+                    สถานะ: {car.statusType || car.status}
                   </div>
                 </td>
 

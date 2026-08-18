@@ -76,13 +76,22 @@ export function getDurationBadge(days: number): {
 }
 
 // Pool Car Status & Reservation Badge
-export function getPoolCarBadge(isReadyToPick: boolean, isReserved: boolean, reservedType: string | null, status: string, statusType: string): {
+export function getPoolCarBadge(
+  isReadyToPick: boolean,
+  isStandbyAvailable: boolean,
+  isReserved: boolean,
+  reservedType: string | null,
+  reservedTargetVinNo: string | null,
+  status: string,
+  statusType: string
+): {
   label: string
+  subLabel?: string
   bg: string
   text: string
   border: string
   dot: string
-  category: 'READY' | 'RESERVED_LINEMAN' | 'RESERVED_TARGET' | 'RESERVED_UNASSIGNED' | 'MAINTENANCE' | 'OTHER'
+  category: 'READY' | 'STANDBY' | 'RESERVED_LINEMAN' | 'RESERVED_TARGET' | 'RESERVED_UNASSIGNED' | 'MAINTENANCE' | 'OTHER'
 } {
   const s = (status || '').toUpperCase()
   const st = (statusType || '').toUpperCase()
@@ -98,18 +107,34 @@ export function getPoolCarBadge(isReadyToPick: boolean, isReserved: boolean, res
     }
   }
 
-  if (isReadyToPick) {
+  // 1. Replacement Available (รถทดแทนพร้อมใช้งานทันที)
+  if (isReadyToPick || st.includes('REPLACEMENT_AVAILABLE') || st.includes('REPLACEMENT AVAILABLE')) {
     return {
-      label: 'พร้อมใช้งาน (ว่าง)',
+      label: 'พร้อมใช้ทันที (Replacement Available)',
+      subLabel: 'รถทดแทนในคลัง พร้อมหยิบกุญแจจ่ายงาน',
       bg: 'bg-emerald-50 dark:bg-emerald-950/40',
-      text: 'text-emerald-700 dark:text-emerald-400',
-      border: 'border-emerald-200 dark:border-emerald-800',
-      dot: 'bg-emerald-500',
+      text: 'text-emerald-700 dark:text-emerald-300 font-medium',
+      border: 'border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-500/20',
+      dot: 'bg-emerald-500 animate-pulse',
       category: 'READY'
     }
   }
 
-  if (isReserved) {
+  // 2. Available Use (รถ Standby พร้อมแปลง)
+  if (isStandbyAvailable || st.includes('AVAILABLE_USE') || st.includes('AVAILABLE USE') || s === 'AVAILABLE') {
+    return {
+      label: 'Standby พร้อมแปลง (Available Use)',
+      subLabel: 'นำมาเปลี่ยนสถานะเป็นรถทดแทนได้',
+      bg: 'bg-sky-50 dark:bg-sky-950/40',
+      text: 'text-sky-700 dark:text-sky-300 font-medium',
+      border: 'border-sky-200 dark:border-sky-800',
+      dot: 'bg-sky-500',
+      category: 'STANDBY'
+    }
+  }
+
+  // 3. Reserved cars
+  if (isReserved || st.includes('RESERVE')) {
     const rType = (reservedType || '').toLowerCase()
     if (rType.includes('line') || rType.includes('lineman')) {
       return {
@@ -121,8 +146,18 @@ export function getPoolCarBadge(isReadyToPick: boolean, isReserved: boolean, res
         category: 'RESERVED_LINEMAN'
       }
     }
+    if (reservedTargetVinNo) {
+      return {
+        label: 'จองให้คันหลัก',
+        bg: 'bg-amber-50 dark:bg-amber-950/40',
+        text: 'text-amber-800 dark:text-amber-300 font-medium',
+        border: 'border-amber-300 dark:border-amber-700',
+        dot: 'bg-amber-500',
+        category: 'RESERVED_TARGET'
+      }
+    }
     return {
-      label: 'จองสำรองไว้',
+      label: 'จองสำรอง (โควตากลาง)',
       bg: 'bg-amber-50 dark:bg-amber-950/40',
       text: 'text-amber-700 dark:text-amber-400',
       border: 'border-amber-200 dark:border-amber-800',

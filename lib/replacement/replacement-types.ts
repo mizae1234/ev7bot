@@ -49,6 +49,8 @@ export interface ReplacementPoolCar {
   // Reservation Info
   isReserved: boolean
   isReadyToPick: boolean
+  isStandbyAvailable: boolean
+  poolCategory: 'REPLACEMENT_AVAILABLE' | 'AVAILABLE_USE' | 'REPLACEMENT_RESERVED'
   reservedTargetVinNo: string | null
   reservedTargetRegisterNo?: string | null
   reservedReleaseDate: string | null
@@ -81,7 +83,8 @@ export interface ReplacementHistoryItem {
 export interface ReplacementStatsSummary {
   totalFleet: number
   activeInUse: number
-  readyToPick: number
+  readyToPick: number // Replacement Available (12 cars - พร้อมใช้งานทันที)
+  availableUseStandby: number // Available Use (190 cars - รถ standby นำมาแปลงเป็นรถทดแทนได้)
   reservedLineman: number
   reservedOthers: number
   reservedUnassigned: number

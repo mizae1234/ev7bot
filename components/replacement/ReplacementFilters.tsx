@@ -98,11 +98,12 @@ export function ReplacementFilters({
                   : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100'
               } focus:outline-none focus:ring-2 focus:ring-amber-500/30`}
             >
-              <option value="ALL">🚗 ความพร้อม / การจอง (ทั้งหมด)</option>
-              <option value="READY">🟢 พร้อมใช้งานทันที (Ready to Pick)</option>
+              <option value="ALL">🚗 สถานะคลัง / การจอง (ทั้งหมด)</option>
+              <option value="READY">🟢 พร้อมใช้ทันที (Replacement Available)</option>
+              <option value="STANDBY">🔵 Standby พร้อมแปลง (Available Use)</option>
               <option value="RESERVED_LINEMAN">🟢 จองให้ Line Man</option>
-              <option value="RESERVED_OTHERS">🟡 จองสำรอง / โครงการอื่นๆ</option>
-              <option value="RESERVED_UNASSIGNED">⚪ จองแบบไม่ระบุทะเบียน</option>
+              <option value="RESERVED_OTHERS">🟡 จองให้คันหลักอื่นๆ</option>
+              <option value="RESERVED_UNASSIGNED">⚪ จองแบบไม่ระบุทะเบียน (โควตากลาง)</option>
             </select>
           </div>
         )}

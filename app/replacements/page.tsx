@@ -29,6 +29,7 @@ function ReplacementPageContent() {
     totalFleet: 0,
     activeInUse: 0,
     readyToPick: 0,
+    availableUseStandby: 0,
     reservedLineman: 0,
     reservedOthers: 0,
     reservedUnassigned: 0,

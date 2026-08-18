@@ -19,7 +19,7 @@ export function ReplacementStatsCards({
       id: 'ACTIVE_ALL',
       targetTab: 'ACTIVE' as const,
       filterKey: 'ALL',
-      title: 'กำลังใช้งานทดแทน (Active in Use)',
+      title: 'กำลังใช้งานทดแทน (Active)',
       desc: 'รถคันหลักยังซ่อมไม่เสร็จ',
       count: stats.activeInUse,
       unit: 'คัน',
@@ -33,11 +33,11 @@ export function ReplacementStatsCards({
       )
     },
     {
-      id: 'READY_TO_PICK',
+      id: 'REPLACEMENT_AVAILABLE',
       targetTab: 'POOL' as const,
       filterKey: 'READY',
-      title: 'พร้อมใช้งาน / ว่าง (Ready to Pick)',
-      desc: 'หยิบกุญแจไปใช้งานได้ทันที',
+      title: 'พร้อมใช้ทันที (Replacement Avail)',
+      desc: 'รถทดแทนพร้อมจ่ายงานทันที',
       count: stats.readyToPick,
       unit: 'คัน',
       badgeColor: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
@@ -50,11 +50,28 @@ export function ReplacementStatsCards({
       )
     },
     {
+      id: 'AVAILABLE_USE_STANDBY',
+      targetTab: 'POOL' as const,
+      filterKey: 'STANDBY',
+      title: 'Standby พร้อมแปลง (Available Use)',
+      desc: 'นำมาแปลงเป็นรถทดแทนได้',
+      count: stats.availableUseStandby || 0,
+      unit: 'คัน',
+      badgeColor: 'text-sky-600 dark:text-sky-400 bg-sky-500/10',
+      bg: 'from-sky-500/10 to-sky-600/5 hover:border-sky-500/50',
+      activeBorder: 'border-sky-500 ring-2 ring-sky-500/20 bg-sky-500/10',
+      icon: (
+        <svg className="w-5 h-5 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      )
+    },
+    {
       id: 'RESERVED_LINEMAN',
       targetTab: 'POOL' as const,
       filterKey: 'RESERVED_LINEMAN',
       title: 'จองให้ Line Man (Reserved)',
-      desc: 'ล็อกโควตาสำหรับโครงการ Line Man',
+      desc: 'โควตาโครงการ Line Man',
       count: stats.reservedLineman,
       unit: 'คัน',
       badgeColor: 'text-teal-600 dark:text-teal-400 bg-teal-500/10',
@@ -70,7 +87,7 @@ export function ReplacementStatsCards({
       id: 'RESERVED_OTHERS',
       targetTab: 'POOL' as const,
       filterKey: 'RESERVED_OTHERS',
-      title: 'จองสำรองอื่นๆ / ไม่ระบุทะเบียน',
+      title: 'จองสำรองอื่นๆ / โควตากลาง',
       desc: `ไม่ระบุทะเบียน ${stats.reservedUnassigned} คัน`,
       count: stats.reservedOthers,
       unit: 'คัน',
@@ -103,7 +120,7 @@ export function ReplacementStatsCards({
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
       {cards.map(card => {
         const isSelected = activeTab === card.targetTab && activeFilter === card.filterKey
 

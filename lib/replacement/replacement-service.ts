@@ -209,7 +209,15 @@ export async function getReplacementPoolCars(
     const reservedTypeStr = (r.ReservedType as string) || ''
 
     const isReserved = statusTypeStr.toLowerCase().includes('reserve') || !!reservedRemarkStr || !!reservedTypeStr
-    const isReadyToPick = (statusTypeStr.toLowerCase().includes('available') || statusStr.toLowerCase() === 'available') && !isReserved
+    const isReadyToPick = (statusTypeStr.toLowerCase().includes('replacement available') || (statusStr.toLowerCase() === 'replacement' && statusTypeStr.toLowerCase().includes('available'))) && !isReserved
+    const isStandbyAvailable = (statusTypeStr.toLowerCase().includes('available use') || statusStr.toLowerCase() === 'available') && !isReserved
+
+    let poolCategory: 'REPLACEMENT_AVAILABLE' | 'AVAILABLE_USE' | 'REPLACEMENT_RESERVED' = 'REPLACEMENT_RESERVED'
+    if (isReadyToPick) {
+      poolCategory = 'REPLACEMENT_AVAILABLE'
+    } else if (isStandbyAvailable) {
+      poolCategory = 'AVAILABLE_USE'
+    }
 
     const targetVin = (r.ReservedTargetVinNo as string) || null
 
@@ -227,6 +235,8 @@ export async function getReplacementPoolCars(
       location: (r.Location as string) || null,
       isReserved,
       isReadyToPick,
+      isStandbyAvailable,
+      poolCategory,
       reservedTargetVinNo: targetVin,
       reservedTargetRegisterNo: targetVin ? targetRegMap.get(targetVin) || targetVin : null,
       reservedReleaseDate: r.ReservedReleaseDate ? new Date(r.ReservedReleaseDate as string).toISOString() : null,
@@ -239,8 +249,10 @@ export async function getReplacementPoolCars(
 
   // Apply reservation filter if specified
   if (options.reservationType && options.reservationType !== 'ALL') {
-    if (options.reservationType === 'READY') {
+    if (options.reservationType === 'READY' || options.reservationType === 'REPLACEMENT_AVAILABLE') {
       mapped = mapped.filter(r => r.isReadyToPick)
+    } else if (options.reservationType === 'STANDBY' || options.reservationType === 'AVAILABLE_USE') {
+      mapped = mapped.filter(r => r.isStandbyAvailable)
     } else if (options.reservationType === 'RESERVED_LINEMAN') {
       mapped = mapped.filter(r => (r.reservedType || '').toLowerCase().includes('line') || (r.reservedRemark || '').toLowerCase().includes('lineman') || (r.reservedRemark || '').includes('ไลน์แมน'))
     } else if (options.reservationType === 'RESERVED_OTHERS') {
@@ -277,6 +289,7 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       totalFleet: 0,
       activeInUse: 0,
       readyToPick: 0,
+      availableUseStandby: 0,
       reservedLineman: 0,
       reservedOthers: 0,
       reservedUnassigned: 0,
@@ -314,6 +327,7 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
 
     // 2. Count Fleet Pool cars by calling GetEV_CarForReplacement
     let readyToPick = 0
+    let availableUseStandby = 0
     let reservedLineman = 0
     let reservedOthers = 0
     let reservedUnassigned = 0
@@ -329,11 +343,16 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
 
       const cars = (poolCars.recordset || []) as Record<string, unknown>[]
       cars.forEach((c) => {
-        const isReserved = ((c.StatusType as string) || '').toLowerCase().includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
-        const isAvailable = (((c.StatusType as string) || '').toLowerCase().includes('available') || ((c.Status as string) || '').toLowerCase() === 'available') && !isReserved
+        const sType = ((c.StatusType as string) || '').toLowerCase()
+        const s = ((c.Status as string) || '').toLowerCase()
+        const isReserved = sType.includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
+        const isReady = (sType.includes('replacement available') || (s === 'replacement' && sType.includes('available'))) && !isReserved
+        const isStandby = (sType.includes('available use') || s === 'available') && !isReserved
 
-        if (isAvailable) {
+        if (isReady) {
           readyToPick++
+        } else if (isStandby) {
+          availableUseStandby++
         } else if (isReserved) {
           const rType = (((c.ReservedType as string) || '') + ' ' + ((c.ReservedRemark as string) || '')).toLowerCase()
           if (rType.includes('line') || rType.includes('lineman') || rType.includes('ไลน์แมน')) {
@@ -374,9 +393,10 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
     })
 
     return {
-      totalFleet: Math.max(totalFleetCount, activeInUse + readyToPick + reservedLineman + reservedOthers),
+      totalFleet: Math.max(totalFleetCount, activeInUse + readyToPick + availableUseStandby + reservedLineman + reservedOthers),
       activeInUse,
       readyToPick,
+      availableUseStandby,
       reservedLineman,
       reservedOthers,
       reservedUnassigned,
@@ -390,6 +410,7 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
       totalFleet: 0,
       activeInUse: 0,
       readyToPick: 0,
+      availableUseStandby: 0,
       reservedLineman: 0,
       reservedOthers: 0,
       reservedUnassigned: 0,
