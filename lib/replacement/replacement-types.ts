@@ -50,7 +50,7 @@ export interface ReplacementPoolCar {
   isReserved: boolean
   isReadyToPick: boolean
   isStandbyAvailable: boolean
-  poolCategory: 'REPLACEMENT_AVAILABLE' | 'AVAILABLE_USE' | 'REPLACEMENT_RESERVED'
+  poolCategory: 'REPLACEMENT_AVAILABLE' | 'AVAILABLE_USE' | 'REPLACEMENT_RESERVED' | 'MAINTENANCE'
   reservedTargetVinNo: string | null
   reservedTargetRegisterNo?: string | null
   reservedReleaseDate: string | null

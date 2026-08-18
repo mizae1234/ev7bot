@@ -104,6 +104,7 @@ export function ReplacementFilters({
               <option value="RESERVED_LINEMAN">🟢 จองให้ Line Man</option>
               <option value="RESERVED_OTHERS">🟡 จองให้คันหลักอื่นๆ</option>
               <option value="RESERVED_UNASSIGNED">⚪ จองแบบไม่ระบุทะเบียน (โควตากลาง)</option>
+              <option value="MAINTENANCE">🛠️ รถทดแทนเข้าซ่อม (In Maintenance)</option>
             </select>
           </div>
         )}

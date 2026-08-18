@@ -251,12 +251,78 @@ export async function getReplacementPoolCars(
     }
   })
 
+  // Also fetch maintenance replacement cars from EV_InventoryItem
+  if (!options.status || options.status === 'ALL' || options.status === 'MAINTENANCE') {
+    try {
+      const maintRes = await pool.request().query(`
+        SELECT 
+          i.InventoryItemID,
+          i.VinNo,
+          i.RegisterNo,
+          i.Model,
+          i.Exterior_Color,
+          i.Interior_Color,
+          i.Lot,
+          i.Project,
+          i.Status,
+          i.StatusType,
+          ISNULL(locSub.StatusName, i.CurrentLocation) AS Location
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN dbo.EV_MsSubStatus locSub ON i.CurrentLocation = locSub.StatusCode AND locSub.Type = 'LOCATION'
+        WHERE i.IsActive = 1 
+          AND (i.Status = 'MAINTENANCE' OR i.StatusType LIKE '%MAINTENANCE%')
+          AND (i.Status = 'REPLACEMENT' OR i.StatusType LIKE '%REPLACEMENT%')
+      `)
+
+      const maintCars: ReplacementPoolCar[] = (maintRes.recordset || []).map((r: Record<string, unknown>) => ({
+        inventoryItemId: String(r.InventoryItemID || ''),
+        vinNo: (r.VinNo as string) || '',
+        registerNo: (r.RegisterNo as string) || null,
+        model: (r.Model as string) || null,
+        exteriorColor: (r.Exterior_Color as string) || null,
+        interiorColor: (r.Interior_Color as string) || null,
+        lot: (r.Lot as string) || null,
+        project: (r.Project as string) || null,
+        status: (r.Status as string) || 'MAINTENANCE',
+        statusType: (r.StatusType as string) || 'REPLACEMENT_MAINTENANCE',
+        location: (r.Location as string) || null,
+        isReserved: false,
+        isReadyToPick: false,
+        isStandbyAvailable: false,
+        poolCategory: 'MAINTENANCE',
+        reservedTargetVinNo: null,
+        reservedTargetRegisterNo: null,
+        reservedReleaseDate: null,
+        reservedRemark: null,
+        reservedType: null,
+        customerName: null
+      }))
+
+      mapped.push(...maintCars)
+    } catch (e) {
+      console.error('Failed to fetch maintenance replacement cars:', e)
+    }
+  }
+
+  // Apply search query if specified
+  if (options.search) {
+    const q = options.search.toLowerCase().trim()
+    mapped = mapped.filter(r =>
+      (r.registerNo && r.registerNo.toLowerCase().includes(q)) ||
+      (r.vinNo && r.vinNo.toLowerCase().includes(q)) ||
+      (r.model && r.model.toLowerCase().includes(q)) ||
+      (r.location && r.location.toLowerCase().includes(q))
+    )
+  }
+
   // Apply reservation filter if specified
   if (options.reservationType && options.reservationType !== 'ALL') {
     if (options.reservationType === 'READY' || options.reservationType === 'REPLACEMENT_AVAILABLE') {
       mapped = mapped.filter(r => r.isReadyToPick)
     } else if (options.reservationType === 'STANDBY' || options.reservationType === 'AVAILABLE_USE') {
       mapped = mapped.filter(r => r.isStandbyAvailable)
+    } else if (options.reservationType === 'MAINTENANCE') {
+      mapped = mapped.filter(r => r.poolCategory === 'MAINTENANCE' || r.status === 'MAINTENANCE' || (r.statusType || '').includes('MAINTENANCE'))
     } else if (options.reservationType === 'RESERVED_LINEMAN') {
       mapped = mapped.filter(r => (r.reservedType || '').toLowerCase().includes('line') || (r.reservedRemark || '').toLowerCase().includes('lineman') || (r.reservedRemark || '').includes('ไลน์แมน'))
     } else if (options.reservationType === 'RESERVED_OTHERS') {

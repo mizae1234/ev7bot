@@ -85,7 +85,7 @@ export function ReplacementStatsCards({
     },
     {
       id: 'REPLACEMENT_MAINTENANCE',
-      targetTab: 'ACTIVE' as const,
+      targetTab: 'POOL' as const,
       filterKey: 'MAINTENANCE',
       title: 'รถทดแทนเข้าซ่อม',
       desc: 'รถสำรอง/ทดแทนที่อยู่ระหว่างซ่อม',

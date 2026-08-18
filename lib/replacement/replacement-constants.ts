@@ -107,6 +107,18 @@ export function getPoolCarBadge(
     }
   }
 
+  // 0. Maintenance (รถทดแทนเข้าซ่อม)
+  if (s === 'MAINTENANCE' || st.includes('MAINTENANCE') || st.includes('REPLACEMENT_MAINTENANCE')) {
+    return {
+      label: 'รถทดแทนเข้าซ่อม (In Maintenance)',
+      bg: 'bg-orange-50 dark:bg-orange-950/40',
+      text: 'text-orange-700 dark:text-orange-300 font-medium',
+      border: 'border-orange-300 dark:border-orange-800',
+      dot: 'bg-orange-500',
+      category: 'MAINTENANCE'
+    }
+  }
+
   // 1. Replacement Available (รถทดแทนพร้อมใช้งานทันที)
   if (isReadyToPick || st.includes('REPLACEMENT_AVAILABLE') || st.includes('REPLACEMENT AVAILABLE')) {
     return {
