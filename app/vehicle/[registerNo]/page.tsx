@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
+import { VehicleTimeline, VehicleTimelineEvent } from '@/components/vehicle/VehicleTimeline'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ interface VehicleData {
   rentHistory: RentInfo[]
   maintenance: MaintenanceInfo[]
   returns: ReturnInfo[]
+  timeline?: VehicleTimelineEvent[]
 }
 
 // ─── Helper Functions ──────────────────────────────────────────────
@@ -261,6 +263,13 @@ function VehicleDetailContent() {
             </div>
           )}
         </div>
+
+        {/* ── Vehicle Activity Timeline ── */}
+        <VehicleTimeline
+          events={data.timeline || []}
+          registerNo={car.RegisterNo}
+          vinNo={car.VinNo}
+        />
 
         {/* ── General Vehicle Notes ── */}
         <VehicleNotesSection

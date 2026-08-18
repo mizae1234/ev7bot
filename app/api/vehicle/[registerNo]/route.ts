@@ -144,8 +144,28 @@ export async function GET(
     const notesReq = pool.request()
     notesReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
 
-    // Execute rent history, maintenance records, return history, car sub-statuses, and insurance options concurrently
-    const [rentResult, maintResult, returnResult, carStatusesResult, insuranceResult, problemTypesResult, notesResult] = await Promise.all([
+    const repossessReq = pool.request()
+    repossessReq.input('vinNo', sql.VarChar, car.VinNo)
+
+    const replPoolReq = pool.request()
+    replPoolReq.input('vinNo', sql.VarChar, car.VinNo)
+
+    const inspectReq = pool.request()
+    inspectReq.input('vinNo', sql.VarChar, car.VinNo)
+
+    // Execute all sub-queries concurrently
+    const [
+      rentResult,
+      maintResult,
+      returnResult,
+      carStatusesResult,
+      insuranceResult,
+      problemTypesResult,
+      notesResult,
+      repossessResult,
+      replPoolResult,
+      inspectResult
+    ] = await Promise.all([
       rentReq.query(`
         SELECT
           v.RentItemID, v.ContractNo, v.ContractType,
@@ -217,7 +237,44 @@ export async function GET(
         LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
         WHERE n.InventoryItemID = @inventoryItemId AND n.IsActive = 1
         ORDER BY n.CreateDate DESC
-      `)
+      `),
+      repossessReq.query(`
+        SELECT 
+          r.RepossessID, r.VinNo, r.ContractNo, r.RepossessDate,
+          r.RepossessLocation, r.Remark, r.CreateDate,
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.UserName) AS CreateUserName
+        FROM dbo.EV_VehicleRepossess r
+        LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
+        WHERE r.VinNo = @vinNo AND r.IsActive = 1
+        ORDER BY r.RepossessDate DESC
+      `).catch(() => ({ recordset: [] })),
+      replPoolReq.query(`
+        SELECT 
+          r.ReplacementItemID, r.MaintenanceItemID, r.VinNo,
+          r.ReplacementStartDate, r.ReplacementReturnDate,
+          r.Location, r.Remark, r.IsActive, r.CreateDate,
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.UserName) AS CreateUserName,
+          m.IssueTitle, m.CarStatusCode,
+          mainCar.RegisterNo AS MainRegisterNo,
+          mainCar.VinNo AS MainVinNo,
+          mainCar.Model AS MainModel
+        FROM dbo.EV_ReplacementItem r
+        JOIN dbo.EV_MaintenanceItem m ON r.MaintenanceItemID = m.MaintenanceItemID
+        LEFT JOIN dbo.EV_InventoryItem mainCar ON m.InventoryItemID = mainCar.InventoryItemID
+        LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
+        WHERE r.VinNo = @vinNo
+        ORDER BY r.ReplacementStartDate DESC
+      `).catch(() => ({ recordset: [] })),
+      inspectReq.query(`
+        SELECT 
+          ir.InspectionID, ir.VinNo, ir.RegisterNo, ir.CustomerName, ir.InspectionDate, ir.Location,
+          ir.Status, ir.ReturnReason, ir.AssessmentResult, ir.InspectorName, ir.Mileage, ir.CreateDate,
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', u.LastName))), ''), u.UserName) AS CreateUserName
+        FROM dbo.EV_InspectionReturn ir
+        LEFT JOIN dbo.EV_User u ON ir.CreateUserID = u.UserID
+        WHERE ir.VinNo = @vinNo
+        ORDER BY ir.InspectionDate DESC
+      `).catch(() => ({ recordset: [] }))
     ])
 
     // 4. ดึงรถทดแทน (ถ้ามี), การติดตามงานซ่อม, และไฟล์แนบ สำหรับแต่ละงานซ่อม
@@ -523,6 +580,249 @@ export async function GET(
       console.error('[Vehicle API] Error fetching replacement reservation:', reservedErr)
     }
 
+    // ─── Unified Activity Timeline Builder ─────────────────────────────────────────
+    const timeline: Array<{
+      id: string
+      date: string
+      category: 'RENT' | 'RETURN' | 'REPOSSESS' | 'MAINTENANCE' | 'FOLLOW_UP' | 'REPLACEMENT' | 'NOTE'
+      title: string
+      subtitle?: string | null
+      description?: string | null
+      badge: string
+      badgeColor: 'blue' | 'emerald' | 'rose' | 'amber' | 'purple' | 'indigo' | 'zinc'
+      icon: string
+      location?: string | null
+      user?: string | null
+      relatedRegisterNo?: string | null
+      relatedVin?: string | null
+      meta?: Record<string, unknown>
+    }> = []
+
+    // 1. Rent History Events
+    rentResult.recordset.forEach((r: Record<string, unknown>, idx: number) => {
+      const custName = maskFullName(`${r.FirstName || ''} ${r.LastName || ''}`.trim())
+      const phone = maskPhone(r.PhoneNo as string)
+      
+      if (r.ReleaseDate) {
+        timeline.push({
+          id: `rent-rel-${r.RentItemID || idx}`,
+          date: new Date(r.ReleaseDate as string).toISOString(),
+          category: 'RENT',
+          title: `🚗 ส่งมอบ/ปล่อยรถให้ลูกค้า`,
+          subtitle: `สัญญาเลขที่ ${r.ContractNo || '-'}`,
+          description: `ผู้เช่า: ${custName} (${phone}) | ประเภท: ${r.ContractType || r.RentType || '-'}`,
+          badge: 'ปล่อยรถ',
+          badgeColor: 'emerald',
+          icon: '🚗',
+          user: null,
+          meta: { contractNo: r.ContractNo, rentItemId: r.RentItemID }
+        })
+      }
+
+      if (r.ContractCancellationDate) {
+        timeline.push({
+          id: `rent-cancel-${r.RentItemID || idx}`,
+          date: new Date(r.ContractCancellationDate as string).toISOString(),
+          category: 'RENT',
+          title: `📄 บอกเลิก/สิ้นสุดสัญญาเช่า`,
+          subtitle: `สัญญาเลขที่ ${r.ContractNo || '-'}`,
+          description: `ลูกค้ายกเลิก/สิ้นสุดสัญญา (${custName})`,
+          badge: 'ยกเลิกสัญญา',
+          badgeColor: 'rose',
+          icon: '📄',
+          user: null,
+          meta: { contractNo: r.ContractNo, rentItemId: r.RentItemID }
+        })
+      }
+    })
+
+    // 2. Repossessions
+    repossessResult.recordset.forEach((rep: Record<string, unknown>, idx: number) => {
+      timeline.push({
+        id: `repossess-${rep.RepossessID || idx}`,
+        date: rep.RepossessDate ? new Date(rep.RepossessDate as string).toISOString() : new Date(rep.CreateDate as string).toISOString(),
+        category: 'REPOSSESS',
+        title: `🚨 ยึดคืนรถยนต์`,
+        subtitle: rep.RepossessLocation ? `สถานที่ยึด: ${rep.RepossessLocation}` : 'บันทึกยึดคืนรถ',
+        description: rep.Remark ? String(rep.Remark) : (rep.ContractNo ? `สัญญา: ${rep.ContractNo}` : 'ดำเนินการยึดคืนรถยนต์เข้าสู่ระบบ'),
+        badge: 'ยึดรถ',
+        badgeColor: 'rose',
+        icon: '🚨',
+        location: (rep.RepossessLocation as string) || null,
+        user: (rep.CreateUserName as string) || null,
+        meta: { contractNo: rep.ContractNo, repossessId: rep.RepossessID }
+      })
+    })
+
+    // 3. Replacements as Pool (This car was given to another main vehicle)
+    replPoolResult.recordset.forEach((poolItem: Record<string, unknown>, idx: number) => {
+      if (poolItem.ReplacementStartDate) {
+        timeline.push({
+          id: `repl-pool-${poolItem.ReplacementItemID || idx}`,
+          date: new Date(poolItem.ReplacementStartDate as string).toISOString(),
+          category: 'REPLACEMENT',
+          title: `🚗🔄 นำไปเป็นรถทดแทนให้คันอื่น`,
+          subtitle: `จ่ายให้รถคันหลัก: ${poolItem.MainRegisterNo || poolItem.MainVinNo || '-'} (${poolItem.MainModel || '-'})`,
+          description: poolItem.IssueTitle ? `ใบแจ้งซ่อม #${poolItem.MaintenanceItemID}: ${poolItem.IssueTitle}` : `ใบแจ้งซ่อม #${poolItem.MaintenanceItemID}`,
+          badge: poolItem.ReplacementReturnDate ? 'เคยเป็นรถทดแทน' : 'เป็นรถทดแทนใช้งานอยู่',
+          badgeColor: poolItem.ReplacementReturnDate ? 'purple' : 'amber',
+          icon: '🚗🔄',
+          location: (poolItem.Location as string) || null,
+          user: (poolItem.CreateUserName as string) || null,
+          relatedRegisterNo: (poolItem.MainRegisterNo as string) || null,
+          relatedVin: (poolItem.MainVinNo as string) || null,
+          meta: { replacementItemId: poolItem.ReplacementItemID, maintenanceItemId: poolItem.MaintenanceItemID }
+        })
+      }
+
+      if (poolItem.ReplacementReturnDate) {
+        timeline.push({
+          id: `repl-pool-ret-${poolItem.ReplacementItemID || idx}`,
+          date: new Date(poolItem.ReplacementReturnDate as string).toISOString(),
+          category: 'REPLACEMENT',
+          title: `🔄 สิ้นสุดการเป็นรถทดแทน (ส่งคืนคลัง)`,
+          subtitle: `ส่งคืนจากเคสของรถคันหลัก ${poolItem.MainRegisterNo || poolItem.MainVinNo || '-'}`,
+          description: `ลูกค้านำรถทดแทนกลับมาส่งคืนเรียบร้อย`,
+          badge: 'คืนรถทดแทน',
+          badgeColor: 'emerald',
+          icon: '🔄',
+          user: (poolItem.CreateUserName as string) || null
+        })
+      }
+    })
+
+    // 4. Returns & Inspections
+    returnResult.recordset.forEach((ret: Record<string, unknown>, idx: number) => {
+      if (ret.ReturnDate) {
+        timeline.push({
+          id: `return-${ret.ReturnItemID || idx}`,
+          date: new Date(ret.ReturnDate as string).toISOString(),
+          category: 'RETURN',
+          title: `🔄 ตรวจรับคืนรถยนต์`,
+          subtitle: ret.ParkLocation ? `สถานที่จอดรับคืน: ${ret.ParkLocation}` : 'รับคืนรถยนต์',
+          description: `สัญญา: ${ret.ContractNo || '-'} | ลูกค้า: ${maskFullName(ret.CustomerName as string)}`,
+          badge: 'รับคืนรถ',
+          badgeColor: 'indigo',
+          icon: '🔄',
+          location: (ret.ParkLocation as string) || null,
+          meta: { returnItemId: ret.ReturnItemID, contractNo: ret.ContractNo }
+        })
+      }
+    })
+
+    inspectResult.recordset.forEach((ins: Record<string, unknown>, idx: number) => {
+      if (ins.InspectionDate) {
+        timeline.push({
+          id: `inspect-${ins.InspectionID || idx}`,
+          date: new Date(ins.InspectionDate as string).toISOString(),
+          category: 'RETURN',
+          title: `📋 ใบตรวจสภาพรับคืนรถ (Inspection #${ins.InspectionID})`,
+          subtitle: ins.Location ? `สถานที่ตรวจ: ${ins.Location}` : 'ตรวจสภาพรับคืนรถ',
+          description: `ผลประเมิน: ${ins.AssessmentResult || ins.Status || '-'} | ผู้ตรวจ: ${ins.InspectorName || ins.CreateUserName || '-'} ${ins.Mileage ? `| เลขไมล์: ${ins.Mileage} กม.` : ''}`,
+          badge: 'ตรวจสภาพ',
+          badgeColor: 'indigo',
+          icon: '📋',
+          location: (ins.Location as string) || null,
+          user: (ins.InspectorName as string) || (ins.CreateUserName as string) || null,
+          meta: { inspectionId: ins.InspectionID }
+        })
+      }
+    })
+
+    // 5. Maintenance Tickets
+    maintenance.forEach((m: Record<string, unknown>, idx: number) => {
+      const maintId = m.MaintenanceItemID || idx
+      
+      if (m.ReportDate) {
+        timeline.push({
+          id: `maint-rep-${maintId}`,
+          date: new Date(m.ReportDate as string).toISOString(),
+          category: 'MAINTENANCE',
+          title: `🔧 เปิดใบแจ้งซ่อม #${maintId}`,
+          subtitle: (m.IssueTitle as string) || 'แจ้งซ่อมบำรุง',
+          description: `สถานะ: ${m.CarStatusDescription} | อู่/ศูนย์: ${m.ServiceLocation} | ปัญหา: ${m.ProblemTypeDescription || '-'}`,
+          badge: (m.CarStatusDescription as string) || 'แจ้งซ่อม',
+          badgeColor: 'amber',
+          icon: '🔧',
+          location: (m.ServiceLocation as string) || null,
+          user: (m.CreateUserName as string) || null,
+          meta: { maintenanceItemId: maintId }
+        })
+      }
+
+      if (m.MaintenanceStartDate) {
+        timeline.push({
+          id: `maint-start-${maintId}`,
+          date: new Date(m.MaintenanceStartDate as string).toISOString(),
+          category: 'MAINTENANCE',
+          title: `🛠️ เริ่มดำเนินการซ่อม (ใบงาน #${maintId})`,
+          subtitle: `อู่/ศูนย์: ${m.ServiceLocation}`,
+          description: `ช่างเริ่มดำเนินการซ่อมตามอาการ: ${m.IssueTitle || '-'}`,
+          badge: 'เริ่มซ่อม',
+          badgeColor: 'blue',
+          icon: '🛠️',
+          location: (m.ServiceLocation as string) || null
+        })
+      }
+
+      if (m.MaintenanceFinishDate) {
+        timeline.push({
+          id: `maint-fin-${maintId}`,
+          date: new Date(m.MaintenanceFinishDate as string).toISOString(),
+          category: 'MAINTENANCE',
+          title: `✅ ซ่อมเสร็จสิ้น (ใบงาน #${maintId})`,
+          subtitle: `อู่/ศูนย์: ${m.ServiceLocation}`,
+          description: `งานซ่อมเสร็จสมบูรณ์ พร้อมส่งมอบหรือตรวจรับ`,
+          badge: 'ซ่อมเสร็จ',
+          badgeColor: 'emerald',
+          icon: '✅',
+          location: (m.ServiceLocation as string) || null
+        })
+      }
+
+      // Follow up logs
+      const fList = (m.followUps as Record<string, unknown>[]) || []
+      fList.forEach((f, fIdx) => {
+        const fDate = f.FollowUpDate || f.CreateDate
+        if (fDate) {
+          timeline.push({
+            id: `follow-${f.MaintenanceFollowUpID || `${maintId}-${fIdx}`}`,
+            date: new Date(fDate as string).toISOString(),
+            category: 'FOLLOW_UP',
+            title: `📝 ติดตามงานซ่อม (ใบงาน #${maintId})`,
+            subtitle: `ติดตามโดย: ${f.CreateUserName || '-'}`,
+            description: String(f.FollowUpDetail || '-'),
+            badge: 'ติดตามงาน',
+            badgeColor: 'blue',
+            icon: '📝',
+            user: (f.CreateUserName as string) || null
+          })
+        }
+      })
+    })
+
+    // 6. Vehicle Notes
+    notesResult.recordset.forEach((n: Record<string, unknown>, idx: number) => {
+      const detail = String(n.NoteDetail || '')
+      const isLocNote = detail.includes('ย้ายสถานที่') || detail.includes('📍')
+      timeline.push({
+        id: `note-${n.VehicleNoteID || idx}`,
+        date: new Date(n.CreateDate as string).toISOString(),
+        category: 'NOTE',
+        title: isLocNote ? `📍 บันทึกการย้ายสถานที่ / สถานะ` : `📌 บันทึกหมายเหตุประจำรถ`,
+        subtitle: `บันทึกโดย: ${n.CreateUserName || '-'}`,
+        description: detail,
+        badge: isLocNote ? 'ย้ายสถานที่' : 'โน้ตรถ',
+        badgeColor: isLocNote ? 'indigo' : 'zinc',
+        icon: isLocNote ? '📍' : '📌',
+        user: (n.CreateUserName as string) || null,
+        meta: { vehicleNoteId: n.VehicleNoteID }
+      })
+    })
+
+    // Sort timeline newest to oldest
+    timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
     return NextResponse.json({
       car: maskedCar,
       currentRent: maskedRent,
@@ -533,7 +833,8 @@ export async function GET(
       insuranceOptions: insuranceResult.recordset,
       problemTypes: problemTypesResult.recordset,
       vehicleNotes,
-      replacementReserved
+      replacementReserved,
+      timeline
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)
