@@ -48,48 +48,41 @@ function formatThaiDateTime(dateStr?: string | null): { dateStr: string; timeStr
   }
 }
 
-const COLOR_MAP: Record<string, { badge: string; dot: string; ring: string; border: string }> = {
+const COLOR_MAP: Record<string, { badge: string; dot: string; ring: string }> = {
   emerald: {
     badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60',
     dot: 'bg-emerald-500',
-    ring: 'ring-emerald-500/20',
-    border: 'border-emerald-500/30'
+    ring: 'ring-emerald-500/20'
   },
   rose: {
     badge: 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200/80 dark:border-rose-800/60',
     dot: 'bg-rose-500',
-    ring: 'ring-rose-500/20',
-    border: 'border-rose-500/30'
+    ring: 'ring-rose-500/20'
   },
   amber: {
     badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200/80 dark:border-amber-800/60',
     dot: 'bg-amber-500',
-    ring: 'ring-amber-500/20',
-    border: 'border-amber-500/30'
+    ring: 'ring-amber-500/20'
   },
   blue: {
     badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60',
     dot: 'bg-blue-500',
-    ring: 'ring-blue-500/20',
-    border: 'border-blue-500/30'
+    ring: 'ring-blue-500/20'
   },
   purple: {
     badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60',
     dot: 'bg-purple-500',
-    ring: 'ring-purple-500/20',
-    border: 'border-purple-500/30'
+    ring: 'ring-purple-500/20'
   },
   indigo: {
     badge: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60',
     dot: 'bg-indigo-500',
-    ring: 'ring-indigo-500/20',
-    border: 'border-indigo-500/30'
+    ring: 'ring-indigo-500/20'
   },
   zinc: {
     badge: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
     dot: 'bg-zinc-400',
-    ring: 'ring-zinc-400/20',
-    border: 'border-zinc-400/30'
+    ring: 'ring-zinc-400/20'
   }
 }
 
@@ -158,139 +151,136 @@ export function VehicleTimeline({ events = [], registerNo, vinNo }: VehicleTimel
   }, [events, selectedCategory, searchTerm, sortOrder])
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm overflow-hidden">
-      {/* 1. Header Bar */}
-      <div className="p-5 sm:p-6 border-b border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">🕒</span>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white">
-                ไทม์ไลน์ประวัติเหตุการณ์ของรถ (Vehicle Activity Timeline)
-              </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                รวมประวัติการปล่อยเช่า, คืนรถ, ยึดรถ, งานซ่อม, ประวัติรถทดแทน และบันทึกโน้ต เรียงตามลำดับเวลา
-              </p>
-            </div>
+    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs overflow-hidden">
+      {/* 1. Header Bar (Compact) */}
+      <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🕒</span>
+          <div>
+            <h3 className="text-xs font-bold text-zinc-900 dark:text-white">
+              ไทม์ไลน์ประวัติเหตุการณ์ ({filteredEvents.length} รายการ)
+            </h3>
           </div>
         </div>
 
         {/* Sort Toggle */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
-            title="สลับลำดับเวลา"
-          >
-            <span>{sortOrder === 'DESC' ? '⬇️ ล่าสุดก่อน (ใหม่ ➔ เก่า)' : '⬆️ เก่าสุดก่อน (เก่า ➔ ใหม่)'}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
+          className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer flex items-center gap-1 font-medium transition-colors"
+          title="สลับลำดับเวลา"
+        >
+          <span>{sortOrder === 'DESC' ? 'ล่าสุดก่อน ⬇️' : 'เก่าสุดก่อน ⬆️'}</span>
+        </button>
       </div>
 
-      {/* 2. Filter Pills & Search */}
-      <div className="px-5 py-3.5 bg-zinc-50/70 dark:bg-zinc-800/30 border-b border-zinc-100 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* 2. Filter Pills & Search (Compact) */}
+      <div className="px-3.5 py-2 bg-zinc-50/70 dark:bg-zinc-800/30 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
         {/* Pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap text-xs">
           <button
             type="button"
             onClick={() => setSelectedCategory('ALL')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
               selectedCategory === 'ALL'
                 ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
             }`}
           >
-            🌟 ทั้งหมด ({counts.ALL})
+            ทั้งหมด ({counts.ALL})
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('RENT_RETURN')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedCategory === 'RENT_RETURN'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            🚗 ปล่อย/คืนรถ ({counts.RENT_RETURN})
-          </button>
+          {counts.RENT_RETURN > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('RENT_RETURN')}
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedCategory === 'RENT_RETURN'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
+              }`}
+            >
+              🚗 ปล่อย/คืน ({counts.RENT_RETURN})
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('REPOSSESS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedCategory === 'REPOSSESS'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            🚨 ยึดรถ ({counts.REPOSSESS})
-          </button>
+          {counts.REPOSSESS > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('REPOSSESS')}
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedCategory === 'REPOSSESS'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
+              }`}
+            >
+              🚨 ยึดรถ ({counts.REPOSSESS})
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('REPLACEMENT')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedCategory === 'REPLACEMENT'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            🚗🔄 รถทดแทน ({counts.REPLACEMENT})
-          </button>
+          {counts.REPLACEMENT > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('REPLACEMENT')}
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedCategory === 'REPLACEMENT'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
+              }`}
+            >
+              🔄 รถทดแทน ({counts.REPLACEMENT})
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('MAINTENANCE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedCategory === 'MAINTENANCE'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            🔧 งานซ่อม ({counts.MAINTENANCE})
-          </button>
+          {counts.MAINTENANCE > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('MAINTENANCE')}
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedCategory === 'MAINTENANCE'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
+              }`}
+            >
+              🔧 ซ่อม ({counts.MAINTENANCE})
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('NOTE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedCategory === 'NOTE'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
-            }`}
-          >
-            📌 โน้ต & สถานที่ ({counts.NOTE})
-          </button>
+          {counts.NOTE > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('NOTE')}
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                selectedCategory === 'NOTE'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200/60 dark:border-zinc-700/60'
+              }`}
+            >
+              📌 โน้ต ({counts.NOTE})
+            </button>
+          )}
         </div>
 
         {/* Quick Search */}
-        <div className="relative w-full md:w-56">
-          <svg className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+        <div className="relative w-full sm:w-44">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ค้นหาในไทม์ไลน์..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            placeholder="🔍 ค้นหาในไทม์ไลน์..."
+            className="w-full px-2.5 py-1 rounded-lg text-[11px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
           />
         </div>
       </div>
 
-      {/* 3. Timeline Stream */}
-      <div className="p-5 sm:p-7">
+      {/* 3. Compact Stream Timeline */}
+      <div className="p-4 sm:p-4.5">
         {filteredEvents.length === 0 ? (
-          <div className="py-12 text-center">
-            <span className="text-3xl">📭</span>
-            <p className="mt-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-              {events.length === 0 ? 'ยังไม่มีประวัติเหตุการณ์ที่บันทึกไว้สำหรับคันนี้' : 'ไม่พบเหตุการณ์ที่ตรงตามเงื่อนไขการค้นหา'}
-            </p>
+          <div className="py-6 text-center text-xs text-zinc-400">
+            {events.length === 0 ? 'ยังไม่มีประวัติเหตุการณ์ที่บันทึกไว้' : 'ไม่พบเหตุการณ์ตามเงื่อนไขที่ค้นหา'}
           </div>
         ) : (
-          <div className="relative pl-6 sm:pl-8 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-6 sm:space-y-7 ml-3 sm:ml-4">
+          <div className="relative pl-4 sm:pl-5 border-l-2 border-zinc-200 dark:border-zinc-750 space-y-3 ml-1.5 sm:ml-2">
             {filteredEvents.map((evt) => {
               const { dateStr, timeStr } = formatThaiDateTime(evt.date)
               const color = COLOR_MAP[evt.badgeColor] || COLOR_MAP.zinc
@@ -298,73 +288,66 @@ export function VehicleTimeline({ events = [], registerNo, vinNo }: VehicleTimel
               return (
                 <div key={evt.id} className="relative group">
                   {/* Node Dot */}
-                  <div className={`absolute -left-[31px] sm:-left-[39px] top-1.5 w-4 h-4 rounded-full border-2 border-white dark:border-zinc-900 ${color.dot} ring-4 ${color.ring} transition-transform group-hover:scale-125`} />
+                  <div className={`absolute -left-[23px] sm:-left-[27px] top-1.5 w-2.5 h-2.5 rounded-full border border-white dark:border-zinc-900 ${color.dot} ring-2 ${color.ring}`} />
 
-                  {/* Event Card */}
-                  <div className="p-4 sm:p-5 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-800/40 hover:bg-white dark:hover:bg-zinc-800/80 hover:shadow-md transition-all space-y-2.5">
-                    {/* Top Row: Timestamp & Badge */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white">
-                          📅 {dateStr}
+                  {/* Compact Event Card */}
+                  <div className="p-2.5 sm:p-3 rounded-xl border border-zinc-200/70 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-white dark:hover:bg-zinc-800/70 transition-all space-y-1 text-xs">
+                    {/* Top Row: Date + Badge on Left | User on Right */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">
+                          {dateStr}
                         </span>
                         {timeStr && (
-                          <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/50 px-2 py-0.5 rounded-md">
-                            ⏰ {timeStr}
+                          <span className="font-mono text-[10.5px] text-zinc-400 bg-zinc-200/60 dark:bg-zinc-700/50 px-1.5 py-0.2 rounded">
+                            {timeStr}
                           </span>
                         )}
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${color.badge}`}>
+                          {evt.icon} {evt.badge}
+                        </span>
                       </div>
 
-                      <span className={`px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold border ${color.badge}`}>
-                        {evt.icon} {evt.badge}
-                      </span>
+                      {evt.user && (
+                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium shrink-0">
+                          โดย {evt.user}
+                        </span>
+                      )}
                     </div>
 
                     {/* Title & Subtitle */}
-                    <div>
-                      <h3 className="text-sm font-extrabold text-zinc-900 dark:text-white">
+                    <div className="text-xs text-zinc-800 dark:text-zinc-200 leading-snug">
+                      <strong className="font-semibold text-zinc-900 dark:text-white">
                         {evt.title}
-                      </h3>
+                      </strong>
                       {evt.subtitle && (
-                        <p className="text-xs font-medium text-zinc-600 dark:text-zinc-300 mt-0.5">
-                          {evt.subtitle}
-                        </p>
+                        <span className="text-zinc-600 dark:text-zinc-400 ml-1">
+                          — {evt.subtitle}
+                        </span>
                       )}
                     </div>
 
-                    {/* Description Details */}
+                    {/* Description Details (Compact) */}
                     {evt.description && (
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap bg-white/80 dark:bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+                      <div className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed pt-0.5">
                         {evt.description}
-                      </p>
+                      </div>
                     )}
 
-                    {/* Bottom Metadata: Location, User, Related Link */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-zinc-500 dark:text-zinc-400 border-t border-zinc-200/40 dark:border-zinc-800/40">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {evt.location && (
-                          <span className="flex items-center gap-1 font-medium text-zinc-700 dark:text-zinc-300">
-                            <span>📍</span>
-                            <span>{evt.location}</span>
-                          </span>
-                        )}
-                        {evt.user && (
-                          <span className="flex items-center gap-1">
-                            <span>👤</span>
-                            <span>โดย: {evt.user}</span>
-                          </span>
+                    {/* Location & Related Link */}
+                    {(evt.location || evt.relatedRegisterNo) && (
+                      <div className="flex items-center justify-between text-[10.5px] text-zinc-400 pt-1 border-t border-zinc-200/40 dark:border-zinc-800/40">
+                        {evt.location ? <span>📍 {evt.location}</span> : <span />}
+                        {evt.relatedRegisterNo && (
+                          <Link
+                            href={`/vehicle/${evt.relatedRegisterNo}`}
+                            className="font-semibold text-rose-600 dark:text-rose-400 hover:underline"
+                          >
+                            🚗 ดูรถคันหลัก ({evt.relatedRegisterNo}) ↗
+                          </Link>
                         )}
                       </div>
-
-                      {evt.relatedRegisterNo && (
-                        <Link
-                          href={`/vehicle/${evt.relatedRegisterNo}`}
-                          className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400 hover:underline"
-                        >
-                          <span>🚗 ดูรถคันหลัก ({evt.relatedRegisterNo}) ↗</span>
-                        </Link>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
               )
