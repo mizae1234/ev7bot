@@ -79,33 +79,21 @@ const navGroups: NavGroup[] = [
     ]
   },
   {
-    id: 'fleet',
-    label: 'กองรถ & อะไหล่',
-    icon: '🚘',
+    id: 'operations',
+    label: 'งานส่งมอบ & บันทึก',
+    icon: '🚚',
     items: [
       {
-        name: 'ข้อมูลยานพาหนะ (Vehicles)',
-        href: '/vehicle',
-        desc: 'ค้นหาและตรวจสอบข้อมูลรถยนต์ ทะเบียน และสถานะ',
-        icon: '🚘'
+        name: 'งานส่งมอบรถยนต์ (Delivery Cases)',
+        href: '/case-delivery',
+        desc: 'จัดการเคสและการส่งมอบรถให้ลูกค้า',
+        icon: '🚚'
       },
       {
         name: 'บันทึกหมายเหตุรถ (Vehicle Notes)',
         href: '/vehicle-notes',
         desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
         icon: '📝'
-      },
-      {
-        name: 'ระบบเบิกจ่ายอะไหล่ (Spare Parts)',
-        href: '/spare-parts',
-        desc: 'คลังอะไหล่และการเบิกจ่ายอะไหล่ซ่อมบำรุง',
-        icon: '📦'
-      },
-      {
-        name: 'งานส่งมอบรถยนต์ (Delivery Cases)',
-        href: '/case-delivery',
-        desc: 'จัดการเคสและการส่งมอบรถให้ลูกค้า',
-        icon: '🚚'
       }
     ]
   }
