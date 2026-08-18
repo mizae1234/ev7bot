@@ -3,20 +3,22 @@ import {
   getInsuranceMasterTypes,
   getInsuranceCompanies,
   getDistinctModels,
-  getDistinctProjects
+  getDistinctProjects,
+  getDistinctProjectTypes
 } from '@/lib/policy/policy-service'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const [masterTypes, companies, models, projects] = await Promise.all([
+    const [masterTypes, companies, models, projects, projectTypes] = await Promise.all([
       getInsuranceMasterTypes(),
       getInsuranceCompanies(),
       getDistinctModels(),
-      getDistinctProjects()
+      getDistinctProjects(),
+      getDistinctProjectTypes()
     ])
-    return NextResponse.json({ masterTypes, companies, models, projects })
+    return NextResponse.json({ masterTypes, companies, models, projects, projectTypes })
   } catch (err: any) {
     console.error('[GET /api/policy/master Error]', err)
     return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล Master' }, { status: 500 })

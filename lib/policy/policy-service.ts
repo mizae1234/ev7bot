@@ -101,6 +101,28 @@ export async function getDistinctProjects(): Promise<string[]> {
 }
 
 /**
+ * 1.4 Fetch Distinct Project Types from dbo.EV_InventoryItem
+ */
+export async function getDistinctProjectTypes(): Promise<string[]> {
+  try {
+    const pool = await getMSSQLReadOnlyPool()
+    if (!pool) return []
+
+    const result = await pool.request().query(`
+      SELECT DISTINCT ProjectType
+      FROM dbo.EV_InventoryItem
+      WHERE ProjectType IS NOT NULL AND RTRIM(LTRIM(ProjectType)) <> '' AND IsActive = 1
+      ORDER BY ProjectType ASC
+    `)
+
+    return result.recordset.map((r: { ProjectType: string }) => r.ProjectType.trim()).filter(Boolean)
+  } catch (err) {
+    console.error('[getDistinctProjectTypes Error]', err)
+    return []
+  }
+}
+
+/**
  * 2. Get Paginated Policy & Tax List with Filtering
  */
 export async function getPolicyList(params: {
@@ -110,6 +132,7 @@ export async function getPolicyList(params: {
   typeFilter?: string    // 'ALL' | 'DV1' | 'DV2' | 'DV3' | 'DV5' | 'DAC'
   categoryFilter?: string // 'ALL' | 'INSURANCE' | 'ACT' | 'TAX' | 'METER'
   projectFilter?: string
+  projectTypeFilter?: string
   modelFilter?: string
   statusFilter?: string
   page?: number
@@ -146,7 +169,12 @@ export async function getPolicyList(params: {
 
   if (params.projectFilter && params.projectFilter !== 'ALL') {
     req.input('project', sql.NVarChar, params.projectFilter)
-    whereClause += ' AND (i.Project = @project OR i.ProjectType = @project)'
+    whereClause += ' AND i.Project = @project'
+  }
+
+  if (params.projectTypeFilter && params.projectTypeFilter !== 'ALL') {
+    req.input('projectType', sql.NVarChar, params.projectTypeFilter)
+    whereClause += ' AND i.ProjectType = @projectType'
   }
 
   if (params.modelFilter && params.modelFilter !== 'ALL') {

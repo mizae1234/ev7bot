@@ -108,7 +108,7 @@ export function PolicyTable({
                   <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
                     {rec.vinNo}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {rec.model && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
                         {rec.model}
@@ -117,6 +117,11 @@ export function PolicyTable({
                     {rec.project && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-medium border border-amber-200/50 dark:border-amber-800/40">
                         {rec.project}
+                      </span>
+                    )}
+                    {rec.projectType && rec.projectType !== rec.project && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-medium border border-purple-200/50 dark:border-purple-800/40">
+                        {rec.projectType}
                       </span>
                     )}
                   </div>

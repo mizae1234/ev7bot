@@ -49,6 +49,7 @@ function PolicyPageContent() {
   const [masterTypes, setMasterTypes] = useState<InsuranceMasterType[]>([])
   const [companies, setCompanies] = useState<InsuranceCompanyOption[]>([])
   const [projects, setProjects] = useState<string[]>([])
+  const [projectTypes, setProjectTypes] = useState<string[]>([])
   const [models, setModels] = useState<string[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -64,6 +65,7 @@ function PolicyPageContent() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [projectFilter, setProjectFilter] = useState('ALL')
+  const [projectTypeFilter, setProjectTypeFilter] = useState('ALL')
   const [modelFilter, setModelFilter] = useState('ALL')
 
   // Modals & Drawers
@@ -95,6 +97,7 @@ function PolicyPageContent() {
         if (data.companies) setCompanies(data.companies)
         if (data.models && Array.isArray(data.models)) setModels(data.models)
         if (data.projects && Array.isArray(data.projects)) setProjects(data.projects)
+        if (data.projectTypes && Array.isArray(data.projectTypes)) setProjectTypes(data.projectTypes)
       })
       .catch(err => console.error('Failed to load master types:', err))
   }, [])
@@ -113,6 +116,7 @@ function PolicyPageContent() {
       if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
+      if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
 
       const res = await fetch(`/api/policy?${query.toString()}`)
@@ -129,7 +133,7 @@ function PolicyPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, expiryFilter, missingFilter, statusFilter, typeFilter, projectFilter, modelFilter])
+  }, [page, search, expiryFilter, missingFilter, statusFilter, typeFilter, projectFilter, projectTypeFilter, modelFilter])
 
   useEffect(() => {
     fetchPolicies()
@@ -160,6 +164,10 @@ function PolicyPageContent() {
     setProjectFilter(val)
     setPage(1)
   }
+  const handleProjectTypeFilterChange = (val: string) => {
+    setProjectTypeFilter(val)
+    setPage(1)
+  }
   const handleModelFilterChange = (val: string) => {
     setModelFilter(val)
     setPage(1)
@@ -180,6 +188,7 @@ function PolicyPageContent() {
       if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
+      if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
 
       const res = await fetch(`/api/policy?${query.toString()}`)
@@ -192,6 +201,7 @@ function PolicyPageContent() {
         'เลขตัวถัง (VIN)': r.vinNo,
         'รุ่นรถ': r.model || '-',
         'โครงการ': r.project || '-',
+        'ประเภทโครงการ': r.projectType || '-',
         'สถานะรถ': r.statusName || r.status || '-',
         'สถานที่จอด': r.locationName || '-',
         'ประเภทประกัน': getInsuranceTypeLabel(r.insuranceType, r.insuranceTypeName),
@@ -305,10 +315,13 @@ function PolicyPageContent() {
             onTypeFilterChange={handleTypeFilterChange}
             projectFilter={projectFilter}
             onProjectFilterChange={handleProjectFilterChange}
+            projectTypeFilter={projectTypeFilter}
+            onProjectTypeFilterChange={handleProjectTypeFilterChange}
             modelFilter={modelFilter}
             onModelFilterChange={handleModelFilterChange}
             masterTypes={masterTypes}
             projects={projects}
+            projectTypes={projectTypes}
             models={models}
             onExportExcel={handleExportExcel}
             exportLoading={exportLoading}

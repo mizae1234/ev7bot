@@ -12,12 +12,15 @@ interface PolicyFiltersProps {
   onTypeFilterChange: (val: string) => void
   projectFilter: string
   onProjectFilterChange: (val: string) => void
+  projectTypeFilter?: string
+  onProjectTypeFilterChange?: (val: string) => void
   modelFilter: string
   onModelFilterChange: (val: string) => void
   statusFilter: string
   onStatusFilterChange: (val: string) => void
   masterTypes: InsuranceMasterType[]
   projects: string[]
+  projectTypes?: string[]
   models: string[]
   statuses?: { code: string; label: string }[]
   onExportExcel: () => void
@@ -35,12 +38,15 @@ export function PolicyFilters({
   onTypeFilterChange,
   projectFilter,
   onProjectFilterChange,
+  projectTypeFilter = 'ALL',
+  onProjectTypeFilterChange,
   modelFilter,
   onModelFilterChange,
   statusFilter,
   onStatusFilterChange,
   masterTypes,
   projects,
+  projectTypes = [],
   models,
   statuses,
   onExportExcel,
@@ -191,6 +197,20 @@ export function PolicyFilters({
           </select>
         )}
 
+        {/* 5.1 Project Type */}
+        {projectTypes && projectTypes.length > 0 && (
+          <select
+            value={projectTypeFilter}
+            onChange={(e) => onProjectTypeFilterChange && onProjectTypeFilterChange(e.target.value)}
+            className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          >
+            <option value="ALL">ประเภทโครงการ: ทั้งหมด</option>
+            {projectTypes.map(pt => (
+              <option key={pt} value={pt}>{pt}</option>
+            ))}
+          </select>
+        )}
+
         {/* 6. Model */}
         {models.length > 0 && (
           <select
@@ -206,7 +226,7 @@ export function PolicyFilters({
         )}
 
         {/* Clear Filters button */}
-        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || statusFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || modelFilter !== 'ALL') && (
+        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || statusFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || projectTypeFilter !== 'ALL' || modelFilter !== 'ALL') && (
           <button
             type="button"
             onClick={() => {
@@ -216,6 +236,7 @@ export function PolicyFilters({
               onStatusFilterChange('ALL')
               onTypeFilterChange('ALL')
               onProjectFilterChange('ALL')
+              if (onProjectTypeFilterChange) onProjectTypeFilterChange('ALL')
               onModelFilterChange('ALL')
             }}
             className="text-xs py-1 px-2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"

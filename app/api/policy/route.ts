@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const typeFilter = searchParams.get('typeFilter') || undefined
     const categoryFilter = searchParams.get('categoryFilter') || undefined
     const projectFilter = searchParams.get('projectFilter') || undefined
+    const projectTypeFilter = searchParams.get('projectTypeFilter') || undefined
     const modelFilter = searchParams.get('modelFilter') || undefined
     const statusFilter = searchParams.get('statusFilter') || undefined
     const page = parseInt(searchParams.get('page') || '1', 10)
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
       typeFilter,
       categoryFilter,
       projectFilter,
+      projectTypeFilter,
       modelFilter,
       statusFilter,
       page,
