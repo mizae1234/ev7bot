@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 
@@ -142,21 +143,24 @@ export function Navbar() {
           <div className="flex items-center gap-6 lg:gap-8">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2.5 group transition-transform active:scale-98"
+              className="flex items-center gap-3 group transition-transform active:scale-98"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:shadow-indigo-500/30 transition-all">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+              <div className="relative h-8 sm:h-9 flex items-center bg-white/60 dark:bg-white/95 px-2.5 py-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 shadow-xs group-hover:shadow-sm transition-all">
+                <Image
+                  src="/images/ev7-logo.png"
+                  alt="EV7 Logo"
+                  width={92}
+                  height={35}
+                  priority
+                  className="object-contain h-6 sm:h-7 w-auto"
+                />
               </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-zinc-900 via-indigo-950 to-zinc-900 dark:from-white dark:via-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">
-                    EV7 Operations
-                  </span>
-                </div>
-                <span className="text-[10px] text-zinc-400 font-medium tracking-tight">
-                  Fleet & Maintenance Tracking
+              <div className="hidden lg:flex flex-col">
+                <span className="font-extrabold text-xs tracking-tight text-zinc-800 dark:text-zinc-200">
+                  Operations
+                </span>
+                <span className="text-[9.5px] text-zinc-400 dark:text-zinc-500 font-medium tracking-tight -mt-0.5">
+                  Fleet & Maintenance
                 </span>
               </div>
             </Link>
