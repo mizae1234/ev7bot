@@ -704,6 +704,10 @@ export async function updateSinglePolicy(params: {
   vehicleTaxEndDate?: string | null
   meterTaxStartDate?: string | null
   meterTaxEndDate?: string | null
+  insuranceFilePath?: string | null
+  actFilePath?: string | null
+  vehicleTaxFilePath?: string | null
+  meterTaxFilePath?: string | null
   userId?: number | null
 }) {
   const pool = await getMSSQLWritePool()
@@ -717,14 +721,18 @@ export async function updateSinglePolicy(params: {
   req.input('insStart', sql.Date, params.insuranceStartDate ? new Date(params.insuranceStartDate) : null)
   req.input('insEnd', sql.Date, params.insuranceEndDate ? new Date(params.insuranceEndDate) : null)
   req.input('insComp', sql.NVarChar, params.insuranceCompany || null)
+  req.input('insFile', sql.VarChar, params.insuranceFilePath || null)
   req.input('actPolicyNo', sql.VarChar, params.actPolicyNo || null)
   req.input('actStart', sql.Date, params.actStartDate ? new Date(params.actStartDate) : null)
   req.input('actEnd', sql.Date, params.actEndDate ? new Date(params.actEndDate) : null)
   req.input('actComp', sql.NVarChar, params.actCompany || null)
+  req.input('actFile', sql.VarChar, params.actFilePath || null)
   req.input('vTaxStart', sql.Date, params.vehicleTaxStartDate ? new Date(params.vehicleTaxStartDate) : null)
   req.input('vTaxEnd', sql.Date, params.vehicleTaxEndDate ? new Date(params.vehicleTaxEndDate) : null)
+  req.input('vTaxFile', sql.VarChar, params.vehicleTaxFilePath || null)
   req.input('mTaxStart', sql.Date, params.meterTaxStartDate ? new Date(params.meterTaxStartDate) : null)
   req.input('mTaxEnd', sql.Date, params.meterTaxEndDate ? new Date(params.meterTaxEndDate) : null)
+  req.input('mTaxFile', sql.VarChar, params.meterTaxFilePath || null)
   req.input('userId', sql.Int, params.userId || 1)
 
   await req.query(`
@@ -737,14 +745,18 @@ export async function updateSinglePolicy(params: {
           InsuranceStartDate = @insStart,
           InsuranceEndDate = @insEnd,
           InsuranceCompany = @insComp,
+          InsuranceFilePath = COALESCE(@insFile, InsuranceFilePath),
           ActPolicyNo = @actPolicyNo,
           ActStartDate = @actStart,
           ActEndDate = @actEnd,
           ActCompany = @actComp,
+          ActFilePath = COALESCE(@actFile, ActFilePath),
           VehicleTaxStartDate = @vTaxStart,
           VehicleTaxEndDate = @vTaxEnd,
+          VehicleTaxFilePath = COALESCE(@vTaxFile, VehicleTaxFilePath),
           MeterTaxStartDate = @mTaxStart,
           MeterTaxEndDate = @mTaxEnd,
+          MeterTaxFilePath = COALESCE(@mTaxFile, MeterTaxFilePath),
           UpdateDate = GETDATE(),
           UpdateUserID = @userId
       WHERE VinNo = @vinNo;
@@ -752,14 +764,14 @@ export async function updateSinglePolicy(params: {
     ELSE
     BEGIN
       INSERT INTO dbo.EV_Policy (
-        VinNo, RegisterNo, InsurancePolicyNo, InsuranceType, InsuranceStartDate, InsuranceEndDate, InsuranceCompany,
-        ActPolicyNo, ActStartDate, ActEndDate, ActCompany, VehicleTaxStartDate, VehicleTaxEndDate,
-        MeterTaxStartDate, MeterTaxEndDate, IsActive, CreateDate, CreateUserID
+        VinNo, RegisterNo, InsurancePolicyNo, InsuranceType, InsuranceStartDate, InsuranceEndDate, InsuranceCompany, InsuranceFilePath,
+        ActPolicyNo, ActStartDate, ActEndDate, ActCompany, ActFilePath, VehicleTaxStartDate, VehicleTaxEndDate, VehicleTaxFilePath,
+        MeterTaxStartDate, MeterTaxEndDate, MeterTaxFilePath, IsActive, CreateDate, CreateUserID
       )
       VALUES (
-        @vinNo, @registerNo, @insPolicyNo, @insType, @insStart, @insEnd, @insComp,
-        @actPolicyNo, @actStart, @actEnd, @actComp, @vTaxStart, @vTaxEnd,
-        @mTaxStart, @mTaxEnd, 1, GETDATE(), @userId
+        @vinNo, @registerNo, @insPolicyNo, @insType, @insStart, @insEnd, @insComp, @insFile,
+        @actPolicyNo, @actStart, @actEnd, @actComp, @actFile, @vTaxStart, @vTaxEnd, @vTaxFile,
+        @mTaxStart, @mTaxEnd, @mTaxFile, 1, GETDATE(), @userId
       );
     END
   `)
