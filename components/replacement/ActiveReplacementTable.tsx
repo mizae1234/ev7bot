@@ -63,10 +63,15 @@ export function ActiveReplacementTable({
                   <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
                     {rec.replacementVin}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
                       {rec.replacementModel || 'Aion'}
                     </span>
+                    {rec.replacementStatus?.toUpperCase().includes('MAINTENANCE') && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-800">
+                        🛠️ ตัวรถทดแทนเข้าซ่อม
+                      </span>
+                    )}
                     {rec.replacementLocationName && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                         📍 {rec.replacementLocationName}

@@ -121,11 +121,15 @@ export async function getActiveReplacements(
 
   if (options.durationFilter && options.durationFilter !== 'ALL') {
     if (options.durationFilter === 'CRITICAL') {
-      allRows = allRows.filter(r => r.daysInUse > 30)
+      allRows = allRows.filter(r => r.daysInUse > 30 && !(r.replacementStatus || '').toUpperCase().includes('MAINTENANCE'))
     } else if (options.durationFilter === 'WARNING') {
-      allRows = allRows.filter(r => r.daysInUse >= 14 && r.daysInUse <= 30)
+      allRows = allRows.filter(r => r.daysInUse >= 14 && r.daysInUse <= 30 && !(r.replacementStatus || '').toUpperCase().includes('MAINTENANCE'))
     } else if (options.durationFilter === 'NORMAL') {
-      allRows = allRows.filter(r => r.daysInUse < 14)
+      allRows = allRows.filter(r => r.daysInUse < 14 && !(r.replacementStatus || '').toUpperCase().includes('MAINTENANCE'))
+    } else if (options.durationFilter === 'MAINTENANCE') {
+      allRows = allRows.filter(r => (r.replacementStatus || '').toUpperCase().includes('MAINTENANCE'))
+    } else if (options.durationFilter === 'ACTIVE_ONLY') {
+      allRows = allRows.filter(r => !(r.replacementStatus || '').toUpperCase().includes('MAINTENANCE'))
     }
   }
 
@@ -300,13 +304,16 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
   }
 
   try {
-    // 1. Count Active Replacements and Duration alerts
+    // 1. Count Active Replacements and Duration alerts (excluding maintenance)
     const activeRes = await pool.request().query(`
       SELECT 
         r.ReplacementItemID,
         r.ReplacementStartDate,
-        r.ReplacementReturnDate
+        r.ReplacementReturnDate,
+        replCar.Status AS replStatus,
+        replCar.StatusType AS replStatusType
       FROM dbo.EV_ReplacementItem r
+      LEFT JOIN dbo.EV_InventoryItem replCar ON r.VinNo = replCar.VinNo
       WHERE r.IsActive = 1 AND (r.ReplacementReturnDate IS NULL OR r.ReplacementReturnDate >= CAST(GETDATE() AS DATE))
     `)
 
@@ -316,12 +323,18 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
 
     const activeRows = (activeRes.recordset || []) as Record<string, unknown>[]
     activeRows.forEach((r) => {
-      activeInUse++
-      const days = calculateDaysInUse(r.ReplacementStartDate as string | null, r.ReplacementReturnDate as string | null)
-      if (days > 30) {
-        criticalDurationAlert++
-      } else if (days >= 14) {
-        warningDurationAlert++
+      const s = ((r.replStatus as string) || '').toUpperCase()
+      const st = ((r.replStatusType as string) || '').toUpperCase()
+      const isMaint = s === 'MAINTENANCE' || st.includes('MAINTENANCE')
+
+      if (!isMaint) {
+        activeInUse++
+        const days = calculateDaysInUse(r.ReplacementStartDate as string | null, r.ReplacementReturnDate as string | null)
+        if (days > 30) {
+          criticalDurationAlert++
+        } else if (days >= 14) {
+          warningDurationAlert++
+        }
       }
     })
 

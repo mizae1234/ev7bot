@@ -120,11 +120,10 @@ export function getPoolCarBadge(
     }
   }
 
-  // 2. Available Use (รถ Standby พร้อมแปลง)
+  // 2. Available Use (รถ Standby สามารถเปลี่ยนเป็นรถทดแทนได้)
   if (isStandbyAvailable || st.includes('AVAILABLE_USE') || st.includes('AVAILABLE USE') || s === 'AVAILABLE') {
     return {
-      label: 'Standby พร้อมแปลง (Available Use)',
-      subLabel: 'นำมาเปลี่ยนสถานะเป็นรถทดแทนได้',
+      label: 'Standby สามารถเปลี่ยนเป็นรถทดแทนได้',
       bg: 'bg-sky-50 dark:bg-sky-950/40',
       text: 'text-sky-700 dark:text-sky-300 font-medium',
       border: 'border-sky-200 dark:border-sky-800',

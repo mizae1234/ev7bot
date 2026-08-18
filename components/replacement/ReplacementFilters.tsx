@@ -100,7 +100,7 @@ export function ReplacementFilters({
             >
               <option value="ALL">🚗 สถานะคลัง / การจอง (ทั้งหมด)</option>
               <option value="READY">🟢 พร้อมใช้ทันที (Replacement Available)</option>
-              <option value="STANDBY">🔵 Standby พร้อมแปลง (Available Use)</option>
+              <option value="STANDBY">🔵 Standby สามารถเปลี่ยนเป็นรถทดแทนได้</option>
               <option value="RESERVED_LINEMAN">🟢 จองให้ Line Man</option>
               <option value="RESERVED_OTHERS">🟡 จองให้คันหลักอื่นๆ</option>
               <option value="RESERVED_UNASSIGNED">⚪ จองแบบไม่ระบุทะเบียน (โควตากลาง)</option>
