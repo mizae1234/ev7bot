@@ -33,12 +33,6 @@ const navGroups: NavGroup[] = [
         icon: '📋'
       },
       {
-        name: 'มอนิเตอร์รถทดแทน',
-        href: '/replacements',
-        desc: 'ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ และรถเข้าซ่อม',
-        icon: '🚗🔄'
-      },
-      {
         name: 'บอร์ดงานซ่อม & การถือครองรถ',
         href: '/custody',
         desc: 'กระดานติดตามงานซ่อมและการถือครองรถยนต์ในแต่ละฝ่าย',
@@ -61,7 +55,7 @@ const navGroups: NavGroup[] = [
   },
   {
     id: 'delivery',
-    label: 'งานส่งมอบ/คืน',
+    label: 'ส่งมอบ & รับคืน',
     icon: '🚚',
     items: [
       {
@@ -128,6 +122,7 @@ export function Navbar() {
   }, [pathname])
 
   const isDashboardActive = pathname === '/dashboard' || pathname === '/'
+  const isReplacementsActive = pathname.startsWith('/replacements')
 
   const isGroupActive = (group: NavGroup) => {
     return group.items.some((item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)))
@@ -175,7 +170,20 @@ export function Navbar() {
                 <span>แดชบอร์ด</span>
               </Link>
 
-              {/* Grouped Dropdown Menus: งานซ่อม, งานประกัน, งานส่งมอบ/คืน */}
+              {/* Menu 2: Direct Link to รถทดแทน (Replacements) */}
+              <Link
+                href="/replacements"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isReplacementsActive
+                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+                }`}
+              >
+                <span>🚗🔄</span>
+                <span>รถทดแทน</span>
+              </Link>
+
+              {/* Grouped Dropdown Menus: งานซ่อม, งานประกัน, ส่งมอบ & รับคืน, อื่นๆ */}
               {navGroups.map((group) => {
                 const active = isGroupActive(group)
                 const isOpen = openDropdown === group.id
@@ -303,9 +311,30 @@ export function Navbar() {
                 </p>
               </div>
             </Link>
+
+            {/* Direct Link: Replacements */}
+            <Link
+              href="/replacements"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
+                isReplacementsActive
+                  ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
+                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              <span className="text-xl shrink-0">🚗🔄</span>
+              <div>
+                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                  รถทดแทน (Replacements)
+                </span>
+                <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500">
+                  ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ และโควตาจอง
+                </p>
+              </div>
+            </Link>
           </div>
 
-          {/* Grouped Menus: งานซ่อม, งานประกัน, งานส่งมอบ/คืน */}
+          {/* Grouped Menus: งานซ่อม, งานประกัน, ส่งมอบ & รับคืน, อื่นๆ */}
           {navGroups.map((group) => (
             <div key={group.id} className="space-y-1.5">
               <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
