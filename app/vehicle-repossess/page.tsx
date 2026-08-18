@@ -349,7 +349,6 @@ function VehicleRepossessContent() {
                       <th className="py-3.5 px-4">📅 วันที่ยึดรถ</th>
                       <th className="py-3.5 px-4">📍 สถานที่ไปยึดรถ</th>
                       <th className="py-3.5 px-4">📝 หมายเหตุ / รายละเอียด</th>
-                      <th className="py-3.5 px-4">📍 สถานที่จอด & สถานะ</th>
                       <th className="py-3.5 px-4">👤 ผู้บันทึก</th>
                     </tr>
                   </thead>
@@ -408,25 +407,13 @@ function VehicleRepossessContent() {
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="text-zinc-800 dark:text-zinc-200 font-medium max-w-[180px] line-clamp-2" title={r.repossessLocation || '-'}>
+                            <div className="text-zinc-800 dark:text-zinc-200 font-medium max-w-[200px] line-clamp-2" title={r.repossessLocation || '-'}>
                               📍 {r.repossessLocation || <span className="text-zinc-400 italic">ไม่ระบุ</span>}
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="text-zinc-600 dark:text-zinc-400 text-xs max-w-[200px] line-clamp-2" title={r.remark || '-'}>
+                            <div className="text-zinc-600 dark:text-zinc-400 text-xs max-w-[220px] line-clamp-2" title={r.remark || '-'}>
                               {r.remark || <span className="text-zinc-400 italic">-</span>}
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="space-y-1">
-                              <div className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 truncate max-w-[140px]" title={r.currentLocationName || r.currentLocation || '-'}>
-                                🏢 {r.currentLocationName || r.currentLocation || '-'}
-                              </div>
-                              {r.carStatusName && (
-                                <span className="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200/40">
-                                  {r.carStatusName}
-                                </span>
-                              )}
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
@@ -502,8 +489,7 @@ function VehicleRepossessContent() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
-                      <span>จอดที่: {r.currentLocationName || r.currentLocation || '-'}</span>
+                    <div className="flex items-center justify-end text-[11px] text-zinc-400 pt-1">
                       <span>บันทึกโดย: {r.createUserName || '-'}</span>
                     </div>
                   </div>
