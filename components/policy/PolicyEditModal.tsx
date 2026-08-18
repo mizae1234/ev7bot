@@ -30,7 +30,7 @@ export function PolicyEditModal({
         vinNo: record.vinNo,
         registerNo: record.registerNo || '',
         insurancePolicyNo: record.insurancePolicyNo || '',
-        insuranceType: record.insuranceType || 'DV1',
+        insuranceType: record.insuranceType || '',
         insuranceStartDate: record.insuranceStartDate || '',
         insuranceEndDate: record.insuranceEndDate || '',
         insuranceCompany: record.insuranceCompany || '',
@@ -128,10 +128,11 @@ export function PolicyEditModal({
                   ประเภทประกัน
                 </label>
                 <select
-                  value={formData.insuranceType || 'DV1'}
+                  value={formData.insuranceType || ''}
                   onChange={(e) => setFormData({ ...formData, insuranceType: e.target.value })}
                   className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
+                  <option value="">-- กรุณาเลือกประเภทประกัน --</option>
                   {masterTypes.filter(m => m.category === 'VOLUNTARY').map(m => (
                     <option key={m.typeCode} value={m.typeCode}>
                       {m.typeCode} - {m.typeName}
@@ -182,10 +183,11 @@ export function PolicyEditModal({
                   🏢 บริษัทประกันภัย
                 </label>
                 <select
-                  value={formData.insuranceCompany || 'ไอแคร์ประกันภัย'}
+                  value={formData.insuranceCompany || ''}
                   onChange={(e) => setFormData({ ...formData, insuranceCompany: e.target.value })}
                   className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
+                  <option value="">-- กรุณาเลือกบริษัทประกันภัย --</option>
                   {companies.length > 0 ? (
                     companies.map(c => (
                       <option key={c.statusCode} value={c.statusName}>
@@ -193,7 +195,11 @@ export function PolicyEditModal({
                       </option>
                     ))
                   ) : (
-                    <option value="ไอแคร์ประกันภัย">ไอแคร์ประกันภัย (ICARE_INSURANCE)</option>
+                    <>
+                      <option value="ไอแคร์ประกันภัย">ไอแคร์ประกันภัย (ICARE_INSURANCE)</option>
+                      <option value="เมืองไทยประกันภัย">เมืองไทยประกันภัย (MUANGTHAI_INSURANCE)</option>
+                      <option value="วิริยะประกันภัย">วิริยะประกันภัย (VIRIYA_INSURANCE)</option>
+                    </>
                   )}
                 </select>
               </div>
@@ -230,6 +236,32 @@ export function PolicyEditModal({
                   onChange={(e) => setFormData({ ...formData, actEndDate: e.target.value })}
                   className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-mono"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                  🏢 บริษัทผู้รับประกัน พ.ร.บ.
+                </label>
+                <select
+                  value={formData.actCompany || ''}
+                  onChange={(e) => setFormData({ ...formData, actCompany: e.target.value })}
+                  className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                >
+                  <option value="">-- กรุณาเลือกบริษัท พ.ร.บ. --</option>
+                  {companies.length > 0 ? (
+                    companies.map(c => (
+                      <option key={c.statusCode} value={c.statusName}>
+                        {c.statusName} ({c.statusCode})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="ไอแคร์ประกันภัย">ไอแคร์ประกันภัย (ICARE_INSURANCE)</option>
+                      <option value="เมืองไทยประกันภัย">เมืองไทยประกันภัย (MUANGTHAI_INSURANCE)</option>
+                      <option value="วิริยะประกันภัย">วิริยะประกันภัย (VIRIYA_INSURANCE)</option>
+                    </>
+                  )}
+                </select>
               </div>
             </div>
           </div>
