@@ -17,61 +17,54 @@ interface NavGroup {
   id: string
   label: string
   icon: string
-  isLive?: boolean
   items: NavItem[]
 }
 
 const navGroups: NavGroup[] = [
   {
-    id: 'dashboards',
-    label: 'แดชบอร์ด',
-    icon: '📊',
+    id: 'maintenance',
+    label: 'งานซ่อม',
+    icon: '🔧',
     items: [
       {
-        name: 'ภาพรวมการดำเนินงาน',
-        href: '/dashboard',
-        desc: 'แดชบอร์ดสรุปยอดส่งมอบ งานซ่อม และสถิติประจำวัน',
-        icon: '📈'
-      },
-      {
-        name: 'ศูนย์จัดการงานซ่อม (Maintenance)',
+        name: 'ศูนย์จัดการงานซ่อม',
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
         icon: '📋'
-      }
-    ]
-  },
-  {
-    id: 'monitors',
-    label: 'ระบบมอนิเตอร์',
-    icon: '📡',
-    items: [
+      },
       {
-        name: 'มอนิเตอร์รถทดแทน (Replacements)',
+        name: 'มอนิเตอร์รถทดแทน',
         href: '/replacements',
-        desc: 'ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ โควตาจอง และรถเข้าซ่อม',
+        desc: 'ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ และรถเข้าซ่อม',
         icon: '🚗🔄'
       },
       {
-        name: 'มอนิเตอร์ประกันภัย & ภาษี (Policies)',
-        href: '/policies',
-        desc: 'ตรวจสอบความคุ้มครอง วันหมดอายุประกัน/พ.ร.บ./ภาษี และเอกสาร PDF',
-        icon: '📑'
-      },
-      {
-        name: 'บอร์ดงานซ่อม & การถือครองรถ (Custody)',
+        name: 'บอร์ดงานซ่อม & การถือครองรถ',
         href: '/custody',
         desc: 'กระดานติดตามงานซ่อมและการถือครองรถยนต์ในแต่ละฝ่าย',
         icon: '📋'
       },
       {
-        name: 'มอนิเตอร์ตรวจสภาพรถ (Audit)',
+        name: 'มอนิเตอร์ตรวจสภาพรถ',
         href: '/audit',
         desc: 'ระบบตรวจนับและ Audit สภาพรถยนต์',
         icon: '🔍'
+      }
+    ]
+  },
+  {
+    id: 'insurance',
+    label: 'งานประกัน',
+    icon: '🛡️',
+    items: [
+      {
+        name: 'ประกันภัย & ภาษีรถยนต์',
+        href: '/policies',
+        desc: 'ตรวจสอบความคุ้มครอง วันหมดอายุประกัน/พ.ร.บ./ภาษี และเอกสาร PDF',
+        icon: '📑'
       },
       {
-        name: 'ประวัติการเคลมประกัน (Claim Logs)',
+        name: 'ประวัติการเคลมประกัน',
         href: '/claim-logs',
         desc: 'บันทึกประวัติการเปิดเคลมและสถานะเคลมประกัน',
         icon: '🛡️'
@@ -79,21 +72,52 @@ const navGroups: NavGroup[] = [
     ]
   },
   {
-    id: 'operations',
-    label: 'งานส่งมอบ & บันทึก',
+    id: 'delivery',
+    label: 'งานส่งมอบ/คืน',
     icon: '🚚',
     items: [
       {
-        name: 'งานส่งมอบรถยนต์ (Delivery Cases)',
+        name: 'งานส่งมอบรถยนต์',
         href: '/case-delivery',
         desc: 'จัดการเคสและการส่งมอบรถให้ลูกค้า',
         icon: '🚚'
       },
       {
-        name: 'บันทึกหมายเหตุรถ (Vehicle Notes)',
+        name: 'บันทึกหมายเหตุรถ',
         href: '/vehicle-notes',
         desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
         icon: '📝'
+      }
+    ]
+  },
+  {
+    id: 'others',
+    label: 'อื่นๆ',
+    icon: '📂',
+    items: [
+      {
+        name: 'ข้อมูลยานพาหนะ',
+        href: '/vehicle',
+        desc: 'ค้นหาและตรวจสอบข้อมูลรถยนต์ ทะเบียน และสถานะ',
+        icon: '🚘'
+      },
+      {
+        name: 'ระบบเบิกจ่ายอะไหล่',
+        href: '/spare-parts',
+        desc: 'คลังอะไหล่และการเบิกจ่ายอะไหล่ซ่อมบำรุง',
+        icon: '📦'
+      },
+      {
+        name: 'งานสัญญา (EV Core)',
+        href: '/case-contract',
+        desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',
+        icon: '📄'
+      },
+      {
+        name: 'บันทึกการสื่อสาร (LINE Logs)',
+        href: '/logchats',
+        desc: 'ประวัติการสนทนาและการแจ้งเตือนระบบ',
+        icon: '💬'
       }
     ]
   }
@@ -127,6 +151,8 @@ export function Navbar() {
     setOpenDropdown(null)
   }, [pathname])
 
+  const isDashboardActive = pathname === '/dashboard' || pathname === '/'
+
   const isGroupActive = (group: NavGroup) => {
     return group.items.some((item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)))
   }
@@ -136,7 +162,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 1. Brand Logo */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6 lg:gap-8">
             <Link
               href="/dashboard"
               className="flex items-center gap-2.5 group transition-transform active:scale-98"
@@ -158,8 +184,22 @@ export function Navbar() {
               </div>
             </Link>
 
-            {/* 2. Desktop Navigation Groups */}
+            {/* 2. Desktop Navigation */}
             <nav ref={dropdownRef} className="hidden md:flex items-center gap-1.5">
+              {/* Menu 1: Direct Link to Dashboard (Home) */}
+              <Link
+                href="/dashboard"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isDashboardActive
+                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+                }`}
+              >
+                <span>📊</span>
+                <span>แดชบอร์ด</span>
+              </Link>
+
+              {/* Grouped Dropdown Menus: งานซ่อม, งานประกัน, งานส่งมอบ/คืน */}
               {navGroups.map((group) => {
                 const active = isGroupActive(group)
                 const isOpen = openDropdown === group.id
@@ -177,9 +217,6 @@ export function Navbar() {
                     >
                       <span>{group.icon}</span>
                       <span>{group.label}</span>
-                      {group.isLive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      )}
                       <svg
                         className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
                           isOpen ? 'rotate-180 text-indigo-500' : ''
@@ -269,6 +306,30 @@ export function Navbar() {
       {/* 4. Mobile Drawer Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl px-4 py-4 max-h-[85vh] overflow-y-auto space-y-4 shadow-xl">
+          {/* Direct Link: Dashboard */}
+          <div className="space-y-1">
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
+                isDashboardActive
+                  ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
+                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+              }`}
+            >
+              <span className="text-xl shrink-0">📊</span>
+              <div>
+                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                  แดชบอร์ด (Dashboard)
+                </span>
+                <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500">
+                  ภาพรวมการส่งมอบ งานซ่อม และสถิติ
+                </p>
+              </div>
+            </Link>
+          </div>
+
+          {/* Grouped Menus: งานซ่อม, งานประกัน, งานส่งมอบ/คืน */}
           {navGroups.map((group) => (
             <div key={group.id} className="space-y-1.5">
               <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
