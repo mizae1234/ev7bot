@@ -45,21 +45,18 @@ const navGroups: NavGroup[] = [
     id: 'monitors',
     label: 'ระบบมอนิเตอร์',
     icon: '📡',
-    isLive: true,
     items: [
       {
         name: 'มอนิเตอร์รถทดแทน (Replacements)',
         href: '/replacements',
         desc: 'ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ โควตาจอง และรถเข้าซ่อม',
-        icon: '🚗🔄',
-        badge: 'Live'
+        icon: '🚗🔄'
       },
       {
         name: 'มอนิเตอร์ประกันภัย & ภาษี (Policies)',
         href: '/policies',
         desc: 'ตรวจสอบความคุ้มครอง วันหมดอายุประกัน/พ.ร.บ./ภาษี และเอกสาร PDF',
-        icon: '📑',
-        badge: 'Live'
+        icon: '📑'
       },
       {
         name: 'มอนิเตอร์รับมอบ & อายัดรถ (Custody)',
