@@ -75,12 +75,6 @@ const navGroups: NavGroup[] = [
         href: '/case-delivery',
         desc: 'จัดการเคสและการส่งมอบรถให้ลูกค้า',
         icon: '🚚'
-      },
-      {
-        name: 'บันทึกหมายเหตุรถ',
-        href: '/vehicle-notes',
-        desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
-        icon: '📝'
       }
     ]
   },
@@ -89,6 +83,12 @@ const navGroups: NavGroup[] = [
     label: 'อื่นๆ',
     icon: '📂',
     items: [
+      {
+        name: 'บันทึกหมายเหตุรถ',
+        href: '/vehicle-notes',
+        desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
+        icon: '📝'
+      },
       {
         name: 'งานสัญญา (EV Core)',
         href: '/case-contract',
