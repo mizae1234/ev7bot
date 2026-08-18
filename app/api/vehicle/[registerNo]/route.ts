@@ -501,13 +501,23 @@ export async function GET(
         }
       : null
 
+    let markedActive = false
     const rentHistory = rentResult.recordset.map((r: any) => {
-      const isCurrentActive = activeRentRow && activeRentRow.RentItemID === r.RentItemID
+      let isCurrentActive = false
+      if (activeRentRow && !markedActive) {
+        if (activeRentRow.ContractNo && r.ContractNo && activeRentRow.ContractNo === r.ContractNo) {
+          isCurrentActive = true
+          markedActive = true
+        } else if (activeRentRow.RentItemID && r.RentItemID && activeRentRow.RentItemID === r.RentItemID) {
+          isCurrentActive = true
+          markedActive = true
+        }
+      }
       return {
         ...stripSensitiveFields(r),
         ...maskName(r.FirstName, r.LastName),
         PhoneNo: maskPhone(r.PhoneNo),
-        IsActive: Boolean(isCurrentActive),
+        IsActive: isCurrentActive,
       }
     })
 
