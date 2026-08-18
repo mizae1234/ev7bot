@@ -5,12 +5,14 @@ import { formatThaiDate, getDurationBadge } from '@/lib/replacement/replacement-
 interface ActiveReplacementTableProps {
   records: ReplacementActiveItem[]
   loading: boolean
+  startIndex?: number
   onOpenDetail: (item: ReplacementActiveItem) => void
 }
 
 export function ActiveReplacementTable({
   records,
   loading,
+  startIndex = 0,
   onOpenDetail
 }: ActiveReplacementTableProps) {
   if (loading) {
@@ -37,6 +39,7 @@ export function ActiveReplacementTable({
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
+            <th className="py-3 px-3 text-center w-12">#</th>
             <th className="py-3 px-4">🚗 รถทดแทนที่นำไปใช้</th>
             <th className="py-3 px-4 text-center">➔</th>
             <th className="py-3 px-4">🛠️ รถคันหลักที่เข้าซ่อม</th>
@@ -47,7 +50,7 @@ export function ActiveReplacementTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
-          {records.map((rec) => {
+          {records.map((rec, idx) => {
             const badge = getDurationBadge(rec.daysInUse)
 
             return (
@@ -55,6 +58,11 @@ export function ActiveReplacementTable({
                 key={rec.replacementItemId}
                 className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50 transition-colors"
               >
+                {/* 0. Row Number */}
+                <td className="py-3 px-3 text-center font-mono text-zinc-400 dark:text-zinc-500 font-semibold">
+                  {startIndex + idx + 1}
+                </td>
+
                 {/* 1. Replacement Car Info */}
                 <td className="py-3 px-4">
                   <div className="font-bold text-sm text-indigo-600 dark:text-indigo-400">

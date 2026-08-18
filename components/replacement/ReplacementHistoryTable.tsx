@@ -5,11 +5,13 @@ import { formatThaiDate } from '@/lib/replacement/replacement-constants'
 interface ReplacementHistoryTableProps {
   records: ReplacementHistoryItem[]
   loading: boolean
+  startIndex?: number
 }
 
 export function ReplacementHistoryTable({
   records,
-  loading
+  loading,
+  startIndex = 0
 }: ReplacementHistoryTableProps) {
   if (loading) {
     return (
@@ -35,6 +37,7 @@ export function ReplacementHistoryTable({
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
+            <th className="py-3 px-3 text-center w-12">#</th>
             <th className="py-3 px-4">🛠️ รถคันหลัก</th>
             <th className="py-3 px-4">🚗 รถทดแทนที่ให้ (VIN)</th>
             <th className="py-3 px-4">ช่วงเวลาการใช้งาน</th>
@@ -49,6 +52,11 @@ export function ReplacementHistoryTable({
               key={`${rec.vinNo}-${rec.vinNoReplacement}-${idx}`}
               className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50 transition-colors"
             >
+              {/* 0. Row Number */}
+              <td className="py-3 px-3 text-center font-mono text-zinc-400 dark:text-zinc-500 font-semibold">
+                {startIndex + idx + 1}
+              </td>
+
               {/* 1. Main Car Info */}
               <td className="py-3 px-4">
                 <div className="font-semibold text-sm text-zinc-900 dark:text-white">

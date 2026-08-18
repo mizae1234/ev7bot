@@ -5,9 +5,10 @@ import { formatThaiDate, getPoolCarBadge } from '@/lib/replacement/replacement-c
 interface FleetPoolTableProps {
   records: ReplacementPoolCar[]
   loading: boolean
+  startIndex?: number
 }
 
-export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
+export function FleetPoolTable({ records, loading, startIndex = 0 }: FleetPoolTableProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800">
@@ -32,6 +33,7 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
+            <th className="py-3 px-3 text-center w-12">#</th>
             <th className="py-3 px-4">ข้อมูลรถทดแทน</th>
             <th className="py-3 px-4">รุ่น / สี</th>
             <th className="py-3 px-4">สถานะความพร้อม</th>
@@ -41,7 +43,7 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
-          {records.map((car) => {
+          {records.map((car, idx) => {
             const badge = getPoolCarBadge(
               car.isReadyToPick,
               car.isStandbyAvailable,
@@ -57,6 +59,11 @@ export function FleetPoolTable({ records, loading }: FleetPoolTableProps) {
                 key={car.vinNo}
                 className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
               >
+                {/* 0. Row Number */}
+                <td className="py-3 px-3 text-center font-mono text-zinc-400 dark:text-zinc-500 font-semibold">
+                  {startIndex + idx + 1}
+                </td>
+
                 {/* 1. Vehicle Info */}
                 <td className="py-3 px-4">
                   <div className="font-bold text-sm text-zinc-900 dark:text-white">

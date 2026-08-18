@@ -381,6 +381,7 @@ function ReplacementPageContent() {
         <ActiveReplacementTable
           records={activeRecords}
           loading={loading}
+          startIndex={(page - 1) * 50}
           onOpenDetail={(item) => setSelectedItem(item)}
         />
       )}
@@ -389,6 +390,7 @@ function ReplacementPageContent() {
         <FleetPoolTable
           records={poolRecords}
           loading={loading}
+          startIndex={(page - 1) * 50}
         />
       )}
 
@@ -396,6 +398,7 @@ function ReplacementPageContent() {
         <ReplacementHistoryTable
           records={historyRecords}
           loading={loading}
+          startIndex={(page - 1) * 50}
         />
       )}
 
