@@ -69,6 +69,12 @@ const navGroups: NavGroup[] = [
         href: '/case-delivery',
         desc: 'จัดการเคสและการส่งมอบรถให้ลูกค้า',
         icon: '🚚'
+      },
+      {
+        name: 'มอนิเตอร์การรับคืนรถ (Returns)',
+        href: '/dashboard/returns-monitor',
+        desc: 'ติดตามและตรวจสอบรายการรับคืนรถ',
+        icon: '🔄'
       }
     ]
   },
