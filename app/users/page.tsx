@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Pagination } from '@/components/ui/Pagination'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { exportToExcel } from '@/lib/exportExcel'
 
 interface RegisteredUser {
   id: number
@@ -17,6 +18,12 @@ interface RegisteredUser {
   receiveAllNotes?: boolean
   registeredAt: string
   updatedAt: string
+  firstName?: string | null
+  lastName?: string | null
+  email?: string | null
+  branchCode?: string | null
+  branchName?: string | null
+  isMapped?: boolean
 }
 
 function UserManagementContent() {
@@ -37,8 +44,10 @@ function UserManagementContent() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [summary, setSummary] = useState({ totalSuperAdmin: 0, totalAdmin: 0, totalUser: 0, total: 0 })
   const [loading, setLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // lineUserId
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [branches, setBranches] = useState<{ code: string; name: string }[]>([])
 
   // Auth / Role States
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -121,6 +130,22 @@ function UserManagementContent() {
       fetchRecipients()
     }
   }, [isAuthenticated, passcode, liffUserId, userRole])
+
+  // Fetch branches for dropdown
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const res = await fetch('/api/liff/locations')
+        if (res.ok) {
+          const data = await res.json()
+          setBranches(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch branches', err)
+      }
+    }
+    fetchBranches()
+  }, [])
 
   // Debounced search trigger
   useEffect(() => {
@@ -357,6 +382,32 @@ function UserManagementContent() {
     }
   }
 
+  const handleBranchChange = async (targetLineUserId: string, newBranchCode: string) => {
+    setActionLoading(targetLineUserId)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineUserId: targetLineUserId,
+          branchCode: newBranchCode,
+          passcode,
+          userId: liffUserId
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(`เกิดข้อผิดพลาด: ${data.error || 'ไม่สามารถแก้ไขสาขาได้'}`)
+      } else {
+        await fetchUsers()
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!broadcastTargetId || !broadcastMessage.trim() || !liffUserId) return
@@ -393,6 +444,104 @@ function UserManagementContent() {
     navigator.clipboard.writeText(id)
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleExportExcel = async () => {
+    if (!isAuthenticated || !passcode || !liffUserId) return
+    setExportLoading(true)
+    try {
+      const params = new URLSearchParams({
+        passcode,
+        userId: liffUserId,
+        export: 'true',
+        search,
+        role: roleFilter,
+        status: statusFilter,
+      })
+      const res = await fetch(`/api/admin/users?${params.toString()}`)
+      if (!res.ok) {
+        alert('เกิดข้อผิดพลาดในการดึงข้อมูลสำหรับส่งออก')
+        return
+      }
+      const data = await res.json()
+      const exportList: RegisteredUser[] = data.users || []
+
+      if (exportList.length === 0) {
+        alert('ไม่มีข้อมูลผู้ใช้งานที่ตรงกับเงื่อนไขสำหรับส่งออก')
+        return
+      }
+
+      const headers = [
+        'ลำดับ',
+        'ชื่อ',
+        'นามสกุล',
+        'อีเมล',
+        'ชื่อใน LINE',
+        'LINE User ID',
+        'รหัส EV_User',
+        'รหัสสาขา',
+        'ชื่อสาขา',
+        'ระดับสิทธิ์',
+        'สถานะการใช้งาน',
+        'รับแจ้งเตือนทุกบันทึก',
+        'วันที่ลงทะเบียน'
+      ]
+
+      const roleLabels: Record<string, string> = {
+        SUPER_ADMIN: 'Super Admin',
+        ADMIN: 'Admin',
+        USER: 'User'
+      }
+
+      const rows = exportList.map((u, index) => {
+        const regDate = u.registeredAt
+          ? new Date(u.registeredAt).toLocaleString('th-TH', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Bangkok'
+            })
+          : '-'
+
+        return [
+          index + 1,
+          u.firstName || '-',
+          u.lastName || '-',
+          u.email || '-',
+          u.displayName || '-',
+          u.lineUserId,
+          u.ev7UserId !== null && u.ev7UserId !== undefined ? u.ev7UserId : 'ยังไม่ผูก',
+          u.branchCode || '-',
+          u.branchName || 'ไม่ระบุสาขา',
+          roleLabels[u.role] || u.role,
+          u.isActive ? 'เปิดใช้งาน' : 'ระงับการใช้งาน',
+          u.receiveAllNotes ? 'ใช่' : 'ไม่ใช่',
+          regDate
+        ]
+      })
+
+      const dateStr = new Date().toLocaleDateString('th-TH', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Bangkok'
+      })
+
+      exportToExcel({
+        reportName: 'รายชื่อผู้ใช้งานระบบ EV7',
+        periodLabel: `ข้อมูล ณ วันที่ ${dateStr}`,
+        headers,
+        rows,
+        fileName: 'รายชื่อผู้ใช้งานระบบ_EV7'
+      })
+    } catch (err: any) {
+      console.error('[Export Excel Error]', err)
+      alert(`เกิดข้อผิดพลาดในการส่งออก Excel: ${err.message}`)
+    } finally {
+      setExportLoading(false)
+    }
   }
 
   const formatDateTime = (dateStr: string | null) => {
@@ -705,33 +854,59 @@ function UserManagementContent() {
           </form>
         </div>
 
-        {/* Main Tabs */}
-        <div className="flex border-b border-zinc-800">
-          <button
-            onClick={() => setActiveMainTab('users')}
-            className={`py-3 px-6 text-sm font-bold border-b-2 transition-all ${
-              activeMainTab === 'users'
-                ? 'border-emerald-500 text-emerald-400 font-extrabold'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            👥 บัญชีใช้งานในระบบ ({summary.total})
-          </button>
-          <button
-            onClick={() => setActiveMainTab('requests')}
-            className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
-              activeMainTab === 'requests'
-                ? 'border-emerald-500 text-emerald-400 font-extrabold'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300'
-            }`}
-          >
-            ⏳ คำขออนุมัติใช้งาน
-            {pendingRequests.length > 0 && (
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-zinc-950 rounded-full">
-                {pendingRequests.length}
-              </span>
-            )}
-          </button>
+        {/* Main Tabs & Export Button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 gap-2 pb-2 sm:pb-0">
+          <div className="flex">
+            <button
+              onClick={() => setActiveMainTab('users')}
+              className={`py-3 px-6 text-sm font-bold border-b-2 transition-all ${
+                activeMainTab === 'users'
+                  ? 'border-emerald-500 text-emerald-400 font-extrabold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              👥 บัญชีใช้งานในระบบ ({summary.total})
+            </button>
+            <button
+              onClick={() => setActiveMainTab('requests')}
+              className={`py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+                activeMainTab === 'requests'
+                  ? 'border-emerald-500 text-emerald-400 font-extrabold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              ⏳ คำขออนุมัติใช้งาน
+              {pendingRequests.length > 0 && (
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-zinc-950 rounded-full">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {activeMainTab === 'users' && (
+            <div className="flex items-center gap-2 px-2 sm:px-0">
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={exportLoading || loading || total === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/25 hover:border-emerald-600 shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                title="ส่งออกรายชื่อผู้ใช้งานทั้งหมดเป็นไฟล์ Excel"
+              >
+                {exportLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>กำลังส่งออก...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📥</span>
+                    <span>Export Excel</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tab 1: Active Users List */}
@@ -821,7 +996,7 @@ function UserManagementContent() {
                         )}
 
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-2.5 flex-wrap">
                             <span className="font-bold text-zinc-100 text-base">{user.displayName || 'ผู้ใช้ LINE'}</span>
                             {getRoleBadge(user.role)}
                             {!user.isActive && (
@@ -830,6 +1005,29 @@ function UserManagementContent() {
                               </span>
                             )}
                           </div>
+
+                          {(user.firstName || user.lastName || user.email || user.branchName) && (
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs pt-0.5">
+                              {(user.firstName || user.lastName) && (
+                                <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                                  <span>👤</span>
+                                  <span>{`${user.firstName || ''} ${user.lastName || ''}`.trim()}</span>
+                                </span>
+                              )}
+                              {user.email && (
+                                <span className="text-zinc-400 flex items-center gap-1">
+                                  <span>✉️</span>
+                                  <span>{user.email}</span>
+                                </span>
+                              )}
+                              {user.branchName && (
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                                  <span>📍</span>
+                                  <span>{user.branchName}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono">
                             <span className="truncate max-w-[200px] md:max-w-xs">{user.lineUserId}</span>
@@ -849,9 +1047,9 @@ function UserManagementContent() {
                           📅 ลงทะเบียนเมื่อ: <span className="text-zinc-400 font-medium">{formatDateTime(user.registeredAt)}</span>
                         </div>
 
-                         <div className="flex items-center gap-2.5">
+                         <div className="flex items-center gap-2.5 flex-wrap">
                            {/* EV7 ID input */}
-                           <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1">
+                           <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1" title="รหัส User ID ใน SQL Server EV_User">
                              <span className="text-[10px] text-zinc-500 font-bold">EV7 ID:</span>
                              <input
                                type="number"
@@ -861,6 +1059,24 @@ function UserManagementContent() {
                                onChange={(e) => handleEv7UserIdChange(user.lineUserId, e.target.value)}
                                className="w-14 bg-transparent border-0 text-center text-xs text-zinc-300 focus:outline-none focus:ring-0 p-0 font-mono disabled:opacity-50"
                              />
+                           </div>
+
+                           {/* Branch drop-down */}
+                           <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1" title="สังกัดสาขา (Branch Location)">
+                             <span className="text-[10px] text-zinc-500 font-bold">สาขา:</span>
+                             <select
+                               value={user.branchCode || ''}
+                               disabled={actionLoading === user.lineUserId}
+                               onChange={(e) => handleBranchChange(user.lineUserId, e.target.value)}
+                               className="bg-transparent border-0 text-xs text-zinc-300 focus:outline-none focus:ring-0 p-0 font-medium disabled:opacity-50 cursor-pointer max-w-[130px] truncate"
+                             >
+                               <option value="" className="bg-zinc-900 text-zinc-400">-- ไม่ระบุ --</option>
+                               {branches.map((b) => (
+                                 <option key={b.code} value={b.code} className="bg-zinc-900 text-zinc-200">
+                                   {b.name}
+                                 </option>
+                               ))}
+                             </select>
                            </div>
 
                            {/* Role drop-down */}
