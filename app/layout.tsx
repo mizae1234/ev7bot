@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Prompt } from 'next/font/google'
+import { Navbar } from '@/components/ui/Navbar'
 import './globals.css'
 
 const prompt = Prompt({
@@ -23,8 +24,11 @@ export default function RootLayout({
       <head>
         <meta name="color-scheme" content="light" />
       </head>
-      <body className="antialiased min-h-screen bg-slate-50 text-zinc-900">
-        {children}
+      <body className="antialiased min-h-screen bg-slate-50 text-zinc-900 flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          {children}
+        </main>
       </body>
     </html>
   )

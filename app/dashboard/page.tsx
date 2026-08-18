@@ -234,7 +234,6 @@ function DashboardContent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <LoginProfile />
             {isLoading ? (
               <LoadingSkeleton className="h-6 w-36" />
             ) : data ? (
@@ -248,45 +247,10 @@ function DashboardContent() {
               </span>
             ) : null}
 
-            <a
-              href="/case-delivery"
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              🚗 ส่งมอบรถ
-            </a>
-
-            <a
-              href="/case-contract"
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              📄 สัญญา (EV Core)
-            </a>
-
-            <a
-              href="/custody"
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              📋 บอร์ดติดตามงาน (Kanban)
-            </a>
-
-            <a
-              href="/vehicle-notes"
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              📝 บันทึกตัวรถทั้งหมด
-            </a>
-
-            <a
-              href="/chat"
-              className="flex items-center gap-1.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-zinc-900 text-xs font-bold py-1.5 px-3.5 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md"
-            >
-              🧈 Chat Butter
-            </a>
-
             <button
               onClick={handleManualRefresh}
               disabled={isLoading || isValidating}
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
