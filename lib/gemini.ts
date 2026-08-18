@@ -231,7 +231,19 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
   GROUP BY ISNULL(loc.StatusName, ISNULL(NULLIF(i.CurrentLocation, ''), 'ไม่ระบุ'))
   ORDER BY Total DESC
 
-### ถามโน้ตประจำรถ / ประวัติการย้ายสถานที่ (เช่น "โน้ตรถ ทอ-3791", "ประวัติย้ายรถ ทอ-3791")
+### ถามประวัติการเคลื่อนย้ายสถานที่ / เปลี่ยนพิกัดรถ (เช่น "ประวัติย้ายรถ ทอ-3260", "รถ ทอ-3260 ย้ายไปไหนมาบ้าง", "รถคันนี้ย้ายล่าสุดเมื่อไหร่", "วันนี้ย้ายรถไปไหนบ้าง")
+- ดึงจาก View dbo.View_VehicleLocationLog โดยตรง (มีข้อมูลสถานที่, วันเวลา, ผู้ย้าย ครบถ้วน):
+  SELECT RegisterNo, VinNo, Model, CurrentLocationName, MovementDetail, MovementDate, CreateUserName
+  FROM dbo.View_VehicleLocationLog
+  WHERE RegisterNo LIKE '%3260%' OR VinNo LIKE '%3260%'
+  ORDER BY MovementDate DESC
+- สรุปการย้ายรถวันนี้:
+  SELECT RegisterNo, VinNo, CurrentLocationName, MovementDetail, MovementDate, CreateUserName
+  FROM dbo.View_VehicleLocationLog
+  WHERE CAST(MovementDate AS DATE) = CAST(GETDATE() AS DATE)
+  ORDER BY MovementDate DESC
+
+### ถามโน้ตประจำรถทั่วไป (เช่น "โน้ตรถ ทอ-3791")
 - ดึงโน้ตทั้งหมดของรถคันนั้น:
   SELECT n.VehicleNoteID, n.NoteDetail, n.CreateDate, ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreatedBy
   FROM EV_VehicleNote n
@@ -239,7 +251,6 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
   LEFT JOIN EV_User u ON n.CreateUserID = u.UserID
   WHERE (i.RegisterNo LIKE '%3791%' OR i.VinNo LIKE '%3791%') AND n.IsActive = 1
   ORDER BY n.CreateDate DESC
-- ถ้าต้องการเฉพาะ log การย้ายสถานที่ ให้กรอง NoteDetail LIKE '%ย้ายสถานที่%'
 
 ### ถามรถส่งมอบวันนี้
 - ใช้ function getDeliveryToday ก่อน ถ้าต้องการ detail ใช้:
@@ -431,7 +442,7 @@ const functionDeclarations: FunctionDeclaration[] = [
   },
   {
     name: 'runCustomQuery',
-    description: 'รัน SQL query หรือ Stored Procedure แบบ custom สำหรับคำถามที่ฟังก์ชันอื่นตอบไม่ได้ — ใช้ได้เฉพาะ SELECT หรือ EXEC Get* (SP ที่ขึ้นต้นด้วย Get) เท่านั้น ตาราง: dbo.EV_InventoryItem, dbo.EV_RentItem, dbo.EV_MaintenanceItem, dbo.EV_ReplacementItem, dbo.EV_ReturnItem',
+    description: 'รัน SQL query หรือ Stored Procedure แบบ custom สำหรับคำถามที่ฟังก์ชันอื่นตอบไม่ได้ — ใช้ได้เฉพาะ SELECT หรือ EXEC Get* (SP ที่ขึ้นต้นด้วย Get) เท่านั้น ตารางและวิว: dbo.EV_InventoryItem, dbo.EV_RentItem, dbo.EV_MaintenanceItem, dbo.EV_ReplacementItem, dbo.EV_ReturnItem, dbo.View_VehicleLocationLog, dbo.View_VehicleMovementLog, dbo.EV_VehicleRepossess',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
