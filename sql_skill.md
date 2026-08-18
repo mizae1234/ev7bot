@@ -1380,6 +1380,60 @@ ORDER BY StatusCode;
 - `MUANGTHAI_INSURANCE` ➔ เมืองไทยประกันภัย
 - `VIRIYA_INSURANCE` ➔ วิริยะประกันภัย
 
+---
+
+## 11. Vehicle Repossession & Movements (การยึดรถและการเคลื่อนย้าย)
+
+### `dbo.EV_VehicleRepossess` (ตารางบันทึกการยึดคืนรถยนต์)
+ใช้เก็บประวัติการลงพื้นที่ยึดคืนรถยนต์เข้าสู่ระบบ
+- **คอลัมน์สำคัญ**: `RepossessID`, `InventoryItemID`, `VinNo`, `ContractNo`, `RepossessDate`, `RepossessLocation` (สถานที่ไปยึดรถ), `Remark` (สาเหตุ/หมายเหตุ), `IsActive`, `CreateDate`, `CreateUserID`
+
+**ตัวอย่างการค้นหาประวัติการยึดรถ:**
+```sql
+SELECT 
+  r.RepossessID,
+  i.RegisterNo,
+  r.VinNo,
+  r.ContractNo,
+  r.RepossessDate,
+  r.RepossessLocation,
+  r.Remark,
+  ISNULL(u.FirstName, u.UserName) AS CreateUserName,
+  r.CreateDate
+FROM dbo.EV_VehicleRepossess r
+LEFT JOIN dbo.EV_InventoryItem i ON (r.InventoryItemID = i.InventoryItemID OR r.VinNo = i.VinNo)
+LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
+WHERE r.IsActive = 1
+ORDER BY r.RepossessDate DESC;
+```
+
+---
+
+### `dbo.View_VehicleMovementLog` (วิวประวัติการเคลื่อนย้ายและเปลี่ยนสถานที่ของรถ)
+รวบรวมประวัติการเคลื่อนย้ายรถจากทุกจุดในระบบ (การย้ายสถานที่, การยึดคืนรถ, และการตรวจรับคืน) เพื่อให้ Bot Butter หรือ Dashboard สืบประวัติการย้ายรถได้ทันที
+
+**คอลัมน์:**
+`MovementID`, `MovementType` (`LOCATION_CHANGE`/`REPOSSESS`/`RETURN`), `MovementTypeName`, `InventoryItemID`, `VinNo`, `RegisterNo`, `Model`, `Project`, `ProjectType`, `CurrentLocation`, `CurrentLocationName`, `OriginLocation`, `DestinationLocation`, `MovementDetail`, `MovementDate`, `CreateDate`, `CreateUserID`, `CreateUserName`, `IsActive`
+
+**ตัวอย่างการค้นหาประวัติการเคลื่อนย้ายรถ 1 คัน:**
+```sql
+SELECT 
+  MovementID,
+  MovementTypeName,
+  RegisterNo,
+  VinNo,
+  OriginLocation,
+  DestinationLocation,
+  CurrentLocationName,
+  MovementDetail,
+  MovementDate,
+  CreateUserName
+FROM dbo.View_VehicleMovementLog
+WHERE RegisterNo = 'ทอ-4990' OR VinNo = 'LNADHAB36R1E07099'
+ORDER BY MovementDate DESC;
+```
+
+
 
 
 
