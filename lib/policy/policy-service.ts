@@ -100,8 +100,15 @@ export async function getPolicyList(params: {
         i.Project AS project,
         i.ProjectType AS projectType,
         i.CurrentLocation AS currentLocation,
+        ISNULL(loc.StatusName, i.CurrentLocation) AS locationName,
         i.Status AS status,
         i.StatusType AS statusType,
+        COALESCE(
+          ISNULL(sub_st.DescriptionStatus, sub_st.StatusName),
+          ISNULL(sub_s.DescriptionStatus, sub_s.StatusName),
+          i.StatusType,
+          i.Status
+        ) AS statusName,
 
         -- Insurance
         p.InsurancePolicyNo AS insurancePolicyNo,
@@ -131,13 +138,16 @@ export async function getPolicyList(params: {
 
         -- Driver Info
         r.ContractNo AS contractNo,
-        ISNULL(NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), ''), 'ลูกค้าทั่วไป') AS customerName,
+        NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), '') AS customerName,
         r.PhoneNo AS phoneNo,
 
         CONVERT(VARCHAR(19), p.UpdateDate, 120) AS updatedAt
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_Policy p ON i.VinNo = p.VinNo AND p.IsActive = 1
       LEFT JOIN dbo.EV_MsInsuranceType m ON p.InsuranceType = m.TypeCode
+      LEFT JOIN dbo.EV_MsSubStatus sub_st ON i.StatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsSubStatus sub_s ON i.Status = sub_s.StatusCode AND sub_s.Type = 'STATUS'
+      LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
       LEFT JOIN (
         SELECT r1.*
         FROM dbo.EV_RentItem r1

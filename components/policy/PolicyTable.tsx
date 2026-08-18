@@ -52,7 +52,7 @@ export function PolicyTable({
             <th className="py-3 px-4">📜 พ.ร.บ. (PLMC)</th>
             <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
             <th className="py-3 px-4">⏱️ ภาษีมิเตอร์แท็กซี่</th>
-            <th className="py-3 px-4">ผู้เช่า / สัญญา</th>
+            <th className="py-3 px-4">สถานะรถ / สถานที่</th>
             <th className="py-3 px-4 text-center">จัดการ</th>
           </tr>
         </thead>
@@ -74,6 +74,28 @@ export function PolicyTable({
                 ? rec.actFilePath
                 : `${SPACES_CDN}/${rec.actFilePath}`
               : null
+
+            // Determine status style
+            let statusStyle = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+            let statusDot = 'bg-zinc-400'
+            const s = (rec.status || '').toUpperCase()
+
+            if (s === 'ON_RENT') {
+              statusStyle = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+              statusDot = 'bg-emerald-500'
+            } else if (s === 'AVAILABLE') {
+              statusStyle = 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+              statusDot = 'bg-sky-500'
+            } else if (s === 'MAINTENANCE') {
+              statusStyle = 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+              statusDot = 'bg-rose-500'
+            } else if (s === 'REPLACEMENT') {
+              statusStyle = 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+              statusDot = 'bg-purple-500'
+            } else if (s === 'PENDING' || s === 'PRODUCTION') {
+              statusStyle = 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+              statusDot = 'bg-amber-500'
+            }
 
             return (
               <tr
@@ -211,21 +233,29 @@ export function PolicyTable({
                   )}
                 </td>
 
-                {/* 6. Customer / Contract */}
+                {/* 6. Vehicle Status & Location */}
                 <td className="py-3 px-4">
-                  <div className="text-zinc-900 dark:text-zinc-100 font-medium">
-                    {rec.customerName || '-'}
+                  <div className="space-y-1">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusStyle}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                      {rec.statusName || rec.status || 'ไม่ระบุ'}
+                    </span>
+
+                    {rec.locationName && (
+                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                        <span className="text-zinc-400">📍</span>
+                        <span className="truncate max-w-[150px]" title={rec.locationName}>
+                          {rec.locationName}
+                        </span>
+                      </div>
+                    )}
+
+                    {rec.customerName && (
+                      <div className="text-[10px] text-zinc-400 truncate max-w-[150px]">
+                        ผู้เช่า: {rec.customerName}
+                      </div>
+                    )}
                   </div>
-                  {rec.contractNo && (
-                    <div className="text-[11px] text-zinc-500 font-mono mt-0.5">
-                      สัญญา: {rec.contractNo}
-                    </div>
-                  )}
-                  {rec.phoneNo && (
-                    <div className="text-[11px] text-zinc-400 mt-0.5">
-                      📞 {rec.phoneNo}
-                    </div>
-                  )}
                 </td>
 
                 {/* 7. Row Actions */}

@@ -181,6 +181,8 @@ function PolicyPageContent() {
         'เลขตัวถัง (VIN)': r.vinNo,
         'รุ่นรถ': r.model || '-',
         'โครงการ': r.project || '-',
+        'สถานะรถ': r.statusName || r.status || '-',
+        'สถานที่จอด': r.locationName || '-',
         'ประเภทประกัน': r.insuranceType || '-',
         'เลขกรมธรรม์ประกัน': r.insurancePolicyNo || '-',
         'วันหมดอายุประกัน': formatThaiDate(r.insuranceEndDate),

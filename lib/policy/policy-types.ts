@@ -20,8 +20,10 @@ export interface PolicyVehicleRecord {
   project: string | null
   projectType: string | null
   currentLocation: string | null
+  locationName?: string | null
   status: string | null
   statusType: string | null
+  statusName?: string | null
   
   // Insurance (PLMV - Voluntary)
   insurancePolicyNo: string | null
