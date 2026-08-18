@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- View: dbo.View_VehicleLocationLog & dbo.View_VehicleMovementLog
 -- Description: Vehicle Location Movement & Relocation History Log
--- Source: dbo.EV_VehicleLocationLog joined with dbo.EV_MsSubStatus (Type='LOCATION')
+-- Source: dbo.EV_VehicleLocationLog joined with dbo.EV_MsSubStatus (Type='LOCATION') & dbo.EV_MsStatus
 -- Used by: EV7 Dashboard & Butter AI Chatbot Assistant
 -- ==============================================================================
 
@@ -22,6 +22,10 @@ SELECT
     i.Model,
     i.Project,
     i.ProjectType,
+    i.Status AS StatusCode,
+    ISNULL(st.DescriptionStatus, ISNULL(st.StatusName, i.Status)) AS StatusName,
+    i.StatusType,
+    ISNULL(subSt.DescriptionStatus, ISNULL(subSt.StatusName, i.StatusType)) AS SubStatusName,
     l.OldLocation AS FromLocationCode,
     ISNULL(locFrom.StatusName, l.OldLocation) AS FromLocation,
     l.NewLocation AS ToLocationCode,
@@ -42,6 +46,8 @@ SELECT
 FROM dbo.EV_VehicleLocationLog l
 LEFT JOIN dbo.EV_InventoryItem i ON l.InventoryItemID = i.InventoryItemID
 LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
+LEFT JOIN dbo.EV_MsStatus st ON i.Status = st.StatusCode
+LEFT JOIN dbo.EV_MsSubStatus subSt ON i.StatusType = subSt.StatusCode
 LEFT JOIN dbo.EV_MsSubStatus locFrom ON l.OldLocation = locFrom.StatusCode AND locFrom.Type = 'LOCATION'
 LEFT JOIN dbo.EV_MsSubStatus locTo ON l.NewLocation = locTo.StatusCode AND locTo.Type = 'LOCATION';
 GO

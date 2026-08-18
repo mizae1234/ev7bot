@@ -13,6 +13,10 @@ interface VehicleLocationMovementItem {
   registerNo: string | null
   model: string | null
   project: string | null
+  statusCode: string | null
+  statusName: string | null
+  statusType: string | null
+  subStatusName: string | null
   currentLocation: string | null
   currentLocationName: string | null
   fromLocation: string | null
@@ -31,6 +35,8 @@ interface MovementStats {
   uniqueVehicles: number
 }
 
+// SQL Server stores Bangkok time directly — mssql driver serializes as UTC (Z suffix).
+// Use UTC methods to format date/time without double +7 offset.
 function formatThaiDate(dateStr?: string | null): string {
   if (!dateStr) return '-'
   try {
@@ -63,6 +69,42 @@ function formatThaiDateTime(dateStr?: string | null): string {
   }
 }
 
+function getVehicleStatusBadge(statusCode?: string | null, statusName?: string | null, subStatusName?: string | null) {
+  if (!statusCode && !statusName) return <span className="text-zinc-400 text-xs">-</span>
+  
+  const code = (statusCode || '').toUpperCase()
+  let colorClass = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+  
+  if (code.includes('AVAILABLE') || code.includes('READY')) {
+    colorClass = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+  } else if (code.includes('ON_RENT') || code.includes('ONRENT')) {
+    colorClass = 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+  } else if (code.includes('MAINTENANCE') || code.includes('REPAIR')) {
+    colorClass = 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+  } else if (code.includes('REPLACEMENT')) {
+    colorClass = 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+  } else if (code.includes('PRODUCTION')) {
+    colorClass = 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+  } else if (code.includes('REPOSSESS') || code.includes('ACCIDENT')) {
+    colorClass = 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+  } else if (code.includes('GR') || code.includes('WAITING')) {
+    colorClass = 'bg-yellow-50 dark:bg-yellow-950/50 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <span className={`inline-block px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${colorClass}`}>
+        {statusName || statusCode}
+      </span>
+      {subStatusName && (
+        <div className="text-[10px] text-zinc-400 font-medium">
+          {subStatusName}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function VehicleMovementContent() {
   const [records, setRecords] = useState<VehicleLocationMovementItem[]>([])
   const [stats, setStats] = useState<MovementStats>({
@@ -82,7 +124,6 @@ function VehicleMovementContent() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-
   const [exportLoading, setExportLoading] = useState(false)
 
   // Debounce search
@@ -107,16 +148,18 @@ function VehicleMovementContent() {
       if (endDate) params.set('endDate', endDate)
 
       const res = await fetch(`/api/vehicle-movement?${params.toString()}`)
-      if (!res.ok) throw new Error('ไม่สามารถโหลดข้อมูลประวัติการย้ายสถานที่รถได้')
+      if (!res.ok) {
+        throw new Error(`HTTP Error: ${res.status}`)
+      }
 
       const data = await res.json()
       setRecords(data.records || [])
       setStats(data.stats || { totalCount: 0, thisMonthCount: 0, todayCount: 0, uniqueVehicles: 0 })
       setTotal(data.pagination?.total || 0)
       setTotalPages(data.pagination?.totalPages || 1)
-    } catch (err: unknown) {
-      console.error(err)
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดข้อมูล')
+    } catch (err) {
+      console.error('Fetch movement logs failed:', err)
+      setError('ไม่สามารถดึงข้อมูลประวัติการย้ายสถานที่ได้')
     } finally {
       setLoading(false)
     }
@@ -126,13 +169,20 @@ function VehicleMovementContent() {
     fetchData()
   }, [fetchData])
 
-  // Export Excel
+  const handleResetFilters = () => {
+    setSearch('')
+    setDebouncedSearch('')
+    setStartDate('')
+    setEndDate('')
+    setPage(1)
+  }
+
   const handleExportExcel = async () => {
     try {
       setExportLoading(true)
       const params = new URLSearchParams()
       params.set('page', '1')
-      params.set('limit', '2000')
+      params.set('limit', '5000')
       if (debouncedSearch) params.set('search', debouncedSearch)
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
@@ -147,13 +197,14 @@ function VehicleMovementContent() {
         'เลขตัวถัง (VIN)': r.vinNo,
         'รุ่นรถ': r.model || '-',
         'โครงการ': r.project || '-',
+        'สถานะรถ': r.statusName || r.statusCode || '-',
+        'Sub-Status': r.subStatusName || r.statusType || '-',
         'สถานที่ต้นทาง': r.fromLocation || '-',
         'สถานที่ปลายทาง': r.toLocation || '-',
         'สถานที่จอดปัจจุบัน': r.currentLocationName || r.currentLocation || '-',
         'วันที่ย้าย': formatThaiDate(r.movementDate),
         'เวลาที่ย้าย': formatThaiDateTime(r.movementDate),
         'ผู้ดำเนินการย้าย': r.createUserName || '-',
-        'รายละเอียดบันทึก': r.movementDetail || '-',
         'วันที่บันทึกเข้าระบบ': formatThaiDateTime(r.createDate)
       }))
 
@@ -232,7 +283,7 @@ function VehicleMovementContent() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 ค้นหา ทะเบียนรถ, VIN, สถานที่ต้นทาง, สถานที่ปลายทาง, ผู้ย้าย..."
+                placeholder="🔍 ค้นหา ทะเบียนรถ, VIN, สถานะรถ, สถานที่ต้นทาง, สถานที่ปลายทาง, ผู้ย้าย..."
                 className="w-full pl-3 pr-8 py-2 rounded-xl text-xs bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
               {search && (
@@ -246,38 +297,39 @@ function VehicleMovementContent() {
               )}
             </div>
 
-            {/* Date Filters */}
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <div className="flex items-center gap-1">
-                <span className="text-zinc-400 text-[11px]">ตั้งแต่:</span>
+            {/* Date Range Inputs */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/80 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[11px] text-zinc-400">จาก:</span>
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-                  className="px-2 py-1.5 rounded-xl text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className="bg-transparent text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-1">
-                <span className="text-zinc-400 text-[11px]">ถึง:</span>
+              <div className="flex items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/80 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                <span className="text-[11px] text-zinc-400">ถึง:</span>
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-                  className="px-2 py-1.5 rounded-xl text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    setPage(1)
+                  }}
+                  className="bg-transparent text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none"
                 />
               </div>
 
-              {(startDate || endDate || search) && (
+              {(search || startDate || endDate) && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearch('')
-                    setStartDate('')
-                    setEndDate('')
-                    setPage(1)
-                  }}
-                  className="px-2.5 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer"
+                  onClick={handleResetFilters}
+                  className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition-colors cursor-pointer"
                 >
                   ล้างตัวกรอง
                 </button>
@@ -286,38 +338,41 @@ function VehicleMovementContent() {
           </div>
         </div>
 
-        {/* 4. Table / Data List */}
+        {/* 4. Table & List Section */}
         {loading ? (
-          <div className="text-center py-16 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800">
-            <div className="animate-spin text-3xl mb-2">🔄</div>
-            <p className="text-sm text-zinc-500">กำลังโหลดประวัติการย้ายสถานที่รถ...</p>
+          <div className="py-20 text-center space-y-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800">
+            <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-zinc-400">กำลังโหลดประวัติการย้ายสถานที่รถ...</p>
           </div>
         ) : error ? (
-          <div className="p-6 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl text-center">
-            <p className="text-sm text-red-600 dark:text-red-400 font-semibold">{error}</p>
+          <div className="py-16 text-center space-y-2 bg-white dark:bg-zinc-900 rounded-2xl border border-rose-200 dark:border-rose-900/40 text-rose-600">
+            <span className="text-2xl">⚠️</span>
+            <p className="text-xs font-semibold">{error}</p>
             <button
+              type="button"
               onClick={() => fetchData()}
-              className="mt-3 px-4 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="text-xs underline hover:opacity-80"
             >
               ลองใหม่อีกครั้ง
             </button>
           </div>
         ) : records.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800">
-            <span className="text-4xl">📍✨</span>
-            <h3 className="mt-2 text-sm font-bold text-zinc-800 dark:text-zinc-200">ไม่พบรายการย้ายสถานที่</h3>
-            <p className="text-xs text-zinc-400 mt-1">ลองปรับเงื่อนไขการค้นหา หรือช่วงเวลาใหม่</p>
+          <div className="py-20 text-center space-y-2 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-zinc-400">
+            <span className="text-3xl">📍✨</span>
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">ไม่พบประวัติการย้ายสถานที่</p>
+            <p className="text-xs text-zinc-400">ลองเปลี่ยนคำค้นหา หรือช่วงวันที่ดูใหม่อีกครั้ง</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Desktop Table */}
-            <div className="hidden lg:block overflow-hidden bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px]">
+                    <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px]">
                       <th className="py-3.5 px-4 w-12 text-center">#</th>
                       <th className="py-3.5 px-4">🚗 ข้อมูลตัวรถ & ทะเบียน</th>
+                      <th className="py-3.5 px-4">🏷️ สถานะรถ</th>
                       <th className="py-3.5 px-4">📍 เส้นทางการย้าย (ต้นทาง ➔ ปลายทาง)</th>
                       <th className="py-3.5 px-4">📅 วันที่ & เวลาที่ย้าย</th>
                       <th className="py-3.5 px-4">👤 ผู้ดำเนินการย้าย</th>
@@ -356,6 +411,11 @@ function VehicleMovementContent() {
                                 {r.vinNo}
                               </div>
                             </div>
+                          </td>
+
+                          {/* Vehicle Status */}
+                          <td className="py-3.5 px-4">
+                            {getVehicleStatusBadge(r.statusCode, r.statusName, r.subStatusName)}
                           </td>
 
                           {/* Route Badge (From -> To) */}
@@ -413,19 +473,24 @@ function VehicleMovementContent() {
                     className="p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-2.5 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-zinc-400">#{rowNum}</span>
-                        <Link
-                          href={`/vehicle/${r.registerNo || r.vinNo}`}
-                          className="font-bold text-sm text-zinc-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400"
-                        >
-                          {r.registerNo || 'ไม่มีทะเบียน'}
-                        </Link>
-                        {r.model && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-                            {r.model}
-                          </span>
-                        )}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-zinc-400">#{rowNum}</span>
+                          <Link
+                            href={`/vehicle/${r.registerNo || r.vinNo}`}
+                            className="font-bold text-sm text-zinc-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400"
+                          >
+                            {r.registerNo || 'ไม่มีทะเบียน'}
+                          </Link>
+                          {r.model && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                              {r.model}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          {getVehicleStatusBadge(r.statusCode, r.statusName, r.subStatusName)}
+                        </div>
                       </div>
 
                       <span className="text-[11px] text-zinc-400">

@@ -21,6 +21,10 @@ export interface VehicleLocationMovementItem {
   registerNo: string | null
   model: string | null
   project: string | null
+  statusCode: string | null
+  statusName: string | null
+  statusType: string | null
+  subStatusName: string | null
   currentLocation: string | null
   currentLocationName: string | null
   fromLocation: string | null
@@ -54,7 +58,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // 1. Query strictly from dbo.EV_VehicleLocationLog joined with dbo.EV_MsSubStatus for Thai names
+    // 1. Query strictly from dbo.EV_VehicleLocationLog joined with EV_MsSubStatus & EV_MsStatus
     const baseCte = `
       WITH MovementView AS (
         SELECT
@@ -64,6 +68,10 @@ export async function GET(req: NextRequest) {
           i.RegisterNo AS registerNo,
           i.Model AS model,
           i.Project AS project,
+          i.Status AS statusCode,
+          ISNULL(st.DescriptionStatus, ISNULL(st.StatusName, i.Status)) AS statusName,
+          i.StatusType AS statusType,
+          ISNULL(subSt.DescriptionStatus, ISNULL(subSt.StatusName, i.StatusType)) AS subStatusName,
           l.NewLocation AS currentLocation,
           ISNULL(locTo.StatusName, l.NewLocation) AS currentLocationName,
           ISNULL(locFrom.StatusName, l.OldLocation) AS fromLocation,
@@ -81,6 +89,8 @@ export async function GET(req: NextRequest) {
         FROM dbo.EV_VehicleLocationLog l
         LEFT JOIN dbo.EV_InventoryItem i ON l.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
+        LEFT JOIN dbo.EV_MsStatus st ON i.Status = st.StatusCode
+        LEFT JOIN dbo.EV_MsSubStatus subSt ON i.StatusType = subSt.StatusCode
         LEFT JOIN dbo.EV_MsSubStatus locFrom ON l.OldLocation = locFrom.StatusCode AND locFrom.Type = 'LOCATION'
         LEFT JOIN dbo.EV_MsSubStatus locTo ON l.NewLocation = locTo.StatusCode AND locTo.Type = 'LOCATION'
       )
@@ -99,6 +109,7 @@ export async function GET(req: NextRequest) {
         vinNo LIKE @search OR
         registerNo LIKE @search OR
         model LIKE @search OR
+        statusName LIKE @search OR
         fromLocation LIKE @search OR
         toLocation LIKE @search OR
         movementDetail LIKE @search OR
@@ -173,6 +184,10 @@ export async function GET(req: NextRequest) {
         registerNo: (row.registerNo as string) || null,
         model: (row.model as string) || null,
         project: (row.project as string) || null,
+        statusCode: (row.statusCode as string) || null,
+        statusName: (row.statusName as string) || null,
+        statusType: (row.statusType as string) || null,
+        subStatusName: (row.subStatusName as string) || null,
         currentLocation: (row.currentLocation as string) || null,
         currentLocationName: (row.currentLocationName as string) || null,
         fromLocation: (row.fromLocation as string) || null,
