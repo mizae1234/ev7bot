@@ -39,6 +39,14 @@ export interface MovementStats {
   uniqueVehicles: number
 }
 
+function cleanLocationName(raw: string | null, locMap: Map<string, string>): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  // Remove any trailing action tag like (QUICK_REPORT_LOC)
+  const stripped = trimmed.replace(/\s*\([A-Z0-9_ -]+\)\s*$/i, '').trim()
+  return locMap.get(stripped) || locMap.get(trimmed) || stripped || trimmed
+}
+
 function parseLocationNote(noteDetail: string | null, locMap: Map<string, string>): {
   fromLocation: string | null
   toLocation: string | null
@@ -52,8 +60,8 @@ function parseLocationNote(noteDetail: string | null, locMap: Map<string, string
     const rawTo = arrowMatch[2]?.trim() || null
     const rawActor = arrowMatch[3]?.trim() || null
 
-    const fromLoc = rawFrom ? (locMap.get(rawFrom) || rawFrom) : null
-    const toLoc = rawTo ? (locMap.get(rawTo) || rawTo) : null
+    const fromLoc = cleanLocationName(rawFrom, locMap)
+    const toLoc = cleanLocationName(rawTo, locMap)
     return { fromLocation: fromLoc, toLocation: toLoc, actor: rawActor }
   }
 
@@ -90,32 +98,9 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // 2. High performance optimized CTE
+    // 2. High performance optimized CTE (Strictly from EV_VehicleNote to avoid duplicate DB trigger logs)
     const baseCte = `
       WITH LocationMovements AS (
-        -- A. บันทึกจาก EV_VehicleLocationLog (ถ้ามี)
-        SELECT
-          CONCAT('LOC-', ISNULL(CAST(l.InventoryItemID AS VARCHAR(20)), '0'), '-', CONVERT(VARCHAR(30), l.CreateDate, 126)) AS movementId,
-          l.InventoryItemID AS inventoryItemId,
-          l.VinNo AS vinNo,
-          i.RegisterNo AS registerNo,
-          i.Model AS model,
-          i.Project AS project,
-          l.NewLocation AS currentLocation,
-          l.OldLocation AS originLocation,
-          l.NewLocation AS destinationLocation,
-          CONCAT(N'📍 ย้ายสถานที่: ', ISNULL(l.OldLocation, '-'), N' → ', ISNULL(l.NewLocation, '-'), CASE WHEN l.ActionCode IS NOT NULL THEN CONCAT(N' (', l.ActionCode, N')') ELSE N'' END) AS movementDetail,
-          l.CreateDate AS movementDate,
-          l.CreateDate AS createDate,
-          l.CreateUserID AS createUserId,
-          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
-        FROM dbo.EV_VehicleLocationLog l
-        LEFT JOIN dbo.EV_InventoryItem i ON l.InventoryItemID = i.InventoryItemID
-        LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
-
-        UNION ALL
-
-        -- B. บันทึกจาก EV_VehicleNote
         SELECT
           CONCAT('NOTE-', n.VehicleNoteID) AS movementId,
           n.InventoryItemID AS inventoryItemId,
@@ -124,8 +109,6 @@ export async function GET(req: NextRequest) {
           i.Model AS model,
           i.Project AS project,
           i.CurrentLocation AS currentLocation,
-          NULL AS originLocation,
-          NULL AS destinationLocation,
           n.NoteDetail AS movementDetail,
           n.CreateDate AS movementDate,
           n.CreateDate AS createDate,
