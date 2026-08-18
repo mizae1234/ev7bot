@@ -137,3 +137,22 @@ export function getExpiryBadge(status: ExpiryStatus, daysLeft: number | null) {
       }
   }
 }
+
+export function getInsuranceTypeLabel(typeCode?: string | null, typeName?: string | null): string {
+  if (typeName && typeName.trim()) return typeName.trim()
+  if (!typeCode) return 'ประกันภัย'
+  const c = typeCode.trim().toUpperCase()
+  const map: Record<string, string> = {
+    DV1: 'ประกันชั้น 1',
+    DV2: 'ประกันชั้น 2',
+    DV3: 'ประกันชั้น 3',
+    DV5: 'ประกัน 2+/3+',
+    DAC: 'พ.ร.บ.',
+    TAX_VEHICLE: 'ภาษีรถยนต์',
+    TAX_METER: 'ภาษีมิเตอร์',
+    PLMV: 'ประกันภาคสมัครใจ',
+    PLMC: 'พ.ร.บ.'
+  }
+  return map[c] || typeCode
+}
+

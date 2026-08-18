@@ -10,7 +10,7 @@ import {
   InsuranceMasterType,
   InsuranceCompanyOption
 } from '@/lib/policy/policy-types'
-import { formatThaiDate } from '@/lib/policy/policy-constants'
+import { formatThaiDate, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 import { PolicyStatsCards } from '@/components/policy/PolicyStatsCards'
 import { PolicyFilters } from '@/components/policy/PolicyFilters'
 import { PolicyTable } from '@/components/policy/PolicyTable'
@@ -201,7 +201,7 @@ function PolicyPageContent() {
         'โครงการ': r.project || '-',
         'สถานะรถ': r.statusName || r.status || '-',
         'สถานที่จอด': r.locationName || '-',
-        'ประเภทประกัน': r.insuranceType || '-',
+        'ประเภทประกัน': getInsuranceTypeLabel(r.insuranceType, r.insuranceTypeName),
         'บริษัทประกัน': r.insuranceCompany || '-',
         'เลขกรมธรรม์ประกัน': r.insurancePolicyNo || '-',
         'วันหมดอายุประกัน': formatThaiDate(r.insuranceEndDate),

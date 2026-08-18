@@ -1,6 +1,6 @@
 import React from 'react'
 import { PolicyVehicleRecord } from '@/lib/policy/policy-types'
-import { formatThaiDate, getExpiryBadge } from '@/lib/policy/policy-constants'
+import { formatThaiDate, getExpiryBadge, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 
 interface PolicyTableProps {
   records: PolicyVehicleRecord[]
@@ -126,11 +126,11 @@ export function PolicyTable({
                 <td className="py-3 px-4">
                   {rec.insurancePolicyNo ? (
                     <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="px-1.5 py-0.5 text-[10px] rounded font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40">
-                          {rec.insuranceType || 'PLMV'}
+                          {getInsuranceTypeLabel(rec.insuranceType, rec.insuranceTypeName)}
                         </span>
-                        <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200">
+                        <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200 text-xs">
                           {rec.insurancePolicyNo}
                         </span>
                       </div>
