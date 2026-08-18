@@ -85,7 +85,7 @@ export function VehicleLocationHistory({ registerNo, vinNo, movements }: Vehicle
       </div>
 
       {/* Content */}
-      <div className="p-4 sm:p-5">
+      <div className="p-4 sm:p-5 space-y-4">
         {movements.length === 0 ? (
           <div className="text-center py-8 text-zinc-400 space-y-1.5">
             <span className="text-3xl">📍✨</span>
@@ -93,7 +93,38 @@ export function VehicleLocationHistory({ registerNo, vinNo, movements }: Vehicle
             <p className="text-[11px] text-zinc-400">เมื่อมีการเปลี่ยนสถานที่จอดรถ ระบบจะบันทึกประวัติการย้ายสถานที่เข้ามาที่นี่โดยอัตโนมัติ</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Summary Mini Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 space-y-0.5">
+                <span className="text-[11px] font-semibold text-zinc-400">📊 ย้ายสถานที่ทั้งหมด</span>
+                <p className="text-base font-black text-zinc-900 dark:text-white">
+                  {movements.length} <span className="text-xs font-normal text-zinc-400">ครั้ง</span>
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/50 space-y-0.5">
+                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">📍 จุดจอดล่าสุด</span>
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate" title={movements[0]?.toLocation || movements[0]?.fromLocation || '-'}>
+                  {movements[0]?.toLocation || movements[0]?.fromLocation || '-'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 space-y-0.5">
+                <span className="text-[11px] font-semibold text-zinc-400">📅 ย้ายล่าสุดเมื่อ</span>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                  {formatThaiDate(movements[0]?.movementDate)}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 space-y-0.5">
+                <span className="text-[11px] font-semibold text-zinc-400">👤 ผู้ดำเนินการล่าสุด</span>
+                <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                  {movements[0]?.createUserName || '-'}
+                </p>
+              </div>
+            </div>
+
             {/* Desktop Table */}
             <div className="hidden sm:block overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-800">
               <table className="w-full text-left text-xs border-collapse">

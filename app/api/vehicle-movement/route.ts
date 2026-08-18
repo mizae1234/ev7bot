@@ -91,9 +91,32 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // 2. Query strictly location movement notes & logs
+    // 2. Query strictly location movement notes & structured location logs
     const baseCte = `
       WITH LocationMovements AS (
+        -- A. บันทึกจาก EV_VehicleLocationLog (ถ้ามี)
+        SELECT
+          CONCAT('LOC-', ISNULL(CAST(l.InventoryItemID AS VARCHAR), '0'), '-', FORMAT(l.CreateDate, 'yyyyMMddHHmmssfff')) AS movementId,
+          l.InventoryItemID AS inventoryItemId,
+          l.VinNo AS vinNo,
+          i.RegisterNo AS registerNo,
+          i.Model AS model,
+          i.Project AS project,
+          l.NewLocation AS currentLocation,
+          l.OldLocation AS originLocation,
+          l.NewLocation AS destinationLocation,
+          CONCAT(N'📍 ย้ายสถานที่: ', ISNULL(l.OldLocation, '-'), N' → ', ISNULL(l.NewLocation, '-'), CASE WHEN l.ActionCode IS NOT NULL THEN CONCAT(N' (', l.ActionCode, N')') ELSE N'' END) AS movementDetail,
+          TRY_CAST(l.CreateDate AS DATETIME) AS movementDate,
+          TRY_CAST(l.CreateDate AS DATETIME) AS createDate,
+          l.CreateUserID AS createUserId,
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
+        FROM dbo.EV_VehicleLocationLog l
+        LEFT JOIN dbo.EV_InventoryItem i ON (l.InventoryItemID = i.InventoryItemID OR l.VinNo = i.VinNo)
+        LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
+
+        UNION ALL
+
+        -- B. บันทึกจาก EV_VehicleNote
         SELECT
           CONCAT('NOTE-', n.VehicleNoteID) AS movementId,
           n.InventoryItemID AS inventoryItemId,
@@ -102,6 +125,8 @@ export async function GET(req: NextRequest) {
           i.Model AS model,
           i.Project AS project,
           i.CurrentLocation AS currentLocation,
+          NULL AS originLocation,
+          NULL AS destinationLocation,
           n.NoteDetail AS movementDetail,
           TRY_CAST(n.CreateDate AS DATETIME) AS movementDate,
           TRY_CAST(n.CreateDate AS DATETIME) AS createDate,
