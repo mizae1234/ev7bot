@@ -146,20 +146,20 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 1. Brand Logo */}
-          <div className="flex items-center gap-6 lg:gap-8">
+          <div className="flex items-center gap-3 lg:gap-5 shrink-0">
             <Link
               href="/dashboard"
-              className="flex items-center gap-3 group transition-transform active:scale-98"
+              className="flex items-center gap-2.5 group transition-transform active:scale-98 shrink-0"
             >
-              <div className="relative h-8 sm:h-9 flex items-center bg-white/60 dark:bg-white/95 px-2.5 py-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 shadow-xs group-hover:shadow-sm transition-all">
+              <div className="relative h-8 sm:h-9 flex items-center bg-white dark:bg-white px-2 py-0.5 rounded-xl border border-zinc-200/80 dark:border-zinc-700 shadow-xs group-hover:shadow-sm transition-all shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/ev7-logo.png"
                   alt="EV7 Logo"
-                  className="object-contain h-6 sm:h-7 w-auto"
+                  className="object-contain h-6 sm:h-7 w-auto block shrink-0"
                 />
               </div>
-              <div className="hidden lg:flex flex-col">
+              <div className="hidden xl:flex flex-col shrink-0">
                 <span className="font-extrabold text-xs tracking-tight text-zinc-800 dark:text-zinc-200">
                   Operations
                 </span>
@@ -170,11 +170,11 @@ export function Navbar() {
             </Link>
 
             {/* 2. Desktop Navigation */}
-            <nav ref={dropdownRef} className="hidden md:flex items-center gap-1.5">
+            <nav ref={dropdownRef} className="hidden md:flex items-center gap-1 lg:gap-1.5">
               {/* Menu 1: Direct Link to Dashboard (Home) */}
               <Link
                 href="/dashboard"
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                   isDashboardActive
                     ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
                     : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
@@ -187,7 +187,7 @@ export function Navbar() {
               {/* Menu 2: Direct Link to รถทดแทน (Replacements) */}
               <Link
                 href="/replacements"
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                   isReplacementsActive
                     ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
                     : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
@@ -207,7 +207,7 @@ export function Navbar() {
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(isOpen ? null : group.id)}
-                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                         active
                           ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80'
                           : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
@@ -230,7 +230,7 @@ export function Navbar() {
                     {/* Dropdown Menu */}
                     {isOpen && (
                       <div className="absolute left-0 mt-2 w-80 rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/80 dark:border-zinc-800 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                        <div className="px-3 py-1.5 mb-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                        <div className="px-3 py-1.5 mb-1 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                           {group.label}
                         </div>
                         <div className="space-y-1">
@@ -251,11 +251,11 @@ export function Navbar() {
                                 <span className="text-xl shrink-0 mt-0.5">{item.icon}</span>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-semibold truncate text-zinc-900 dark:text-white">
+                                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
                                       {item.name}
                                     </span>
                                     {item.badge && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                         {item.badge}
                                       </span>
                                     )}
@@ -317,10 +317,10 @@ export function Navbar() {
             >
               <span className="text-xl shrink-0">📊</span>
               <div>
-                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                <span className="text-sm font-semibold text-zinc-900 dark:text-white">
                   แดชบอร์ด (Dashboard)
                 </span>
-                <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
                   ภาพรวมการส่งมอบ งานซ่อม และสถิติ
                 </p>
               </div>
@@ -338,10 +338,10 @@ export function Navbar() {
             >
               <span className="text-xl shrink-0">🚗🔄</span>
               <div>
-                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                <span className="text-sm font-semibold text-zinc-900 dark:text-white">
                   รถทดแทน (Replacements)
                 </span>
-                <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500">
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
                   ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ และโควตาจอง
                 </p>
               </div>
@@ -351,7 +351,7 @@ export function Navbar() {
           {/* Grouped Menus: งานซ่อม, งานประกัน, ส่งมอบ & รับคืน, อื่นๆ */}
           {navGroups.map((group) => (
             <div key={group.id} className="space-y-1.5">
-              <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                 <span>{group.icon}</span>
                 <span>{group.label}</span>
               </div>
