@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const files = formData.getAll('files') as File[]
     const lineUserId = (formData.get('lineUserId') as string) || ''
+    const globalCompany = (formData.get('insuranceCompany') as string) || 'ไอแคร์ประกันภัย'
     const metadataStr = (formData.get('metadata') as string) || ''
 
     if (!files || files.length === 0) {
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
         const policyTypeName = override.policyTypeName || parsed.policyTypeName
         const startDate = override.startDate || parsed.startDateStr
         const endDate = override.endDate || parsed.expiryDateStr
+        const company = override.insuranceCompany || globalCompany
 
         if (!vinNo || !endDate || !policyNo || docType === 'UNKNOWN') {
           errors.push(`ไฟล์ "${file.name}": ข้อมูลไม่ครบถ้วนหรือไม่สามารถอ่านเลขตัวถัง/วันหมดอายุได้`)
@@ -97,6 +99,7 @@ export async function POST(req: NextRequest) {
           policyNo,
           startDate,
           endDate,
+          company,
           originalFileName: file.name,
           filePath: s3Key,
           fileSize: file.size,

@@ -10,6 +10,11 @@ export interface InsuranceMasterType {
   isActive: boolean
 }
 
+export interface InsuranceCompanyOption {
+  statusCode: string
+  statusName: string
+}
+
 export type ExpiryStatus = 'ACTIVE' | 'WARNING_60' | 'WARNING_30' | 'EXPIRED' | 'MISSING'
 
 export interface PolicyVehicleRecord {
@@ -114,6 +119,7 @@ export interface PolicyLogItem {
   policyType: string | null
   policyTypeName: string | null
   policyNo: string | null
+  insuranceCompany?: string | null
   startDate: string | null
   endDate: string | null
   originalFileName: string | null

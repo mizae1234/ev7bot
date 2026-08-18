@@ -1,10 +1,11 @@
 import React, { useState, useRef, useMemo } from 'react'
 import { parsePolicyFileName } from '@/lib/policy/policy-parser'
-import { ParsedPolicyFile } from '@/lib/policy/policy-types'
+import { ParsedPolicyFile, InsuranceCompanyOption } from '@/lib/policy/policy-types'
 import { formatThaiDate } from '@/lib/policy/policy-constants'
 
 interface PolicyBatchUploadProps {
   lineUserId?: string | null
+  companies?: InsuranceCompanyOption[]
   onUploadSuccess: () => void
 }
 
@@ -19,10 +20,11 @@ interface UploadQueueItem extends ParsedPolicyFile {
 const CHUNK_SIZE = 15 // Number of files per HTTP batch request
 const CONCURRENCY = 4 // Number of parallel batch requests
 
-export function PolicyBatchUpload({ lineUserId, onUploadSuccess }: PolicyBatchUploadProps) {
+export function PolicyBatchUpload({ lineUserId, companies = [], onUploadSuccess }: PolicyBatchUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<UploadQueueItem[]>([])
   const [uploading, setUploading] = useState(false)
+  const [selectedCompany, setSelectedCompany] = useState<string>('ไอแคร์ประกันภัย')
   const isPausedRef = useRef(false)
 
   // Progress metrics
@@ -93,6 +95,7 @@ export function PolicyBatchUpload({ lineUserId, onUploadSuccess }: PolicyBatchUp
     const formData = new FormData()
     chunk.forEach(it => formData.append('files', it.file))
     if (lineUserId) formData.append('lineUserId', lineUserId)
+    formData.append('insuranceCompany', selectedCompany || 'ไอแคร์ประกันภัย')
 
     const metadataMap: Record<string, any> = {}
     chunk.forEach(it => {
@@ -102,6 +105,7 @@ export function PolicyBatchUpload({ lineUserId, onUploadSuccess }: PolicyBatchUp
         policyType: it.policyType,
         policyTypeName: it.policyTypeName,
         policyNo: it.policyNo,
+        insuranceCompany: selectedCompany || 'ไอแคร์ประกันภัย',
         startDate: it.startDateStr,
         endDate: it.expiryDateStr
       }
@@ -302,6 +306,45 @@ export function PolicyBatchUpload({ lineUserId, onUploadSuccess }: PolicyBatchUp
 
   return (
     <div className="space-y-5">
+      {/* 🏢 Select Insurance Company (Required from EV_MsSubStatus) */}
+      <div className="p-4.5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-600/5 to-transparent border border-amber-300 dark:border-amber-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-2xl bg-amber-500 text-zinc-950 font-bold text-base shadow-sm">
+            🏢
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                เลือกบริษัทประกันภัย (Insurance Company)
+              </h4>
+              <span className="text-rose-500 font-bold text-xs">* จำเป็นต้องเลือก</span>
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              กำหนดบริษัทประกันภัยสำหรับไฟล์กรมธรรม์ชุดที่กำลังจะอัปโหลดนี้
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full sm:w-80">
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            disabled={uploading}
+            className="w-full text-xs font-bold py-2.5 px-3.5 rounded-xl bg-white dark:bg-zinc-900 border-2 border-amber-400 dark:border-amber-600 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+          >
+            {companies.length > 0 ? (
+              companies.map((c) => (
+                <option key={c.statusCode} value={c.statusName}>
+                  {c.statusName} ({c.statusCode})
+                </option>
+              ))
+            ) : (
+              <option value="ไอแคร์ประกันภัย">ไอแคร์ประกันภัย (ICARE_INSURANCE)</option>
+            )}
+          </select>
+        </div>
+      </div>
+
       {/* Dropzone Area */}
       <div
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}

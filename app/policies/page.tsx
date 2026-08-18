@@ -7,7 +7,8 @@ import { Pagination } from '@/components/ui/Pagination'
 import {
   PolicyVehicleRecord,
   PolicyStatsSummary,
-  InsuranceMasterType
+  InsuranceMasterType,
+  InsuranceCompanyOption
 } from '@/lib/policy/policy-types'
 import { formatThaiDate } from '@/lib/policy/policy-constants'
 import { PolicyStatsCards } from '@/components/policy/PolicyStatsCards'
@@ -41,6 +42,7 @@ function PolicyPageContent() {
     totalWithPolicy: 0
   })
   const [masterTypes, setMasterTypes] = useState<InsuranceMasterType[]>([])
+  const [companies, setCompanies] = useState<InsuranceCompanyOption[]>([])
   const [projects, setProjects] = useState<string[]>([])
   const [models, setModels] = useState<string[]>([])
 
@@ -88,6 +90,7 @@ function PolicyPageContent() {
       .then(res => res.json())
       .then(data => {
         if (data.masterTypes) setMasterTypes(data.masterTypes)
+        if (data.companies) setCompanies(data.companies)
       })
       .catch(err => console.error('Failed to load master types:', err))
   }, [])
@@ -184,6 +187,7 @@ function PolicyPageContent() {
         'สถานะรถ': r.statusName || r.status || '-',
         'สถานที่จอด': r.locationName || '-',
         'ประเภทประกัน': r.insuranceType || '-',
+        'บริษัทประกัน': r.insuranceCompany || '-',
         'เลขกรมธรรม์ประกัน': r.insurancePolicyNo || '-',
         'วันหมดอายุประกัน': formatThaiDate(r.insuranceEndDate),
         'สถานะประกัน': r.insuranceDaysLeft !== null ? (r.insuranceDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.insuranceDaysLeft} วัน`) : 'ไม่มีข้อมูล',
@@ -336,6 +340,7 @@ function PolicyPageContent() {
 
           <PolicyBatchUpload
             lineUserId={liffUserId}
+            companies={companies}
             onUploadSuccess={() => {
               fetchPolicies()
             }}
@@ -364,6 +369,7 @@ function PolicyPageContent() {
           fetchPolicies()
         }}
         masterTypes={masterTypes}
+        companies={companies}
         lineUserId={liffUserId}
       />
 

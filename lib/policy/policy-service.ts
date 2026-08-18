@@ -1,6 +1,7 @@
 import { getMSSQLReadOnlyPool, getMSSQLWritePool, sql } from '@/lib/mssql'
 import {
   InsuranceMasterType,
+  InsuranceCompanyOption,
   PolicyVehicleRecord,
   PolicyStatsSummary,
   PolicyLogItem
@@ -28,6 +29,30 @@ export async function getInsuranceMasterTypes(): Promise<InsuranceMasterType[]> 
   } catch (err) {
     console.error('[getInsuranceMasterTypes Error]', err)
     return DEFAULT_INSURANCE_TYPES
+  }
+}
+
+/**
+ * 1.1 Fetch Insurance Companies from dbo.EV_MsSubStatus (Type = 'INSURANCE')
+ */
+export async function getInsuranceCompanies(): Promise<InsuranceCompanyOption[]> {
+  try {
+    const pool = await getMSSQLReadOnlyPool()
+    if (!pool) return [{ statusCode: 'ICARE_INSURANCE', statusName: 'ไอแคร์ประกันภัย' }]
+
+    const result = await pool.request().query(`
+      SELECT StatusCode AS statusCode, StatusName AS statusName
+      FROM dbo.EV_MsSubStatus
+      WHERE Type = 'INSURANCE' AND IsActive = 1
+      ORDER BY StatusCode ASC
+    `)
+
+    return result.recordset.length > 0
+      ? result.recordset
+      : [{ statusCode: 'ICARE_INSURANCE', statusName: 'ไอแคร์ประกันภัย' }]
+  } catch (err) {
+    console.error('[getInsuranceCompanies Error]', err)
+    return [{ statusCode: 'ICARE_INSURANCE', statusName: 'ไอแคร์ประกันภัย' }]
   }
 }
 
@@ -290,6 +315,7 @@ export async function savePolicyPdfRecord(params: {
   originalFileName: string
   filePath: string // S3 Key
   fileSize: number
+  company?: string | null
   userId?: number | null
 }) {
   const pool = await getMSSQLWritePool()
@@ -327,6 +353,7 @@ export async function savePolicyPdfRecord(params: {
     logReq.input('policyType', sql.VarChar, params.policyType || null)
     logReq.input('policyTypeName', sql.NVarChar, params.policyTypeName || null)
     logReq.input('policyNo', sql.VarChar, params.policyNo)
+    logReq.input('company', sql.NVarChar, params.company || 'ไอแคร์ประกันภัย')
     logReq.input('startDate', sql.Date, params.startDate ? new Date(params.startDate) : null)
     logReq.input('endDate', sql.Date, new Date(params.endDate))
     logReq.input('originalFileName', sql.NVarChar, params.originalFileName)
@@ -338,12 +365,12 @@ export async function savePolicyPdfRecord(params: {
     await logReq.query(`
       INSERT INTO dbo.EV_PolicyLog (
         VinNo, RegisterNo, DocType, PolicyType, PolicyTypeName, PolicyNo,
-        StartDate, EndDate, OriginalFileName, FilePath, FileSize, UploadSource,
+        InsuranceCompany, StartDate, EndDate, OriginalFileName, FilePath, FileSize, UploadSource,
         IsCurrent, IsActive, CreateDate, CreateUserID
       )
       VALUES (
         @vinNo, @registerNo, @docType, @policyType, @policyTypeName, @policyNo,
-        @startDate, @endDate, @originalFileName, @filePath, @fileSize, @uploadSource,
+        @company, @startDate, @endDate, @originalFileName, @filePath, @fileSize, @uploadSource,
         1, 1, GETDATE(), @createUserId
       )
     `)
@@ -353,6 +380,7 @@ export async function savePolicyPdfRecord(params: {
     upsertReq.input('vinNo', sql.VarChar, params.vinNo)
     upsertReq.input('registerNo', sql.VarChar, registerNo || null)
     upsertReq.input('policyNo', sql.VarChar, params.policyNo)
+    upsertReq.input('company', sql.NVarChar, params.company || 'ไอแคร์ประกันภัย')
     upsertReq.input('startDate', sql.Date, params.startDate ? new Date(params.startDate) : null)
     upsertReq.input('endDate', sql.Date, new Date(params.endDate))
     upsertReq.input('filePath', sql.VarChar, params.filePath)
@@ -367,6 +395,7 @@ export async function savePolicyPdfRecord(params: {
           SET RegisterNo = COALESCE(@registerNo, RegisterNo),
               InsurancePolicyNo = @policyNo,
               InsuranceType = @policyType,
+              InsuranceCompany = @company,
               InsuranceStartDate = @startDate,
               InsuranceEndDate = @endDate,
               InsuranceFilePath = @filePath,
@@ -377,12 +406,12 @@ export async function savePolicyPdfRecord(params: {
         ELSE
         BEGIN
           INSERT INTO dbo.EV_Policy (
-            VinNo, RegisterNo, InsurancePolicyNo, InsuranceType,
+            VinNo, RegisterNo, InsurancePolicyNo, InsuranceType, InsuranceCompany,
             InsuranceStartDate, InsuranceEndDate, InsuranceFilePath,
             IsActive, CreateDate, CreateUserID
           )
           VALUES (
-            @vinNo, @registerNo, @policyNo, @policyType,
+            @vinNo, @registerNo, @policyNo, @policyType, @company,
             @startDate, @endDate, @filePath,
             1, GETDATE(), @userId
           );
@@ -396,6 +425,7 @@ export async function savePolicyPdfRecord(params: {
           UPDATE dbo.EV_Policy
           SET RegisterNo = COALESCE(@registerNo, RegisterNo),
               ActPolicyNo = @policyNo,
+              ActCompany = @company,
               ActStartDate = @startDate,
               ActEndDate = @endDate,
               ActFilePath = @filePath,
@@ -406,12 +436,12 @@ export async function savePolicyPdfRecord(params: {
         ELSE
         BEGIN
           INSERT INTO dbo.EV_Policy (
-            VinNo, RegisterNo, ActPolicyNo,
+            VinNo, RegisterNo, ActPolicyNo, ActCompany,
             ActStartDate, ActEndDate, ActFilePath,
             IsActive, CreateDate, CreateUserID
           )
           VALUES (
-            @vinNo, @registerNo, @policyNo,
+            @vinNo, @registerNo, @policyNo, @company,
             @startDate, @endDate, @filePath,
             1, GETDATE(), @userId
           );
@@ -559,6 +589,7 @@ export async function getPolicyHistoryByVin(vinNo: string): Promise<PolicyLogIte
       l.PolicyType AS policyType,
       l.PolicyTypeName AS policyTypeName,
       l.PolicyNo AS policyNo,
+      l.InsuranceCompany AS insuranceCompany,
       CONVERT(VARCHAR(10), l.StartDate, 120) AS startDate,
       CONVERT(VARCHAR(10), l.EndDate, 120) AS endDate,
       l.OriginalFileName AS originalFileName,

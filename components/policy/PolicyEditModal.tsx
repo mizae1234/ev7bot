@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { PolicyVehicleRecord, InsuranceMasterType } from '@/lib/policy/policy-types'
+import { PolicyVehicleRecord, InsuranceMasterType, InsuranceCompanyOption } from '@/lib/policy/policy-types'
 
 interface PolicyEditModalProps {
   record: PolicyVehicleRecord | null
@@ -7,6 +7,7 @@ interface PolicyEditModalProps {
   onClose: () => void
   onSaveSuccess: () => void
   masterTypes: InsuranceMasterType[]
+  companies?: InsuranceCompanyOption[]
   lineUserId?: string | null
 }
 
@@ -16,6 +17,7 @@ export function PolicyEditModal({
   onClose,
   onSaveSuccess,
   masterTypes,
+  companies = [],
   lineUserId
 }: PolicyEditModalProps) {
   const [formData, setFormData] = useState<any>({})
@@ -173,6 +175,27 @@ export function PolicyEditModal({
                   onChange={(e) => setFormData({ ...formData, insuranceEndDate: e.target.value })}
                   className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                  🏢 บริษัทประกันภัย
+                </label>
+                <select
+                  value={formData.insuranceCompany || 'ไอแคร์ประกันภัย'}
+                  onChange={(e) => setFormData({ ...formData, insuranceCompany: e.target.value })}
+                  className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                >
+                  {companies.length > 0 ? (
+                    companies.map(c => (
+                      <option key={c.statusCode} value={c.statusName}>
+                        {c.statusName} ({c.statusCode})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="ไอแคร์ประกันภัย">ไอแคร์ประกันภัย (ICARE_INSURANCE)</option>
+                  )}
+                </select>
               </div>
             </div>
           </div>

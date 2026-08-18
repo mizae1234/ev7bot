@@ -1315,6 +1315,7 @@ SELECT
   l.DocType,
   l.PolicyTypeName,
   l.PolicyNo,
+  l.InsuranceCompany,
   l.StartDate,
   l.EndDate,
   l.FilePath,
@@ -1324,6 +1325,18 @@ FROM dbo.EV_PolicyLog l
 WHERE l.VinNo = @vinNo AND l.IsActive = 1
 ORDER BY l.CreateDate DESC;
 ```
+
+#### 3) Master บริษัทประกันภัย (`dbo.EV_MsSubStatus`):
+```sql
+SELECT StatusCode, StatusName, Type, IsActive
+FROM dbo.EV_MsSubStatus
+WHERE Type = 'INSURANCE' AND IsActive = 1
+ORDER BY StatusCode;
+```
+- `ICARE_INSURANCE` ➔ ไอแคร์ประกันภัย
+- `MUANGTHAI_INSURANCE` ➔ เมืองไทยประกันภัย
+- `VIRIYA_INSURANCE` ➔ วิริยะประกันภัย
+
 
 
 

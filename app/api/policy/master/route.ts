@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import { getInsuranceMasterTypes } from '@/lib/policy/policy-service'
+import { getInsuranceMasterTypes, getInsuranceCompanies } from '@/lib/policy/policy-service'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const masterTypes = await getInsuranceMasterTypes()
-    return NextResponse.json({ masterTypes })
+    const [masterTypes, companies] = await Promise.all([
+      getInsuranceMasterTypes(),
+      getInsuranceCompanies()
+    ])
+    return NextResponse.json({ masterTypes, companies })
   } catch (err: any) {
     console.error('[GET /api/policy/master Error]', err)
     return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล Master' }, { status: 500 })

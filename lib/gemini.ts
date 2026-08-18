@@ -112,7 +112,15 @@ CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.Use
 - EV_VehicleNote.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MsSubStatus (Type='LOCATION') — EV_InventoryItem.CurrentLocation = EV_MsSubStatus.StatusCode
 
-## วิธี Query ตามสถานการณ์
+### ถามข้อมูลประกันภัย พ.ร.บ. หรือภาษีรถ (เช่น "ทะเบียน ทอ-4623 ประกันหมดเมื่อไหร่ ของที่ไหน")
+1. ดึงจาก dbo.EV_Policy โดยเชื่อมกับ EV_InventoryItem ด้วย VinNo:
+   SELECT p.InsurancePolicyNo, m.TypeName AS InsuranceTypeName, p.InsuranceEndDate, p.InsuranceCompany,
+          p.ActPolicyNo, p.ActEndDate, p.ActCompany,
+          p.VehicleTaxEndDate, p.MeterTaxEndDate
+   FROM dbo.EV_Policy p
+   LEFT JOIN dbo.EV_MsInsuranceType m ON p.InsuranceType = m.TypeCode
+   WHERE p.VinNo = '<VinNo>' AND p.IsActive = 1
+2. **ข้อห้ามเด็ดขาด (Strict Rule)**: ข้อมูลชื่อบริษัทประกันภัยต้องดึงจากคอลัมน์ InsuranceCompany (สำหรับประกันภาคสมัครใจ) หรือ ActCompany (สำหรับ พ.ร.บ.) ในตาราง dbo.EV_Policy เท่านั้น! ห้ามคาดเดาหรือแต่งชื่อบริษัทประกันภัยขึ้นเองเด็ดขาด หากในฐานข้อมูลเป็น NULL ให้แจ้งว่า "ไม่ระบุบริษัทประกัน" หรือระบุเฉพาะเลขกรมธรรม์และวันหมดอายุ
 
 ### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร") หรือถามด้วยเลข VIN (เลขตัวถัง)
 1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน (รองรับทั้งทะเบียนรถและเลข VIN):

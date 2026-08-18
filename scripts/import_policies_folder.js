@@ -181,6 +181,7 @@ async function run() {
         req.input('policyType', sql.VarChar(20), parsed.policyType)
         req.input('policyTypeName', sql.NVarChar(100), parsed.policyTypeName)
         req.input('policyNo', sql.VarChar(100), parsed.policyNo)
+        req.input('company', sql.NVarChar, process.argv[3] || 'ไอแคร์ประกันภัย')
         req.input('startDate', sql.Date, new Date(parsed.startDateStr))
         req.input('endDate', sql.Date, new Date(parsed.expiryDateStr))
         req.input('fileName', sql.NVarChar(250), fileName)
@@ -201,6 +202,7 @@ async function run() {
               UPDATE dbo.EV_Policy
               SET InsurancePolicyNo = @policyNo,
                   InsuranceType = @policyType,
+                  InsuranceCompany = @company,
                   InsuranceStartDate = @startDate,
                   InsuranceEndDate = @endDate,
                   InsuranceFilePath = @filePath,
@@ -213,6 +215,7 @@ async function run() {
             BEGIN
               UPDATE dbo.EV_Policy
               SET ActPolicyNo = @policyNo,
+                  ActCompany = @company,
                   ActStartDate = @startDate,
                   ActEndDate = @endDate,
                   ActFilePath = @filePath,
@@ -226,17 +229,19 @@ async function run() {
           BEGIN
             INSERT INTO dbo.EV_Policy (
               VinNo, RegisterNo,
-              InsurancePolicyNo, InsuranceType, InsuranceStartDate, InsuranceEndDate, InsuranceFilePath,
-              ActPolicyNo, ActStartDate, ActEndDate, ActFilePath,
+              InsurancePolicyNo, InsuranceType, InsuranceCompany, InsuranceStartDate, InsuranceEndDate, InsuranceFilePath,
+              ActPolicyNo, ActCompany, ActStartDate, ActEndDate, ActFilePath,
               CreateUserID, CreateDate, IsActive
             ) VALUES (
               @vinNo, @regNo,
               CASE WHEN @docType = 'INSURANCE' THEN @policyNo ELSE NULL END,
               CASE WHEN @docType = 'INSURANCE' THEN @policyType ELSE NULL END,
+              CASE WHEN @docType = 'INSURANCE' THEN @company ELSE NULL END,
               CASE WHEN @docType = 'INSURANCE' THEN @startDate ELSE NULL END,
               CASE WHEN @docType = 'INSURANCE' THEN @endDate ELSE NULL END,
               CASE WHEN @docType = 'INSURANCE' THEN @filePath ELSE NULL END,
               CASE WHEN @docType = 'ACT' THEN @policyNo ELSE NULL END,
+              CASE WHEN @docType = 'ACT' THEN @company ELSE NULL END,
               CASE WHEN @docType = 'ACT' THEN @startDate ELSE NULL END,
               CASE WHEN @docType = 'ACT' THEN @endDate ELSE NULL END,
               CASE WHEN @docType = 'ACT' THEN @filePath ELSE NULL END,
@@ -252,11 +257,11 @@ async function run() {
           -- Insert new Log
           INSERT INTO dbo.EV_PolicyLog (
             VinNo, RegisterNo, DocType, PolicyType, PolicyTypeName,
-            PolicyNo, StartDate, EndDate, OriginalFileName, FilePath, FileSize,
+            PolicyNo, InsuranceCompany, StartDate, EndDate, OriginalFileName, FilePath, FileSize,
             UploadSource, IsCurrent, CreateUserID, CreateDate, IsActive
           ) VALUES (
             @vinNo, @regNo, @docType, @policyType, @policyTypeName,
-            @policyNo, @startDate, @endDate, @fileName, @filePath, @fileSize,
+            @policyNo, @company, @startDate, @endDate, @fileName, @filePath, @fileSize,
             'CLI_FOLDER_IMPORT', 1, @userId, GETDATE(), 1
           );
 

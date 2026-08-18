@@ -132,10 +132,16 @@ export function PolicyTable({
                         <span className="px-1.5 py-0.5 text-[10px] rounded font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40">
                           {rec.insuranceType || 'PLMV'}
                         </span>
-                        <span className="font-mono text-zinc-700 dark:text-zinc-300">
+                        <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200">
                           {rec.insurancePolicyNo}
                         </span>
                       </div>
+                      {rec.insuranceCompany && (
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
+                          <span>🏢</span>
+                          <span>{rec.insuranceCompany}</span>
+                        </div>
+                      )}
                       <div className="text-zinc-500 text-[11px]">
                         หมดอายุ: <strong className="text-zinc-800 dark:text-zinc-200">{formatThaiDate(rec.insuranceEndDate)}</strong>
                       </div>
