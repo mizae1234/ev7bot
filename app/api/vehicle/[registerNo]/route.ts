@@ -136,6 +136,7 @@ export async function GET(
     // Prepare requests
     const rentReq = pool.request()
     rentReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
+    rentReq.input('vinNo', sql.NVarChar, car.VinNo)
 
     const maintReq = pool.request()
     maintReq.input('inventoryItemId', sql.Int, car.InventoryItemID)
@@ -158,6 +159,8 @@ export async function GET(
     const inspectReq = pool.request()
     inspectReq.input('vinNo', sql.VarChar, car.VinNo)
 
+    const locationsReq = pool.request()
+
     // Execute all sub-queries concurrently
     const [
       rentResult,
@@ -169,7 +172,8 @@ export async function GET(
       notesResult,
       repossessResult,
       replPoolResult,
-      inspectResult
+      inspectResult,
+      locationsResult
     ] = await Promise.all([
       rentReq.query(`
         SELECT
@@ -180,8 +184,8 @@ export async function GET(
           CAST(COALESCE(r.IsActive, 0) AS BIT) AS IsActive,
           v.RentType
         FROM dbo.View_AccumarateReleaseCar v
-        LEFT JOIN dbo.EV_RentItem r ON v.RentItemID = r.RentItemID
-        WHERE v.InventoryItemID = @inventoryItemId
+        LEFT JOIN dbo.EV_RentItem r ON v.ContractNo = r.ContractNo
+        WHERE v.VinNo = @vinNo
         ORDER BY v.ExpectedReleaseDate DESC, v.ReleaseDate DESC
       `),
       maintReq.query(`
@@ -279,6 +283,11 @@ export async function GET(
         LEFT JOIN dbo.EV_User u ON ir.CreateUserID = u.UserID
         WHERE ir.VinNo = @vinNo
         ORDER BY ir.InspectionDate DESC
+      `).catch(() => ({ recordset: [] })),
+      locationsReq.query(`
+        SELECT StatusCode, StatusName
+        FROM dbo.EV_MsSubStatus
+        WHERE Type = 'LOCATION' AND IsActive = 1
       `).catch(() => ({ recordset: [] }))
     ])
 
@@ -849,6 +858,51 @@ export async function GET(
       })
     })
 
+    // 7. Location Movements (เฉพาะประวัติการย้ายสถานที่)
+    const locMap = new Map<string, string>()
+    ;(locationsResult?.recordset || []).forEach((row: { StatusCode: string; StatusName: string }) => {
+      if (row.StatusCode && row.StatusName) {
+        locMap.set(row.StatusCode.trim(), row.StatusName.trim())
+      }
+    })
+
+    const locationMovements: {
+      movementId: string
+      fromLocation: string | null
+      toLocation: string | null
+      movementDetail: string | null
+      movementDate: string
+      createDate: string
+      createUserName: string | null
+    }[] = []
+
+    notesResult.recordset.forEach((n: Record<string, unknown>) => {
+      const detail = String(n.NoteDetail || '')
+      if (detail.includes('ย้ายสถานที่') || detail.includes('เปลี่ยนสถานที่')) {
+        const arrowMatch = detail.match(/(?:ย้ายสถานที่|เปลี่ยนสถานที่)[:\s]+([^→\->|]+)\s*(?:→|->)\s*([^|]+)(?:\s*\|\s*โดย:\s*(.*))?/i)
+        let fromLoc: string | null = null
+        let toLoc: string | null = null
+        let actor: string | null = null
+        if (arrowMatch) {
+          const rawFrom = arrowMatch[1]?.trim() || null
+          const rawTo = arrowMatch[2]?.trim() || null
+          fromLoc = rawFrom ? (locMap.get(rawFrom) || rawFrom) : null
+          toLoc = rawTo ? (locMap.get(rawTo) || rawTo) : null
+          actor = arrowMatch[3]?.trim() || null
+        }
+        const effectiveActor = actor || (n.CreateUserName as string) || '-'
+        locationMovements.push({
+          movementId: `NOTE-${n.VehicleNoteID}`,
+          fromLocation: fromLoc,
+          toLocation: toLoc,
+          movementDetail: detail,
+          movementDate: n.CreateDate ? new Date(n.CreateDate as string).toISOString() : new Date().toISOString(),
+          createDate: n.CreateDate ? new Date(n.CreateDate as string).toISOString() : new Date().toISOString(),
+          createUserName: maskStaffName(effectiveActor),
+        })
+      }
+    })
+
     // Sort timeline newest to oldest
     timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
@@ -863,10 +917,11 @@ export async function GET(
       problemTypes: problemTypesResult.recordset,
       vehicleNotes,
       replacementReserved,
-      timeline
+      timeline,
+      locationMovements
     })
   } catch (error) {
     console.error('[Vehicle API Error]', error)
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูล' }, { status: 500 })
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการดึงข้อมูล', details: String(error) }, { status: 500 })
   }
 }

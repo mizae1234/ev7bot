@@ -6,6 +6,7 @@ import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 import { VehicleTimeline, VehicleTimelineEvent } from '@/components/vehicle/VehicleTimeline'
+import { VehicleLocationHistory, VehicleLocationMovement } from '@/components/vehicle/VehicleLocationHistory'
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ interface VehicleData {
   maintenance: MaintenanceInfo[]
   returns: ReturnInfo[]
   timeline?: VehicleTimelineEvent[]
+  locationMovements?: VehicleLocationMovement[]
 }
 
 // ─── Helper Functions ──────────────────────────────────────────────
@@ -516,6 +518,13 @@ function VehicleDetailContent() {
             </div>
           </SectionCard>
         )}
+
+        {/* ── Vehicle Location Movement History (ล่างสุด) ── */}
+        <VehicleLocationHistory
+          registerNo={car.RegisterNo}
+          vinNo={car.VinNo}
+          movements={data.locationMovements || []}
+        />
 
         {/* Footer */}
         <div className="text-center text-xs text-zinc-400 py-4">
