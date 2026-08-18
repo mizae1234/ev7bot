@@ -106,12 +106,6 @@ const navGroups: NavGroup[] = [
         href: '/case-contract',
         desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',
         icon: '📄'
-      },
-      {
-        name: 'บันทึกการสื่อสาร (LINE Logs)',
-        href: '/logchats',
-        desc: 'ประวัติการสนทนาและการแจ้งเตือนระบบ',
-        icon: '💬'
       }
     ]
   }
