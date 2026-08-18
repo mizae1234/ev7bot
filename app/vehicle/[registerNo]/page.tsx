@@ -116,11 +116,12 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-'
   try {
     const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '-'
     const day = d.getUTCDate()
     const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
     const month = months[d.getUTCMonth()]
     const year = d.getUTCFullYear() + 543
-    return `${day} ${month} ${year}`
+    return `${day} ${month || '-'} ${year}`
   } catch {
     return dateStr
   }
@@ -156,30 +157,46 @@ function getRepairStatusInfo(code: string): { label: string; color: string } {
 
 function VehicleDetailContent() {
   const params = useParams()
-  const registerNo = decodeURIComponent(params.registerNo as string)
+  const rawParam = params?.registerNo
+  const rawStr = typeof rawParam === 'string' ? rawParam : Array.isArray(rawParam) ? rawParam[0] : ''
+  let registerNo = ''
+  try {
+    registerNo = rawStr ? decodeURIComponent(rawStr) : ''
+  } catch {
+    registerNo = rawStr || ''
+  }
 
   const [data, setData] = useState<VehicleData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!registerNo) {
+      setLoading(false)
+      setError('ไม่พบเลขทะเบียนรถในลิงก์')
+      return
+    }
+    let isMounted = true
     async function fetchData() {
       try {
         const res = await fetch(`/api/vehicle/${encodeURIComponent(registerNo)}`)
         if (!res.ok) {
-          const err = await res.json()
-          setError(err.error || 'ไม่พบข้อมูลรถ')
+          const err = await res.json().catch(() => ({}))
+          if (isMounted) setError(err.error || 'ไม่พบข้อมูลรถ')
           return
         }
         const json = await res.json()
-        setData(json)
+        if (isMounted) setData(json)
       } catch {
-        setError('ไม่สามารถโหลดข้อมูลได้')
+        if (isMounted) setError('ไม่สามารถโหลดข้อมูลได้')
       } finally {
-        setLoading(false)
+        if (isMounted) setLoading(false)
       }
     }
     fetchData()
+    return () => {
+      isMounted = false
+    }
   }, [registerNo])
 
   if (loading) return <LoadingState />
@@ -188,10 +205,10 @@ function VehicleDetailContent() {
 
   const { car, currentRent, rentHistory = [], maintenance = [], returns = [] } = data
   const statusInfo = getStatusInfo(
-    car.StatusCode,
-    car.StatusCode === 'AVAILABLE' && car.SubStatusName ? car.SubStatusName : car.StatusName
+    car?.StatusCode || '',
+    car?.StatusCode === 'AVAILABLE' && car?.SubStatusName ? car.SubStatusName : car?.StatusName
   )
-  const activeMaint = maintenance.find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
+  const activeMaint = (maintenance || []).find(m => m.IsActive && m.CarStatusCode !== 'COMPLETE')
 
   // Consolidate all follow-ups from all maintenance items
   const allFollowUps = (maintenance || [])
@@ -204,27 +221,6 @@ function VehicleDetailContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-emerald-50/30 dark:from-zinc-900 dark:via-zinc-950 dark:to-zinc-900/40 text-zinc-900 dark:text-zinc-100">
-      {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/80 dark:bg-zinc-950/80 border-b border-zinc-200/60 dark:border-zinc-800/60 shadow-sm">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <a href="/dashboard" className="flex items-center gap-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors text-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-              Dashboard
-            </a>
-            <span className="text-zinc-300 dark:text-zinc-700">|</span>
-            <a href="/maintenance/dashboard" className="text-zinc-500 hover:text-amber-600 dark:text-zinc-400 dark:hover:text-amber-400 transition-colors text-sm">
-              🔧 ซ่อมบำรุง
-            </a>
-            <span className="text-zinc-300 dark:text-zinc-700">|</span>
-            <h1 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">🚗 ข้อมูลรถ {car.RegisterNo || car.VinNo}</h1>
-          </div>
-          <LoginProfile />
-        </div>
-      </header>
-
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
         {/* ── Car Info Card ── */}
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-sm overflow-hidden">

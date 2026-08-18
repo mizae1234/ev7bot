@@ -87,13 +87,14 @@ function LiffContent() {
         }
 
         // Check if user is mapped to ev7UserId
-        const redirectTarget = searchParams.get('path') || '/dashboard'
+        const rawTarget = searchParams.get('path') || '/dashboard'
+        const redirectTarget = rawTarget.startsWith('/') ? rawTarget : `/${rawTarget}`
         if (!registration || !registration.ev7UserId) {
           console.log('[LIFF] User has no linked ev7UserId. Redirecting to registration page...')
           router.replace(`/liff/register?path=${encodeURIComponent(redirectTarget)}`)
         } else {
           console.log('[LIFF] Registration complete. Redirecting to:', redirectTarget)
-          router.replace(redirectTarget)
+          router.replace(encodeURI(redirectTarget))
         }
       } catch (err) {
         console.error('[LIFF Error]', err)
