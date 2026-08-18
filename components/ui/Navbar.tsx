@@ -105,8 +105,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Don't render navbar on LIFF mobile views
-  if (pathname && pathname.startsWith('/liff')) {
+  // Don't render navbar on LIFF mobile views or Audit pages
+  if (pathname && (pathname.startsWith('/liff') || pathname.startsWith('/audit'))) {
     return null
   }
 
