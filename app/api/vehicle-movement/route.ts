@@ -14,10 +14,8 @@ function maskStaffName(name?: string | null): string {
   return parts[0]
 }
 
-export interface VehicleMovementItem {
+export interface VehicleLocationMovementItem {
   movementId: string
-  movementType: string
-  movementTypeName: string
   inventoryItemId: number | null
   vinNo: string
   registerNo: string | null
@@ -25,8 +23,8 @@ export interface VehicleMovementItem {
   project: string | null
   currentLocation: string | null
   currentLocationName: string | null
-  originLocation: string | null
-  destinationLocation: string | null
+  fromLocation: string | null
+  toLocation: string | null
   movementDetail: string | null
   movementDate: string
   createDate: string
@@ -41,13 +39,34 @@ export interface MovementStats {
   uniqueVehicles: number
 }
 
+function parseLocationNote(noteDetail: string | null, locMap: Map<string, string>): {
+  fromLocation: string | null
+  toLocation: string | null
+  actor: string | null
+} {
+  if (!noteDetail) return { fromLocation: null, toLocation: null, actor: null }
+  
+  // Format: 📍 ย้ายสถานที่: [old] → [new] | โดย: [actor]
+  const arrowMatch = noteDetail.match(/(?:ย้ายสถานที่|เปลี่ยนสถานที่)[:\s]+([^→\->|]+)\s*(?:→|->)\s*([^|]+)(?:\s*\|\s*โดย:\s*(.*))?/i)
+  if (arrowMatch) {
+    const rawFrom = arrowMatch[1]?.trim() || null
+    const rawTo = arrowMatch[2]?.trim() || null
+    const rawActor = arrowMatch[3]?.trim() || null
+
+    const fromLoc = rawFrom ? (locMap.get(rawFrom) || rawFrom) : null
+    const toLoc = rawTo ? (locMap.get(rawTo) || rawTo) : null
+    return { fromLocation: fromLoc, toLocation: toLoc, actor: rawActor }
+  }
+
+  return { fromLocation: null, toLocation: null, actor: null }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const limit = Math.max(1, parseInt(searchParams.get('limit') || '50', 10))
     const search = searchParams.get('search')?.trim() || ''
-    const movementType = searchParams.get('movementType')?.trim() || ''
     const startDate = searchParams.get('startDate')?.trim() || ''
     const endDate = searchParams.get('endDate')?.trim() || ''
     const location = searchParams.get('location')?.trim() || ''
@@ -57,94 +76,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    // Unified Movement CTE with safe TRY_CAST for date conversions
+    // 1. Fetch location masters for code-to-name translation
+    const locMasterReq = pool.request()
+    const locMasterRes = await locMasterReq.query(`
+      SELECT StatusCode, StatusName 
+      FROM dbo.EV_MsSubStatus 
+      WHERE Type = 'LOCATION'
+    `).catch(() => ({ recordset: [] }))
+
+    const locMap = new Map<string, string>()
+    locMasterRes.recordset.forEach((row: { StatusCode: string; StatusName: string }) => {
+      if (row.StatusCode && row.StatusName) {
+        locMap.set(row.StatusCode.trim(), row.StatusName.trim())
+      }
+    })
+
+    // 2. Query strictly location movement notes & logs
     const baseCte = `
-      WITH AllMovements AS (
-        -- 1. Direct Location Change Notes (from EV_VehicleNote)
+      WITH LocationMovements AS (
         SELECT
           CONCAT('NOTE-', n.VehicleNoteID) AS movementId,
-          'LOCATION_CHANGE' AS movementType,
-          N'ย้ายสถานที่ / อัปเดตสถานะ' AS movementTypeName,
           n.InventoryItemID AS inventoryItemId,
           i.VinNo AS vinNo,
           i.RegisterNo AS registerNo,
           i.Model AS model,
           i.Project AS project,
           i.CurrentLocation AS currentLocation,
-          NULL AS originLocation,
-          NULL AS destinationLocation,
           n.NoteDetail AS movementDetail,
           TRY_CAST(n.CreateDate AS DATETIME) AS movementDate,
           TRY_CAST(n.CreateDate AS DATETIME) AS createDate,
           n.CreateUserID AS createUserId,
-          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName,
-          n.IsActive AS isActive
+          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
         FROM dbo.EV_VehicleNote n
         INNER JOIN dbo.EV_InventoryItem i ON n.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_User u ON n.CreateUserID = u.UserID
         WHERE (
           n.NoteDetail LIKE N'%ย้ายสถานที่%' 
-          OR n.NoteDetail LIKE N'%📍%' 
           OR n.NoteDetail LIKE N'%เปลี่ยนสถานที่%'
-          OR n.NoteDetail LIKE N'%ยึดคืนรถยนต์%'
         ) AND n.IsActive = 1
-
-        UNION ALL
-
-        -- 2. Repossessions (from EV_VehicleRepossess)
-        SELECT
-          CONCAT('REPOSSESS-', r.RepossessID) AS movementId,
-          'REPOSSESS' AS movementType,
-          N'ยึดคืนรถยนต์' AS movementTypeName,
-          r.InventoryItemID AS inventoryItemId,
-          r.VinNo AS vinNo,
-          i.RegisterNo AS registerNo,
-          i.Model AS model,
-          i.Project AS project,
-          i.CurrentLocation AS currentLocation,
-          r.RepossessLocation AS originLocation,
-          NULL AS destinationLocation,
-          ISNULL(r.Remark, N'ดำเนินการยึดคืนรถยนต์เข้าสู่ระบบ') AS movementDetail,
-          TRY_CAST(ISNULL(r.RepossessDate, r.CreateDate) AS DATETIME) AS movementDate,
-          TRY_CAST(r.CreateDate AS DATETIME) AS createDate,
-          r.CreateUserID AS createUserId,
-          ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName,
-          r.IsActive AS isActive
-        FROM dbo.EV_VehicleRepossess r
-        LEFT JOIN dbo.EV_InventoryItem i ON (r.InventoryItemID = i.InventoryItemID OR r.VinNo = i.VinNo)
-        LEFT JOIN dbo.EV_User u ON r.CreateUserID = u.UserID
-        WHERE r.IsActive = 1
-
-        UNION ALL
-
-        -- 3. Returns (from EV_ReturnItem)
-        SELECT
-          CONCAT('RETURN-', ret.ReturnItemID) AS movementId,
-          'RETURN' AS movementType,
-          N'ตรวจรับคืนรถยนต์' AS movementTypeName,
-          i.InventoryItemID AS inventoryItemId,
-          ret.VinNo AS vinNo,
-          i.RegisterNo AS registerNo,
-          i.Model AS model,
-          i.Project AS project,
-          i.CurrentLocation AS currentLocation,
-          NULL AS originLocation,
-          ret.ParkLocation AS destinationLocation,
-          CONCAT(N'รับคืนรถยนต์ ลูกค้า: ', ISNULL(ret.CustomerName, '-'), CASE WHEN ret.Mileage IS NOT NULL THEN CONCAT(N' | เลขไมล์: ', ret.Mileage, N' กม.') ELSE N'' END) AS movementDetail,
-          TRY_CAST(ISNULL(ret.ReturnDate, ret.ReceiveDate) AS DATETIME) AS movementDate,
-          TRY_CAST(ISNULL(ret.ReturnDate, ret.ReceiveDate) AS DATETIME) AS createDate,
-          NULL AS createUserId,
-          N'เจ้าหน้าที่รับคืนรถ' AS createUserName,
-          1 AS isActive
-        FROM dbo.EV_ReturnItem ret
-        LEFT JOIN dbo.EV_InventoryItem i ON ret.VinNo = i.VinNo
-        WHERE ret.ParkLocation IS NOT NULL OR ret.ReturnDate IS NOT NULL
       ),
       MovementView AS (
         SELECT
           m.*,
           ISNULL(loc.StatusName, m.currentLocation) AS currentLocationName
-        FROM AllMovements m
+        FROM LocationMovements m
         LEFT JOIN dbo.EV_MsSubStatus loc ON m.currentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
       )
     `
@@ -163,17 +138,9 @@ export async function GET(req: NextRequest) {
         registerNo LIKE @search OR
         model LIKE @search OR
         movementDetail LIKE @search OR
-        originLocation LIKE @search OR
-        destinationLocation LIKE @search OR
         currentLocationName LIKE @search OR
         createUserName LIKE @search
       )`)
-    }
-
-    if (movementType && movementType !== 'ALL') {
-      dataReq.input('movementType', sql.VarChar, movementType)
-      countReq.input('movementType', sql.VarChar, movementType)
-      whereConditions.push('movementType = @movementType')
     }
 
     if (location) {
@@ -181,8 +148,6 @@ export async function GET(req: NextRequest) {
       countReq.input('locFilter', sql.NVarChar, `%${location}%`)
       whereConditions.push(`(
         currentLocationName LIKE @locFilter OR
-        originLocation LIKE @locFilter OR
-        destinationLocation LIKE @locFilter OR
         movementDetail LIKE @locFilter
       )`)
     }
@@ -240,26 +205,32 @@ export async function GET(req: NextRequest) {
     const statsRes = await statsReq.query(statsQuery)
     const statRow = statsRes.recordset[0] || {}
 
-    // Map records with masked user names
-    const records: VehicleMovementItem[] = (dataRes.recordset || []).map((row: Record<string, unknown>) => ({
-      movementId: String(row.movementId || ''),
-      movementType: String(row.movementType || 'LOCATION_CHANGE'),
-      movementTypeName: String(row.movementTypeName || 'ย้ายสถานที่'),
-      inventoryItemId: row.inventoryItemId ? Number(row.inventoryItemId) : null,
-      vinNo: String(row.vinNo || ''),
-      registerNo: (row.registerNo as string) || null,
-      model: (row.model as string) || null,
-      project: (row.project as string) || null,
-      currentLocation: (row.currentLocation as string) || null,
-      currentLocationName: (row.currentLocationName as string) || null,
-      originLocation: (row.originLocation as string) || null,
-      destinationLocation: (row.destinationLocation as string) || null,
-      movementDetail: (row.movementDetail as string) || null,
-      movementDate: row.movementDate ? new Date(row.movementDate as string).toISOString() : new Date().toISOString(),
-      createDate: row.createDate ? new Date(row.createDate as string).toISOString() : new Date().toISOString(),
-      createUserId: row.createUserId ? Number(row.createUserId) : null,
-      createUserName: maskStaffName(row.createUserName as string),
-    }))
+    // Map records with parsed From/To and masked user names
+    const records: VehicleLocationMovementItem[] = (dataRes.recordset || []).map((row: Record<string, unknown>) => {
+      const detail = (row.movementDetail as string) || ''
+      const parsed = parseLocationNote(detail, locMap)
+
+      // Fallback actor if parsed actor exists
+      const effectiveActor = parsed.actor || (row.createUserName as string) || '-'
+
+      return {
+        movementId: String(row.movementId || ''),
+        inventoryItemId: row.inventoryItemId ? Number(row.inventoryItemId) : null,
+        vinNo: String(row.vinNo || ''),
+        registerNo: (row.registerNo as string) || null,
+        model: (row.model as string) || null,
+        project: (row.project as string) || null,
+        currentLocation: (row.currentLocation as string) || null,
+        currentLocationName: (row.currentLocationName as string) || null,
+        fromLocation: parsed.fromLocation,
+        toLocation: parsed.toLocation,
+        movementDetail: detail,
+        movementDate: row.movementDate ? new Date(row.movementDate as string).toISOString() : new Date().toISOString(),
+        createDate: row.createDate ? new Date(row.createDate as string).toISOString() : new Date().toISOString(),
+        createUserId: row.createUserId ? Number(row.createUserId) : null,
+        createUserName: maskStaffName(effectiveActor),
+      }
+    })
 
     const stats: MovementStats = {
       totalCount: Number(statRow.totalCount || 0),
@@ -279,9 +250,9 @@ export async function GET(req: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('[Vehicle Movement API] Error:', error)
+    console.error('[Vehicle Location Movement API] Error:', error)
     return NextResponse.json(
-      { error: 'เกิดข้อผิดพลาดในการดึงข้อมูลประวัติการเคลื่อนย้ายรถ', details: String(error) },
+      { error: 'เกิดข้อผิดพลาดในการดึงข้อมูลประวัติการย้ายสถานที่รถ', details: String(error) },
       { status: 500 }
     )
   }

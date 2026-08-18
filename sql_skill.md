@@ -1409,27 +1409,24 @@ ORDER BY r.RepossessDate DESC;
 
 ---
 
-### `dbo.View_VehicleMovementLog` (วิวประวัติการเคลื่อนย้ายและเปลี่ยนสถานที่ของรถ)
-รวบรวมประวัติการเคลื่อนย้ายรถจากทุกจุดในระบบ (การย้ายสถานที่, การยึดคืนรถ, และการตรวจรับคืน) เพื่อให้ Bot Butter หรือ Dashboard สืบประวัติการย้ายรถได้ทันที
+### `dbo.View_VehicleLocationLog` (วิวประวัติการเคลื่อนย้ายสถานที่ / เปลี่ยนพิกัดรถ)
+รวบรวมประวัติการย้ายสถานที่จอดรถทั้งหมด เพื่อให้ Bot Butter หรือ Dashboard สืบประวัติการย้ายรถได้ทันที
 
 **คอลัมน์:**
-`MovementID`, `MovementType` (`LOCATION_CHANGE`/`REPOSSESS`/`RETURN`), `MovementTypeName`, `InventoryItemID`, `VinNo`, `RegisterNo`, `Model`, `Project`, `ProjectType`, `CurrentLocation`, `CurrentLocationName`, `OriginLocation`, `DestinationLocation`, `MovementDetail`, `MovementDate`, `CreateDate`, `CreateUserID`, `CreateUserName`, `IsActive`
+`MovementID`, `InventoryItemID`, `VinNo`, `RegisterNo`, `Model`, `Project`, `ProjectType`, `CurrentLocation`, `CurrentLocationName`, `MovementDetail`, `MovementDate`, `CreateDate`, `CreateUserID`, `CreateUserName`, `IsActive`
 
-**ตัวอย่างการค้นหาประวัติการเคลื่อนย้ายรถ 1 คัน:**
+**ตัวอย่างการค้นหาประวัติการย้ายสถานที่รถ 1 คัน:**
 ```sql
 SELECT 
   MovementID,
-  MovementTypeName,
   RegisterNo,
   VinNo,
-  OriginLocation,
-  DestinationLocation,
   CurrentLocationName,
   MovementDetail,
   MovementDate,
   CreateUserName
-FROM dbo.View_VehicleMovementLog
-WHERE RegisterNo = 'ทอ-4990' OR VinNo = 'LNADHAB36R1E07099'
+FROM dbo.View_VehicleLocationLog
+WHERE RegisterNo = 'ทอ-3260' OR VinNo = 'LNADHAB31R1E09651'
 ORDER BY MovementDate DESC;
 ```
 
