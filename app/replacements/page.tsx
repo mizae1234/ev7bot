@@ -283,19 +283,25 @@ function ReplacementPageContent() {
     }
   }
 
+  const poolCarsCount = stats.readyToPick + (stats.availableUseStandby || 0) + stats.reservedLineman + stats.reservedOthers + stats.inMaintenance
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2.5 mb-1.5">
             <span className="text-2xl sm:text-3xl">🚗🔄</span>
             <h1 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">
               ระบบมอนิเตอร์และจัดการรถทดแทน (Replacement Hub)
             </h1>
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-              Live Fleet Monitor
-            </span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>กองรถทั้งหมด <strong className="text-indigo-600 dark:text-indigo-400 font-extrabold">{stats.totalFleet}</strong> คัน</span>
+              <span className="text-zinc-400 dark:text-zinc-500 font-normal">
+                (ใช้งาน <strong className="text-zinc-700 dark:text-zinc-300">{stats.activeInUse}</strong> + คลัง & จอง <strong className="text-zinc-700 dark:text-zinc-300">{poolCarsCount}</strong>)
+              </span>
+            </div>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
             ติดตามการใช้งานรถทดแทนแบบเรียลไทม์ ตรวจสอบคลังรถว่างพร้อมใช้ (Available Pool) และคันที่ล็อกโควตาจองไว้
@@ -330,7 +336,7 @@ function ReplacementPageContent() {
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
-            🚗 คลังรถ & การจอง ({stats.readyToPick + (stats.availableUseStandby || 0) + stats.reservedLineman + stats.reservedOthers + stats.inMaintenance})
+            🚗 คลังรถ & การจอง ({poolCarsCount})
           </button>
           <button
             type="button"
