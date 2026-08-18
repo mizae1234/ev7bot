@@ -264,17 +264,17 @@ function VehicleDetailContent() {
           )}
         </div>
 
+        {/* ── General Vehicle Notes / Chat Log ── */}
+        <VehicleNotesSection
+          inventoryItemId={car.InventoryItemID}
+          registerNo={car.RegisterNo || car.VinNo}
+        />
+
         {/* ── Vehicle Activity Timeline ── */}
         <VehicleTimeline
           events={data.timeline || []}
           registerNo={car.RegisterNo}
           vinNo={car.VinNo}
-        />
-
-        {/* ── General Vehicle Notes ── */}
-        <VehicleNotesSection
-          inventoryItemId={car.InventoryItemID}
-          registerNo={car.RegisterNo || car.VinNo}
         />
 
         {/* ── Current Rent ── */}
