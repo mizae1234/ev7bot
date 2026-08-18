@@ -152,12 +152,10 @@ export function Navbar() {
               className="flex items-center gap-3 group transition-transform active:scale-98"
             >
               <div className="relative h-8 sm:h-9 flex items-center bg-white/60 dark:bg-white/95 px-2.5 py-1 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 shadow-xs group-hover:shadow-sm transition-all">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src="/images/ev7-logo.png"
                   alt="EV7 Logo"
-                  width={92}
-                  height={35}
-                  priority
                   className="object-contain h-6 sm:h-7 w-auto"
                 />
               </div>
