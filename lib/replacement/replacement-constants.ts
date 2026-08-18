@@ -47,7 +47,7 @@ export function getDurationBadge(days: number): {
 } {
   if (days > 30) {
     return {
-      label: `ใช้งาน ${days} วัน (> 30 วัน)`,
+      label: `ใช้งาน ${days} วัน`,
       bg: 'bg-rose-50 dark:bg-rose-950/40',
       text: 'text-rose-700 dark:text-rose-400',
       border: 'border-rose-200 dark:border-rose-800',
@@ -57,7 +57,7 @@ export function getDurationBadge(days: number): {
   }
   if (days >= 14) {
     return {
-      label: `ใช้งาน ${days} วัน (14-30 วัน)`,
+      label: `ใช้งาน ${days} วัน`,
       bg: 'bg-amber-50 dark:bg-amber-950/40',
       text: 'text-amber-700 dark:text-amber-400',
       border: 'border-amber-200 dark:border-amber-800',

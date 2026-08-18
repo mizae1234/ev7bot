@@ -126,9 +126,9 @@ export function ActiveReplacementTable({
                 </td>
 
                 {/* 5. Duration Badge */}
-                <td className="py-3 px-4 text-center">
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
-                    <span className={`w-2 h-2 rounded-full ${badge.dot}`} />
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${badge.bg} ${badge.text} ${badge.border}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${badge.dot}`} />
                     <span>{badge.label}</span>
                   </div>
                 </td>
