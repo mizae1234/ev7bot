@@ -82,6 +82,12 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.UserID ผู้บันทึก), IsActive (bit, เอาเฉพาะ IsActive=1)
 หมายเหตุ: ตาราง EV_VehicleNote ทำหน้าที่เป็นทั้ง "โน้ตบันทึกประจำรถ" และ "log การเคลื่อนย้ายสถานที่" ทุกครั้งที่มีการเปลี่ยนสถานที่จอดรถ ระบบจะบันทึก note ใหม่อัตโนมัติพร้อมข้อความ "📍 ย้ายสถานที่: ..." เข้ามา
 
+### View: dbo.View_VehicleMovementLog (ประวัติการเคลื่อนย้ายรถ / ย้ายสถานที่ / ยึดรถ / รับคืน)
+คอลัมน์: MovementID, MovementType ('LOCATION_CHANGE'/'REPOSSESS'/'RETURN'), MovementTypeName (ชื่อประเภทภาษาไทย เช่น 'ย้ายสถานที่ / อัปเดตสถานะ', 'ยึดคืนรถยนต์', 'ตรวจรับคืนรถยนต์'), InventoryItemID, VinNo, RegisterNo, Model, Project, ProjectType, CurrentLocation (รหัสสถานที่ปัจจุบัน), CurrentLocationName (ชื่อสถานที่ปัจจุบันภาษาไทย), OriginLocation (สถานที่เดิม/สถานที่ไปยึด), DestinationLocation (สถานที่ใหม่/จุดจอดรับคืน), MovementDetail (รายละเอียด/หมายเหตุการเคลื่อนย้าย), MovementDate (วันและเวลาที่เกิดเหตุการณ์), CreateDate, CreateUserID, CreateUserName (ผู้บันทึก), IsActive
+หมายเหตุ: วิวนี้รวมประวัติการเคลื่อนย้ายรถทั้งหมดในระบบ สามารถสืบค้นประวัติการย้ายสถานที่ของรถคันใดๆ ได้โดยตรง เช่น:
+SELECT * FROM dbo.View_VehicleMovementLog WHERE RegisterNo = 'ทอ-4990' ORDER BY MovementDate DESC
+
+
 ### ตาราง: dbo.EV_Policy (ประกันภัย พ.ร.บ. ภาษีรถ และภาษีมิเตอร์)
 คอลัมน์: PolicyID (PK), VinNo, RegisterNo, InsurancePolicyNo (เลขกรมธรรม์ภาคสมัครใจ), InsuranceType (DV1, DV2, DV3, DV5), InsuranceStartDate, InsuranceEndDate (วันหมดอายุประกัน), InsuranceFilePath, InsuranceCompany, ActPolicyNo (เลข พ.ร.บ.), ActStartDate, ActEndDate (วันหมดอายุ พ.ร.บ.), ActFilePath, ActCompany, VehicleTaxStartDate, VehicleTaxEndDate (วันหมดอายุภาษีรถยนต์ประจำปี), MeterTaxStartDate, MeterTaxEndDate (วันหมดอายุตรวจมิเตอร์แท็กซี่), IsActive (bit)
 

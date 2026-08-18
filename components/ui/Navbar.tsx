@@ -85,16 +85,22 @@ const navGroups: NavGroup[] = [
     icon: '📂',
     items: [
       {
-        name: 'บันทึกหมายเหตุรถ',
-        href: '/vehicle-notes',
-        desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
-        icon: '📝'
+        name: 'ประวัติการเคลื่อนย้ายรถ',
+        href: '/vehicle-movement',
+        desc: 'ติดตามการเปลี่ยนสถานที่ พิกัดจอด และการย้ายรถ',
+        icon: '📍'
       },
       {
         name: 'ประวัติการยึดรถ',
         href: '/vehicle-repossess',
         desc: 'ตรวจสอบและติดตามประวัติการยึดคืนรถยนต์',
         icon: '🚨'
+      },
+      {
+        name: 'บันทึกหมายเหตุรถ',
+        href: '/vehicle-notes',
+        desc: 'บันทึกประวัติและโน้ตสำคัญประจำคันรถ',
+        icon: '📝'
       },
       {
         name: 'งานสัญญา (EV Core)',
