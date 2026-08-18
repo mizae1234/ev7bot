@@ -57,6 +57,50 @@ export async function getInsuranceCompanies(): Promise<InsuranceCompanyOption[]>
 }
 
 /**
+ * 1.2 Fetch Distinct Vehicle Models from dbo.EV_InventoryItem
+ */
+export async function getDistinctModels(): Promise<string[]> {
+  try {
+    const pool = await getMSSQLReadOnlyPool()
+    if (!pool) return []
+
+    const result = await pool.request().query(`
+      SELECT DISTINCT Model
+      FROM dbo.EV_InventoryItem
+      WHERE Model IS NOT NULL AND RTRIM(LTRIM(Model)) <> '' AND IsActive = 1
+      ORDER BY Model ASC
+    `)
+
+    return result.recordset.map((r: { Model: string }) => r.Model.trim()).filter(Boolean)
+  } catch (err) {
+    console.error('[getDistinctModels Error]', err)
+    return []
+  }
+}
+
+/**
+ * 1.3 Fetch Distinct Projects from dbo.EV_InventoryItem
+ */
+export async function getDistinctProjects(): Promise<string[]> {
+  try {
+    const pool = await getMSSQLReadOnlyPool()
+    if (!pool) return []
+
+    const result = await pool.request().query(`
+      SELECT DISTINCT Project
+      FROM dbo.EV_InventoryItem
+      WHERE Project IS NOT NULL AND RTRIM(LTRIM(Project)) <> '' AND IsActive = 1
+      ORDER BY Project ASC
+    `)
+
+    return result.recordset.map((r: { Project: string }) => r.Project.trim()).filter(Boolean)
+  } catch (err) {
+    console.error('[getDistinctProjects Error]', err)
+    return []
+  }
+}
+
+/**
  * 2. Get Paginated Policy & Tax List with Filtering
  */
 export async function getPolicyList(params: {

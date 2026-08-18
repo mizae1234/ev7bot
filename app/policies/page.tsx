@@ -93,6 +93,8 @@ function PolicyPageContent() {
       .then(data => {
         if (data.masterTypes) setMasterTypes(data.masterTypes)
         if (data.companies) setCompanies(data.companies)
+        if (data.models && Array.isArray(data.models)) setModels(data.models)
+        if (data.projects && Array.isArray(data.projects)) setProjects(data.projects)
       })
       .catch(err => console.error('Failed to load master types:', err))
   }, [])
@@ -121,15 +123,6 @@ function PolicyPageContent() {
         if (data.stats) setStats(data.stats)
         setTotal(data.total || 0)
         setTotalPages(data.totalPages || 1)
-
-        // Extract distinct projects & models for dropdowns
-        if (data.records) {
-          const list = data.records as PolicyVehicleRecord[]
-          const distinctProjects = Array.from(new Set(list.map(r => r.project).filter(Boolean))) as string[]
-          const distinctModels = Array.from(new Set(list.map(r => r.model).filter(Boolean))) as string[]
-          setProjects(prev => Array.from(new Set([...prev, ...distinctProjects])))
-          setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
-        }
       }
     } catch (err) {
       console.error('Failed to fetch policies:', err)
