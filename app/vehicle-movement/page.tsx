@@ -179,11 +179,16 @@ function VehicleMovementContent() {
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl sm:text-3xl">📍</span>
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex flex-wrap items-center gap-2">
                     ประวัติการเคลื่อนย้ายสถานที่
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
                       Location Relocation Log
                     </span>
+                    {total > 0 && (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        {total.toLocaleString()} รายการ
+                      </span>
+                    )}
                   </h1>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                     ตรวจสอบประวัติการย้ายสถานที่รถยนต์ พิกัดต้นทาง ➔ ปลายทาง และผู้ดำเนินการ
@@ -217,47 +222,8 @@ function VehicleMovementContent() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        {/* 2. KPI Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-1">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-              <span>📊</span> การย้ายสถานที่ทั้งหมด
-            </span>
-            <div className="text-2xl font-black text-zinc-900 dark:text-white">
-              {stats.totalCount.toLocaleString()} <span className="text-xs font-normal text-zinc-400">ครั้ง</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-1">
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span>📅</span> ย้ายในเดือนนี้
-            </span>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-              {stats.thisMonthCount.toLocaleString()} <span className="text-xs font-normal text-zinc-400">ครั้ง</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-1">
-            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-              <span>⚡</span> ย้ายวันนี้
-            </span>
-            <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-              {stats.todayCount.toLocaleString()} <span className="text-xs font-normal text-zinc-400">ครั้ง</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-1">
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <span>🚘</span> รถที่มีการย้ายสถานที่
-            </span>
-            <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-              {stats.uniqueVehicles.toLocaleString()} <span className="text-xs font-normal text-zinc-400">คัน</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Filters & Search Bar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-4">
+        {/* Filters & Search Bar */}
         <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs space-y-3">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Search Input */}
