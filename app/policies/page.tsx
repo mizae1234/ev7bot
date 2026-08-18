@@ -18,7 +18,6 @@ import { PolicyBatchUpload } from '@/components/policy/PolicyBatchUpload'
 import { PolicyTaxExcelImport } from '@/components/policy/PolicyTaxExcelImport'
 import { PolicyHistoryDrawer } from '@/components/policy/PolicyHistoryDrawer'
 import { PolicyEditModal } from '@/components/policy/PolicyEditModal'
-import { PdfViewerModal } from '@/components/policy/PdfViewerModal'
 
 function PolicyPageContent() {
   const [activeTab, setActiveTab] = useState<'LIST' | 'UPLOAD_PDF' | 'IMPORT_EXCEL'>('LIST')
@@ -70,11 +69,6 @@ function PolicyPageContent() {
   const [editRecord, setEditRecord] = useState<PolicyVehicleRecord | null>(null)
   const [historyVin, setHistoryVin] = useState<string | null>(null)
   const [historyRegisterNo, setHistoryRegisterNo] = useState<string | null>(null)
-  const [pdfModal, setPdfModal] = useState<{ isOpen: boolean; url: string | null; title: string }>({
-    isOpen: false,
-    url: null,
-    title: ''
-  })
 
   // User Profile
   const [liffUserId, setLiffUserId] = useState<string | null>(null)
@@ -320,7 +314,6 @@ function PolicyPageContent() {
           <PolicyTable
             records={records}
             loading={loading}
-            onViewPdf={(url, title) => setPdfModal({ isOpen: true, url, title })}
             onOpenHistory={(vin, reg) => {
               setHistoryVin(vin)
               setHistoryRegisterNo(reg)
@@ -401,14 +394,6 @@ function PolicyPageContent() {
           setHistoryVin(null)
           setHistoryRegisterNo(null)
         }}
-        onViewPdf={(url, title) => setPdfModal({ isOpen: true, url, title })}
-      />
-
-      <PdfViewerModal
-        isOpen={pdfModal.isOpen}
-        url={pdfModal.url}
-        title={pdfModal.title}
-        onClose={() => setPdfModal({ isOpen: false, url: null, title: '' })}
       />
     </div>
   )

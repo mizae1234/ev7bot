@@ -7,7 +7,6 @@ interface PolicyHistoryDrawerProps {
   registerNo: string | null
   isOpen: boolean
   onClose: () => void
-  onViewPdf: (url: string, title: string) => void
 }
 
 const SPACES_CDN = process.env.NEXT_PUBLIC_SPACES_CDN_URL || 'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com'
@@ -16,8 +15,7 @@ export function PolicyHistoryDrawer({
   vinNo,
   registerNo,
   isOpen,
-  onClose,
-  onViewPdf
+  onClose
 }: PolicyHistoryDrawerProps) {
   const [logs, setLogs] = useState<PolicyLogItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -142,17 +140,17 @@ export function PolicyHistoryDrawer({
                             <span className="text-[10px] text-zinc-400 truncate max-w-[180px]">
                               📄 {log.originalFileName || 'ไฟล์แนบ PDF'}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => onViewPdf(pdfUrl, `${log.policyTypeName || 'เอกสาร'} - ${log.policyNo || vinNo}`)}
-                              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium underline inline-flex items-center gap-1"
+                            <a
+                              href={pdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold hover:underline inline-flex items-center gap-1"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
-                              เปิดดู PDF
-                            </button>
+                              เปิดดู PDF ↗
+                            </a>
                           </div>
                         )}
 
