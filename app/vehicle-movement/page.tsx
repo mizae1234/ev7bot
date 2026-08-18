@@ -321,7 +321,6 @@ function VehicleMovementContent() {
                       <th className="py-3.5 px-4">📍 เส้นทางการย้าย (ต้นทาง ➔ ปลายทาง)</th>
                       <th className="py-3.5 px-4">📅 วันที่ & เวลาที่ย้าย</th>
                       <th className="py-3.5 px-4">👤 ผู้ดำเนินการย้าย</th>
-                      <th className="py-3.5 px-4">📝 ข้อความบันทึกเต็ม</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
@@ -395,13 +394,6 @@ function VehicleMovementContent() {
                               <span>{r.createUserName || '-'}</span>
                             </div>
                           </td>
-
-                          {/* Full Detail (Wrap Message) */}
-                          <td className="py-3.5 px-4 min-w-[280px] max-w-[500px]">
-                            <div className="text-zinc-700 dark:text-zinc-300 text-xs leading-relaxed whitespace-pre-wrap break-words">
-                              {r.movementDetail || '-'}
-                            </div>
-                          </td>
                         </tr>
                       )
                     })}
@@ -453,11 +445,6 @@ function VehicleMovementContent() {
                         </span>
                       </div>
                     ) : null}
-
-                    {/* Message Detail Wrap */}
-                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap break-words">
-                      {r.movementDetail || '-'}
-                    </div>
 
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1">
                       <span className="font-mono select-all">VIN: {r.vinNo}</span>

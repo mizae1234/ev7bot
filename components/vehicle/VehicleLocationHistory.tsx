@@ -132,9 +132,8 @@ export function VehicleLocationHistory({ registerNo, vinNo, movements }: Vehicle
                   <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[11px]">
                     <th className="py-3 px-3.5 w-10 text-center">#</th>
                     <th className="py-3 px-3.5">📍 เส้นทางการย้าย (ต้นทาง ➔ ปลายทาง)</th>
-                    <th className="py-3 px-3.5 w-40">📅 วันที่ & เวลาที่ย้าย</th>
-                    <th className="py-3 px-3.5 w-32">👤 ผู้ดำเนินการ</th>
-                    <th className="py-3 px-3.5">📝 รายละเอียดบันทึก</th>
+                    <th className="py-3 px-3.5 w-44">📅 วันที่ & เวลาที่ย้าย</th>
+                    <th className="py-3 px-3.5 w-36">👤 ผู้ดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60">
@@ -174,11 +173,6 @@ export function VehicleLocationHistory({ registerNo, vinNo, movements }: Vehicle
                           <span>{m.createUserName || '-'}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-3.5">
-                        <div className="text-zinc-700 dark:text-zinc-300 text-xs leading-relaxed whitespace-pre-wrap break-words">
-                          {m.movementDetail || '-'}
-                        </div>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -210,10 +204,6 @@ export function VehicleLocationHistory({ registerNo, vinNo, movements }: Vehicle
                       </span>
                     </div>
                   ) : null}
-
-                  <div className="p-2 rounded-lg bg-zinc-100/70 dark:bg-zinc-800/70 text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap break-words">
-                    {m.movementDetail || '-'}
-                  </div>
 
                   <div className="text-[11px] text-zinc-400 text-right">
                     ผู้ดำเนินการ: <span className="font-semibold text-zinc-600 dark:text-zinc-300">{m.createUserName || '-'}</span>
