@@ -3,6 +3,27 @@ import { getMSSQLReadOnlyPool, sql } from '@/lib/mssql'
 
 export const dynamic = 'force-dynamic'
 
+function maskStaffName(name?: string | null): string {
+  if (!name) return '-'
+  const trimmed = name.trim()
+  if (!trimmed) return '-'
+  if (trimmed.includes('@')) return trimmed.split('@')[0]
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) return `คุณ${parts[1]}`
+  return parts[0]
+}
+
+function maskFullName(name?: string | null): string {
+  if (!name) return '-'
+  const trimmed = name.trim()
+  if (!trimmed) return '-'
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) return `คุณ${parts[1]}`
+  return parts[0]
+}
+
 export interface VehicleRepossessItem {
   repossessId: number
   inventoryItemId: number | null
@@ -198,9 +219,9 @@ export async function GET(req: NextRequest) {
       remark: (row.remark as string) || null,
       createDate: row.createDate ? new Date(row.createDate as string).toISOString() : new Date().toISOString(),
       createUserId: row.createUserId ? Number(row.createUserId) : null,
-      createUserName: (row.createUserName as string) || null,
+      createUserName: maskStaffName(row.createUserName as string),
       updateDate: row.updateDate ? new Date(row.updateDate as string).toISOString() : null,
-      updateUserName: (row.updateUserName as string) || null
+      updateUserName: maskStaffName(row.updateUserName as string)
     }))
 
     // Batch lookup customer names for any rentItemId / contractNo
@@ -224,7 +245,7 @@ export async function GET(req: NextRequest) {
         rentRes.recordset.forEach((r: Record<string, unknown>) => {
           if (r.ContractNo) {
             customerMap.set(r.ContractNo as string, {
-              name: (r.CustomerName as string) || '',
+              name: maskFullName(r.CustomerName as string),
               phone: (r.PhoneNo as string) || ''
             })
           }

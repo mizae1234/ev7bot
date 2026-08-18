@@ -5,20 +5,42 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic';
 // ─── Data Masking Helpers ──────────────────────────────────────────
 
-/** ชื่อ → แสดงเต็ม, นามสกุล → *** */
-function maskName(firstName?: string, lastName?: string): { FirstName: string; LastName: string } {
+/** ชื่อ → แสดงเฉพาะชื่อต้น ไม่เอานามสกุล */
+function maskName(firstName?: string, _lastName?: string): { FirstName: string; LastName: string } {
+  const f = (firstName || '').trim().split(/\s+/)[0] || '-'
   return {
-    FirstName: firstName || '-',
-    LastName: lastName ? '***' : '-',
+    FirstName: f,
+    LastName: '',
   }
 }
 
-/** ชื่อเต็ม "สมชาย ใจดี" → "สมชาย ***" */
-function maskFullName(fullName?: string): string {
+/** ชื่อเต็ม "สมชาย ใจดี" หรือ "คุณนิพนธ์ ออมทรัพย์สิน" → เอาแค่ชื่อต้น เช่น "สมชาย" หรือ "คุณสมชาย" */
+function maskFullName(fullName?: string | null): string {
   if (!fullName) return '-'
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length <= 1) return parts[0]
-  return `${parts[0]} ***`
+  const trimmed = fullName.trim()
+  if (!trimmed) return '-'
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    return `คุณ${parts[1]}`
+  }
+  return parts[0]
+}
+
+/** ชื่อพนักงาน/ผู้บันทึก → เอาแค่ชื่อต้น ไม่เอานามสกุล เช่น "นิพนธ์" หรือ "คุณนิพนธ์" */
+function maskStaffName(staffName?: string | null): string {
+  if (!staffName) return '-'
+  const trimmed = staffName.trim()
+  if (!trimmed) return '-'
+  if (trimmed.includes('@')) {
+    return trimmed.split('@')[0]
+  }
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    return `คุณ${parts[1]}`
+  }
+  return parts[0]
 }
 
 /** เบอร์โทร → แสดงเฉพาะ 4 ตัวท้าย เช่น ***-1234 */
@@ -45,7 +67,7 @@ function stripSensitiveFields(obj: Record<string, unknown>): Record<string, unkn
   return cleaned
 }
 
-function maskDriverName(driverName?: string): string {
+function maskDriverName(driverName?: string | null): string {
   if (!driverName) return '-'
   const trimmed = driverName.trim()
   if (trimmed === 'รถใหม่ยังไม่มีเจ้าของ' || trimmed === 'รถทดแทน') return trimmed
@@ -54,26 +76,9 @@ function maskDriverName(driverName?: string): string {
   if (parts.length === 0) return '-'
   
   if (parts[0] === 'คุณ' && parts.length > 1) {
-    const firstName = parts[1]
-    const remaining = parts.slice(2)
-    if (remaining.length === 0) {
-      return `คุณ ${firstName}`
-    }
-    const maskedRemaining = remaining.map(part => {
-      if (part === 'คืนรถ') return 'คืนรถ'
-      return '***'
-    }).join(' ')
-    return `คุณ ${firstName} ${maskedRemaining}`
-  } else {
-    const firstName = parts[0]
-    const remaining = parts.slice(1)
-    if (remaining.length === 0) return firstName
-    const maskedRemaining = remaining.map(part => {
-      if (part === 'คืนรถ') return 'คืนรถ'
-      return '***'
-    }).join(' ')
-    return `${firstName} ${maskedRemaining}`
+    return `คุณ${parts[1]}`
   }
+  return parts[0]
 }
 
 export async function GET(
@@ -457,16 +462,14 @@ export async function GET(
       let creatorName = '-';
       if (originalName && lineDisplayName) {
         if (originalName.includes('@')) {
-          creatorName = lineDisplayName;
-        } else if (originalName !== lineDisplayName) {
-          creatorName = `${originalName} (${lineDisplayName})`;
+          creatorName = maskStaffName(lineDisplayName);
         } else {
-          creatorName = originalName;
+          creatorName = maskStaffName(originalName);
         }
       } else if (lineDisplayName) {
-        creatorName = lineDisplayName;
+        creatorName = maskStaffName(lineDisplayName);
       } else if (originalName) {
-        creatorName = originalName;
+        creatorName = maskStaffName(originalName);
       }
 
       return {
@@ -488,9 +491,9 @@ export async function GET(
       ? {
           ...stripSensitiveFields(activeRentRow),
           FirstName: activeRentRow.FirstName || '-',
-          LastName: activeRentRow.LastName || '',
+          LastName: '',
           PhoneNo: maskPhone(activeRentRow.PhoneNo),
-          CustomerName: (activeRentRow.FirstName + (activeRentRow.LastName ? ' ' + activeRentRow.LastName : '')).trim() || 'ลูกค้าทั่วไป',
+          CustomerName: (activeRentRow.FirstName || 'ลูกค้าทั่วไป').trim(),
         }
       : null
 
@@ -543,6 +546,8 @@ export async function GET(
       ServiceLocation: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
       Insurance: mapCode(m.InsuranceCode, insuranceMap),
       CarStatusDescription: m.CarStatusName || m.CarStatusCode || '-',
+      CreateUserName: maskStaffName(m.CreateUserName as string),
+      UpdateUserName: maskStaffName(m.UpdateUserName as string),
       replacements: replacements[m.MaintenanceItemID as number] || [],
       followUps: followUps[m.MaintenanceItemID as number] || [],
       attachments: attachments[m.MaintenanceItemID as number] || [],
@@ -638,6 +643,7 @@ export async function GET(
 
     // 2. Repossessions
     repossessResult.recordset.forEach((rep: Record<string, unknown>, idx: number) => {
+      const staff = maskStaffName(rep.CreateUserName as string)
       timeline.push({
         id: `repossess-${rep.RepossessID || idx}`,
         date: rep.RepossessDate ? new Date(rep.RepossessDate as string).toISOString() : new Date(rep.CreateDate as string).toISOString(),
@@ -649,13 +655,14 @@ export async function GET(
         badgeColor: 'rose',
         icon: '🚨',
         location: (rep.RepossessLocation as string) || null,
-        user: (rep.CreateUserName as string) || null,
+        user: staff,
         meta: { contractNo: rep.ContractNo, repossessId: rep.RepossessID }
       })
     })
 
     // 3. Replacements as Pool (This car was given to another main vehicle)
     replPoolResult.recordset.forEach((poolItem: Record<string, unknown>, idx: number) => {
+      const staff = maskStaffName(poolItem.CreateUserName as string)
       if (poolItem.ReplacementStartDate) {
         timeline.push({
           id: `repl-pool-${poolItem.ReplacementItemID || idx}`,
@@ -668,7 +675,7 @@ export async function GET(
           badgeColor: poolItem.ReplacementReturnDate ? 'purple' : 'amber',
           icon: '🚗🔄',
           location: (poolItem.Location as string) || null,
-          user: (poolItem.CreateUserName as string) || null,
+          user: staff,
           relatedRegisterNo: (poolItem.MainRegisterNo as string) || null,
           relatedVin: (poolItem.MainVinNo as string) || null,
           meta: { replacementItemId: poolItem.ReplacementItemID, maintenanceItemId: poolItem.MaintenanceItemID }
@@ -686,7 +693,7 @@ export async function GET(
           badge: 'คืนรถทดแทน',
           badgeColor: 'emerald',
           icon: '🔄',
-          user: (poolItem.CreateUserName as string) || null
+          user: staff
         })
       }
     })
@@ -711,6 +718,7 @@ export async function GET(
     })
 
     inspectResult.recordset.forEach((ins: Record<string, unknown>, idx: number) => {
+      const staff = maskStaffName((ins.InspectorName || ins.CreateUserName) as string)
       if (ins.InspectionDate) {
         timeline.push({
           id: `inspect-${ins.InspectionID || idx}`,
@@ -718,12 +726,12 @@ export async function GET(
           category: 'RETURN',
           title: `📋 ใบตรวจสภาพรับคืนรถ (Inspection #${ins.InspectionID})`,
           subtitle: ins.Location ? `สถานที่ตรวจ: ${ins.Location}` : 'ตรวจสภาพรับคืนรถ',
-          description: `ผลประเมิน: ${ins.AssessmentResult || ins.Status || '-'} | ผู้ตรวจ: ${ins.InspectorName || ins.CreateUserName || '-'} ${ins.Mileage ? `| เลขไมล์: ${ins.Mileage} กม.` : ''}`,
+          description: `ผลประเมิน: ${ins.AssessmentResult || ins.Status || '-'} | ผู้ตรวจ: ${staff} ${ins.Mileage ? `| เลขไมล์: ${ins.Mileage} กม.` : ''}`,
           badge: 'ตรวจสภาพ',
           badgeColor: 'indigo',
           icon: '📋',
           location: (ins.Location as string) || null,
-          user: (ins.InspectorName as string) || (ins.CreateUserName as string) || null,
+          user: staff,
           meta: { inspectionId: ins.InspectionID }
         })
       }
@@ -732,6 +740,7 @@ export async function GET(
     // 5. Maintenance Tickets
     maintenance.forEach((m: Record<string, unknown>, idx: number) => {
       const maintId = m.MaintenanceItemID || idx
+      const staff = maskStaffName(m.CreateUserName as string)
       
       if (m.ReportDate) {
         timeline.push({
@@ -745,7 +754,7 @@ export async function GET(
           badgeColor: 'amber',
           icon: '🔧',
           location: (m.ServiceLocation as string) || null,
-          user: (m.CreateUserName as string) || null,
+          user: staff,
           meta: { maintenanceItemId: maintId }
         })
       }
@@ -784,18 +793,19 @@ export async function GET(
       const fList = (m.followUps as Record<string, unknown>[]) || []
       fList.forEach((f, fIdx) => {
         const fDate = f.FollowUpDate || f.CreateDate
+        const fStaff = maskStaffName(f.CreateUserName as string)
         if (fDate) {
           timeline.push({
             id: `follow-${f.MaintenanceFollowUpID || `${maintId}-${fIdx}`}`,
             date: new Date(fDate as string).toISOString(),
             category: 'FOLLOW_UP',
             title: `📝 ติดตามงานซ่อม (ใบงาน #${maintId})`,
-            subtitle: `ติดตามโดย: ${f.CreateUserName || '-'}`,
+            subtitle: `ติดตามโดย: ${fStaff}`,
             description: String(f.FollowUpDetail || '-'),
             badge: 'ติดตามงาน',
             badgeColor: 'blue',
             icon: '📝',
-            user: (f.CreateUserName as string) || null
+            user: fStaff
           })
         }
       })
@@ -803,6 +813,7 @@ export async function GET(
 
     // 6. Vehicle Notes
     notesResult.recordset.forEach((n: Record<string, unknown>, idx: number) => {
+      const staff = maskStaffName(n.CreateUserName as string)
       const detail = String(n.NoteDetail || '')
       const isLocNote = detail.includes('ย้ายสถานที่') || detail.includes('📍')
       timeline.push({
@@ -810,12 +821,12 @@ export async function GET(
         date: new Date(n.CreateDate as string).toISOString(),
         category: 'NOTE',
         title: isLocNote ? `📍 บันทึกการย้ายสถานที่ / สถานะ` : `📌 บันทึกหมายเหตุประจำรถ`,
-        subtitle: `บันทึกโดย: ${n.CreateUserName || '-'}`,
+        subtitle: `บันทึกโดย: ${staff}`,
         description: detail,
         badge: isLocNote ? 'ย้ายสถานที่' : 'โน้ตรถ',
         badgeColor: isLocNote ? 'indigo' : 'zinc',
         icon: isLocNote ? '📍' : '📌',
-        user: (n.CreateUserName as string) || null,
+        user: staff,
         meta: { vehicleNoteId: n.VehicleNoteID }
       })
     })
