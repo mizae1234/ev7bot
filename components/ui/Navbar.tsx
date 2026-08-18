@@ -250,19 +250,6 @@ export function Navbar() {
                   </div>
                 )
               })}
-
-              {/* Direct Link: Log Chats */}
-              <Link
-                href="/logchats"
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  pathname.startsWith('/logchats') || pathname.startsWith('/chat')
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80'
-                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
-                }`}
-              >
-                <span>💬</span>
-                <span>แชต & Log</span>
-              </Link>
             </nav>
           </div>
 
@@ -299,9 +286,6 @@ export function Navbar() {
               <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                 <span>{group.icon}</span>
                 <span>{group.label}</span>
-                {group.isLive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />
-                )}
               </div>
               <div className="space-y-1">
                 {group.items.map((item) => {
@@ -340,29 +324,6 @@ export function Navbar() {
               </div>
             </div>
           ))}
-
-          {/* Direct Link: Log Chats in Mobile */}
-          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
-            <Link
-              href="/logchats"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
-                pathname.startsWith('/logchats') || pathname.startsWith('/chat')
-                  ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
-                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
-              }`}
-            >
-              <span className="text-xl shrink-0">💬</span>
-              <div>
-                <span className="text-xs font-semibold text-zinc-900 dark:text-white">
-                  บันทึกการสื่อสาร & LINE Logs
-                </span>
-                <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500">
-                  ประวัติการสนทนาและการแจ้งเตือนระบบ
-                </p>
-              </div>
-            </Link>
-          </div>
         </div>
       )}
     </header>
