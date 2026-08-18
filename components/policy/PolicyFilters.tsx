@@ -14,9 +14,12 @@ interface PolicyFiltersProps {
   onProjectFilterChange: (val: string) => void
   modelFilter: string
   onModelFilterChange: (val: string) => void
+  statusFilter: string
+  onStatusFilterChange: (val: string) => void
   masterTypes: InsuranceMasterType[]
   projects: string[]
   models: string[]
+  statuses?: { code: string; label: string }[]
   onExportExcel: () => void
   exportLoading: boolean
 }
@@ -34,12 +37,24 @@ export function PolicyFilters({
   onProjectFilterChange,
   modelFilter,
   onModelFilterChange,
+  statusFilter,
+  onStatusFilterChange,
   masterTypes,
   projects,
   models,
+  statuses,
   onExportExcel,
   exportLoading
 }: PolicyFiltersProps) {
+  const defaultStatuses = statuses || [
+    { code: 'ON_RENT', label: '🚗 อยู่ระหว่างเช่า (ON_RENT)' },
+    { code: 'AVAILABLE', label: '🟢 พร้อมใช้งาน / รถว่าง (AVAILABLE)' },
+    { code: 'MAINTENANCE', label: '🛠️ อยู่ระหว่างซ่อม (MAINTENANCE)' },
+    { code: 'REPLACEMENT', label: '🔄 รถทดแทน (REPLACEMENT)' },
+    { code: 'PENDING', label: '⏳ รอดำเนินการ (PENDING)' },
+    { code: 'PRODUCTION', label: '🏭 รอประกอบ/ผลิต (PRODUCTION)' }
+  ]
+
   return (
     <div className="flex flex-col gap-3 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
       {/* Top Bar: Search & Action Buttons */}
@@ -60,7 +75,7 @@ export function PolicyFilters({
           {search && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -74,7 +89,7 @@ export function PolicyFilters({
             type="button"
             onClick={onExportExcel}
             disabled={exportLoading}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50 cursor-pointer"
           >
             {exportLoading ? (
               <svg className="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
@@ -113,7 +128,25 @@ export function PolicyFilters({
           <option value="COMPLETE">✅ ข้อมูลเอกสารครบถ้วน</option>
         </select>
 
-        {/* 2. Expiry Status */}
+        {/* 2. Vehicle Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => onStatusFilterChange(e.target.value)}
+          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
+            statusFilter !== 'ALL'
+              ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-400'
+              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+          }`}
+        >
+          <option value="ALL">สถานะรถ: ทั้งหมด</option>
+          {defaultStatuses.map(s => (
+            <option key={s.code} value={s.code}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+
+        {/* 3. Expiry Status */}
         <select
           value={expiryFilter}
           onChange={(e) => onExpiryFilterChange(e.target.value)}
@@ -130,7 +163,7 @@ export function PolicyFilters({
           <option value="ACTIVE">🟢 ความคุ้มครองปกติ</option>
         </select>
 
-        {/* 3. Insurance Type */}
+        {/* 4. Insurance Type */}
         <select
           value={typeFilter}
           onChange={(e) => onTypeFilterChange(e.target.value)}
@@ -144,7 +177,7 @@ export function PolicyFilters({
           ))}
         </select>
 
-        {/* 4. Project */}
+        {/* 5. Project */}
         {projects.length > 0 && (
           <select
             value={projectFilter}
@@ -158,7 +191,7 @@ export function PolicyFilters({
           </select>
         )}
 
-        {/* 5. Model */}
+        {/* 6. Model */}
         {models.length > 0 && (
           <select
             value={modelFilter}
@@ -173,18 +206,19 @@ export function PolicyFilters({
         )}
 
         {/* Clear Filters button */}
-        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || modelFilter !== 'ALL') && (
+        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || statusFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || modelFilter !== 'ALL') && (
           <button
             type="button"
             onClick={() => {
               onSearchChange('')
               onExpiryFilterChange('ALL')
               onMissingFilterChange('ALL')
+              onStatusFilterChange('ALL')
               onTypeFilterChange('ALL')
               onProjectFilterChange('ALL')
               onModelFilterChange('ALL')
             }}
-            className="text-xs py-1 px-2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline"
+            className="text-xs py-1 px-2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"
           >
             ล้างตัวกรอง
           </button>

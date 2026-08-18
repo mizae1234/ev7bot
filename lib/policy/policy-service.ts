@@ -67,6 +67,7 @@ export async function getPolicyList(params: {
   categoryFilter?: string // 'ALL' | 'INSURANCE' | 'ACT' | 'TAX' | 'METER'
   projectFilter?: string
   modelFilter?: string
+  statusFilter?: string
   page?: number
   limit?: number
 }): Promise<{
@@ -107,6 +108,11 @@ export async function getPolicyList(params: {
   if (params.modelFilter && params.modelFilter !== 'ALL') {
     req.input('model', sql.NVarChar, params.modelFilter)
     whereClause += ' AND i.Model = @model'
+  }
+
+  if (params.statusFilter && params.statusFilter !== 'ALL') {
+    req.input('statusFilter', sql.NVarChar, params.statusFilter)
+    whereClause += ' AND (i.Status = @statusFilter OR i.StatusType = @statusFilter)'
   }
 
   if (params.typeFilter && params.typeFilter !== 'ALL') {

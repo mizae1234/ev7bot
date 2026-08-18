@@ -61,6 +61,7 @@ function PolicyPageContent() {
   const [search, setSearch] = useState('')
   const [expiryFilter, setExpiryFilter] = useState('ALL')
   const [missingFilter, setMissingFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [projectFilter, setProjectFilter] = useState('ALL')
   const [modelFilter, setModelFilter] = useState('ALL')
@@ -79,7 +80,7 @@ function PolicyPageContent() {
       try {
         const parsed = JSON.parse(cachedProfile)
         setLiffUserId(parsed.userId || null)
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -107,6 +108,7 @@ function PolicyPageContent() {
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
       if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
+      if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
@@ -116,14 +118,15 @@ function PolicyPageContent() {
 
       if (res.ok) {
         setRecords(data.records || [])
-        setStats(data.stats || stats)
+        if (data.stats) setStats(data.stats)
         setTotal(data.total || 0)
         setTotalPages(data.totalPages || 1)
 
         // Extract distinct projects & models for dropdowns
         if (data.records) {
-          const distinctProjects = Array.from(new Set(data.records.map((r: any) => r.project).filter(Boolean))) as string[]
-          const distinctModels = Array.from(new Set(data.records.map((r: any) => r.model).filter(Boolean))) as string[]
+          const list = data.records as PolicyVehicleRecord[]
+          const distinctProjects = Array.from(new Set(list.map(r => r.project).filter(Boolean))) as string[]
+          const distinctModels = Array.from(new Set(list.map(r => r.model).filter(Boolean))) as string[]
           setProjects(prev => Array.from(new Set([...prev, ...distinctProjects])))
           setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
         }
@@ -133,7 +136,7 @@ function PolicyPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, expiryFilter, missingFilter, typeFilter, projectFilter, modelFilter])
+  }, [page, search, expiryFilter, missingFilter, statusFilter, typeFilter, projectFilter, modelFilter])
 
   useEffect(() => {
     fetchPolicies()
@@ -150,6 +153,10 @@ function PolicyPageContent() {
   }
   const handleMissingFilterChange = (val: string) => {
     setMissingFilter(val)
+    setPage(1)
+  }
+  const handleStatusFilterChange = (val: string) => {
+    setStatusFilter(val)
     setPage(1)
   }
   const handleTypeFilterChange = (val: string) => {
@@ -177,6 +184,7 @@ function PolicyPageContent() {
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
       if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
+      if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
       if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
       if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
@@ -298,6 +306,8 @@ function PolicyPageContent() {
             onExpiryFilterChange={handleExpiryFilterChange}
             missingFilter={missingFilter}
             onMissingFilterChange={handleMissingFilterChange}
+            statusFilter={statusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
             typeFilter={typeFilter}
             onTypeFilterChange={handleTypeFilterChange}
             projectFilter={projectFilter}
