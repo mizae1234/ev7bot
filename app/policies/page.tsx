@@ -193,10 +193,7 @@ function PolicyPageContent() {
         'วันหมดอายุภาษีรถ': formatThaiDate(r.vehicleTaxEndDate),
         'สถานะภาษีรถ': r.vehicleTaxDaysLeft !== null ? (r.vehicleTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.vehicleTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
         'วันหมดอายุภาษีมิเตอร์': formatThaiDate(r.meterTaxEndDate),
-        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
-        'ผู้เช่าปัจจุบัน': r.customerName || '-',
-        'เลขที่สัญญา': r.contractNo || '-',
-        'เบอร์โทร': r.phoneNo || '-'
+        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล'
       }))
 
       const ws = XLSX.utils.json_to_sheet(exportRows)

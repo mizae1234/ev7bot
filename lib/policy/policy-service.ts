@@ -136,11 +136,6 @@ export async function getPolicyList(params: {
         CONVERT(VARCHAR(10), p.MeterTaxEndDate, 120) AS meterTaxEndDate,
         p.MeterTaxFilePath AS meterTaxFilePath,
 
-        -- Driver Info
-        r.ContractNo AS contractNo,
-        NULLIF(LTRIM(RTRIM(r.FirstName + ' ' + ISNULL(r.LastName, ''))), '') AS customerName,
-        r.PhoneNo AS phoneNo,
-
         CONVERT(VARCHAR(19), p.UpdateDate, 120) AS updatedAt
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_Policy p ON i.VinNo = p.VinNo AND p.IsActive = 1
@@ -148,16 +143,6 @@ export async function getPolicyList(params: {
       LEFT JOIN dbo.EV_MsSubStatus sub_st ON i.StatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus sub_s ON i.Status = sub_s.StatusCode AND sub_s.Type = 'STATUS'
       LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
-      LEFT JOIN (
-        SELECT r1.*
-        FROM dbo.EV_RentItem r1
-        INNER JOIN (
-          SELECT InventoryItemID, MAX(RentItemID) AS MaxRentID
-          FROM dbo.EV_RentItem
-          WHERE IsActive = 1
-          GROUP BY InventoryItemID
-        ) r2 ON r1.RentItemID = r2.MaxRentID
-      ) r ON i.InventoryItemID = r.InventoryItemID
       ${whereClause}
     )
     SELECT * FROM VehicleData

@@ -241,20 +241,12 @@ export function PolicyTable({
                       {rec.statusName || rec.status || 'ไม่ระบุ'}
                     </span>
 
-                    {rec.locationName && (
-                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                        <span className="text-zinc-400">📍</span>
-                        <span className="truncate max-w-[150px]" title={rec.locationName}>
-                          {rec.locationName}
-                        </span>
-                      </div>
-                    )}
-
-                    {rec.customerName && (
-                      <div className="text-[10px] text-zinc-400 truncate max-w-[150px]">
-                        ผู้เช่า: {rec.customerName}
-                      </div>
-                    )}
+                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                      <span className="text-zinc-400">📍</span>
+                      <span className="truncate max-w-[170px] font-medium" title={rec.locationName || rec.currentLocation || 'ไม่ระบุสถานที่'}>
+                        {rec.locationName || rec.currentLocation || <span className="italic text-zinc-400">ไม่ระบุสถานที่</span>}
+                      </span>
+                    </div>
                   </div>
                 </td>
 
