@@ -28,13 +28,15 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpiring30 }
       ],
       icon: (
-        <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       ),
-      bg: 'from-amber-500/10 to-amber-600/5 hover:border-amber-500/50',
+      bg: 'from-amber-500/10 via-amber-500/5 to-transparent hover:border-amber-500/50',
+      borderDefault: 'border-amber-200/70 dark:border-amber-900/40',
       activeBorder: 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-500/10',
-      badgeColor: 'text-amber-600 dark:text-amber-400 bg-amber-500/10'
+      chipActive: 'text-amber-700 dark:text-amber-300 bg-amber-500/15 border-amber-500/20',
+      chipMuted: 'text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 border-transparent'
     },
     {
       id: 'EXPIRED',
@@ -49,13 +51,15 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpired }
       ],
       icon: (
-        <svg className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      bg: 'from-rose-500/10 to-rose-600/5 hover:border-rose-500/50',
+      bg: 'from-rose-500/10 via-rose-500/5 to-transparent hover:border-rose-500/50',
+      borderDefault: 'border-rose-200/70 dark:border-rose-900/40',
       activeBorder: 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-500/10',
-      badgeColor: 'text-rose-600 dark:text-rose-400 bg-rose-500/10'
+      chipActive: 'text-rose-700 dark:text-rose-300 bg-rose-500/15 border-rose-500/20',
+      chipMuted: 'text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 border-transparent'
     },
     {
       id: 'EXPIRING_60',
@@ -70,19 +74,21 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpiring60 }
       ],
       icon: (
-        <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      bg: 'from-yellow-500/10 to-yellow-600/5 hover:border-yellow-500/50',
+      bg: 'from-yellow-500/10 via-yellow-500/5 to-transparent hover:border-yellow-500/50',
+      borderDefault: 'border-yellow-200/70 dark:border-yellow-900/40',
       activeBorder: 'border-yellow-500 ring-2 ring-yellow-500/20 bg-yellow-500/10',
-      badgeColor: 'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
+      chipActive: 'text-yellow-700 dark:text-yellow-300 bg-yellow-500/15 border-yellow-500/20',
+      chipMuted: 'text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 border-transparent'
     },
     {
       id: 'MISSING_ANY',
       type: 'MISSING',
       title: 'ยังขาดข้อมูลเอกสาร',
-      desc: `ไม่มีเอกสารอย่างน้อย 1 รายการ`,
+      desc: 'ไม่มีเอกสารอย่างน้อย 1 รายการ',
       count: stats.totalMissingAny,
       breakdown: [
         { label: 'ขาดประกัน', val: stats.insuranceMissing },
@@ -91,18 +97,20 @@ export function PolicyStatsCards({
         { label: 'ขาดมิเตอร์', val: stats.meterMissing }
       ],
       icon: (
-        <svg className="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
-      bg: 'from-slate-500/10 to-slate-600/5 hover:border-slate-500/50',
+      bg: 'from-slate-500/10 via-slate-500/5 to-transparent hover:border-slate-500/50',
+      borderDefault: 'border-zinc-200/80 dark:border-zinc-800',
       activeBorder: 'border-slate-500 ring-2 ring-slate-500/20 bg-slate-500/10',
-      badgeColor: 'text-slate-700 dark:text-slate-300 bg-slate-200/60 dark:bg-slate-800'
+      chipActive: 'text-slate-700 dark:text-slate-300 bg-slate-200/80 dark:bg-slate-800 border-slate-300/40 dark:border-slate-700/40',
+      chipMuted: 'text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/60 border-transparent'
     }
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
       {cards.map(card => {
         const isSelected = card.type === 'EXPIRY'
           ? (activeExpiryFilter === card.id && activeMissingFilter === 'ALL')
@@ -129,37 +137,46 @@ export function PolicyStatsCards({
             key={card.id}
             type="button"
             onClick={handleClick}
-            className={`text-left relative p-4.5 rounded-2xl border transition-all duration-200 bg-gradient-to-br backdrop-blur-sm ${card.bg} ${
-              isSelected ? card.activeBorder : 'border-zinc-200/80 dark:border-zinc-800'
-            } shadow-sm hover:shadow-md cursor-pointer`}
+            className={`text-left relative p-4 rounded-2xl border transition-all duration-200 bg-white dark:bg-zinc-900 bg-gradient-to-br ${card.bg} ${
+              isSelected ? card.activeBorder : `${card.borderDefault} hover:border-zinc-300 dark:hover:border-zinc-700`
+            } shadow-xs hover:shadow-sm cursor-pointer flex flex-col justify-between`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                {card.title}
-              </span>
-              <div className="p-2 rounded-xl bg-white dark:bg-zinc-800 shadow-sm border border-zinc-200/60 dark:border-zinc-700/60">
-                {card.icon}
+            <div>
+              {/* Header Title + Icon */}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 leading-tight">
+                  {card.title}
+                </span>
+                <div className="w-7 h-7 rounded-xl bg-white dark:bg-zinc-800 shadow-xs border border-zinc-200/70 dark:border-zinc-700/70 flex items-center justify-center shrink-0">
+                  {card.icon}
+                </div>
+              </div>
+
+              {/* Counter */}
+              <div className="flex items-baseline gap-1.5 mb-3">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white font-mono">
+                  {card.count.toLocaleString()}
+                </span>
+                <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">คัน</span>
               </div>
             </div>
 
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                {card.count.toLocaleString()}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">คัน</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800">
-              {card.breakdown.map((item, idx) => (
-                <span
-                  key={idx}
-                  className={`text-[11px] px-2 py-0.5 rounded-md font-medium ${
-                    item.val > 0 ? card.badgeColor : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
-                  }`}
-                >
-                  {item.label}: <strong className="font-semibold">{item.val}</strong>
-                </span>
-              ))}
+            {/* Sub Breakdown Badges */}
+            <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/80 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
+              {card.breakdown.map((item, idx) => {
+                const hasValue = item.val > 0
+                return (
+                  <span
+                    key={idx}
+                    className={`text-[10.5px] px-2 py-0.5 rounded-lg border font-medium transition-colors inline-flex items-center gap-1 ${
+                      hasValue ? card.chipActive : card.chipMuted
+                    }`}
+                  >
+                    <span>{item.label}:</span>
+                    <strong className="font-bold">{item.val.toLocaleString()}</strong>
+                  </span>
+                )
+              })}
             </div>
           </button>
         )
