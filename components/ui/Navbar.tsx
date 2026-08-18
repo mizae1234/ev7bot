@@ -27,6 +27,12 @@ const navGroups: NavGroup[] = [
     icon: '🔧',
     items: [
       {
+        name: 'แจ้งเหตุ (Quick Report)',
+        href: '/liff/quick-report',
+        desc: 'แบบฟอร์มแจ้งเหตุ แจ้งซ่อมด่วน และตรวจเช็คตัวรถ',
+        icon: '🚨'
+      },
+      {
         name: 'ศูนย์จัดการงานซ่อม',
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
