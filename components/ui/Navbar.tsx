@@ -105,11 +105,6 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Don't render navbar on LIFF mobile views or Audit pages
-  if (pathname && (pathname.startsWith('/liff') || pathname.startsWith('/audit'))) {
-    return null
-  }
-
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -126,6 +121,11 @@ export function Navbar() {
     setMobileMenuOpen(false)
     setOpenDropdown(null)
   }, [pathname])
+
+  // Don't render navbar on LIFF mobile views or Audit pages (must be called AFTER all hooks)
+  if (pathname && (pathname.startsWith('/liff') || pathname.startsWith('/audit'))) {
+    return null
+  }
 
   const isDashboardActive = pathname === '/dashboard' || pathname === '/'
   const isReplacementsActive = pathname.startsWith('/replacements')
