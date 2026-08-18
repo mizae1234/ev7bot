@@ -49,48 +49,35 @@ export default function CustodyPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-zinc-900 pb-12 dark:bg-zinc-950 dark:text-zinc-50">
       {/* HEADER SECTION */}
-      <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 bg-white/80 backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/80">
-        <div className="mx-auto max-w-[95rem] px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard"
-              className="inline-flex items-center justify-center p-2 rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 transition-all dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            </a>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-transparent dark:from-white dark:to-zinc-400">
-                📋 บอร์ดติดตามงานซ่อมและการควบคุมรถทดแทน
-              </h1>
-              <p className="text-xs text-zinc-500">
-                กระดานแสดงภาระงานและการถือครองรถยนต์ในแต่ละฝ่ายปฏิบัติงานแบบเรียลไทม์ (กดที่ตัวการ์ดเพื่อขยายดูรายละเอียดเพิ่มเติม)
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 self-end sm:self-auto">
-            <LoginProfile />
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading || isValidating}
-              className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className={`w-3.5 h-3.5 ${isValidating ? 'animate-spin text-indigo-500' : ''}`}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-              รีเฟรชบอร์ด
-            </button>
-          </div>
+      <div className="mx-auto max-w-[95rem] px-4 pt-6 pb-2 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-zinc-900 to-zinc-600 bg-clip-text text-transparent dark:from-white dark:to-zinc-400">
+            📋 บอร์ดติดตามงานซ่อมและการควบคุมรถทดแทน
+          </h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            กระดานแสดงภาระงานและการถือครองรถยนต์ในแต่ละฝ่ายปฏิบัติงานแบบเรียลไทม์ (กดที่ตัวการ์ดเพื่อขยายดูรายละเอียดเพิ่มเติม)
+          </p>
         </div>
-      </header>
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading || isValidating}
+            className="flex items-center gap-1.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold py-1.5 px-3 rounded-xl shadow-xs transition-all duration-200 disabled:opacity-50 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className={`w-3.5 h-3.5 ${isValidating ? 'animate-spin text-indigo-500' : ''}`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            รีเฟรชบอร์ด
+          </button>
+        </div>
+      </div>
 
       {/* FILTER & SEARCH */}
       <div className="mx-auto max-w-[95rem] px-4 mt-6 sm:px-6 lg:px-8">

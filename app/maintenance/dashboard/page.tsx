@@ -231,7 +231,6 @@ function MaintenanceDashboardContent() {
             >
               🔧 รายการใบซ่อมบำรุง
             </a>
-            <LoginProfile />
           </div>
         </div>
 

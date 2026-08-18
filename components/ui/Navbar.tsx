@@ -34,7 +34,7 @@ const navGroups: NavGroup[] = [
         icon: '📈'
       },
       {
-        name: 'ศูนย์จัดการงานซ่อม (Kanban)',
+        name: 'ศูนย์จัดการงานซ่อม (Maintenance)',
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
         icon: '📋'
@@ -59,10 +59,10 @@ const navGroups: NavGroup[] = [
         icon: '📑'
       },
       {
-        name: 'มอนิเตอร์รับมอบ & อายัดรถ (Custody)',
+        name: 'บอร์ดงานซ่อม & การถือครองรถ (Custody)',
         href: '/custody',
-        desc: 'ติดตามสถานะอายัดรถและการส่งมอบทรัพย์สิน',
-        icon: '🔑'
+        desc: 'กระดานติดตามงานซ่อมและการถือครองรถยนต์ในแต่ละฝ่าย',
+        icon: '📋'
       },
       {
         name: 'มอนิเตอร์ตรวจสภาพรถ (Audit)',

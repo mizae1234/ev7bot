@@ -168,24 +168,12 @@ function VehicleNotesContent() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200/60 pb-6 dark:border-zinc-800/60">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-indigo-600 dark:from-zinc-100 dark:to-indigo-400 tracking-tight font-sans">
-                📝 ประวัติการบันทึกข้อมูลรถ (Vehicle Notes)
-              </h1>
-              <a 
-                href="/dashboard" 
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-850 text-zinc-500 dark:text-zinc-400 transition-all shadow-sm"
-              >
-                🏠 Dashboard
-              </a>
-            </div>
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-indigo-600 dark:from-zinc-100 dark:to-indigo-400 tracking-tight font-sans">
+              📝 ประวัติการบันทึกข้อมูลรถ (Vehicle Notes)
+            </h1>
             <p className="text-xs text-zinc-500 mt-1 dark:text-zinc-450">
               ประวัติข้อความโน้ตและสถานะล่าสุดของรถยนต์ในระบบ ค้นหาตามทะเบียน เลขตัวถัง หรือเนื้อหาโน้ตได้
             </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <LoginProfile />
           </div>
         </div>
 
