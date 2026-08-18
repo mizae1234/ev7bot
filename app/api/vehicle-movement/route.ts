@@ -46,7 +46,6 @@ function parseLocationNote(noteDetail: string | null, locMap: Map<string, string
 } {
   if (!noteDetail) return { fromLocation: null, toLocation: null, actor: null }
   
-  // Format: 📍 ย้ายสถานที่: [old] → [new] | โดย: [actor]
   const arrowMatch = noteDetail.match(/(?:ย้ายสถานที่|เปลี่ยนสถานที่)[:\s]+([^→\->|]+)\s*(?:→|->)\s*([^|]+)(?:\s*\|\s*โดย:\s*(.*))?/i)
   if (arrowMatch) {
     const rawFrom = arrowMatch[1]?.trim() || null
@@ -91,12 +90,12 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // 2. Query strictly location movement notes & structured location logs
+    // 2. High performance optimized CTE
     const baseCte = `
       WITH LocationMovements AS (
         -- A. บันทึกจาก EV_VehicleLocationLog (ถ้ามี)
         SELECT
-          CONCAT('LOC-', ISNULL(CAST(l.InventoryItemID AS VARCHAR), '0'), '-', FORMAT(l.CreateDate, 'yyyyMMddHHmmssfff')) AS movementId,
+          CONCAT('LOC-', ISNULL(CAST(l.InventoryItemID AS VARCHAR(20)), '0'), '-', CONVERT(VARCHAR(30), l.CreateDate, 126)) AS movementId,
           l.InventoryItemID AS inventoryItemId,
           l.VinNo AS vinNo,
           i.RegisterNo AS registerNo,
@@ -106,12 +105,12 @@ export async function GET(req: NextRequest) {
           l.OldLocation AS originLocation,
           l.NewLocation AS destinationLocation,
           CONCAT(N'📍 ย้ายสถานที่: ', ISNULL(l.OldLocation, '-'), N' → ', ISNULL(l.NewLocation, '-'), CASE WHEN l.ActionCode IS NOT NULL THEN CONCAT(N' (', l.ActionCode, N')') ELSE N'' END) AS movementDetail,
-          TRY_CAST(l.CreateDate AS DATETIME) AS movementDate,
-          TRY_CAST(l.CreateDate AS DATETIME) AS createDate,
+          l.CreateDate AS movementDate,
+          l.CreateDate AS createDate,
           l.CreateUserID AS createUserId,
           ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
         FROM dbo.EV_VehicleLocationLog l
-        LEFT JOIN dbo.EV_InventoryItem i ON (l.InventoryItemID = i.InventoryItemID OR l.VinNo = i.VinNo)
+        LEFT JOIN dbo.EV_InventoryItem i ON l.InventoryItemID = i.InventoryItemID
         LEFT JOIN dbo.EV_User u ON l.CreateUserID = u.UserID
 
         UNION ALL
@@ -128,8 +127,8 @@ export async function GET(req: NextRequest) {
           NULL AS originLocation,
           NULL AS destinationLocation,
           n.NoteDetail AS movementDetail,
-          TRY_CAST(n.CreateDate AS DATETIME) AS movementDate,
-          TRY_CAST(n.CreateDate AS DATETIME) AS createDate,
+          n.CreateDate AS movementDate,
+          n.CreateDate AS createDate,
           n.CreateUserID AS createUserId,
           ISNULL(NULLIF(RTRIM(LTRIM(CONCAT(u.FirstName, ' ', ISNULL(u.LastName, '')))), ''), u.UserName) AS createUserName
         FROM dbo.EV_VehicleNote n
@@ -180,54 +179,49 @@ export async function GET(req: NextRequest) {
     if (startDate) {
       dataReq.input('startDate', sql.Date, startDate)
       countReq.input('startDate', sql.Date, startDate)
-      whereConditions.push('TRY_CAST(movementDate AS DATE) >= @startDate')
+      whereConditions.push('CAST(movementDate AS DATE) >= @startDate')
     }
 
     if (endDate) {
       dataReq.input('endDate', sql.Date, endDate)
       countReq.input('endDate', sql.Date, endDate)
-      whereConditions.push('TRY_CAST(movementDate AS DATE) <= @endDate')
+      whereConditions.push('CAST(movementDate AS DATE) <= @endDate')
     }
 
     const whereSql = whereConditions.join(' AND ')
 
-    // Execute Count Query
-    const totalCountQuery = `
-      ${baseCte}
-      SELECT COUNT(*) AS total FROM MovementView WHERE ${whereSql}
-    `
-    const countRes = await countReq.query(totalCountQuery)
-    const total = countRes.recordset[0]?.total || 0
-
-    // Execute Paginated Data Query
+    // Execute Count and Data in Parallel
     const offset = (page - 1) * limit
     dataReq.input('offset', sql.Int, offset)
     dataReq.input('limit', sql.Int, limit)
 
-    const dataQuery = `
-      ${baseCte}
-      SELECT *
-      FROM MovementView
-      WHERE ${whereSql}
-      ORDER BY movementDate DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @limit ROWS ONLY
-    `
-    const dataRes = await dataReq.query(dataQuery)
+    const [countRes, dataRes, statsRes] = await Promise.all([
+      countReq.query(`
+        ${baseCte}
+        SELECT COUNT(*) AS total FROM MovementView WHERE ${whereSql}
+      `),
+      dataReq.query(`
+        ${baseCte}
+        SELECT *
+        FROM MovementView
+        WHERE ${whereSql}
+        ORDER BY movementDate DESC
+        OFFSET @offset ROWS
+        FETCH NEXT @limit ROWS ONLY
+      `),
+      pool.request().query(`
+        ${baseCte}
+        SELECT
+          COUNT(*) AS totalCount,
+          SUM(CASE WHEN MONTH(movementDate) = MONTH(GETDATE()) AND YEAR(movementDate) = YEAR(GETDATE()) THEN 1 ELSE 0 END) AS thisMonthCount,
+          SUM(CASE WHEN CAST(movementDate AS DATE) = CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS todayCount,
+          COUNT(DISTINCT vinNo) AS uniqueVehicles
+        FROM MovementView
+        WHERE movementDate IS NOT NULL
+      `).catch(() => ({ recordset: [{ totalCount: 0, thisMonthCount: 0, todayCount: 0, uniqueVehicles: 0 }] }))
+    ])
 
-    // Execute KPI Stats
-    const statsReq = pool.request()
-    const statsQuery = `
-      ${baseCte}
-      SELECT
-        COUNT(*) AS totalCount,
-        SUM(CASE WHEN MONTH(movementDate) = MONTH(GETDATE()) AND YEAR(movementDate) = YEAR(GETDATE()) THEN 1 ELSE 0 END) AS thisMonthCount,
-        SUM(CASE WHEN TRY_CAST(movementDate AS DATE) = TRY_CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) AS todayCount,
-        COUNT(DISTINCT vinNo) AS uniqueVehicles
-      FROM MovementView
-      WHERE movementDate IS NOT NULL
-    `
-    const statsRes = await statsReq.query(statsQuery)
+    const total = countRes.recordset[0]?.total || 0
     const statRow = statsRes.recordset[0] || {}
 
     // Map records with parsed From/To and masked user names
@@ -235,7 +229,8 @@ export async function GET(req: NextRequest) {
       const detail = (row.movementDetail as string) || ''
       const parsed = parseLocationNote(detail, locMap)
 
-      // Fallback actor if parsed actor exists
+      const fromLoc = parsed.fromLocation || (row.originLocation as string) || null
+      const toLoc = parsed.toLocation || (row.destinationLocation as string) || null
       const effectiveActor = parsed.actor || (row.createUserName as string) || '-'
 
       return {
@@ -247,8 +242,8 @@ export async function GET(req: NextRequest) {
         project: (row.project as string) || null,
         currentLocation: (row.currentLocation as string) || null,
         currentLocationName: (row.currentLocationName as string) || null,
-        fromLocation: parsed.fromLocation,
-        toLocation: parsed.toLocation,
+        fromLocation: fromLoc,
+        toLocation: toLoc,
         movementDetail: detail,
         movementDate: row.movementDate ? new Date(row.movementDate as string).toISOString() : new Date().toISOString(),
         createDate: row.createDate ? new Date(row.createDate as string).toISOString() : new Date().toISOString(),
@@ -258,7 +253,7 @@ export async function GET(req: NextRequest) {
     })
 
     const stats: MovementStats = {
-      totalCount: Number(statRow.totalCount || 0),
+      totalCount: Number(statRow.totalCount || total),
       thisMonthCount: Number(statRow.thisMonthCount || 0),
       todayCount: Number(statRow.todayCount || 0),
       uniqueVehicles: Number(statRow.uniqueVehicles || 0),
