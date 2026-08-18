@@ -345,6 +345,86 @@ export function PolicyBatchUpload({ lineUserId, companies = [], onUploadSuccess 
         </div>
       </div>
 
+      {/* 📖 Format Specification Guide (Hint for Batch Upload) */}
+      <div className="p-4.5 rounded-3xl bg-zinc-50/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800 space-y-3.5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200/60 dark:border-zinc-800/60 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📋</span>
+            <div>
+              <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                โครงสร้างรูปแบบชื่อไฟล์ที่ระบบ Auto-Parser รองรับ
+              </h4>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                ระบบจะแยกประเภท วันหมดอายุ และเลขตัวถังอัตโนมัติจากชื่อไฟล์ตาม 4 ส่วนนี้:
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 self-start sm:self-auto">
+            คั่นด้วย Underscore (_) 4 ส่วน
+          </span>
+        </div>
+
+        {/* Visual Pill Breakdown */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/50 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">ส่วนที่ 1: ประเภท</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-mono">PLMV / PLMC</span>
+            </div>
+            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+              PLMV = ภาคสมัครใจ<br />
+              PLMC = พ.ร.บ.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-purple-50/50 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-800/50 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase">ส่วนที่ 2: เลขตัวถัง</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 font-mono">17 หลัก</span>
+            </div>
+            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono truncate">
+              LNAAKAA12R5E01443
+            </p>
+            <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400">เลขตัวถัง VIN รถยนต์</p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/50 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">ส่วนที่ 3: เลขกรมธรรม์</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-mono">Policy No.</span>
+            </div>
+            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono truncate">
+              DV1BK2508000072
+            </p>
+            <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400">หรือ DACBK... (พ.ร.บ.)</p>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">ส่วนที่ 4: วันหมดอายุ</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-mono">ววดดปปปป พ.ศ.</span>
+            </div>
+            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+              17082569
+            </p>
+            <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400">17 ส.ค. 2569 (8 หลัก)</p>
+          </div>
+        </div>
+
+        {/* Real Examples */}
+        <div className="pt-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <span className="font-semibold text-zinc-600 dark:text-zinc-400">ตัวอย่างชื่อไฟล์ที่พร้อมอัปโหลด:</span>
+          <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+            <span className="px-2.5 py-1 rounded-lg bg-blue-100/70 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+              PLMV_LNAAKAA12R5E01443_DV1BK2508000072_17082569.PDF
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-purple-100/70 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800">
+              PLMC_LNAAKAA12R5E01443_DACBK2508000072_17082569.PDF
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Dropzone Area */}
       <div
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
@@ -375,9 +455,6 @@ export function PolicyBatchUpload({ lineUserId, companies = [], onUploadSuccess 
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-lg">
           ระบบ Chunking Concurrency ควบคุมการส่งชุดละ 15 ไฟล์พร้อมกัน 4 เส้นทาง สามารถอัปโหลดไฟล์ 4,000 ไฟล์เสร็จสิ้นภายใน ~1-2 นาที
         </p>
-        <div className="flex items-center gap-3 mt-3 text-[11px] text-zinc-400 font-mono">
-          <span>ตัวอย่าง: PLMV_LNAAKAA12R5E01443_DV1BK2508000072_17082569.PDF</span>
-        </div>
       </div>
 
       {/* Real-time Progress Bar & Queue Status Banner */}
