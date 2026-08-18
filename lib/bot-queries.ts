@@ -516,6 +516,9 @@ export async function searchVehicle(params: { keyword: string }) {
     keyword: params.keyword,
     count: result.recordset.length,
     vehicles: result.recordset,
+    message: result.recordset.length === 0
+      ? `ไม่พบข้อมูลสำหรับ "${params.keyword}" ในระบบสต็อกหลัก (dbo.EV_InventoryItem)`
+      : undefined,
   }
 }
 

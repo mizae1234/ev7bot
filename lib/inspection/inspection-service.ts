@@ -379,7 +379,7 @@ export async function updateInspection(params: {
             const insertReturnResult = await transaction.request()
               .input('rentItemId', sql.BigInt, rent?.RentItemID || targetRentItemId || null)
               .input('vinNo', sql.VarChar, inspect.VinNo)
-              .input('returnModel', sql.NVarChar, rent?.Model || inspect.Model || null)
+              .input('model', sql.NVarChar, rent?.Model || inspect.Model || null)
               .input('registerNo', sql.NVarChar, rent?.RegisterNo || inspect.RegisterNo || null)
               .input('customerName', sql.NVarChar, params.customerName || rent?.CustomerName || inspect.CustomerName || 'ลูกค้าทั่วไป')
               .input('phoneNo', sql.VarChar, params.customerContact || rent?.PhoneNo || inspect.CustomerContact || null)
@@ -389,16 +389,16 @@ export async function updateInspection(params: {
               .input('createUserID', sql.Int, params.ev7UserId)
               .query(`
                 INSERT INTO dbo.EV_ReturnItem (
-                  RentItemID, VinNo, ReturnModel, ReturnRegisterNo, CustomerName, PhoneNo,
+                  RentItemID, VinNo, Model, RegisterNo, CustomerName, PhoneNo,
                   Mileage, ParkLocation, ReturnDate, Status, IsActive, CreateDate, CreateUserID, IsSentToK2
                 )
                 VALUES (
-                  @rentItemId, @vinNo, @returnModel, @registerNo, @customerName, @phoneNo,
+                  @rentItemId, @vinNo, @model, @registerNo, @customerName, @phoneNo,
                   @mileage, @parkLocation, @returnDate, 'SUBMIT', 1, GETDATE(), @createUserID, 0
                 );
-                SELECT SCOPE_IDENTITY() AS NewReturnItemID;
+                SELECT SCOPE_IDENTITY() AS ReturnItemID;
               `)
-            returnItemId = insertReturnResult.recordset[0]?.NewReturnItemID
+            returnItemId = insertReturnResult.recordset[0]?.ReturnItemID
 
             // Link newly created ReturnItemID back to EV_Inspection
             if (returnItemId) {
