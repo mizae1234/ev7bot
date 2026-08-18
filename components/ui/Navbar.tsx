@@ -91,6 +91,12 @@ const navGroups: NavGroup[] = [
         icon: '📝'
       },
       {
+        name: 'ประวัติการยึดรถ',
+        href: '/vehicle-repossess',
+        desc: 'ตรวจสอบและติดตามประวัติการยึดคืนรถยนต์',
+        icon: '🚨'
+      },
+      {
         name: 'งานสัญญา (EV Core)',
         href: '/case-contract',
         desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',
