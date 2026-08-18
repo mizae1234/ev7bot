@@ -1198,4 +1198,132 @@ SP นี้ให้ตัวเลข summary ที่ dashboard เดิม
 - **Chart**: `components/audit/StatusHierarchyChart.tsx` — รองรับทั้ง light/dark theme
 - **Dashboard wrapper**: `components/dashboard/FleetStatusChart.tsx` — SWR + render
 
+## 16. การจัดการประกันภัย พ.ร.บ. ภาษีรถยนต์ และภาษีมิเตอร์ (Policy & Tax Management)
+
+ระบบสำหรับติดตามและจัดการเอกสารความคุ้มครองและภาษีรถยนต์แบบครบวงจร ครอบคลุม:
+1. **ประกันภัยภาคสมัครใจ (Voluntary Insurance - PLMV)**
+2. **พ.ร.บ. คุ้มครองผู้ประสบภัยจากรถ (Compulsory Insurance - PLMC)**
+3. **ภาษีรถยนต์ประจำปี (Annual Vehicle Tax)**
+4. **ภาษีตรวจมิเตอร์แท็กซี่ (Taxi Meter Inspection)**
+
+---
+
+### 16.1 ตาราง Master ประเภทประกัน: `dbo.EV_MsInsuranceType`
+เก็บข้อมูลประเภทความคุ้มครองทั้งหมดในระบบ เพื่อให้สามารถ `JOIN` ออกรายงานได้โดยไม่ต้อง Hardcode
+
+| คอลัมน์ | ชนิดข้อมูล | คำอธิบาย |
+|---|---|---|
+| `TypeCode` | VARCHAR(20) PK | รหัสประเภท (DV1, DV2, DV3, DV5, DAC, TAX_VEHICLE, TAX_METER) |
+| `TypeName` | NVARCHAR(100) | ชื่อประเภท (ประกันภัยชั้น 1, พ.ร.บ. ฯลฯ) |
+| `Category` | VARCHAR(50) | หมวดหมู่: `VOLUNTARY` (ภาคสมัครใจ), `COMPULSORY` (ภาคบังคับ), `TAX` (ภาษี) |
+| `FilePrefix` | VARCHAR(20) | คำนำหน้าชื่อไฟล์ PDF: `PLMV` หรือ `PLMC` |
+| `SortOrder` | INT | ลำดับการแสดงผล |
+| `IsActive` | BIT | สถานะใช้งาน (1 = ใช้งาน) |
+
+---
+
+### 16.2 ตารางหลักสถานะปัจจุบัน: `dbo.EV_Policy`
+เก็บข้อมูลความคุ้มครองและวันหมดอายุฉบับล่าสุดของรถแต่ละคัน (เชื่อมกับ `EV_InventoryItem` ด้วย `VinNo`)
+
+| คอลัมน์ | ชนิดข้อมูล | คำอธิบาย |
+|---|---|---|
+| `PolicyID` | BIGINT PK | รหัสรายการ (Identity) |
+| `VinNo` | VARCHAR(50) | เลขตัวถังรถ (17 หลัก) |
+| `RegisterNo` | VARCHAR(50) | เลขทะเบียนรถ |
+| `InsurancePolicyNo` | VARCHAR(100) | เลขที่กรมธรรม์ประกันภัยภาคสมัครใจ |
+| `InsuranceType` | VARCHAR(20) | รหัสประเภทประกัน (FK -> EV_MsInsuranceType.TypeCode เช่น DV1) |
+| `InsuranceStartDate` | DATE | วันเริ่มคุ้มครองประกันภัย |
+| `InsuranceEndDate` | DATE | วันหมดอายุประกันภัยภาคสมัครใจ |
+| `InsuranceFilePath` | VARCHAR(500) | S3 Key ไฟล์ PDF ประกันบน DigitalOcean Spaces |
+| `InsuranceCompany` | NVARCHAR(100) | บริษัทประกันภัย |
+| `ActPolicyNo` | VARCHAR(100) | เลขที่ พ.ร.บ. |
+| `ActStartDate` | DATE | วันเริ่มคุ้มครอง พ.ร.บ. |
+| `ActEndDate` | DATE | วันหมดอายุ พ.ร.บ. |
+| `ActFilePath` | VARCHAR(500) | S3 Key ไฟล์ PDF พ.ร.บ. บน DigitalOcean Spaces |
+| `ActCompany` | NVARCHAR(100) | บริษัท พ.ร.บ. |
+| `VehicleTaxStartDate`| DATE | วันเริ่มภาษีรถยนต์ประจำปี |
+| `VehicleTaxEndDate`  | DATE | วันหมดอายุภาษีรถยนต์ประจำปี |
+| `MeterTaxStartDate`  | DATE | วันเริ่มตรวจมิเตอร์แท็กซี่ |
+| `MeterTaxEndDate`    | DATE | วันหมดอายุตรวจมิเตอร์แท็กซี่ |
+| `IsActive`           | BIT | สถานะใช้งาน (1 = ใช้งาน) |
+
+---
+
+### 16.3 ตารางประวัติและ Audit Log: `dbo.EV_PolicyLog`
+เก็บบันทึกประวัติกรมธรรม์และเอกสารทุกลำดับที่มีการอัปโหลดหรือนำเข้าใหม่ เพื่อเก็บเป็นหลักฐานย้อนหลัง
+
+| คอลัมน์ | ชนิดข้อมูล | คำอธิบาย |
+|---|---|---|
+| `LogID` | BIGINT PK | รหัส Log (Identity) |
+| `VinNo` | VARCHAR(50) | เลขตัวถังรถ |
+| `RegisterNo` | VARCHAR(50) | เลขทะเบียนรถ |
+| `DocType` | VARCHAR(50) | ประเภทเอกสาร: `INSURANCE`, `ACT`, `VEHICLE_TAX`, `METER_TAX` |
+| `PolicyType` | VARCHAR(20) | รหัสความคุ้มครอง (DV1, DV2, DV3, DV5, DAC) |
+| `PolicyTypeName` | NVARCHAR(100)| ชื่อประเภทความคุ้มครอง |
+| `PolicyNo` | VARCHAR(100) | เลขที่กรมธรรม์ |
+| `StartDate` | DATE | วันเริ่มคุ้มครอง |
+| `EndDate` | DATE | วันหมดอายุ |
+| `OriginalFileName`| NVARCHAR(250)| ชื่อไฟล์ต้นฉบับที่อัปโหลด |
+| `FilePath` | VARCHAR(500) | S3 Key หรือ URL ของไฟล์ PDF |
+| `UploadSource` | VARCHAR(50) | แหล่งนำเข้า: `BATCH_PDF_UPLOAD`, `EXCEL_IMPORT`, `MANUAL` |
+| `IsCurrent` | BIT | 1 = กรมธรรม์ฉบับปัจจุบัน, 0 = กรมธรรม์ฉบับเดิมในอดีต |
+
+---
+
+### 16.4 รูปแบบชื่อไฟล์ PDF และการถอดรหัส (Naming Convention)
+- **ประกันภาคสมัครใจ**: `PLMV_<VIN>_<POLICY_NO>_<EXPIRY_DDMMYYYY_BE>.PDF`
+  - ตัวอย่าง: `PLMV_LNAAKAA12R5E01443_DV1BK2508000072_17082569.PDF`
+  - `PLMV` ➔ ประกันภัยภาคสมัครใจ
+  - `DV1` ➔ ประกันชั้น 1
+  - `17082569` ➔ วันหมดอายุ 17/08/2569 (พ.ศ.) แปลงเป็น ค.ศ. `2026-08-17` (ลบ 543)
+- **พ.ร.บ.**: `PLMC_<VIN>_<POLICY_NO>_<EXPIRY_DDMMYYYY_BE>.PDF`
+  - ตัวอย่าง: `PLMC_LNAAKAA12R5E01443_DACBK2508000072_17082569.PDF`
+  - `PLMC` ➔ พ.ร.บ.
+  - `DAC` ➔ ประกันภัยภาคบังคับ (พ.ร.บ.)
+
+---
+
+### 16.5 ตัวอย่างคำสั่ง Query ที่ใช้บ่อยสำหรับ Bot และ Dashboard
+
+#### 1) ตรวจสอบรถที่ประกันหรือ พ.ร.บ. ใกล้หมดอายุ (ใน 30 วัน):
+```sql
+SELECT 
+  i.VinNo,
+  i.RegisterNo,
+  i.Model,
+  p.InsurancePolicyNo,
+  m.TypeName AS InsuranceTypeName,
+  p.InsuranceEndDate,
+  DATEDIFF(DAY, GETDATE(), p.InsuranceEndDate) AS InsuranceDaysLeft,
+  p.ActPolicyNo,
+  p.ActEndDate,
+  DATEDIFF(DAY, GETDATE(), p.ActEndDate) AS ActDaysLeft
+FROM dbo.EV_InventoryItem i
+JOIN dbo.EV_Policy p ON i.VinNo = p.VinNo AND p.IsActive = 1
+LEFT JOIN dbo.EV_MsInsuranceType m ON p.InsuranceType = m.TypeCode
+WHERE i.IsActive = 1
+  AND (
+    (p.InsuranceEndDate IS NOT NULL AND DATEDIFF(DAY, GETDATE(), p.InsuranceEndDate) BETWEEN 0 AND 30)
+    OR (p.ActEndDate IS NOT NULL AND DATEDIFF(DAY, GETDATE(), p.ActEndDate) BETWEEN 0 AND 30)
+  )
+ORDER BY p.InsuranceEndDate ASC;
+```
+
+#### 2) ดูประวัติย้อนหลังของรถ 1 คัน:
+```sql
+SELECT 
+  l.DocType,
+  l.PolicyTypeName,
+  l.PolicyNo,
+  l.StartDate,
+  l.EndDate,
+  l.FilePath,
+  l.IsCurrent,
+  l.CreateDate
+FROM dbo.EV_PolicyLog l
+WHERE l.VinNo = @vinNo AND l.IsActive = 1
+ORDER BY l.CreateDate DESC;
+```
+
+
 

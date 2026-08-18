@@ -82,6 +82,15 @@ ReceiveDate, ReturnDate, Mileage, ParkLocation
 CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.UserID ผู้บันทึก), IsActive (bit, เอาเฉพาะ IsActive=1)
 หมายเหตุ: ตาราง EV_VehicleNote ทำหน้าที่เป็นทั้ง "โน้ตบันทึกประจำรถ" และ "log การเคลื่อนย้ายสถานที่" ทุกครั้งที่มีการเปลี่ยนสถานที่จอดรถ ระบบจะบันทึก note ใหม่อัตโนมัติพร้อมข้อความ "📍 ย้ายสถานที่: ..." เข้ามา
 
+### ตาราง: dbo.EV_Policy (ประกันภัย พ.ร.บ. ภาษีรถ และภาษีมิเตอร์)
+คอลัมน์: PolicyID (PK), VinNo, RegisterNo, InsurancePolicyNo (เลขกรมธรรม์ภาคสมัครใจ), InsuranceType (DV1, DV2, DV3, DV5), InsuranceStartDate, InsuranceEndDate (วันหมดอายุประกัน), InsuranceFilePath, InsuranceCompany, ActPolicyNo (เลข พ.ร.บ.), ActStartDate, ActEndDate (วันหมดอายุ พ.ร.บ.), ActFilePath, ActCompany, VehicleTaxStartDate, VehicleTaxEndDate (วันหมดอายุภาษีรถยนต์ประจำปี), MeterTaxStartDate, MeterTaxEndDate (วันหมดอายุตรวจมิเตอร์แท็กซี่), IsActive (bit)
+
+### ตาราง: dbo.EV_MsInsuranceType (Master ประเภทความคุ้มครอง)
+คอลัมน์: TypeCode (PK เช่น DV1=ชั้น 1, DV2=ชั้น 2, DV3=ชั้น 3, DV5=2+/3+, DAC=พ.ร.บ., TAX_VEHICLE=ภาษีรถ, TAX_METER=ภาษีมิเตอร์), TypeName, Category ('VOLUNTARY'/'COMPULSORY'/'TAX'), FilePrefix ('PLMV'/'PLMC'), IsActive
+
+### ตาราง: dbo.EV_PolicyLog (ประวัติและ Audit Log กรมธรรม์ย้อนหลัง)
+คอลัมน์: LogID (PK), VinNo, RegisterNo, DocType ('INSURANCE'/'ACT'/'VEHICLE_TAX'/'METER_TAX'), PolicyType, PolicyTypeName, PolicyNo, StartDate, EndDate, OriginalFileName, FilePath, UploadSource, IsCurrent (1=ฉบับปัจจุบัน, 0=ประวัติเดิม), IsActive, CreateDate
+
 ### ตาราง: dbo.EV_MsSubStatus (Master สถานที่/สถานะย่อย)
 เมื่อ Type = 'LOCATION' → เป็นรายการสถานที่จอดรถทั้งหมดในระบบ
 คอลัมน์: StatusCode (รหัส เช่น EV7_YARD_PRAPADAENG, AION_GI_SALAYA), StatusName (ชื่อสถานที่ เช่น "EV7 Yard พระประแดง", "Aion ศาลายา"), Type, IsActive
@@ -91,6 +100,9 @@ CreateDate (วันที่สร้าง), CreateUserID (FK → EV_User.Use
 คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
 
 ## ความสัมพันธ์ระหว่างตาราง
+- EV_Policy.VinNo = EV_InventoryItem.VinNo
+- EV_Policy.InsuranceType = EV_MsInsuranceType.TypeCode
+- EV_PolicyLog.VinNo = EV_InventoryItem.VinNo
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_RentItemLinemanHistory.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MaintenanceItem.InventoryItemID → EV_InventoryItem.InventoryItemID
