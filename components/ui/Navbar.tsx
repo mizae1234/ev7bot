@@ -43,12 +43,6 @@ const navGroups: NavGroup[] = [
         href: '/custody',
         desc: 'กระดานติดตามงานซ่อมและการถือครองรถยนต์ในแต่ละฝ่าย',
         icon: '📋'
-      },
-      {
-        name: 'มอนิเตอร์ตรวจสภาพรถ',
-        href: '/audit',
-        desc: 'ระบบตรวจนับและ Audit สภาพรถยนต์',
-        icon: '🔍'
       }
     ]
   },
