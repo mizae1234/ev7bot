@@ -68,40 +68,40 @@ export async function getActiveReplacements(
   `
 
   const result = await pool.request().query(query)
-  let allRows: ReplacementActiveItem[] = (result.recordset || []).map((row: any) => {
-    const daysInUse = calculateDaysInUse(row.replacementStartDate, row.replacementReturnDate)
+  let allRows: ReplacementActiveItem[] = (result.recordset || []).map((row: Record<string, unknown>) => {
+    const daysInUse = calculateDaysInUse(row.replacementStartDate as string | null, row.replacementReturnDate as string | null)
     const badge = getDurationBadge(daysInUse)
 
     return {
       replacementItemId: Number(row.replacementItemId),
       maintenanceItemId: Number(row.maintenanceItemId),
-      replacementVin: row.replacementVin || '',
-      replacementRegisterNo: row.replacementRegisterNo || null,
-      replacementModel: row.replacementModel || null,
-      replacementLocation: row.replacementLocation || null,
-      replacementLocationName: row.replacementLocationName || row.replacementLocation || null,
-      replacementStatus: row.replacementStatus || null,
+      replacementVin: (row.replacementVin as string) || '',
+      replacementRegisterNo: (row.replacementRegisterNo as string) || null,
+      replacementModel: (row.replacementModel as string) || null,
+      replacementLocation: (row.replacementLocation as string) || null,
+      replacementLocationName: (row.replacementLocationName as string) || (row.replacementLocation as string) || null,
+      replacementStatus: (row.replacementStatus as string) || null,
       mainInventoryItemId: row.mainInventoryItemId ? Number(row.mainInventoryItemId) : null,
-      mainRegisterNo: row.mainRegisterNo || null,
-      mainVinNo: row.mainVinNo || null,
-      mainModel: row.mainModel || null,
-      mainStatus: row.mainStatus || null,
-      mainLocation: row.mainLocation || null,
-      issueTitle: row.issueTitle || null,
-      maintenanceStartDate: row.maintenanceStartDate ? new Date(row.maintenanceStartDate).toISOString() : null,
-      maintenanceFinishDate: row.maintenanceFinishDate ? new Date(row.maintenanceFinishDate).toISOString() : null,
-      garageName: row.garageName || null,
-      technicianName: row.technicianName || null,
-      serviceType: row.serviceType || null,
-      replacementStartDate: row.replacementStartDate ? new Date(row.replacementStartDate).toISOString() : null,
-      replacementReturnDate: row.replacementReturnDate ? new Date(row.replacementReturnDate).toISOString() : null,
+      mainRegisterNo: (row.mainRegisterNo as string) || null,
+      mainVinNo: (row.mainVinNo as string) || null,
+      mainModel: (row.mainModel as string) || null,
+      mainStatus: (row.mainStatus as string) || null,
+      mainLocation: (row.mainLocation as string) || null,
+      issueTitle: (row.issueTitle as string) || null,
+      maintenanceStartDate: row.maintenanceStartDate ? new Date(row.maintenanceStartDate as string).toISOString() : null,
+      maintenanceFinishDate: row.maintenanceFinishDate ? new Date(row.maintenanceFinishDate as string).toISOString() : null,
+      garageName: (row.garageName as string) || null,
+      technicianName: (row.technicianName as string) || null,
+      serviceType: (row.serviceType as string) || null,
+      replacementStartDate: row.replacementStartDate ? new Date(row.replacementStartDate as string).toISOString() : null,
+      replacementReturnDate: row.replacementReturnDate ? new Date(row.replacementReturnDate as string).toISOString() : null,
       daysInUse,
       durationStatus: badge.status,
-      remark: row.remark || null,
-      createUserName: row.createUserName || null,
-      createDate: row.createDate ? new Date(row.createDate).toISOString() : null,
-      updateUserName: row.updateUserName || null,
-      updateDate: row.updateDate ? new Date(row.updateDate).toISOString() : null
+      remark: (row.remark as string) || null,
+      createUserName: (row.createUserName as string) || null,
+      createDate: row.createDate ? new Date(row.createDate as string).toISOString() : null,
+      updateUserName: (row.updateUserName as string) || null,
+      updateDate: row.updateDate ? new Date(row.updateDate as string).toISOString() : null
     }
   })
 
@@ -174,16 +174,16 @@ export async function getReplacementPoolCars(
     .input('Page', sql.Int, 1)
     .input('PerPage', sql.Int, 500)
 
-  let rawList: any[] = []
+  let rawList: Record<string, unknown>[] = []
   try {
     const spRes = await spReq.execute('GetEV_CarForReplacement')
-    rawList = spRes.recordset || []
+    rawList = (spRes.recordset || []) as Record<string, unknown>[]
   } catch (err) {
     console.error('Failed to execute GetEV_CarForReplacement:', err)
   }
 
   // Look up Target Register numbers if reservedTargetVinNo exists
-  const targetVins = Array.from(new Set(rawList.map(r => r.ReservedTargetVinNo).filter(Boolean))) as string[]
+  const targetVins = Array.from(new Set(rawList.map(r => r.ReservedTargetVinNo as string).filter(Boolean)))
   const targetRegMap = new Map<string, string>()
 
   if (targetVins.length > 0) {
@@ -194,39 +194,46 @@ export async function getReplacementPoolCars(
         WHERE VinNo IN (${targetVins.map(v => `'${v.replace(/'/g, "''")}'`).join(',')})
       `
       const targetRes = await pool.request().query(targetQuery)
-      targetRes.recordset.forEach(t => {
-        if (t.VinNo) targetRegMap.set(t.VinNo, t.RegisterNo || t.VinNo)
+      targetRes.recordset.forEach((t: Record<string, unknown>) => {
+        if (t.VinNo) targetRegMap.set(t.VinNo as string, (t.RegisterNo as string) || (t.VinNo as string))
       })
     } catch (e) {
       console.error('Failed to fetch target car details:', e)
     }
   }
 
-  let mapped: ReplacementPoolCar[] = rawList.map((r: any) => {
-    const isReserved = (r.StatusType || '').toLowerCase().includes('reserve') || !!r.ReservedRemark || !!r.ReservedType
-    const isReadyToPick = ((r.StatusType || '').toLowerCase().includes('available') || (r.Status || '').toLowerCase() === 'available') && !isReserved
+  let mapped: ReplacementPoolCar[] = rawList.map((r: Record<string, unknown>) => {
+    const statusTypeStr = (r.StatusType as string) || ''
+    const statusStr = (r.Status as string) || ''
+    const reservedRemarkStr = (r.ReservedRemark as string) || ''
+    const reservedTypeStr = (r.ReservedType as string) || ''
+
+    const isReserved = statusTypeStr.toLowerCase().includes('reserve') || !!reservedRemarkStr || !!reservedTypeStr
+    const isReadyToPick = (statusTypeStr.toLowerCase().includes('available') || statusStr.toLowerCase() === 'available') && !isReserved
+
+    const targetVin = (r.ReservedTargetVinNo as string) || null
 
     return {
       inventoryItemId: String(r.InventoryItemID || ''),
-      vinNo: r.VinNo || '',
-      registerNo: r.RegisterNo || null,
-      model: r.Model || null,
-      exteriorColor: r.Exterior_Color || null,
-      interiorColor: r.Interior_Color || null,
-      lot: r.Lot || null,
-      project: r.Project || null,
-      status: r.Status || '',
-      statusType: r.StatusType || '',
-      location: r.Location || null,
+      vinNo: (r.VinNo as string) || '',
+      registerNo: (r.RegisterNo as string) || null,
+      model: (r.Model as string) || null,
+      exteriorColor: (r.Exterior_Color as string) || null,
+      interiorColor: (r.Interior_Color as string) || null,
+      lot: (r.Lot as string) || null,
+      project: (r.Project as string) || null,
+      status: statusStr,
+      statusType: statusTypeStr,
+      location: (r.Location as string) || null,
       isReserved,
       isReadyToPick,
-      reservedTargetVinNo: r.ReservedTargetVinNo || null,
-      reservedTargetRegisterNo: r.ReservedTargetVinNo ? targetRegMap.get(r.ReservedTargetVinNo) || r.ReservedTargetVinNo : null,
-      reservedReleaseDate: r.ReservedReleaseDate ? new Date(r.ReservedReleaseDate).toISOString() : null,
-      reservedRemark: r.ReservedRemark || null,
-      reservedType: r.ReservedType || null,
-      customerName: r.CustomerName || null,
-      totalCount: r.TotalCount || undefined
+      reservedTargetVinNo: targetVin,
+      reservedTargetRegisterNo: targetVin ? targetRegMap.get(targetVin) || targetVin : null,
+      reservedReleaseDate: r.ReservedReleaseDate ? new Date(r.ReservedReleaseDate as string).toISOString() : null,
+      reservedRemark: reservedRemarkStr || null,
+      reservedType: reservedTypeStr || null,
+      customerName: (r.CustomerName as string) || null,
+      totalCount: (r.TotalCount as number) || undefined
     }
   })
 
@@ -294,10 +301,10 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
     let criticalDurationAlert = 0
     let warningDurationAlert = 0
 
-    const activeRows = activeRes.recordset || []
-    activeRows.forEach((r: any) => {
+    const activeRows = (activeRes.recordset || []) as Record<string, unknown>[]
+    activeRows.forEach((r) => {
       activeInUse++
-      const days = calculateDaysInUse(r.ReplacementStartDate, r.ReplacementReturnDate)
+      const days = calculateDaysInUse(r.ReplacementStartDate as string | null, r.ReplacementReturnDate as string | null)
       if (days > 30) {
         criticalDurationAlert++
       } else if (days >= 14) {
@@ -306,7 +313,6 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
     })
 
     // 2. Count Fleet Pool cars by calling GetEV_CarForReplacement
-    let totalFleet = 0
     let readyToPick = 0
     let reservedLineman = 0
     let reservedOthers = 0
@@ -321,15 +327,15 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
         .input('PerPage', sql.Int, 500)
         .execute('GetEV_CarForReplacement')
 
-      const cars = poolCars.recordset || []
-      cars.forEach((c: any) => {
-        const isReserved = (c.StatusType || '').toLowerCase().includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
-        const isAvailable = ((c.StatusType || '').toLowerCase().includes('available') || (c.Status || '').toLowerCase() === 'available') && !isReserved
+      const cars = (poolCars.recordset || []) as Record<string, unknown>[]
+      cars.forEach((c) => {
+        const isReserved = ((c.StatusType as string) || '').toLowerCase().includes('reserve') || !!c.ReservedRemark || !!c.ReservedType
+        const isAvailable = (((c.StatusType as string) || '').toLowerCase().includes('available') || ((c.Status as string) || '').toLowerCase() === 'available') && !isReserved
 
         if (isAvailable) {
           readyToPick++
         } else if (isReserved) {
-          const rType = ((c.ReservedType || '') + ' ' + (c.ReservedRemark || '')).toLowerCase()
+          const rType = (((c.ReservedType as string) || '') + ' ' + ((c.ReservedRemark as string) || '')).toLowerCase()
           if (rType.includes('line') || rType.includes('lineman') || rType.includes('ไลน์แมน')) {
             reservedLineman++
           } else {
@@ -356,12 +362,12 @@ export async function getReplacementStatsSummary(): Promise<ReplacementStatsSumm
     let inMaintenance = 0
     let totalFleetCount = 0
 
-    const fleetRows = fleetStatusRes.recordset || []
-    fleetRows.forEach((row: any) => {
+    const fleetRows = (fleetStatusRes.recordset || []) as Record<string, unknown>[]
+    fleetRows.forEach((row) => {
       const cnt = Number(row.cnt || 0)
       totalFleetCount += cnt
-      const s = (row.Status || '').toUpperCase()
-      const st = (row.StatusType || '').toUpperCase()
+      const s = ((row.Status as string) || '').toUpperCase()
+      const st = ((row.StatusType as string) || '').toUpperCase()
       if (s === 'MAINTENANCE' || st.includes('MAINTENANCE')) {
         inMaintenance += cnt
       }
@@ -411,35 +417,35 @@ export async function getReplacementHistory(
   const page = options.page && options.page > 0 ? options.page : 1
   const limit = options.limit && options.limit > 0 ? options.limit : 50
 
-  let rawHistory: any[] = []
+  let rawHistory: Record<string, unknown>[] = []
   try {
     const res = await pool.request().execute('GetEV_Report_ReplacementHistory')
-    rawHistory = res.recordset || []
+    rawHistory = (res.recordset || []) as Record<string, unknown>[]
   } catch (err) {
     console.error('Failed to execute GetEV_Report_ReplacementHistory:', err)
   }
 
-  let mapped: ReplacementHistoryItem[] = rawHistory.map((r: any) => {
-    const daysUsed = calculateDaysInUse(r.ReplacementStartDate, r.ReplacementReturnDate)
+  let mapped: ReplacementHistoryItem[] = rawHistory.map((r) => {
+    const daysUsed = calculateDaysInUse(r.ReplacementStartDate as string | null, r.ReplacementReturnDate as string | null)
 
     return {
-      registerNo: r.RegisterNo || null,
-      vinNo: r.VinNo || '',
-      model: r.Model || null,
-      vinNoReplacement: r.VinNoReplacement || '',
-      replacementRegisterNo: r.ReplacementRegisterNo || null,
-      replacementModel: r.ReplacementModel || null,
-      replacementStartDate: r.ReplacementStartDate ? new Date(r.ReplacementStartDate).toISOString() : null,
-      replacementReturnDate: r.ReplacementReturnDate ? new Date(r.ReplacementReturnDate).toISOString() : null,
+      registerNo: (r.RegisterNo as string) || null,
+      vinNo: (r.VinNo as string) || '',
+      model: (r.Model as string) || null,
+      vinNoReplacement: (r.VinNoReplacement as string) || '',
+      replacementRegisterNo: (r.ReplacementRegisterNo as string) || null,
+      replacementModel: (r.ReplacementModel as string) || null,
+      replacementStartDate: r.ReplacementStartDate ? new Date(r.ReplacementStartDate as string).toISOString() : null,
+      replacementReturnDate: r.ReplacementReturnDate ? new Date(r.ReplacementReturnDate as string).toISOString() : null,
       daysUsed,
-      location: r.Location || null,
-      remark: r.Remark || null,
+      location: (r.Location as string) || null,
+      remark: (r.Remark as string) || null,
       isActive: !!r.IsActive,
-      replacementStatus: r.ReplacementStatus || null,
-      createDate: r.CreateDate ? new Date(r.CreateDate).toISOString() : null,
-      createName: r.CreateName || null,
-      updateDate: r.UpdateDate ? new Date(r.UpdateDate).toISOString() : null,
-      updateName: r.UpdateName || null
+      replacementStatus: (r.ReplacementStatus as string) || null,
+      createDate: r.CreateDate ? new Date(r.CreateDate as string).toISOString() : null,
+      createName: (r.CreateName as string) || null,
+      updateDate: r.UpdateDate ? new Date(r.UpdateDate as string).toISOString() : null,
+      updateName: (r.UpdateName as string) || null
     }
   })
 

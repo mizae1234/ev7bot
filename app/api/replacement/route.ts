@@ -51,10 +51,11 @@ export async function GET(request: NextRequest) {
       ...result,
       stats
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('Error in GET /api/replacement:', error)
     return NextResponse.json(
-      { error: 'Internal Server Error', message: error?.message || 'Unknown error' },
+      { error: 'Internal Server Error', message: errMessage },
       { status: 500 }
     )
   }

@@ -77,8 +77,9 @@ function ReplacementPageContent() {
           setTotalPages(data.totalPages || 1)
 
           if (data.records) {
-            const distinctLocs = Array.from(new Set(data.records.map((r: any) => r.location).filter(Boolean))) as string[]
-            const distinctModels = Array.from(new Set(data.records.map((r: any) => r.model).filter(Boolean))) as string[]
+            const list = data.records as ReplacementHistoryItem[]
+            const distinctLocs = Array.from(new Set(list.map(r => r.location).filter(Boolean))) as string[]
+            const distinctModels = Array.from(new Set(list.map(r => r.model).filter(Boolean))) as string[]
             setLocations(prev => Array.from(new Set([...prev, ...distinctLocs])))
             setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
           }
@@ -103,22 +104,23 @@ function ReplacementPageContent() {
         const data = await res.json()
         if (res.ok) {
           if (activeTab === 'ACTIVE') {
-            setActiveRecords(data.records || [])
+            const list = (data.records || []) as ReplacementActiveItem[]
+            setActiveRecords(list)
+            const distinctLocs = Array.from(new Set(list.map(r => r.replacementLocationName || r.replacementLocation).filter(Boolean))) as string[]
+            const distinctModels = Array.from(new Set(list.map(r => r.replacementModel || r.mainModel).filter(Boolean))) as string[]
+            setLocations(prev => Array.from(new Set([...prev, ...distinctLocs])))
+            setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
           } else {
-            setPoolRecords(data.records || [])
+            const list = (data.records || []) as ReplacementPoolCar[]
+            setPoolRecords(list)
+            const distinctLocs = Array.from(new Set(list.map(r => r.location).filter(Boolean))) as string[]
+            const distinctModels = Array.from(new Set(list.map(r => r.model).filter(Boolean))) as string[]
+            setLocations(prev => Array.from(new Set([...prev, ...distinctLocs])))
+            setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
           }
           if (data.stats) setStats(data.stats)
           setTotal(data.total || 0)
           setTotalPages(data.totalPages || 1)
-
-          if (data.records) {
-            const locKey = activeTab === 'ACTIVE' ? 'replacementLocationName' : 'location'
-            const modelKey = activeTab === 'ACTIVE' ? 'replacementModel' : 'model'
-            const distinctLocs = Array.from(new Set(data.records.map((r: any) => r[locKey]).filter(Boolean))) as string[]
-            const distinctModels = Array.from(new Set(data.records.map((r: any) => r[modelKey]).filter(Boolean))) as string[]
-            setLocations(prev => Array.from(new Set([...prev, ...distinctLocs])))
-            setModels(prev => Array.from(new Set([...prev, ...distinctModels])))
-          }
         }
       }
     } catch (err) {
@@ -170,7 +172,7 @@ function ReplacementPageContent() {
   const handleExportExcel = async () => {
     setExportLoading(true)
     try {
-      let exportRows: any[] = []
+      let exportRows: Record<string, unknown>[] = []
       let fileName = `รายงานรถทดแทน_EV7_${new Date().toISOString().slice(0, 10)}.xlsx`
 
       if (activeTab === 'ACTIVE') {

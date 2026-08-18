@@ -1,5 +1,3 @@
-import { ReplacementActiveItem } from './replacement-types'
-
 // Format date to Thai string safely using UTC to avoid +7 hour double-offset bug
 export function formatThaiDate(dateInput: string | Date | null | undefined): string {
   if (!dateInput) return '-'
