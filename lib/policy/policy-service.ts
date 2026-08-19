@@ -199,6 +199,7 @@ export async function getPolicyList(params: {
         i.InventoryItemID AS inventoryItemId,
         i.VinNo AS vinNo,
         i.RegisterNo AS registerNo,
+        CONVERT(VARCHAR(10), i.RegisterNoDate, 120) AS registerNoDate,
         i.Model AS model,
         i.Project AS project,
         i.ProjectType AS projectType,

@@ -199,6 +199,7 @@ function PolicyPageContent() {
         'ลำดับ': idx + 1,
         'เลขทะเบียน': r.registerNo || 'ไม่มีทะเบียน',
         'เลขตัวถัง (VIN)': r.vinNo,
+        'วันที่จดทะเบียนรถ': r.registerNoDate ? formatThaiDate(r.registerNoDate) : '-',
         'รุ่นรถ': r.model || '-',
         'โครงการ': r.project || '-',
         'ประเภทโครงการ': r.projectType || '-',

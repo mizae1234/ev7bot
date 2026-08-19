@@ -108,6 +108,12 @@ export function PolicyTable({
                   <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
                     {rec.vinNo}
                   </div>
+                  {rec.registerNoDate && (
+                    <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-0.5 flex items-center gap-1">
+                      <span>🗓️ จดทะเบียน:</span>
+                      <span className="font-mono text-zinc-700 dark:text-zinc-300 font-semibold">{formatThaiDate(rec.registerNoDate)}</span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {rec.model && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">

@@ -21,6 +21,7 @@ export interface PolicyVehicleRecord {
   inventoryItemId?: string | null
   vinNo: string
   registerNo: string | null
+  registerNoDate?: string | null
   model: string | null
   project: string | null
   projectType: string | null
