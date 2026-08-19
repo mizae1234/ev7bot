@@ -156,15 +156,38 @@ export async function getPolicyList(params: {
   let whereClause = 'WHERE i.IsActive = 1'
 
   if (params.search) {
-    req.input('search', sql.NVarChar, `%${params.search.trim()}%`)
-    whereClause += ` AND (
-      i.VinNo LIKE @search
-      OR i.RegisterNo LIKE @search
-      OR p.InsurancePolicyNo LIKE @search
-      OR p.ActPolicyNo LIKE @search
-      OR p.InsuranceCompany LIKE @search
-      OR p.ActCompany LIKE @search
-    )`
+    const rawSearch = params.search.trim()
+    const tokens = Array.from(new Set(rawSearch.split(/[\r\n,\t\s]+/).map(s => s.trim()).filter(Boolean)))
+
+    if (tokens.length > 1) {
+      // Multi-VIN / Multi-term batch search (up to 1000 items from Excel paste)
+      const conditions: string[] = []
+      tokens.slice(0, 1000).forEach((tok, idx) => {
+        const paramExact = `msearch_ex_${idx}`
+        const paramLike = `msearch_lk_${idx}`
+        req.input(paramExact, sql.NVarChar, tok)
+        req.input(paramLike, sql.NVarChar, `%${tok}%`)
+        conditions.push(`(
+          i.VinNo = @${paramExact}
+          OR i.RegisterNo = @${paramExact}
+          OR i.VinNo LIKE @${paramLike}
+          OR i.RegisterNo LIKE @${paramLike}
+          OR p.InsurancePolicyNo LIKE @${paramLike}
+          OR p.ActPolicyNo LIKE @${paramLike}
+        )`)
+      })
+      whereClause += ` AND (${conditions.join(' OR ')})`
+    } else if (tokens.length === 1) {
+      req.input('search', sql.NVarChar, `%${tokens[0]}%`)
+      whereClause += ` AND (
+        i.VinNo LIKE @search
+        OR i.RegisterNo LIKE @search
+        OR p.InsurancePolicyNo LIKE @search
+        OR p.ActPolicyNo LIKE @search
+        OR p.InsuranceCompany LIKE @search
+        OR p.ActCompany LIKE @search
+      )`
+    }
   }
 
   if (params.projectFilter && params.projectFilter !== 'ALL') {
