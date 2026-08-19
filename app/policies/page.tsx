@@ -282,7 +282,7 @@ function PolicyPageContent() {
                 : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
-            📥 นำเข้าภาษี (Excel)
+            📥 นำเข้าภาษีรถยนต์ & มิเตอร์ (Excel)
           </button>
         </div>
       </div>
