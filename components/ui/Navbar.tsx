@@ -116,6 +116,7 @@ export function Navbar() {
   const pathname = usePathname()
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown on outside click
@@ -158,12 +159,19 @@ export function Navbar() {
               className="flex items-center gap-2.5 group transition-transform active:scale-98 shrink-0"
             >
               <div className="relative h-8 sm:h-9 flex items-center bg-white dark:bg-white px-2 py-0.5 rounded-xl border border-zinc-200/80 dark:border-zinc-700 shadow-xs group-hover:shadow-sm transition-all shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/ev7-logo.png"
-                  alt="EV7 Logo"
-                  className="object-contain h-6 sm:h-7 w-auto block shrink-0"
-                />
+                {logoError ? (
+                  <span className="font-black text-sm text-emerald-600 dark:text-emerald-500 tracking-wider">
+                    ⚡ EV7
+                  </span>
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src="/images/ev7-logo.png"
+                    alt="EV7 Logo"
+                    className="object-contain h-6 sm:h-7 w-auto block shrink-0"
+                    onError={() => setLogoError(true)}
+                  />
+                )}
               </div>
               <div className="hidden xl:flex flex-col shrink-0">
                 <span className="font-extrabold text-xs tracking-tight text-zinc-800 dark:text-zinc-200">
