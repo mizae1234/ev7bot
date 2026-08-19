@@ -46,6 +46,7 @@ export function PolicyTable({
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
             <th className="py-3 px-4">ข้อมูลรถ</th>
+            <th className="py-3 px-4 whitespace-nowrap">🗓️ วันที่จดทะเบียน</th>
             <th className="py-3 px-4">🛡️ ประกันภัยภาคสมัครใจ (PLMV)</th>
             <th className="py-3 px-4">📜 พ.ร.บ. (PLMC)</th>
             <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
@@ -108,14 +109,6 @@ export function PolicyTable({
                   <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
                     {rec.vinNo}
                   </div>
-                  <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 font-medium mt-0.5 flex items-center gap-1">
-                    <span>🗓️ จดทะเบียน:</span>
-                    {rec.registerNoDate ? (
-                      <span className="font-mono text-zinc-700 dark:text-zinc-200 font-semibold">{formatThaiDate(rec.registerNoDate)}</span>
-                    ) : (
-                      <span className="text-zinc-400 dark:text-zinc-500 font-mono">-</span>
-                    )}
-                  </div>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {rec.model && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
@@ -128,6 +121,17 @@ export function PolicyTable({
                       </span>
                     )}
                   </div>
+                </td>
+
+                {/* 1.1 วันที่จดทะเบียนรถ (Registration Date Column) */}
+                <td className="py-3 px-4 whitespace-nowrap">
+                  {rec.registerNoDate ? (
+                    <div className="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      {formatThaiDate(rec.registerNoDate)}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs">-</span>
+                  )}
                 </td>
 
                 {/* 2. Insurance (PLMV) */}
