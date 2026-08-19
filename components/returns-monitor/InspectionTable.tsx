@@ -35,6 +35,7 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center w-12 text-slate-400 font-bold">#</th>
               <th className="px-5 py-4">ทะเบียน / เลขตัวถัง (VIN)</th>
               <th className="px-5 py-4">ผู้เช่า / เบอร์โทร</th>
               <th className="px-5 py-4">สถานที่รับคืน</th>
@@ -47,9 +48,10 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
             {paginatedItems.length > 0 ? (
-              paginatedItems.map((item) => {
+              paginatedItems.map((item, idx) => {
                 const isDraft = item.status === 'DRAFT'
                 const assessmentLabel = getAssessmentLabel(item.assessmentResult)
+                const rowNo = (safePage - 1) * PAGE_SIZE + idx + 1
 
                 return (
                   <tr
@@ -57,6 +59,11 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
                     onClick={() => onSelectInspection(item.inspectionId)}
                     className="hover:bg-slate-50 transition duration-150 cursor-pointer active:bg-slate-100"
                   >
+                    {/* Row No */}
+                    <td className="px-4 py-4 text-center font-mono text-[11px] text-slate-400 font-semibold">
+                      {rowNo}
+                    </td>
+
                     {/* Register No & VIN */}
                     <td className="px-5 py-4">
                       <p className="font-bold text-slate-900 text-sm">{item.registerNo || '-'}</p>
@@ -126,7 +133,7 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
               })
             ) : (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-slate-400 font-medium">
+                <td colSpan={9} className="px-5 py-12 text-center text-slate-400 font-medium">
                   ไม่พบข้อมูลรายการคืนรถที่ตรงตามตัวกรอง
                 </td>
               </tr>
