@@ -1,4 +1,5 @@
 import React from 'react'
+import Link from 'next/link'
 import { PolicyVehicleRecord } from '@/lib/policy/policy-types'
 import { formatThaiDate, getExpiryBadge, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 
@@ -103,12 +104,20 @@ export function PolicyTable({
               >
                 {/* 1. Vehicle Info */}
                 <td className="py-3 px-4">
-                  <div className="font-semibold text-sm text-zinc-900 dark:text-white">
-                    {rec.registerNo || <span className="text-zinc-400 italic">ไม่มีทะเบียน</span>}
-                  </div>
-                  <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
-                    {rec.vinNo}
-                  </div>
+                  <Link
+                    href={`/vehicle/${encodeURIComponent(rec.registerNo || rec.vinNo)}`}
+                    target="_blank"
+                    className="group/link block"
+                    title="คลิกเพื่อดูข้อมูลรถและประวัติ (เปิดแท็บใหม่)"
+                  >
+                    <div className="font-semibold text-sm text-zinc-900 dark:text-white group-hover/link:text-amber-600 dark:group-hover/link:text-amber-400 transition-colors flex items-center gap-1">
+                      <span>{rec.registerNo || <span className="text-zinc-400 italic">ไม่มีทะเบียน</span>}</span>
+                      <span className="opacity-0 group-hover/link:opacity-100 text-[10px] text-amber-500 transition-opacity">↗</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5 group-hover/link:text-amber-700 dark:group-hover/link:text-amber-300 group-hover/link:underline">
+                      {rec.vinNo}
+                    </div>
+                  </Link>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {rec.model && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-medium">
