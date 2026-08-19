@@ -46,9 +46,9 @@ export function PolicyTable({
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
             <th className="py-3 px-4">ข้อมูลรถ</th>
-            <th className="py-3 px-4 whitespace-nowrap">🗓️ วันที่จดทะเบียน</th>
             <th className="py-3 px-4">🛡️ ประกันภัยภาคสมัครใจ (PLMV)</th>
             <th className="py-3 px-4">📜 พ.ร.บ. (PLMC)</th>
+            <th className="py-3 px-4 whitespace-nowrap">🗓️ วันที่จดทะเบียน</th>
             <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
             <th className="py-3 px-4">⏱️ ภาษีมิเตอร์แท็กซี่</th>
             <th className="py-3 px-4">สถานะรถ / สถานที่</th>
@@ -121,17 +121,6 @@ export function PolicyTable({
                       </span>
                     )}
                   </div>
-                </td>
-
-                {/* 1.1 วันที่จดทะเบียนรถ (Registration Date Column) */}
-                <td className="py-3 px-4 whitespace-nowrap">
-                  {rec.registerNoDate ? (
-                    <div className="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                      {formatThaiDate(rec.registerNoDate)}
-                    </div>
-                  ) : (
-                    <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs">-</span>
-                  )}
                 </td>
 
                 {/* 2. Insurance (PLMV) */}
@@ -212,6 +201,17 @@ export function PolicyTable({
                     </div>
                   ) : (
                     <span className="text-zinc-400 italic text-[11px]">ไม่มีข้อมูล พ.ร.บ.</span>
+                  )}
+                </td>
+
+                {/* 4. วันที่จดทะเบียนรถ (Registration Date Column - ต่อจาก พ.ร.บ.) */}
+                <td className="py-3 px-4 whitespace-nowrap">
+                  {rec.registerNoDate ? (
+                    <div className="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                      {formatThaiDate(rec.registerNoDate)}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs">-</span>
                   )}
                 </td>
 
