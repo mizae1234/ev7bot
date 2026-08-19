@@ -523,43 +523,43 @@ function CaseDeliveryContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-5">
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-slate-200/70 shadow-sm p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 xl:grid-cols-12 gap-2.5 items-end">
+            <div className="lg:col-span-1 xl:col-span-2">
               <label className="text-xs font-bold text-slate-500 block mb-1">วันที่เริ่มต้น</label>
               <input
                 type="date"
                 value={dateStart}
                 onChange={(e) => setDateStart(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition"
               />
             </div>
-            <div>
+            <div className="lg:col-span-1 xl:col-span-2">
               <label className="text-xs font-bold text-slate-500 block mb-1">วันที่สิ้นสุด</label>
               <input
                 type="date"
                 value={dateEnd}
                 onChange={(e) => setDateEnd(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition"
               />
             </div>
-            <div>
+            <div className="lg:col-span-1 xl:col-span-2">
               <label className="text-xs font-bold text-slate-500 block mb-1">โครงการ</label>
               <select
                 value={projectType}
                 onChange={(e) => setProjectType(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition font-medium"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition font-medium"
               >
                 {PROJECT_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
-            <div>
+            <div className="lg:col-span-1 xl:col-span-2">
               <label className="text-xs font-bold text-slate-500 block mb-1">สถานะ</label>
               <select
                 value={matchFilter}
                 onChange={(e) => { setMatchFilter(e.target.value); setPage(1) }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition font-medium"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition font-medium"
               >
                 <option value="">ทั้งหมด</option>
                 <option value="MATCHED">✅ ตรงกัน</option>
@@ -568,23 +568,23 @@ function CaseDeliveryContent() {
                 <option value="TRACKING_ONLY">⚠️ Tracking อย่างเดียว</option>
               </select>
             </div>
-            <div>
+            <div className="lg:col-span-1 xl:col-span-3">
               <label className="text-xs font-bold text-slate-500 block mb-1">ค้นหา</label>
               <input
                 type="text"
                 placeholder="VIN / ทะเบียน / สัญญา / ชื่อ..."
                 value={searchText}
                 onChange={(e) => { setSearchText(e.target.value); setPage(1) }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition placeholder-slate-400"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400 focus:bg-white transition placeholder-slate-400"
               />
             </div>
-            <div>
+            <div className="lg:col-span-1 xl:col-span-1">
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold text-sm rounded-xl px-4 py-2.5 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold text-sm rounded-xl px-3 py-2 transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1 shrink-0 h-[38px]"
               >
-                {loading ? '⏳ กำลังโหลด...' : '🔍 ค้นหา'}
+                {loading ? '⏳' : '🔍 ค้นหา'}
               </button>
             </div>
           </div>

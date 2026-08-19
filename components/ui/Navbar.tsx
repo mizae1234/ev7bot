@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 
@@ -149,7 +148,10 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all">
+    <header className="sticky top-0 z-50 w-full bg-gradient-to-r from-emerald-100/90 via-teal-50/95 to-sky-100/90 backdrop-blur-md border-b border-emerald-200/90 shadow-sm transition-all">
+      {/* Top Brand Accent Stripe (EV7 Green to Blue) */}
+      <div className="h-[3px] w-full bg-gradient-to-r from-[#009639] via-[#00A859] via-sky-500 to-[#0066CC]" />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 1. Brand Logo */}
@@ -158,9 +160,9 @@ export function Navbar() {
               href="/dashboard"
               className="flex items-center gap-2.5 group transition-transform active:scale-98 shrink-0"
             >
-              <div className="relative h-8 sm:h-9 flex items-center bg-white dark:bg-white px-2 py-0.5 rounded-xl border border-zinc-200/80 dark:border-zinc-700 shadow-xs group-hover:shadow-sm transition-all shrink-0">
+              <div className="relative h-9 flex items-center bg-white px-2.5 py-1 rounded-xl border border-emerald-200 shadow-xs group-hover:border-emerald-500/60 group-hover:shadow-sm transition-all shrink-0">
                 {logoError ? (
-                  <span className="font-black text-sm text-emerald-600 dark:text-emerald-500 tracking-wider">
+                  <span className="font-black text-sm text-emerald-600 tracking-wider">
                     ⚡ EV7
                   </span>
                 ) : (
@@ -174,24 +176,27 @@ export function Navbar() {
                 )}
               </div>
               <div className="hidden xl:flex flex-col shrink-0">
-                <span className="font-extrabold text-xs tracking-tight text-zinc-800 dark:text-zinc-200">
+                <span className="font-bold text-xs tracking-tight text-slate-900">
                   Operations
                 </span>
-                <span className="text-[9.5px] text-zinc-400 dark:text-zinc-500 font-medium tracking-tight -mt-0.5">
+                <span className="text-[10px] text-slate-500 font-medium tracking-tight -mt-0.5">
                   Fleet & Maintenance
                 </span>
               </div>
             </Link>
+
+            {/* Subtle Divider between brand and nav on large screens */}
+            <div className="hidden xl:block h-6 w-px bg-emerald-200/80" />
 
             {/* 2. Desktop Navigation */}
             <nav ref={dropdownRef} className="hidden md:flex items-center gap-1 lg:gap-1.5">
               {/* Menu 1: Direct Link to Dashboard (Home) */}
               <Link
                 href="/dashboard"
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm transition-all cursor-pointer ${
                   isDashboardActive
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+                    ? 'bg-white text-emerald-800 font-bold border border-emerald-300/80 shadow-xs ring-1 ring-emerald-500/10'
+                    : 'text-slate-700 font-medium hover:bg-white/60 hover:text-slate-950'
                 }`}
               >
                 <span>📊</span>
@@ -201,10 +206,10 @@ export function Navbar() {
               {/* Menu 2: Direct Link to รถทดแทน (Replacements) */}
               <Link
                 href="/replacements"
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm transition-all cursor-pointer ${
                   isReplacementsActive
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+                    ? 'bg-white text-emerald-800 font-bold border border-emerald-300/80 shadow-xs ring-1 ring-emerald-500/10'
+                    : 'text-slate-700 font-medium hover:bg-white/60 hover:text-slate-950'
                 }`}
               >
                 <span>🚗🔄</span>
@@ -221,18 +226,18 @@ export function Navbar() {
                     <button
                       type="button"
                       onClick={() => setOpenDropdown(isOpen ? null : group.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm transition-all cursor-pointer ${
                         active
-                          ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80'
-                          : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white'
+                          ? 'bg-white text-emerald-800 font-bold border border-emerald-300/80 shadow-xs ring-1 ring-emerald-500/10'
+                          : 'text-slate-700 font-medium hover:bg-white/60 hover:text-slate-950'
                       }`}
                     >
                       <span>{group.icon}</span>
                       <span>{group.label}</span>
                       <svg
-                        className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${
-                          isOpen ? 'rotate-180 text-indigo-500' : ''
-                        }`}
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                          active ? 'text-emerald-700' : 'text-slate-500'
+                        } ${isOpen ? 'rotate-180 text-emerald-700' : ''}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -243,8 +248,8 @@ export function Navbar() {
 
                     {/* Dropdown Menu */}
                     {isOpen && (
-                      <div className="absolute left-0 mt-2 w-80 rounded-2xl bg-white dark:bg-zinc-900 shadow-xl border border-zinc-200/80 dark:border-zinc-800 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                        <div className="px-3 py-1.5 mb-1 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                      <div className="absolute left-0 mt-2 w-80 rounded-2xl bg-white shadow-xl shadow-emerald-950/10 border border-emerald-100 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 ring-1 ring-black/5">
+                        <div className="px-3 py-1.5 mb-1 text-[11px] font-bold text-emerald-800/70 uppercase tracking-wider">
                           {group.label}
                         </div>
                         <div className="space-y-1">
@@ -258,23 +263,23 @@ export function Navbar() {
                                 onClick={() => setOpenDropdown(null)}
                                 className={`flex items-start gap-3 p-2.5 rounded-xl transition-all ${
                                   isItemActive
-                                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold'
-                                    : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+                                    ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200'
+                                    : 'hover:bg-slate-50 text-slate-700'
                                 }`}
                               >
                                 <span className="text-xl shrink-0 mt-0.5">{item.icon}</span>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                    <span className="text-sm font-semibold text-slate-900">
                                       {item.name}
                                     </span>
                                     {item.badge && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                                         {item.badge}
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500 line-clamp-1 mt-0.5">
+                                  <p className="text-[10.5px] text-slate-500 line-clamp-1 mt-0.5">
                                     {item.desc}
                                   </p>
                                 </div>
@@ -292,13 +297,15 @@ export function Navbar() {
 
           {/* 3. Right Side Actions & Profile */}
           <div className="flex items-center gap-3">
+            {/* Divider on desktop */}
+            <div className="hidden md:block h-6 w-px bg-emerald-200/80" />
             <LoginProfile />
 
             {/* Mobile Hamburger Toggle */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors"
+              className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 transition-colors"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? (
@@ -317,7 +324,7 @@ export function Navbar() {
 
       {/* 4. Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-zinc-200/80 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl px-4 py-4 max-h-[85vh] overflow-y-auto space-y-4 shadow-xl">
+        <div className="md:hidden border-t border-slate-200/80 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl px-4 py-4 max-h-[85vh] overflow-y-auto space-y-4 shadow-xl">
           {/* Direct Link: Dashboard */}
           <div className="space-y-1">
             <Link
@@ -325,16 +332,16 @@ export function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
                 isDashboardActive
-                  ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
-                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/20'
+                  : 'hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
               }`}
             >
               <span className="text-xl shrink-0">📊</span>
               <div>
-                <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
                   แดชบอร์ด (Dashboard)
                 </span>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                <p className="text-xs text-slate-400 dark:text-zinc-500">
                   ภาพรวมการส่งมอบ งานซ่อม และสถิติ
                 </p>
               </div>
@@ -346,16 +353,16 @@ export function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
                 isReplacementsActive
-                  ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
-                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/20'
+                  : 'hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
               }`}
             >
               <span className="text-xl shrink-0">🚗🔄</span>
               <div>
-                <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
                   รถทดแทน (Replacements)
                 </span>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                <p className="text-xs text-slate-400 dark:text-zinc-500">
                   ติดตามรถทดแทนใช้งาน คลังรถพร้อมใช้ และโควตาจอง
                 </p>
               </div>
@@ -365,7 +372,7 @@ export function Navbar() {
           {/* Grouped Menus: งานซ่อม, งานประกัน, ส่งมอบ & รับคืน, อื่นๆ */}
           {navGroups.map((group) => (
             <div key={group.id} className="space-y-1.5">
-              <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 px-2 text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
                 <span>{group.icon}</span>
                 <span>{group.label}</span>
               </div>
@@ -380,14 +387,14 @@ export function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-start gap-3 p-2.5 rounded-xl transition-all ${
                         isItemActive
-                          ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-500/20'
-                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300'
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/20'
+                          : 'hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
                       }`}
                     >
                       <span className="text-xl shrink-0 mt-0.5">{item.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-zinc-900 dark:text-white">
+                          <span className="text-xs font-semibold text-slate-900 dark:text-white">
                             {item.name}
                           </span>
                           {item.badge && (
@@ -396,7 +403,7 @@ export function Navbar() {
                             </span>
                           )}
                         </div>
-                        <p className="text-[10.5px] text-zinc-400 dark:text-zinc-500 line-clamp-1 mt-0.5">
+                        <p className="text-[10.5px] text-slate-400 dark:text-zinc-500 line-clamp-1 mt-0.5">
                           {item.desc}
                         </p>
                       </div>
