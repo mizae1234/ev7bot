@@ -119,7 +119,7 @@ export function PolicyFilters({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               onPaste={handleSearchPaste}
-              placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์ (วางหลาย VIN ได้)..."
+              placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์ (ค้นหาทีละหลาย VinNo. ได้)..."
               className="w-full pl-9.5 pr-8 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
             />
             {search && (
@@ -144,14 +144,14 @@ export function PolicyFilters({
                 ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
                 : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700/60'
             }`}
-            title="วางรายการ VIN ทีละหลายๆ คันจาก Excel"
+            title="ค้นหาทีละหลาย VinNo. จาก Excel"
           >
             <span>📋</span>
             <span className="hidden md:inline">
-              {isMultiSearch ? `ชุด VIN (${activeTokens.length})` : 'วางหลาย VIN (Excel)'}
+              {isMultiSearch ? `ค้นหา (${activeTokens.length} VinNo.)` : 'ค้นหาทีละหลาย VinNo.'}
             </span>
             <span className="md:hidden">
-              {isMultiSearch ? `${activeTokens.length} VIN` : 'หลาย VIN'}
+              {isMultiSearch ? `${activeTokens.length} VinNo.` : 'หลาย VinNo.'}
             </span>
           </button>
         </div>
@@ -361,10 +361,10 @@ export function PolicyFilters({
                 <span className="text-xl">📋</span>
                 <div>
                   <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                    ค้นหาแบบชุดหลาย VIN / ทะเบียน
+                    ค้นหาทีละหลาย VinNo.
                   </h3>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    คัดลอกจาก Excel แล้ววางลงในช่องด้านล่างได้ทันที
+                    คัดลอกจาก Excel แล้ววางลงในช่องด้านล่างเพื่อค้นหาหลายคันพร้อมกัน
                   </p>
                 </div>
               </div>
