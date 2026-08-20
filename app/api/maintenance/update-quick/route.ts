@@ -384,14 +384,26 @@ export async function POST(req: NextRequest) {
 
               // 3. Set new replacement car to REPLACEMENT_CAR
               const updNewCarReq = pool.request()
-              updNewCarReq.input('newVin', sql.VarChar, replacementVin)
+              updNewCarReq.input('newVin', sql.NVarChar, replacementVin)
               updNewCarReq.input('userId', sql.Int, dbUserId)
-              await updNewCarReq.query(`
+              const updNewCarRes = await updNewCarReq.query(`
                 UPDATE dbo.EV_InventoryItem
                 SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
                 WHERE VinNo = @newVin AND IsActive = 1
               `)
-              console.log(`[Replacement Update] Ticket #${maintenanceId}: Changed replacement car from ${existVin} to ${replacementVin}`)
+              console.log(`[Replacement Update] Ticket #${maintenanceId}: Changed replacement car from ${existVin} to ${replacementVin}, rowsAffected=${updNewCarRes.rowsAffected?.[0] ?? 0}`)
+              // Verify status update
+              if ((updNewCarRes.rowsAffected?.[0] ?? 0) === 0) {
+                console.warn(`[Replacement Car Status WARNING] UPDATE affected 0 rows for VinNo=${replacementVin} in update-quick (change car). Retrying with RTRIM...`)
+                await pool.request()
+                  .input('newVin', sql.NVarChar, replacementVin.trim())
+                  .input('userId', sql.Int, dbUserId)
+                  .query(`
+                    UPDATE dbo.EV_InventoryItem
+                    SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                    WHERE RTRIM(LTRIM(VinNo)) = @newVin AND IsActive = 1
+                  `)
+              }
             } else {
               // Same car, just update Location and StartDate if changed
               const updReplRecReq = pool.request()
@@ -404,6 +416,29 @@ export async function POST(req: NextRequest) {
                 SET ReplacementStartDate = @startDate, Location = @location, UpdateUserID = @userId, UpdateDate = GETDATE()
                 WHERE MaintenanceItemID = @maintId AND IsActive = 1
               `)
+
+              // Self-heal: if replacement car is still REPLACEMENT_AVAILABLE, fix it to REPLACEMENT_CAR
+              // (skip if it's in maintenance or other states)
+              try {
+                const chkReq = pool.request()
+                chkReq.input('vin', sql.NVarChar, replacementVin)
+                const chkRes = await chkReq.query(`
+                  SELECT StatusType FROM dbo.EV_InventoryItem WHERE VinNo = @vin AND IsActive = 1
+                `)
+                if (chkRes.recordset.length > 0 && chkRes.recordset[0].StatusType === 'REPLACEMENT_AVAILABLE') {
+                  await pool.request()
+                    .input('vin', sql.NVarChar, replacementVin)
+                    .input('userId', sql.Int, dbUserId)
+                    .query(`
+                      UPDATE dbo.EV_InventoryItem
+                      SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                      WHERE VinNo = @vin AND IsActive = 1
+                    `)
+                  console.log(`[Replacement Self-Heal] VinNo=${replacementVin}: Fixed REPLACEMENT_AVAILABLE → REPLACEMENT_CAR`)
+                }
+              } catch (healErr) {
+                console.error('[Replacement Self-Heal Error]', healErr)
+              }
             }
           } else {
             // No existing replacement record, create one!
@@ -424,14 +459,26 @@ export async function POST(req: NextRequest) {
 
             // Update new replacement car status to REPLACEMENT_CAR
             const updNewCarReq = pool.request()
-            updNewCarReq.input('newVin', sql.VarChar, replacementVin)
+            updNewCarReq.input('newVin', sql.NVarChar, replacementVin)
             updNewCarReq.input('userId', sql.Int, dbUserId)
-            await updNewCarReq.query(`
+            const updNewCarRes = await updNewCarReq.query(`
               UPDATE dbo.EV_InventoryItem
               SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
               WHERE VinNo = @newVin AND IsActive = 1
             `)
-            console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}`)
+            console.log(`[Replacement Update] Ticket #${maintenanceId}: Assigned new replacement car ${replacementVin}, rowsAffected=${updNewCarRes.rowsAffected?.[0] ?? 0}`)
+            // Verify status update
+            if ((updNewCarRes.rowsAffected?.[0] ?? 0) === 0) {
+              console.warn(`[Replacement Car Status WARNING] UPDATE affected 0 rows for VinNo=${replacementVin} in update-quick (new assign). Retrying with RTRIM...`)
+              await pool.request()
+                .input('newVin', sql.NVarChar, replacementVin.trim())
+                .input('userId', sql.Int, dbUserId)
+                .query(`
+                  UPDATE dbo.EV_InventoryItem
+                  SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                  WHERE RTRIM(LTRIM(VinNo)) = @newVin AND IsActive = 1
+                `)
+            }
           }
 
           // Close reservation in EV_ReplacementReserved if exists

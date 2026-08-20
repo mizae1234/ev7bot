@@ -151,13 +151,55 @@ export async function POST(req: NextRequest) {
 
         // 2. Update replacement car status to REPLACEMENT_CAR
         const updReplCarReq = pool.request()
-        updReplCarReq.input('vin', sql.VarChar, body.replacementVin)
+        updReplCarReq.input('vin', sql.NVarChar, body.replacementVin)
         updReplCarReq.input('userId', sql.Int, dbUserId)
-        await updReplCarReq.query(`
+        const updReplCarRes = await updReplCarReq.query(`
           UPDATE dbo.EV_InventoryItem
           SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
           WHERE VinNo = @vin AND IsActive = 1
         `)
+        const rowsAffected = updReplCarRes.rowsAffected?.[0] ?? 0
+        console.log(`[Replacement Car Status Updated] VinNo=${body.replacementVin}: rowsAffected=${rowsAffected}`)
+
+        // 2b. Verification: confirm status actually changed
+        if (rowsAffected === 0) {
+          console.warn(`[Replacement Car Status WARNING] UPDATE affected 0 rows for VinNo=${body.replacementVin}. Retrying with LIKE match...`)
+          // Retry with trimmed/LIKE match in case of whitespace differences
+          const retryReq = pool.request()
+          retryReq.input('vin', sql.NVarChar, body.replacementVin.trim())
+          retryReq.input('userId', sql.Int, dbUserId)
+          const retryRes = await retryReq.query(`
+            UPDATE dbo.EV_InventoryItem
+            SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+            WHERE RTRIM(LTRIM(VinNo)) = @vin AND IsActive = 1
+          `)
+          console.log(`[Replacement Car Status Retry] VinNo=${body.replacementVin}: rowsAffected=${retryRes.rowsAffected?.[0] ?? 0}`)
+        } else {
+          // Verify the update actually persisted
+          const verifyReq = pool.request()
+          verifyReq.input('vin', sql.NVarChar, body.replacementVin)
+          const verifyRes = await verifyReq.query(`
+            SELECT Status, StatusType FROM dbo.EV_InventoryItem WHERE VinNo = @vin AND IsActive = 1
+          `)
+          if (verifyRes.recordset.length > 0) {
+            const v = verifyRes.recordset[0]
+            if (v.StatusType !== 'REPLACEMENT_CAR') {
+              console.error(`[Replacement Car Status MISMATCH] VinNo=${body.replacementVin}: Expected REPLACEMENT_CAR but got ${v.Status}/${v.StatusType}. Forcing update...`)
+              await pool.request()
+                .input('vin', sql.NVarChar, body.replacementVin)
+                .input('userId', sql.Int, dbUserId)
+                .query(`
+                  UPDATE dbo.EV_InventoryItem
+                  SET Status = 'REPLACEMENT', StatusType = 'REPLACEMENT_CAR', CurrentLocation = 'REPLACEMENT_CAR', UpdateDate = GETDATE(), UpdateUserID = @userId
+                  WHERE VinNo = @vin AND IsActive = 1
+                `)
+              console.log(`[Replacement Car Status Force Update] VinNo=${body.replacementVin}: Forced to REPLACEMENT_CAR`)
+            } else {
+              console.log(`[Replacement Car Status Verified] VinNo=${body.replacementVin}: ✅ REPLACEMENT_CAR confirmed`)
+            }
+          }
+        }
+
         // 3. Update EV_ReplacementReserved if exists
         const updResReq = pool.request()
         updResReq.input('targetVin', sql.VarChar, vinNo)
