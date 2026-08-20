@@ -207,7 +207,7 @@ export function Navbar() {
                 }`}
               >
                 <span>🛡️</span>
-                <span>Monitor</span>
+                <span>มอนิเตอร์</span>
               </Link>
 
               {/* Menu 3: Direct Link to รถทดแทน (Replacements) */}
@@ -367,7 +367,7 @@ export function Navbar() {
               <span className="text-xl shrink-0">🛡️</span>
               <div>
                 <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Monitor (ประกัน/ภาษี)
+                  มอนิเตอร์ (ประกัน/ภาษี)
                 </span>
                 <p className="text-xs text-slate-400 dark:text-zinc-500">
                   ติดตามสถานะประกัน พ.ร.บ. ภาษีรถ แบบ read-only
