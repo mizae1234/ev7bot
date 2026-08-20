@@ -23,8 +23,8 @@ interface PolicyFiltersProps {
   projectTypes?: string[]
   models: string[]
   statuses?: { code: string; label: string }[]
-  onExportExcel: () => void
-  exportLoading: boolean
+  onExportExcel?: () => void
+  exportLoading?: boolean
 }
 
 export function PolicyFilters({
@@ -157,6 +157,7 @@ export function PolicyFilters({
         </div>
 
         {/* Action Buttons */}
+        {onExportExcel && (
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
           <button
             type="button"
@@ -177,6 +178,7 @@ export function PolicyFilters({
             <span>ส่งออก Excel</span>
           </button>
         </div>
+        )}
       </div>
 
       {/* Multi-Search Active Badge Banner */}

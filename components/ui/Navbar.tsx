@@ -47,19 +47,6 @@ const navGroups: NavGroup[] = [
     ]
   },
   {
-    id: 'insurance',
-    label: 'งานประกัน',
-    icon: '🛡️',
-    items: [
-      {
-        name: 'ประกันภัย & ภาษีรถยนต์',
-        href: '/policies',
-        desc: 'ตรวจสอบความคุ้มครอง วันหมดอายุประกัน/พ.ร.บ./ภาษี และเอกสาร PDF',
-        icon: '📑'
-      }
-    ]
-  },
-  {
     id: 'delivery',
     label: 'ส่งมอบ & รับคืน',
     icon: '🚚',
@@ -83,6 +70,12 @@ const navGroups: NavGroup[] = [
     label: 'อื่นๆ',
     icon: '📂',
     items: [
+      {
+        name: 'ประกันภัย & ภาษีรถยนต์',
+        href: '/policies',
+        desc: 'จัดการประกัน พ.ร.บ. ภาษี และเอกสาร PDF',
+        icon: '🛡️'
+      },
       {
         name: 'ประวัติการเคลื่อนย้ายรถ',
         href: '/vehicle-movement',
@@ -141,6 +134,7 @@ export function Navbar() {
   }
 
   const isDashboardActive = pathname === '/dashboard' || pathname === '/'
+  const isMonitorActive = pathname.startsWith('/monitor')
   const isReplacementsActive = pathname.startsWith('/replacements')
 
   const isGroupActive = (group: NavGroup) => {
@@ -203,7 +197,20 @@ export function Navbar() {
                 <span>แดชบอร์ด</span>
               </Link>
 
-              {/* Menu 2: Direct Link to รถทดแทน (Replacements) */}
+              {/* Menu 2: Direct Link to Monitor (ประกัน/ภาษี) */}
+              <Link
+                href="/monitor"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm transition-all cursor-pointer ${
+                  isMonitorActive
+                    ? 'bg-white text-emerald-800 font-bold border border-emerald-300/80 shadow-xs ring-1 ring-emerald-500/10'
+                    : 'text-slate-700 font-medium hover:bg-white/60 hover:text-slate-950'
+                }`}
+              >
+                <span>🛡️</span>
+                <span>Monitor</span>
+              </Link>
+
+              {/* Menu 3: Direct Link to รถทดแทน (Replacements) */}
               <Link
                 href="/replacements"
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm transition-all cursor-pointer ${
@@ -216,7 +223,7 @@ export function Navbar() {
                 <span>รถทดแทน</span>
               </Link>
 
-              {/* Grouped Dropdown Menus: งานซ่อม, งานประกัน, ส่งมอบ & รับคืน, อื่นๆ */}
+              {/* Grouped Dropdown Menus: งานซ่อม, ส่งมอบ & รับคืน, อื่นๆ */}
               {navGroups.map((group) => {
                 const active = isGroupActive(group)
                 const isOpen = openDropdown === group.id
@@ -343,6 +350,27 @@ export function Navbar() {
                 </span>
                 <p className="text-xs text-slate-400 dark:text-zinc-500">
                   ภาพรวมการส่งมอบ งานซ่อม และสถิติ
+                </p>
+              </div>
+            </Link>
+
+            {/* Direct Link: Monitor */}
+            <Link
+              href="/monitor"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${
+                isMonitorActive
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-500/20'
+                  : 'hover:bg-slate-50 dark:hover:bg-zinc-800/60 text-slate-700 dark:text-zinc-300'
+              }`}
+            >
+              <span className="text-xl shrink-0">🛡️</span>
+              <div>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Monitor (ประกัน/ภาษี)
+                </span>
+                <p className="text-xs text-slate-400 dark:text-zinc-500">
+                  ติดตามสถานะประกัน พ.ร.บ. ภาษีรถ แบบ read-only
                 </p>
               </div>
             </Link>
