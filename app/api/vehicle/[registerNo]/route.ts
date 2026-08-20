@@ -335,12 +335,14 @@ export async function GET(
       const [replResult, followUpResult, attachmentResult] = await Promise.all([
         replReq.query(`
           SELECT
-            ReplacementItemID, MaintenanceItemID, VinNo,
-            ReplacementStartDate, ReplacementReturnDate,
-            Location, Remark, IsActive
-          FROM dbo.EV_ReplacementItem
-          WHERE MaintenanceItemID IN (${idList})
-          ORDER BY ReplacementStartDate DESC
+            r.ReplacementItemID, r.MaintenanceItemID, r.VinNo,
+            r.ReplacementStartDate, r.ReplacementReturnDate,
+            r.Location, r.Remark, r.IsActive,
+            replCar.RegisterNo
+          FROM dbo.EV_ReplacementItem r
+          LEFT JOIN dbo.EV_InventoryItem replCar ON r.VinNo = replCar.VinNo AND replCar.IsActive = 1
+          WHERE r.MaintenanceItemID IN (${idList})
+          ORDER BY r.ReplacementStartDate DESC
         `),
         followUpReq.query(`
           SELECT

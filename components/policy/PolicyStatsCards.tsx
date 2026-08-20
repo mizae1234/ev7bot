@@ -28,7 +28,7 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpiring30 }
       ],
       icon: (
-        <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       ),
@@ -51,7 +51,7 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpired }
       ],
       icon: (
-        <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -74,7 +74,7 @@ export function PolicyStatsCards({
         { label: 'มิเตอร์', val: stats.meterExpiring60 }
       ],
       icon: (
-        <svg className="w-4 h-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -97,7 +97,7 @@ export function PolicyStatsCards({
         { label: 'ขาดมิเตอร์', val: stats.meterMissing }
       ],
       icon: (
-        <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
@@ -137,38 +137,38 @@ export function PolicyStatsCards({
             key={card.id}
             type="button"
             onClick={handleClick}
-            className={`text-left relative p-4 rounded-2xl border transition-all duration-200 bg-white dark:bg-zinc-900 bg-gradient-to-br ${card.bg} ${
+            className={`text-left relative p-3 rounded-xl border transition-all duration-200 bg-white dark:bg-zinc-900 bg-gradient-to-br ${card.bg} ${
               isSelected ? card.activeBorder : `${card.borderDefault} hover:border-zinc-300 dark:hover:border-zinc-700`
             } shadow-xs hover:shadow-sm cursor-pointer flex flex-col justify-between`}
           >
             <div>
               {/* Header Title + Icon */}
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 leading-tight">
+              <div className="flex items-center justify-between gap-1.5 mb-1">
+                <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 leading-tight">
                   {card.title}
                 </span>
-                <div className="w-7 h-7 rounded-xl bg-white dark:bg-zinc-800 shadow-xs border border-zinc-200/70 dark:border-zinc-700/70 flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 rounded-lg bg-white dark:bg-zinc-800 shadow-xs border border-zinc-200/70 dark:border-zinc-700/70 flex items-center justify-center shrink-0">
                   {card.icon}
                 </div>
               </div>
 
               {/* Counter */}
-              <div className="flex items-baseline gap-1.5 mb-3">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white font-mono">
+              <div className="flex items-baseline gap-1 mb-2">
+                <span className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-white font-mono">
                   {card.count.toLocaleString()}
                 </span>
-                <span className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">คัน</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">คัน</span>
               </div>
             </div>
 
             {/* Sub Breakdown Badges */}
-            <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/80 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
+            <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800/80 grid grid-cols-2 gap-1 sm:flex sm:flex-wrap">
               {card.breakdown.map((item, idx) => {
                 const hasValue = item.val > 0
                 return (
                   <span
                     key={idx}
-                    className={`text-[10.5px] px-2 py-0.5 rounded-lg border font-medium transition-colors inline-flex items-center gap-1 ${
+                    className={`text-[10px] px-1.5 py-0.5 rounded-md border font-medium transition-colors inline-flex items-center gap-0.5 ${
                       hasValue ? card.chipActive : card.chipMuted
                     }`}
                   >

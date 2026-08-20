@@ -15,6 +15,13 @@ interface DbCar {
   CurrentLocation?: string | null
 }
 
+interface ActiveReplacement {
+  VinNo: string
+  RegisterNo?: string
+  Location?: string
+  ReplacementStartDate?: string
+}
+
 interface CarInfoCardProps {
   car: DbCar
   carDetails?: any
@@ -23,6 +30,8 @@ interface CarInfoCardProps {
   /** If true, show a compact card without status badges, location, etc. */
   compact?: boolean
   activeContractNo?: string
+  /** Active replacement car assigned to this vehicle */
+  activeReplacement?: ActiveReplacement | null
 }
 
 /** Returns the Tailwind badge class for a given Thai status name */
@@ -41,7 +50,7 @@ function getStatusBadgeClass(name: string): string {
   return 'bg-slate-100 border-slate-200 text-slate-600'
 }
 
-export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, compact = false, activeContractNo }: CarInfoCardProps) {
+export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, compact = false, activeContractNo, activeReplacement }: CarInfoCardProps) {
   const currentLocationCode = carDetails?.CurrentLocation || car.CurrentLocation
   const currentLocationName = currentLocationCode
     ? (locationMap.get(currentLocationCode) || currentLocationCode)
@@ -115,6 +124,15 @@ export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, 
               <div className="text-[10px] text-slate-500 mt-1 font-semibold flex items-center gap-1">
                 <span>📍 สถานที่ปัจจุบัน:</span>
                 <span className="font-bold text-slate-800">{currentLocationName}</span>
+              </div>
+            )}
+
+            {/* Active Replacement Car Info */}
+            {activeReplacement && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-lg border bg-teal-50 border-teal-200 text-teal-700">
+                  🔄 รถทดแทน: {activeReplacement.RegisterNo || activeReplacement.VinNo}
+                </span>
               </div>
             )}
           </>

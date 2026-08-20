@@ -1548,6 +1548,24 @@ export default function QuickReportPage() {
     [vehicleHistory]
   )
 
+  // Find the active replacement car assigned to this vehicle (across all tickets)
+  const activeReplacementForCard = useMemo(() => {
+    for (const ticket of vehicleHistory) {
+      if (ticket.replacements && ticket.replacements.length > 0) {
+        const active = ticket.replacements.find((r: any) => r.IsActive && !r.ReplacementReturnDate)
+        if (active) {
+          return {
+            VinNo: active.VinNo || '',
+            RegisterNo: active.RegisterNo || '',
+            Location: active.Location || '',
+            ReplacementStartDate: active.ReplacementStartDate || ''
+          }
+        }
+      }
+    }
+    return null
+  }, [vehicleHistory])
+
   // Pre-built Map for O(1) location lookups instead of O(n) .find() on every render
   const locationMap = useMemo(
     () => new Map(locationOptions.map(o => [o.code, o.name])),
@@ -2294,7 +2312,7 @@ export default function QuickReportPage() {
                 <label className="text-xs font-bold text-slate-600 block mb-2">🚗 1. ข้อมูลรถที่เกิดเหตุ / มีปัญหา <span className="text-rose-550">*</span></label>
                 
                 {selectedCar ? (
-                  <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
+                  <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} activeReplacement={activeReplacementForCard} />
                 ) : (
                   <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
                 )}
@@ -3483,7 +3501,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} activeReplacement={activeReplacementForCard} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3665,7 +3683,7 @@ export default function QuickReportPage() {
               </p>
 
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} activeReplacement={activeReplacementForCard} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
@@ -3698,7 +3716,7 @@ export default function QuickReportPage() {
               <label className="text-xs font-bold text-slate-600 block mb-2">🚗 ค้นหารถยนต์เพื่ออัปเดตสถานที่ <span className="text-rose-550">*</span></label>
               
               {selectedCar ? (
-                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} />
+                <CarInfoCard car={selectedCar} carDetails={selectedCarDetails} locationMap={locationMap} onDeselect={handleDeselectCar} activeContractNo={activeContractNo} activeReplacement={activeReplacementForCard} />
               ) : (
                 <VehicleSearchWithScanner onSelectCar={handleSelectCar} />
               )}
