@@ -119,7 +119,7 @@ export function PolicyFilters({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               onPaste={handleSearchPaste}
-              placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์ (ค้นหาทีละหลาย VinNo. ได้)..."
+              placeholder="ค้นหา ทะเบียน, VIN, เลขกรมธรรม์..."
               className="w-full pl-9.5 pr-8 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
             />
             {search && (
