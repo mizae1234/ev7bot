@@ -488,8 +488,8 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       ORDER BY TotalCount DESC
     `),
     pool.request()
-      .input('startDate', sql.DateTime, new Date(startDateStr))
-      .input('endDate', sql.DateTime, new Date(endDateStr))
+      .input('startDate', sql.DateTime, start)
+      .input('endDate', sql.DateTime, end)
       .query(`
         SELECT 
           COUNT(*) AS TotalCount,
@@ -499,8 +499,8 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
         WHERE r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
       `),
     pool.request()
-      .input('startDate', sql.DateTime, new Date(startDateStr))
-      .input('endDate', sql.DateTime, new Date(endDateStr))
+      .input('startDate', sql.DateTime, start)
+      .input('endDate', sql.DateTime, end)
       .query(`
         SELECT 
           COALESCE(rs.DescriptionStatus, rs.StatusName, r.ReturnReason, insp.ReasonName, 'คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ') AS Reason,
