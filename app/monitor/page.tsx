@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import * as XLSX from 'xlsx'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { Pagination } from '@/components/ui/Pagination'
 import {
@@ -8,6 +9,7 @@ import {
   PolicyStatsSummary,
   InsuranceMasterType
 } from '@/lib/policy/policy-types'
+import { formatThaiDate, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 import { PolicyStatsCards } from '@/components/policy/PolicyStatsCards'
 import { PolicyFilters } from '@/components/policy/PolicyFilters'
 import { PolicyTable } from '@/components/policy/PolicyTable'
@@ -44,6 +46,7 @@ function MonitorPageContent() {
   const [models, setModels] = useState<string[]>([])
 
   const [loading, setLoading] = useState(true)
+  const [exportLoading, setExportLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
@@ -136,6 +139,60 @@ function MonitorPageContent() {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
   }, [])
 
+  // Export to Excel
+  const handleExportExcel = async () => {
+    setExportLoading(true)
+    try {
+      const query = new URLSearchParams({ page: '1', limit: '5000' })
+      if (search) query.append('search', search)
+      if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
+      if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
+      if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
+      if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
+      if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
+      if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
+      if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
+
+      const res = await fetch(`/api/policy?${query.toString()}`)
+      const data = await res.json()
+      const list: PolicyVehicleRecord[] = data.records || []
+
+      const exportRows = list.map((r, idx) => ({
+        'ลำดับ': idx + 1,
+        'เลขทะเบียน': r.registerNo || 'ไม่มีทะเบียน',
+        'เลขตัวถัง (VIN)': r.vinNo,
+        'วันที่จดทะเบียนรถ': r.registerNoDate ? formatThaiDate(r.registerNoDate) : '-',
+        'รุ่นรถ': r.model || '-',
+        'โครงการ': r.project || '-',
+        'ประเภทโครงการ': r.projectType || '-',
+        'สถานะรถ': r.statusName || r.status || '-',
+        'สถานที่จอด': r.locationName || '-',
+        'ประเภทประกัน': getInsuranceTypeLabel(r.insuranceType, r.insuranceTypeName),
+        'บริษัทประกัน': r.insuranceCompany || '-',
+        'เลขกรมธรรม์ประกัน': r.insurancePolicyNo || '-',
+        'วันหมดอายุประกัน': formatThaiDate(r.insuranceEndDate),
+        'สถานะประกัน': r.insuranceDaysLeft !== null ? (r.insuranceDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.insuranceDaysLeft} วัน`) : 'ไม่มีข้อมูล',
+        'เลข พ.ร.บ.': r.actPolicyNo || '-',
+        'วันหมดอายุ พ.ร.บ.': formatThaiDate(r.actEndDate),
+        'สถานะ พ.ร.บ.': r.actDaysLeft !== null ? (r.actDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.actDaysLeft} วัน`) : 'ไม่มีข้อมูล',
+        'วันหมดอายุภาษีรถ': formatThaiDate(r.vehicleTaxEndDate),
+        'สถานะภาษีรถ': r.vehicleTaxDaysLeft !== null ? (r.vehicleTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.vehicleTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
+        'วันหมดอายุภาษีมิเตอร์': formatThaiDate(r.meterTaxEndDate),
+        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล'
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(exportRows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Monitor_Data')
+      XLSX.writeFile(wb, `มอนิเตอร์ประกันและภาษี_EV7_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    } catch (err) {
+      console.error('Export Excel failed:', err)
+      alert('เกิดข้อผิดพลาดในการส่งออก Excel')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   // Reset page to 1 when filters change
   const handleSearchChange = (val: string) => { setSearch(val); setPage(1) }
   const handleExpiryFilterChange = (val: string) => { setExpiryFilter(val); setPage(1) }
@@ -156,7 +213,7 @@ function MonitorPageContent() {
             มอนิเตอร์ ประกันภัย พ.ร.บ. และภาษีรถยนต์
           </h1>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            ติดตามสถานะประกัน พ.ร.บ. ภาษีรถประจำปี และภาษีมิเตอร์แท็กซี่ (อ่านอย่างเดียว · รีเฟรชอัตโนมัติทุก 5 นาที)
+            ติดตามสถานะประกัน พ.ร.บ. ภาษีรถประจำปี และภาษีมิเตอร์แท็กซี่ (รีเฟรชอัตโนมัติทุก 5 นาที)
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -214,6 +271,8 @@ function MonitorPageContent() {
           projects={projects}
           projectTypes={projectTypes}
           models={models}
+          onExportExcel={handleExportExcel}
+          exportLoading={exportLoading}
         />
 
         <PolicyTable

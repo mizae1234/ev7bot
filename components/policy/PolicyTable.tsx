@@ -53,7 +53,7 @@ export function PolicyTable({
             <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
             <th className="py-3 px-4">⏱️ ภาษีมิเตอร์แท็กซี่</th>
             <th className="py-3 px-4">สถานะรถ / สถานที่</th>
-            <th className="py-3 px-4 text-center">จัดการ</th>
+            {onOpenEdit && <th className="py-3 px-4 text-center">จัดการ</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
@@ -110,11 +110,11 @@ export function PolicyTable({
                     className="group/link block"
                     title="คลิกเพื่อดูข้อมูลรถและประวัติ (เปิดแท็บใหม่)"
                   >
-                    <div className="font-semibold text-sm text-zinc-900 dark:text-white group-hover/link:text-amber-600 dark:group-hover/link:text-amber-400 transition-colors flex items-center gap-1">
+                    <div className="font-semibold text-sm text-zinc-900 dark:text-white group-hover/link:text-amber-600 dark:group-hover/link:text-amber-400 transition-colors flex items-center gap-1 underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-2 group-hover/link:decoration-amber-400">
                       <span>{rec.registerNo || <span className="text-zinc-400 italic">ไม่มีทะเบียน</span>}</span>
                       <span className="opacity-0 group-hover/link:opacity-100 text-[10px] text-amber-500 transition-opacity">↗</span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5 group-hover/link:text-amber-700 dark:group-hover/link:text-amber-300 group-hover/link:underline">
+                    <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5 group-hover/link:text-amber-700 dark:group-hover/link:text-amber-300 underline decoration-zinc-300 dark:decoration-zinc-600 underline-offset-2 group-hover/link:decoration-amber-400">
                       {rec.vinNo}
                     </div>
                   </Link>
@@ -275,7 +275,8 @@ export function PolicyTable({
                   </div>
                 </td>
 
-                {/* 7. Row Actions */}
+                {/* 7. Row Actions (hidden in monitor) */}
+                {onOpenEdit && (
                 <td className="py-3 px-4 text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     {/* View History Log */}
@@ -290,8 +291,7 @@ export function PolicyTable({
                       </svg>
                     </button>
 
-                    {/* Edit Form (hidden in read-only monitor) */}
-                    {onOpenEdit && (
+                    {/* Edit Form */}
                     <button
                       type="button"
                       title="แก้ไขข้อมูลประกัน/ภาษี"
@@ -302,9 +302,9 @@ export function PolicyTable({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
-                    )}
                   </div>
                 </td>
+                )}
               </tr>
             )
           })}
