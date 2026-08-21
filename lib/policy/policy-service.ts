@@ -124,6 +124,64 @@ export async function getDistinctProjectTypes(): Promise<string[]> {
 }
 
 /**
+ * 1.5 Fetch Distinct Statuses & StatusTypes from dbo.EV_InventoryItem & dbo.EV_MsSubStatus
+ */
+export async function getDistinctVehicleStatuses(): Promise<{
+  mainStatuses: { code: string; label: string }[]
+  statusTypes: { code: string; label: string }[]
+}> {
+  try {
+    const pool = await getMSSQLReadOnlyPool()
+    if (!pool) return { mainStatuses: [], statusTypes: [] }
+
+    const [mainRes, typeRes] = await Promise.all([
+      pool.request().query(`
+        SELECT DISTINCT 
+          i.Status AS code,
+          COALESCE(sub_s.DescriptionStatus, sub_s.StatusName, i.Status) AS label
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN dbo.EV_MsSubStatus sub_s ON i.Status = sub_s.StatusCode AND sub_s.Type = 'STATUS'
+        WHERE i.IsActive = 1 AND i.Status IS NOT NULL AND RTRIM(LTRIM(i.Status)) <> ''
+        ORDER BY label ASC
+      `),
+      pool.request().query(`
+        SELECT DISTINCT 
+          i.StatusType AS code,
+          COALESCE(sub_st.DescriptionStatus, sub_st.StatusName, i.StatusType) AS label
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN dbo.EV_MsSubStatus sub_st ON i.StatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
+        WHERE i.IsActive = 1 AND i.StatusType IS NOT NULL AND RTRIM(LTRIM(i.StatusType)) <> ''
+        ORDER BY label ASC
+      `)
+    ])
+
+    const MAIN_LABELS: Record<string, string> = {
+      ON_RENT: '🚗 อยู่ระหว่างเช่า (ON_RENT)',
+      AVAILABLE: '🟢 พร้อมใช้งาน / รถว่าง (AVAILABLE)',
+      MAINTENANCE: '🛠️ อยู่ระหว่างซ่อม (MAINTENANCE)',
+      REPLACEMENT: '🔄 รถทดแทน (REPLACEMENT)',
+      PENDING: '⏳ รอดำเนินการ (PENDING)',
+      PRODUCTION: '🏭 รอประกอบ/ผลิต (PRODUCTION)',
+    }
+
+    const mainStatuses = mainRes.recordset.map((r: { code: string; label: string }) => ({
+      code: r.code.trim(),
+      label: MAIN_LABELS[r.code.trim()] || r.label?.trim() || r.code.trim()
+    }))
+
+    const statusTypes = typeRes.recordset.map((r: { code: string; label: string }) => ({
+      code: r.code.trim(),
+      label: r.label?.trim() || r.code.trim()
+    }))
+
+    return { mainStatuses, statusTypes }
+  } catch (err) {
+    console.error('[getDistinctVehicleStatuses Error]', err)
+    return { mainStatuses: [], statusTypes: [] }
+  }
+}
+
+/**
  * 2. Get Paginated Policy & Tax List with Filtering
  */
 export async function getPolicyList(params: {
@@ -173,6 +231,17 @@ export async function getPolicyList(params: {
           OR i.RegisterNo = @${paramExact}
           OR i.VinNo LIKE @${paramLike}
           OR i.RegisterNo LIKE @${paramLike}
+          OR i.Status LIKE @${paramLike}
+          OR i.StatusType LIKE @${paramLike}
+          OR sub_st.DescriptionStatus LIKE @${paramLike}
+          OR sub_st.StatusName LIKE @${paramLike}
+          OR sub_s.DescriptionStatus LIKE @${paramLike}
+          OR sub_s.StatusName LIKE @${paramLike}
+          OR loc.StatusName LIKE @${paramLike}
+          OR i.CurrentLocation LIKE @${paramLike}
+          OR i.Model LIKE @${paramLike}
+          OR i.Project LIKE @${paramLike}
+          OR i.ProjectType LIKE @${paramLike}
           OR p.InsurancePolicyNo LIKE @${paramLike}
           OR p.ActPolicyNo LIKE @${paramLike}
         )`)
@@ -183,6 +252,17 @@ export async function getPolicyList(params: {
       whereClause += ` AND (
         i.VinNo LIKE @search
         OR i.RegisterNo LIKE @search
+        OR i.Status LIKE @search
+        OR i.StatusType LIKE @search
+        OR sub_st.DescriptionStatus LIKE @search
+        OR sub_st.StatusName LIKE @search
+        OR sub_s.DescriptionStatus LIKE @search
+        OR sub_s.StatusName LIKE @search
+        OR loc.StatusName LIKE @search
+        OR i.CurrentLocation LIKE @search
+        OR i.Model LIKE @search
+        OR i.Project LIKE @search
+        OR i.ProjectType LIKE @search
         OR p.InsurancePolicyNo LIKE @search
         OR p.ActPolicyNo LIKE @search
         OR p.InsuranceCompany LIKE @search
@@ -208,7 +288,7 @@ export async function getPolicyList(params: {
 
   if (params.statusFilter && params.statusFilter !== 'ALL') {
     req.input('statusFilter', sql.NVarChar, params.statusFilter)
-    whereClause += ' AND (i.Status = @statusFilter OR i.StatusType = @statusFilter)'
+    whereClause += ' AND (i.Status = @statusFilter OR i.StatusType = @statusFilter OR sub_st.StatusCode = @statusFilter OR sub_s.StatusCode = @statusFilter)'
   }
 
   if (params.typeFilter && params.typeFilter !== 'ALL') {

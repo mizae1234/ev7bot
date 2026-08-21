@@ -102,6 +102,42 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
 คอลัมน์: StatusCode (รหัส เช่น EV7_YARD_PRAPADAENG, AION_GI_SALAYA), StatusName (ชื่อสถานที่ เช่น "EV7 Yard พระประแดง", "Aion ศาลายา"), Type, IsActive
 ใช้ JOIN กับ EV_InventoryItem.CurrentLocation เพื่อแปลงรหัสเป็นชื่อสถานที่
 
+### ตาราง: dbo.EV_Inspection (การตรวจรับคืนรถ และ การตรวจสภาพ Stock Audit)
+คอลัมน์: InspectionID (PK), VinNo, RegisterNo,
+InspectionType ('RETURN' = ตรวจรับคืนรถ, 'AUDIT' = ตรวจสภาพ Stock Audit),
+InspectionDate (วันที่ตรวจรับคืน), ReturnDate (วันที่ส่งมอบรถคืนจริง),
+ReturnReason (เหตุผลการคืน เช่น ยกเลิกสัญญา, ครบกำหนดสัญญา, เปลี่ยนรถ),
+Location (รหัสสถานที่รับคืน เช่น EV7_YARD_PRAPADAENG — JOIN กับ EV_MsSubStatus WHERE Type='LOCATION' เพื่อแปลงเป็นชื่อสถานที่),
+CustomerName (ชื่อผู้เช่า/ลูกค้า — ⚠️ แสดงเฉพาะชื่อต้น ห้ามนามสกุล), CustomerContact (เบอร์ติดต่อลูกค้า),
+ContractNo (เลขที่สัญญา), ContractCancellationDate (วันขอยกเลิกสัญญา),
+InspectorName (ชื่อผู้ตรวจเช็คสภาพ — ⚠️ แสดงเฉพาะชื่อต้น ห้ามนามสกุล),
+Mileage (เลขไมล์กิโลเมตรตอนรับคืน),
+Status ('DRAFT' = ฉบับร่าง, 'COMPLETED' = บันทึกเสร็จสมบูรณ์),
+AssessmentResult ('NORMAL' = สภาพปกติสมบูรณ์ ผ่านเกณฑ์ 100%, 'NEED_REPAIR' = พบจุดชำรุดเสียหาย ต้องส่งเข้าซ่อม),
+IsPendingChecklist (bit: 1 = รับคืนรถแล้ว แต่ยังรอตรวจเช็คลิสต์สภาพภายหลัง, 0 = ตรวจเช็คลิสต์แล้ว),
+IsActive (bit, 1=ใช้งาน)
+
+### ตาราง: dbo.EV_InspectionItem (รายการจุดตรวจเช็คลิสต์สภาพรถแต่ละจุด)
+คอลัมน์: InspectionItemID (PK), InspectionID (FK → EV_Inspection.InspectionID),
+Category (หมวดหมู่จุดตรวจ):
+  - 'LICENSE_PLATE': ป้ายทะเบียน (Value: 'FRONT_BACK'=ครบ, 'FRONT_ONLY'=มีแค่หน้า, 'BACK_ONLY'=มีแค่หลัง, 'NONE'=ไม่มีป้าย)
+  - 'ROAD_TAX': ป้ายภาษี/ป้ายวงกลม (Value: 'YES'=มี, 'NO'=ไม่มี)
+  - 'TAX_VEHICLE': ภาษีรถยนต์ประจำปี (Value: 'YES'/'NO', ExpiryDate=วันหมดอายุ)
+  - 'TAX_METER': ภาษีตรวจมิเตอร์แท็กซี่ (Value: 'YES'/'NO', ExpiryDate=วันหมดอายุ)
+  - 'KEY_REMOTE': กุญแจรีโมท (Value: 'YES'=มี, 'NO'=ไม่มี)
+  - 'CONDITION': อุปกรณ์ภายใน/อุปกรณ์ฉุกเฉิน (ItemCode เช่น SPARE_TIRE=ยางอะไหล่, JACK=แม่แรง, CHARGER=สายชาร์จฉุกเฉิน, STICKER=สติ๊กเกอร์, METER=มิเตอร์, HEAD_LIGHT=ไฟหน้า, FOG_LIGHT=ไฟตัดหมอก / Value: 'YES'=มี/ปกติ, 'NO'=ไม่มี/ชำรุด)
+  - 'BODY': ตัวถังและสีรอบคัน (ItemCode เช่น BUMPER_FRONT=กันชนหน้า, BUMPER_REAR=กันชนหลัง, HOOD=ฝากระโปรงหน้า, ROOF=หลังคา, TIRE=ยางรถยนต์, WINDOW_FILM=ฟิล์มกรองแสง / Value: 'NORMAL'=ปกติ, 'SCRATCH'=มีรอยขีดข่วน/เฉี่ยว, 'DENT'=บุบ-แตก/เสียหาย)
+  - 'ACCIDENT': ประวัติ/รอยอุบัติเหตุ (Value: 'YES'=พบร่องรอยอุบัติเหตุ, 'NO'=ไม่มี)
+  - 'CLAIM_DOCS': เอกสารใบเคลมประกัน (Value: 'YES'=มีใบเคลม, 'NO'=ไม่มี)
+  - 'BATTERY_HV': แบตเตอรี่แรงดันสูง (Value: 'NORMAL'=ปกติ, 'WARNING'=ผิดปกติ)
+  - 'AIR_CON': ระบบปรับอากาศ (Value: 'NORMAL'=ปกติ, 'WARNING'=ผิดปกติ)
+  - 'MILEAGE': เลขไมล์ (NumericValue)
+ItemCode (รหัสจุดตรวจ), Value (ค่าผลตรวจ), Detail (หมายเหตุรายละเอียดของรอย/ความเสียหาย),
+NumericValue (ค่าตัวเลข), ExpiryDate (วันหมดอายุ)
+
+### ตาราง: dbo.EV_InspectionPhoto (รูปถ่ายสภาพรถ)
+คอลัมน์: PhotoID (PK), InspectionID (FK → EV_Inspection.InspectionID), Category, ItemCode, Position ('FRONT', 'BACK', 'LEFT', 'RIGHT'), PhotoUrl, IsActive
+
 ### ตาราง: task_notes (จดโน้ต/ติดตามงาน - อยู่ใน PostgreSQL)
 คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
 
@@ -109,6 +145,9 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
 - EV_Policy.VinNo = EV_InventoryItem.VinNo
 - EV_Policy.InsuranceType = EV_MsInsuranceType.TypeCode
 - EV_PolicyLog.VinNo = EV_InventoryItem.VinNo
+- EV_Inspection.VinNo = EV_InventoryItem.VinNo
+- EV_InspectionItem.InspectionID = EV_Inspection.InspectionID
+- EV_InspectionPhoto.InspectionID = EV_Inspection.InspectionID
 - EV_RentItem.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_RentItemLinemanHistory.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MaintenanceItem.InventoryItemID → EV_InventoryItem.InventoryItemID
@@ -116,7 +155,7 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
 - EV_MaintenanceFollowUp.MaintenanceItemID → EV_MaintenanceItem.MaintenanceItemID
 - EV_ReturnItem เก็บข้อมูลแยก (ใช้ VinNo เชื่อม)
 - EV_VehicleNote.InventoryItemID → EV_InventoryItem.InventoryItemID
-- EV_MsSubStatus (Type='LOCATION') — EV_InventoryItem.CurrentLocation = EV_MsSubStatus.StatusCode
+- EV_MsSubStatus (Type='LOCATION') — EV_InventoryItem.CurrentLocation = EV_MsSubStatus.StatusCode / EV_Inspection.Location = EV_MsSubStatus.StatusCode
 
 ### ถามข้อมูลประกันภัย พ.ร.บ. หรือภาษีรถ (เช่น "ทะเบียน ทอ-4623 ประกันหมดเมื่อไหร่ ของที่ไหน")
 1. ดึงจาก dbo.EV_Policy โดยเชื่อมกับ EV_InventoryItem ด้วย VinNo:
@@ -255,6 +294,60 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
 ### ถามรถส่งมอบวันนี้
 - ใช้ function getDeliveryToday ก่อน ถ้าต้องการ detail ใช้:
   SELECT i.RegisterNo, i.Model, r.FirstName, r.LastName, r.ContractNo FROM EV_RentItem r JOIN EV_InventoryItem i ON r.InventoryItemID = i.InventoryItemID WHERE CAST(r.ReleaseDate AS DATE) = CAST(GETDATE() AS DATE) AND r.IsActive = 1
+
+### ถามผลการตรวจสภาพรถ / ข้อมูลรับคืนรถ / จุดชำรุดเสียหาย (เช่น "ผลตรวจสภาพ ทอ-5681", "ตรวจรับคืน ทอ-3033 เป็นยังไง", "รถคันนี้ตรวจรับคืนแล้วพบรอยตรงไหนบ้าง", "เช็คลิสต์ตรวจคืนล่าสุด")
+1. ดึงข้อมูลใบตรวจรับคืนล่าสุดจาก dbo.EV_Inspection:
+   SELECT TOP 1 
+     i.InspectionID, i.VinNo, i.RegisterNo, i.InspectionDate, i.ReturnDate,
+     i.ReturnReason, i.CustomerName, i.CustomerContact, i.InspectorName, i.Mileage,
+     i.AssessmentResult, i.IsPendingChecklist, i.Status, loc.StatusName AS LocationName
+   FROM dbo.EV_Inspection i
+   LEFT JOIN dbo.EV_MsSubStatus loc ON i.Location = loc.StatusCode AND loc.Type = 'LOCATION'
+   WHERE (i.RegisterNo LIKE '%5681%' OR i.VinNo LIKE '%5681%')
+     AND i.InspectionType = 'RETURN' AND i.IsActive = 1
+   ORDER BY i.InspectionDate DESC, i.InspectionID DESC
+
+2. หาก AssessmentResult = 'NEED_REPAIR' หรือต้องการดูจุดความเสียหาย/รอยชำรุด ให้ดึงรายการจาก dbo.EV_InspectionItem:
+   SELECT it.Category, it.ItemCode, it.Value, it.Detail, it.ExpiryDate
+   FROM dbo.EV_InspectionItem it
+   WHERE it.InspectionID = <InspectionID>
+     AND (
+       (it.Category = 'ACCIDENT' AND it.Value = 'YES')
+       OR (it.Category <> 'CAR_PHOTOS' AND it.Category <> 'ACCIDENT' AND it.Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+     )
+
+3. แปลผลการประเมินสภาพและจุดเสียหายให้เข้าใจง่าย:
+   - **NORMAL** → "✅ สภาพปกติสมบูรณ์ ผ่านเกณฑ์ 100%"
+   - **NEED_REPAIR** → "⚠️ พบจุดชำรุดเสียหาย ต้องส่งเข้าซ่อม" (ระบุรายการจุดที่พบ เช่น ป้ายภาษีไม่มี, กันชนหลังมีรอยเฉี่ยว, ฝากระโปรงบุบ พร้อมโน้ตถ้ามี)
+   - **IsPendingChecklist = 1** → "🔄 รับคืนรถแล้ว (รอตรวจเช็คลิสต์สภาพภายหลัง)"
+   - ⚠️ **กฎสำคัญเรื่องความเป็นส่วนตัว (Data Privacy)**: แสดงเฉพาะ **ชื่อต้น** ของลูกค้า/ผู้เช่า และผู้ตรวจเช็คสภาพเท่านั้น (ห้ามแสดงนามสกุล)
+
+### ถามจำนวนรถคืนที่รอตรวจเช็คลิสต์สภาพ (Pending Checklist)
+- ดึงจำนวนรถคืนที่ยังไม่ได้ตรวจสภาพ:
+  SELECT COUNT(*) AS PendingChecklistCount
+  FROM dbo.EV_Inspection
+  WHERE InspectionType = 'RETURN' AND IsPendingChecklist = 1 AND IsActive = 1
+
+### ถามสรุปผลการตรวจรับคืนรถในช่วงเวลา (เช่น "ผลตรวจรับคืนเดือนนี้", "สรุปตรวจสภาพรถ")
+- สรุปผลการประเมินสภาพ:
+  SELECT 
+    CASE 
+      WHEN IsPendingChecklist = 1 THEN 'รอตรวจเช็คลิสต์'
+      WHEN AssessmentResult = 'NORMAL' THEN 'สภาพปกติสมบูรณ์'
+      WHEN AssessmentResult = 'NEED_REPAIR' THEN 'ต้องส่งซ่อม'
+      ELSE 'อื่นๆ'
+    END AS AssessmentStatus,
+    COUNT(*) AS TotalCount
+  FROM dbo.EV_Inspection
+  WHERE InspectionType = 'RETURN' AND IsActive = 1
+    AND InspectionDate >= @startDate AND InspectionDate <= @endDate
+  GROUP BY 
+    CASE 
+      WHEN IsPendingChecklist = 1 THEN 'รอตรวจเช็คลิสต์'
+      WHEN AssessmentResult = 'NORMAL' THEN 'สภาพปกติสมบูรณ์'
+      WHEN AssessmentResult = 'NEED_REPAIR' THEN 'ต้องส่งซ่อม'
+      ELSE 'อื่นๆ'
+    END
 
 ## Stored Procedures ที่ใช้ได้ (EXEC)
 

@@ -22,7 +22,10 @@ interface PolicyFiltersProps {
   projects: string[]
   projectTypes?: string[]
   models: string[]
-  statuses?: { code: string; label: string }[]
+  statuses?: {
+    mainStatuses?: { code: string; label: string }[]
+    statusTypes?: { code: string; label: string }[]
+  } | { code: string; label: string }[]
   onExportExcel?: () => void
   exportLoading?: boolean
 }
@@ -55,14 +58,24 @@ export function PolicyFilters({
   const [showBatchModal, setShowBatchModal] = React.useState(false)
   const [batchInputText, setBatchInputText] = React.useState('')
 
-  const defaultStatuses = statuses || [
-    { code: 'ON_RENT', label: '🚗 อยู่ระหว่างเช่า (ON_RENT)' },
-    { code: 'AVAILABLE', label: '🟢 พร้อมใช้งาน / รถว่าง (AVAILABLE)' },
-    { code: 'MAINTENANCE', label: '🛠️ อยู่ระหว่างซ่อม (MAINTENANCE)' },
-    { code: 'REPLACEMENT', label: '🔄 รถทดแทน (REPLACEMENT)' },
-    { code: 'PENDING', label: '⏳ รอดำเนินการ (PENDING)' },
-    { code: 'PRODUCTION', label: '🏭 รอประกอบ/ผลิต (PRODUCTION)' }
-  ]
+  // Determine mainStatuses and statusTypes
+  const isGroupedStatuses = statuses && !Array.isArray(statuses) && ('mainStatuses' in statuses || 'statusTypes' in statuses)
+  const mainStatuses = isGroupedStatuses
+    ? (statuses as { mainStatuses?: { code: string; label: string }[] }).mainStatuses || []
+    : Array.isArray(statuses)
+    ? statuses
+    : [
+        { code: 'ON_RENT', label: '🚗 อยู่ระหว่างเช่า (ON_RENT)' },
+        { code: 'AVAILABLE', label: '🟢 พร้อมใช้งาน / รถว่าง (AVAILABLE)' },
+        { code: 'MAINTENANCE', label: '🛠️ อยู่ระหว่างซ่อม (MAINTENANCE)' },
+        { code: 'REPLACEMENT', label: '🔄 รถทดแทน (REPLACEMENT)' },
+        { code: 'PENDING', label: '⏳ รอดำเนินการ (PENDING)' },
+        { code: 'PRODUCTION', label: '🏭 รอประกอบ/ผลิต (PRODUCTION)' }
+      ]
+
+  const statusTypes = isGroupedStatuses
+    ? (statuses as { statusTypes?: { code: string; label: string }[] }).statusTypes || []
+    : []
 
   // Detect active search tokens
   const activeTokens = search.trim() ? Array.from(new Set(search.trim().split(/[\r\n,\t\s]+/).filter(Boolean))) : []
@@ -119,7 +132,7 @@ export function PolicyFilters({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               onPaste={handleSearchPaste}
-              placeholder="ค้นหา ทะเบียน, VIN..."
+              placeholder="ค้นหา ทะเบียน, VIN, สถานะรถ, สถานที่..."
               className="w-full pl-10 pr-8 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
             />
             {search && (
@@ -247,11 +260,24 @@ export function PolicyFilters({
           }`}
         >
           <option value="ALL">สถานะรถ: ทั้งหมด</option>
-          {defaultStatuses.map(s => (
-            <option key={s.code} value={s.code}>
-              {s.label}
-            </option>
-          ))}
+          {mainStatuses.length > 0 && (
+            <optgroup label="── สถานะหลัก (Main Status) ──">
+              {mainStatuses.map(s => (
+                <option key={`main_${s.code}`} value={s.code}>
+                  {s.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {statusTypes.length > 0 && (
+            <optgroup label="── สถานะย่อย (Status Type) ──">
+              {statusTypes.map(st => (
+                <option key={`type_${st.code}`} value={st.code}>
+                  {st.label} ({st.code})
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
 
         {/* 3. Expiry Status */}

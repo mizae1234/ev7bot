@@ -44,6 +44,10 @@ function MonitorPageContent() {
   const [projects, setProjects] = useState<string[]>([])
   const [projectTypes, setProjectTypes] = useState<string[]>([])
   const [models, setModels] = useState<string[]>([])
+  const [vehicleStatuses, setVehicleStatuses] = useState<{
+    mainStatuses: { code: string; label: string }[]
+    statusTypes: { code: string; label: string }[]
+  }>({ mainStatuses: [], statusTypes: [] })
 
   const [loading, setLoading] = useState(true)
   const [exportLoading, setExportLoading] = useState(false)
@@ -80,6 +84,7 @@ function MonitorPageContent() {
         if (data.models && Array.isArray(data.models)) setModels(data.models)
         if (data.projects && Array.isArray(data.projects)) setProjects(data.projects)
         if (data.projectTypes && Array.isArray(data.projectTypes)) setProjectTypes(data.projectTypes)
+        if (data.vehicleStatuses) setVehicleStatuses(data.vehicleStatuses)
       })
       .catch(err => console.error('Failed to load master types:', err))
   }, [])
@@ -274,6 +279,7 @@ function MonitorPageContent() {
           projects={projects}
           projectTypes={projectTypes}
           models={models}
+          statuses={vehicleStatuses}
           onExportExcel={handleExportExcel}
           exportLoading={exportLoading}
         />

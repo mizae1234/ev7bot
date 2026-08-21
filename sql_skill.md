@@ -481,6 +481,64 @@ ORDER BY r.ReplacementStartDate DESC;
 
 ---
 
+### ตาราง `dbo.EV_Inspection` & `dbo.EV_InspectionItem` (ระบบตรวจรับคืนรถ & เช็คลิสต์ตรวจสภาพ) ⭐
+
+ตารางหลักสำหรับจัดเก็บผลการตรวจรับคืนรถ, เช็คลิสต์ความสมบูรณ์/จุดชำรุดเสียหาย, รูปถ่าย และผลการประเมินสภาพรถ
+
+#### 1. ตารางหลัก: `dbo.EV_Inspection`
+- `InspectionID` (PK): รหัสใบตรวจสภาพ
+- `VinNo`, `RegisterNo`: เลขตัวถังและทะเบียนรถ
+- `InspectionType`: `'RETURN'` (รับคืนรถ) หรือ `'AUDIT'` (ตรวจสต็อก)
+- `InspectionDate`: วันที่ตรวจรับคืน
+- `ReturnDate`: วันที่ส่งมอบรถคืนจริง
+- `ReturnReason`: เหตุผลการคืนรถ
+- `Location`: รหัสสถานที่รับคืน (JOIN `EV_MsSubStatus` WHERE `Type = 'LOCATION'`)
+- `CustomerName`, `CustomerContact`: ข้อมูลผู้เช่า
+- `InspectorName`: ชื่อผู้ตรวจเช็คสภาพ
+- `Mileage`: เลขไมล์กิโลเมตรตอนรับคืน
+- `AssessmentResult`: `'NORMAL'` (สภาพปกติสมบูรณ์ ผ่านเกณฑ์ 100%), `'NEED_REPAIR'` (พบจุดชำรุดเสียหาย ต้องส่งเข้าซ่อม)
+- `IsPendingChecklist`: `1` = รับคืนรถแล้ว แต่ยังรอตรวจเช็คลิสต์ภายหลัง, `0` = ตรวจเช็คลิสต์แล้ว
+- `Status`: `'DRAFT'`, `'COMPLETED'`
+- `IsActive`: `1`
+
+#### 2. ตารางจุดเช็คลิสต์: `dbo.EV_InspectionItem`
+- `InspectionItemID` (PK)
+- `InspectionID` (FK → `EV_Inspection.InspectionID`)
+- `Category`: `LICENSE_PLATE`, `ROAD_TAX`, `TAX_VEHICLE`, `TAX_METER`, `KEY_REMOTE`, `CONDITION`, `BODY`, `AIR_CON`, `BATTERY_HV`, `ACCIDENT`, `CLAIM_DOCS`, `MILEAGE`
+- `ItemCode`: เช่น `BUMPER_FRONT`, `BUMPER_REAR`, `STICKER`, `SPARE_TIRE`, `CHARGER`, `PHOTOS`
+- `Value`: ค่าผลตรวจ (`YES`/`NO`, `NORMAL`/`SCRATCH`/`DENT`, `FRONT_BACK`/`FRONT_ONLY`/`BACK_ONLY`/`NONE`)
+- `Detail`: หมายเหตุรายละเอียดของรอย/ความเสียหาย
+
+#### ตัวอย่าง Query ตรวจสอบผลตรวจรับคืนและจุดชำรุดล่าสุด:
+```sql
+-- ดึงผลตรวจรับคืนล่าสุด พร้อมจุดชำรุดเสียหาย
+SELECT TOP 1 
+  i.InspectionID, i.VinNo, i.RegisterNo, i.InspectionDate, i.ReturnDate,
+  i.ReturnReason, i.CustomerName, i.InspectorName, i.Mileage,
+  i.AssessmentResult, i.IsPendingChecklist, loc.StatusName AS LocationName,
+  (
+    SELECT 
+      it.Category AS category,
+      it.ItemCode AS itemCode,
+      it.Value AS [value],
+      it.Detail AS detail
+    FROM dbo.EV_InspectionItem it
+    WHERE it.InspectionID = i.InspectionID
+      AND (
+        (it.Category = 'ACCIDENT' AND it.Value = 'YES')
+        OR (it.Category <> 'CAR_PHOTOS' AND it.Category <> 'ACCIDENT' AND it.Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+      )
+    FOR JSON PATH
+  ) AS DamagedItemsJson
+FROM dbo.EV_Inspection i
+LEFT JOIN dbo.EV_MsSubStatus loc ON i.Location = loc.StatusCode AND loc.Type = 'LOCATION'
+WHERE (i.RegisterNo LIKE '%5681%' OR i.VinNo LIKE '%5681%')
+  AND i.InspectionType = 'RETURN' AND i.IsActive = 1
+ORDER BY i.InspectionDate DESC, i.InspectionID DESC
+```
+
+---
+
 ## 8. Production
 
 ### `GetEV_Report_ProductionCar` ⭐
