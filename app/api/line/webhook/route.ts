@@ -2048,7 +2048,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         }
       }
 
-      // Bubble 2: สถิติรถคืนประจำเดือน
+      // Bubble 2: สถิติรถคืนประจำเดือน (สัญญาเช่า)
       const returns = stats.returns || {
         totalCount: 0,
         uniqueVin: 0,
@@ -2057,28 +2057,31 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         byReason: []
       }
 
-      const returnReasonRows = (returns.byReason || []).map((r: any) => ({
-        type: 'box',
-        layout: 'horizontal',
-        contents: [
-          {
-            type: 'text',
-            text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
-            size: 'xs',
-            color: '#555555',
-            flex: 6
-          },
-          {
-            type: 'text',
-            text: `${r.count} ครั้ง (${r.uniqueVin} คัน)`,
-            size: 'xs',
-            weight: 'bold',
-            color: '#1a1a1a',
-            align: 'end',
-            flex: 4
-          }
-        ]
-      }))
+      // Filter out replacement reasons from Bubble 2 so they belong purely in Bubble 3
+      const returnReasonRows = (returns.byReason || [])
+        .filter((r: any) => !r.reason?.includes('รถทดแทน'))
+        .map((r: any) => ({
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            {
+              type: 'text',
+              text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
+              size: 'xs',
+              color: '#555555',
+              flex: 6
+            },
+            {
+              type: 'text',
+              text: `${r.count} ครั้ง (${r.uniqueVin} คัน)`,
+              size: 'xs',
+              weight: 'bold',
+              color: '#1a1a1a',
+              align: 'end',
+              flex: 4
+            }
+          ]
+        }))
 
       const returnBubble = {
         type: 'bubble' as const,
@@ -2173,12 +2176,112 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         }
       }
 
+      // Bubble 3: สถิติคืนรถทดแทนประจำเดือน
+      const repReturns = (stats as any).replacementReturns || {
+        totalCount: 0,
+        uniqueVin: 0,
+        avgDaysUsed: 0,
+        activeInUseCount: 0,
+        byReason: []
+      }
+
+      const repReasonRows = (repReturns.byReason || []).map((r: any) => ({
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          {
+            type: 'text',
+            text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
+            size: 'xs',
+            color: '#555555',
+            flex: 6
+          },
+          {
+            type: 'text',
+            text: `${r.count} ครั้ง (${r.uniqueVin} คัน)`,
+            size: 'xs',
+            weight: 'bold',
+            color: '#1a1a1a',
+            align: 'end',
+            flex: 4
+          }
+        ]
+      }))
+
+      const replacementReturnBubble = {
+        type: 'bubble' as const,
+        size: 'mega' as const,
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: '🔄 สรุปคืนรถทดแทนประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+            { type: 'text', text: `ข้อมูล ณ เดือนที่ ${targetMonth}/${targetYear}`, size: 'xs', color: '#888888' }
+          ],
+          backgroundColor: '#E0F2F1',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'md',
+          contents: [
+            // Overview
+            { type: 'text', text: '📊 ภาพรวมการคืนรถทดแทน', weight: 'bold', size: 'sm', color: '#00695C' },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(repReturns.totalCount), size: 'xl', weight: 'bold', color: '#00796B', align: 'center' },
+                    { type: 'text', text: 'ยอดคืนสะสม (ครั้ง)', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(repReturns.uniqueVin), size: 'xl', weight: 'bold', color: '#1565C0', align: 'center' },
+                    { type: 'text', text: 'รถคืนจริง (คัน)', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: `${repReturns.avgDaysUsed} วัน`, size: 'xl', weight: 'bold', color: '#E65100', align: 'center' },
+                    { type: 'text', text: 'ใช้งานเฉลี่ย', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                }
+              ]
+            },
+            { type: 'separator', margin: 'md' },
+
+            // Breakdown by Reason
+            ...(repReasonRows.length > 0 ? [
+              { type: 'text', text: '📋 แยกตามสาเหตุการคืนรถทดแทน', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+              ...repReasonRows
+            ] : [
+              { type: 'text', text: 'ไม่มีรายการคืนรถทดแทนในเดือนนี้', size: 'xs', color: '#888888', align: 'center' }
+            ])
+          ],
+          paddingAll: 'lg'
+        }
+      }
+
       const flexMessage = {
         type: 'flex' as const,
         altText: `📅 สรุปส่งมอบและรถคืนประจำเดือน ${targetMonth}/${targetYear}`,
         contents: {
           type: 'carousel' as const,
-          contents: [deliveryBubble, returnBubble]
+          contents: [deliveryBubble, returnBubble, replacementReturnBubble]
         },
         quickReply: quickReplyItems
       }

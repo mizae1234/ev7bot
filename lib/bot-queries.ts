@@ -367,6 +367,9 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     returnSummaryRes,
     returnTypeRes,
     returnReasonRes,
+    repSummaryRes,
+    repReasonRes,
+    repActiveRes,
     repairRes
   ] = await Promise.all([
     planReq.query(`
@@ -484,6 +487,45 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       GROUP BY Reason
       ORDER BY TotalCount DESC
     `),
+    pool.request()
+      .input('startDate', sql.DateTime, new Date(startDateStr))
+      .input('endDate', sql.DateTime, new Date(endDateStr))
+      .query(`
+        SELECT 
+          COUNT(*) AS TotalCount,
+          COUNT(DISTINCT r.VinNo) AS UniqueVIN,
+          AVG(CAST(DATEDIFF(day, r.ReplacementStartDate, r.ReplacementReturnDate) AS FLOAT)) AS AvgDaysUsed
+        FROM dbo.EV_ReplacementItem r
+        WHERE r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
+      `),
+    pool.request()
+      .input('startDate', sql.DateTime, new Date(startDateStr))
+      .input('endDate', sql.DateTime, new Date(endDateStr))
+      .query(`
+        SELECT 
+          COALESCE(rs.DescriptionStatus, rs.StatusName, r.ReturnReason, insp.ReasonName, 'คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ') AS Reason,
+          COUNT(*) AS TotalCount,
+          COUNT(DISTINCT r.VinNo) AS UniqueVIN
+        FROM dbo.EV_ReplacementItem r
+        LEFT JOIN dbo.EV_MsSubStatus rs ON r.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
+        OUTER APPLY (
+          SELECT TOP 1 rs2.DescriptionStatus AS ReasonName
+          FROM dbo.EV_Inspection i
+          LEFT JOIN dbo.EV_MsSubStatus rs2 ON i.ReturnReason = rs2.StatusCode AND rs2.Type = 'RETURN_REASON'
+          WHERE i.VinNo = r.VinNo AND i.IsActive = 1 AND CAST(i.ReturnDate AS DATE) = CAST(r.ReplacementReturnDate AS DATE)
+          ORDER BY i.InspectionID DESC
+        ) insp
+        WHERE r.ReplacementReturnDate >= @startDate AND r.ReplacementReturnDate <= @endDate
+        GROUP BY COALESCE(rs.DescriptionStatus, rs.StatusName, r.ReturnReason, insp.ReasonName, 'คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ')
+        ORDER BY TotalCount DESC
+      `),
+    pool.request().query(`
+      SELECT 
+        COUNT(*) AS ActiveCount,
+        COUNT(DISTINCT r.VinNo) AS UniqueVIN
+      FROM dbo.EV_ReplacementItem r
+      WHERE r.IsActive = 1 AND (r.ReplacementReturnDate IS NULL OR r.ReplacementReturnDate >= CAST(GETDATE() AS DATE))
+    `),
     repairReq.query(`
       SELECT
         COUNT(*) AS total,
@@ -560,6 +602,17 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
         uniqueVin: linemanReturnUniqueVin,
       },
       byReason: (returnReasonRes.recordset || []).map((r: any) => ({
+        reason: r.Reason,
+        count: r.TotalCount,
+        uniqueVin: r.UniqueVIN,
+      })),
+    },
+    replacementReturns: {
+      totalCount: repSummaryRes.recordset[0]?.TotalCount || 0,
+      uniqueVin: repSummaryRes.recordset[0]?.UniqueVIN || 0,
+      avgDaysUsed: Math.round((repSummaryRes.recordset[0]?.AvgDaysUsed || 0) * 10) / 10,
+      activeInUseCount: repActiveRes.recordset[0]?.ActiveCount || 0,
+      byReason: (repReasonRes.recordset || []).map((r: any) => ({
         reason: r.Reason,
         count: r.TotalCount,
         uniqueVin: r.UniqueVIN,
