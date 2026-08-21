@@ -558,7 +558,12 @@ export async function getPolicyList(params: {
         return r.insuranceStatus === 'MISSING' && r.actStatus === 'MISSING' && r.vehicleTaxStatus === 'MISSING' && r.meterTaxStatus === 'MISSING'
       }
       if (params.missingFilter === 'COMPLETE') {
-        return r.insuranceStatus !== 'MISSING' && r.actStatus !== 'MISSING' && r.vehicleTaxStatus !== 'MISSING'
+        return (
+          r.insuranceStatus !== 'MISSING' &&
+          r.actStatus !== 'MISSING' &&
+          r.vehicleTaxStatus !== 'MISSING' &&
+          r.meterTaxStatus !== 'MISSING'
+        )
       }
       return true
     })

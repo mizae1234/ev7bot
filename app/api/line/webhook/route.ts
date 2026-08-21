@@ -1800,7 +1800,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
   }
 
   // ─── Monthly Delivery Summary as Flex Message ──────────────────
-  if (matchAny(lower, ['สรุปส่งมอบประจำเดือน', 'ส่งมอบประจำเดือน', 'สรุปประจำเดือน', 'สรุปส่งมอบ', 'สรุปเดือนนี้'])) {
+  if (matchAny(lower, ['สรุปส่งมอบประจำเดือน', 'ส่งมอบประจำเดือน', 'สรุปประจำเดือน', 'สรุปส่งมอบ', 'สรุปเดือนนี้', 'สรุปรถคืนประจำเดือน', 'สรุปคืนรถประจำเดือน', 'สรุปรถคืนเดือนนี้', 'รถคืนประจำเดือน'])) {
     try {
       const { getMonthlyStats } = await import('@/lib/bot-queries')
       
@@ -1922,133 +1922,263 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
       const newPlanRows = buildComparisonRows(stats.plans || [], newActuals)
       const usedPlanRows = buildComparisonRows([], usedActuals)
 
+      const deliveryBubble = {
+        type: 'bubble' as const,
+        size: 'mega' as const,
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+            { type: 'text', text: `ข้อมูล ณ เดือนที่ ${targetMonth}/${targetYear}`, size: 'xs', color: '#888888' }
+          ],
+          backgroundColor: '#FFF3E0',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'md',
+          contents: [
+            // New Vehicles Section
+            { type: 'text', text: '🚛 สถิติส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(newVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+                    { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(newVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+                    { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(newVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
+                    { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(newVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
+                    { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                }
+              ]
+            },
+            ...(newPlanRows.length > 0 ? [
+              { type: 'separator', margin: 'md' },
+              { type: 'text', text: '📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+              ...newPlanRows
+            ] : []),
+
+            { type: 'separator', margin: 'lg' },
+
+            // Used Vehicles Section
+            { type: 'text', text: '🚗 สถิติส่งมอบรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(usedVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
+                    { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(usedVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
+                    { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(usedVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
+                    { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(usedVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
+                    { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                }
+              ]
+            },
+            ...(usedPlanRows.length > 0 ? [
+              { type: 'separator', margin: 'md' },
+              { type: 'text', text: '📋 รายละเอียดส่งมอบ รถมือสอง', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+              ...usedPlanRows
+            ] : [])
+          ],
+          paddingAll: 'lg'
+        }
+      }
+
+      // Bubble 2: สถิติรถคืนประจำเดือน
+      const returns = stats.returns || {
+        totalCount: 0,
+        uniqueVin: 0,
+        normalReturn: { count: 0, uniqueVin: 0 },
+        linemanReturn: { count: 0, uniqueVin: 0 },
+        byReason: []
+      }
+
+      const returnReasonRows = (returns.byReason || []).map((r: any) => ({
+        type: 'box',
+        layout: 'horizontal',
+        contents: [
+          {
+            type: 'text',
+            text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
+            size: 'xs',
+            color: '#555555',
+            flex: 6
+          },
+          {
+            type: 'text',
+            text: `${r.count} ครั้ง (${r.uniqueVin} คัน)`,
+            size: 'xs',
+            weight: 'bold',
+            color: '#1a1a1a',
+            align: 'end',
+            flex: 4
+          }
+        ]
+      }))
+
+      const returnBubble = {
+        type: 'bubble' as const,
+        size: 'mega' as const,
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            { type: 'text', text: '📥 สรุปรถคืนประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
+            { type: 'text', text: `ข้อมูล ณ เดือนที่ ${targetMonth}/${targetYear}`, size: 'xs', color: '#888888' }
+          ],
+          backgroundColor: '#EDE7F6',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'md',
+          contents: [
+            // Return Overview
+            { type: 'text', text: '📊 ภาพรวมการรับคืนรถ', weight: 'bold', size: 'sm', color: '#512DA8' },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(returns.totalCount), size: 'xl', weight: 'bold', color: '#C62828', align: 'center' },
+                    { type: 'text', text: 'ยอดคืนสะสม (ครั้ง)', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                },
+                {
+                  type: 'box',
+                  layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: String(returns.uniqueVin), size: 'xl', weight: 'bold', color: '#1565C0', align: 'center' },
+                    { type: 'text', text: 'รถคืนจริง (คัน)', size: 'xxs', color: '#888888', align: 'center' }
+                  ],
+                  flex: 1
+                }
+              ]
+            },
+            { type: 'separator', margin: 'md' },
+
+            // Breakdown by Return Type
+            { type: 'text', text: '🚗 แยกตามประเภทการคืน', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: '• คืนรถทั่วไป', size: 'xs', color: '#555555', flex: 6 },
+                {
+                  type: 'text',
+                  text: `${returns.normalReturn?.count || 0} ครั้ง (${returns.normalReturn?.uniqueVin || 0} คัน)`,
+                  size: 'xs',
+                  weight: 'bold',
+                  color: '#1a1a1a',
+                  align: 'end',
+                  flex: 4
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: '• รถเวียนคืน Lineman', size: 'xs', color: '#555555', flex: 6 },
+                {
+                  type: 'text',
+                  text: `${returns.linemanReturn?.count || 0} ครั้ง (${returns.linemanReturn?.uniqueVin || 0} คัน)`,
+                  size: 'xs',
+                  weight: 'bold',
+                  color: '#1a1a1a',
+                  align: 'end',
+                  flex: 4
+                }
+              ]
+            },
+
+            // Breakdown by Reason
+            ...(returnReasonRows.length > 0 ? [
+              { type: 'separator', margin: 'md' },
+              { type: 'text', text: '📋 แยกตามสาเหตุการคืน', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+              ...returnReasonRows
+            ] : [])
+          ],
+          paddingAll: 'lg'
+        }
+      }
+
       const flexMessage = {
         type: 'flex' as const,
-        altText: `📅 สรุปส่งมอบประจำเดือน ${targetMonth}/${targetYear}`,
+        altText: `📅 สรุปส่งมอบและรถคืนประจำเดือน ${targetMonth}/${targetYear}`,
         contents: {
-          type: 'bubble' as const,
-          size: 'mega' as const,
-          header: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', weight: 'bold', size: 'lg', color: '#1a1a1a' },
-              { type: 'text', text: `ข้อมูล ณ เดือนที่ ${targetMonth}/${targetYear}`, size: 'xs', color: '#888888' }
-            ],
-            backgroundColor: '#FFF3E0',
-            paddingAll: 'lg'
-          },
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'md',
-            contents: [
-              // New Vehicles Section
-              { type: 'text', text: '🚛 สถิติส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
-              {
-                type: 'box',
-                layout: 'horizontal',
-                spacing: 'md',
-                contents: [
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(newVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                      { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(newVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-                      { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(newVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
-                      { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(newVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                      { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  }
-                ]
-              },
-              ...(newPlanRows.length > 0 ? [
-                { type: 'separator', margin: 'md' },
-                { type: 'text', text: '📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
-                ...newPlanRows
-              ] : []),
-
-              { type: 'separator', margin: 'lg' },
-
-              // Used Vehicles Section
-              { type: 'text', text: '🚗 สถิติส่งมอบรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
-              {
-                type: 'box',
-                layout: 'horizontal',
-                spacing: 'md',
-                contents: [
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(usedVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                      { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(usedVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
-                      { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(usedVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
-                      { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  },
-                  {
-                    type: 'box',
-                    layout: 'vertical',
-                    contents: [
-                      { type: 'text', text: String(usedVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                      { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
-                    ],
-                    flex: 1
-                  }
-                ]
-              },
-              ...(usedPlanRows.length > 0 ? [
-                { type: 'separator', margin: 'md' },
-                { type: 'text', text: '📋 รายละเอียดส่งมอบ รถมือสอง', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
-                ...usedPlanRows
-              ] : [])
-            ],
-            paddingAll: 'lg'
-          }
+          type: 'carousel' as const,
+          contents: [deliveryBubble, returnBubble]
         },
         quickReply: quickReplyItems
       }
