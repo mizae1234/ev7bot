@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import type { InspectionListItem, MasterItemDef } from '@/lib/inspection/types'
 import { exportToExcel, ExportButton } from '@/lib/exportExcel'
-import { getAssessmentLabel, getThaiDate, getThaiDateTime, getReasonLabel } from '@/components/returns-monitor/constants'
+import { getAssessmentLabel, getThaiDate, getThaiDateTime } from '@/components/returns-monitor/constants'
 
 import StatsCards from '@/components/returns-monitor/StatsCards'
 import FilterBar from '@/components/returns-monitor/FilterBar'
@@ -135,7 +135,7 @@ export default function ReturnsMonitorPage() {
       item.isPendingChecklist ? 'ใช่' : '-',
       item.inspectorName || '-',
       item.mileage != null ? item.mileage : '-',
-      item.returnReasonName || getReasonLabel(item.returnReason),
+      item.returnReasonName || item.returnReason || '-',
       getThaiDateTime(item.createDate),
       item.createdByName || '-',
       getThaiDateTime(item.updateDate),

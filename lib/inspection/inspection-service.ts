@@ -957,6 +957,20 @@ export async function getInspectionItemMaster(): Promise<any[]> {
   })
 }
 
+/** ดึงข้อมูล Master เหตุผลการคืนรถจาก EV_MsSubStatus (Type='RETURN_REASON') แบบไดนามิก */
+export async function getReturnReasonsMaster(): Promise<Array<{ code: string; name: string }>> {
+  const pool = await getMSSQLPool()
+  if (!pool) throw new Error('Database connection failed')
+
+  const result = await pool.request().query(`
+    SELECT StatusCode AS code, COALESCE(DescriptionStatus, StatusName, StatusCode) AS name
+    FROM dbo.EV_MsSubStatus
+    WHERE Type = 'RETURN_REASON' AND IsActive = 1
+    ORDER BY Seq ASC, StatusName ASC
+  `)
+  return result.recordset
+}
+
 /** อัปเดตสถานะการจัดการจุดชำรุดเสียหาย (PENDING / IN_PROGRESS / RESOLVED / NO_ACTION_NEEDED) */
 export async function updateInspectionItemResolution(params: {
   inspectionId: number

@@ -6,7 +6,6 @@ import { buildDynamicSections, CHECKLIST_SECTIONS, RESOLVE_STATUS_CONFIG, type I
 import {
   getSpacesCDN,
   getThaiDate,
-  getReasonLabel,
   maskName,
   LICENSE_PLATE_OPTIONS,
   BOOLEAN_OPTIONS,
@@ -783,7 +782,7 @@ function InfoTab({
           })()}
           <div className="space-y-0.5 col-span-2">
             <span className="text-[10px] text-slate-400">เหตุผลในการคืนรถ</span>
-            <p className="font-medium text-slate-800">{detail.returnReasonName || getReasonLabel(detail.returnReason)}</p>
+            <p className="font-medium text-slate-800">{detail.returnReasonName || detail.returnReason || '-'}</p>
           </div>
           <div className="space-y-0.5 col-span-2 border-t border-slate-200 pt-2 mt-1">
             <span className="text-[10px] text-slate-400">เจ้าหน้าที่ผู้ตรวจเช็ค</span>
