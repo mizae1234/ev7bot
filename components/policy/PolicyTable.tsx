@@ -6,6 +6,8 @@ import { formatThaiDate, getExpiryBadge, getInsuranceTypeLabel } from '@/lib/pol
 interface PolicyTableProps {
   records: PolicyVehicleRecord[]
   loading: boolean
+  page?: number
+  pageSize?: number
   onOpenHistory: (vinNo: string, registerNo: string | null) => void
   onOpenEdit?: (record: PolicyVehicleRecord) => void
 }
@@ -15,6 +17,8 @@ const SPACES_CDN = process.env.NEXT_PUBLIC_SPACES_CDN_URL || 'https://space-ev7t
 export function PolicyTable({
   records,
   loading,
+  page = 1,
+  pageSize = 50,
   onOpenHistory,
   onOpenEdit
 }: PolicyTableProps) {
@@ -46,6 +50,7 @@ export function PolicyTable({
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
+            <th className="py-3 px-4 w-12 text-center">ลำดับ</th>
             <th className="py-3 px-4">ข้อมูลรถ</th>
             <th className="py-3 px-4">🛡️ ประกันภัยภาคสมัครใจ (PLMV)</th>
             <th className="py-3 px-4">📜 พ.ร.บ. (PLMC)</th>
@@ -57,7 +62,8 @@ export function PolicyTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-zinc-800 dark:text-zinc-200">
-          {records.map((rec) => {
+          {records.map((rec, idx) => {
+            const rowNumber = (page - 1) * pageSize + idx + 1
             const insBadge = getExpiryBadge(rec.insuranceStatus, rec.insuranceDaysLeft)
             const actBadge = getExpiryBadge(rec.actStatus, rec.actDaysLeft)
             const taxBadge = getExpiryBadge(rec.vehicleTaxStatus, rec.vehicleTaxDaysLeft)
@@ -102,6 +108,11 @@ export function PolicyTable({
                 key={rec.vinNo}
                 className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/50 transition-colors"
               >
+                {/* 0. Row Sequence Number */}
+                <td className="py-3 px-4 text-center font-mono text-zinc-400 dark:text-zinc-500 text-xs font-medium">
+                  {rowNumber}
+                </td>
+
                 {/* 1. Vehicle Info */}
                 <td className="py-3 px-4">
                   <Link

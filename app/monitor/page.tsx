@@ -278,6 +278,8 @@ function MonitorPageContent() {
         <PolicyTable
           records={records}
           loading={loading}
+          page={page}
+          pageSize={50}
           onOpenHistory={(vin, reg) => {
             setHistoryVin(vin)
             setHistoryRegisterNo(reg)
