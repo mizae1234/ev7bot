@@ -120,6 +120,9 @@ export async function GET(
           AND activeRep.IsActive = 1 
           AND activeRep.ReplacementReturnDate IS NULL
           AND am.IsActive = 1
+        ORDER BY 
+          CASE WHEN am.CarStatusCode NOT IN ('COMPLETE', 'GARAGE_COMPLETE') THEN 0 ELSE 1 END,
+          activeRep.ReplacementItemID DESC
       ) mainCarInfo
       WHERE (
         REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') LIKE @cleanIdentifier

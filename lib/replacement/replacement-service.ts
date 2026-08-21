@@ -51,6 +51,8 @@ export async function getActiveReplacements(
       m.ProblemTypeCode AS serviceType,
       r.ReplacementStartDate AS replacementStartDate,
       r.ReplacementReturnDate AS replacementReturnDate,
+      r.ReturnReason AS returnReason,
+      rs.DescriptionStatus AS returnReasonName,
       r.Remark AS remark,
       COALESCE(NULLIF(RTRIM(LTRIM(CONCAT(createUser.FirstName, ' ', createUser.LastName))), ''), createUser.UserName) AS createUserName,
       r.CreateDate AS createDate,
@@ -61,6 +63,7 @@ export async function getActiveReplacements(
     LEFT JOIN dbo.EV_InventoryItem mainCar ON m.InventoryItemID = mainCar.InventoryItemID
     LEFT JOIN dbo.EV_InventoryItem replCar ON r.VinNo = replCar.VinNo
     LEFT JOIN dbo.EV_MsSubStatus locSub ON COALESCE(r.Location, replCar.CurrentLocation) = locSub.StatusCode AND locSub.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_MsSubStatus rs ON r.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
     LEFT JOIN dbo.EV_User createUser ON r.CreateUserID = createUser.UserID
     LEFT JOIN dbo.EV_User updateUser ON r.UpdateUserID = updateUser.UserID
     WHERE r.IsActive = 1 AND (r.ReplacementReturnDate IS NULL OR r.ReplacementReturnDate >= CAST(GETDATE() AS DATE))
@@ -97,6 +100,8 @@ export async function getActiveReplacements(
       replacementReturnDate: row.replacementReturnDate ? new Date(row.replacementReturnDate as string).toISOString() : null,
       daysInUse,
       durationStatus: badge.status,
+      returnReason: (row.returnReason as string) || null,
+      returnReasonName: (row.returnReasonName as string) || (row.returnReason as string) || null,
       remark: (row.remark as string) || null,
       createUserName: (row.createUserName as string) || null,
       createDate: row.createDate ? new Date(row.createDate as string).toISOString() : null,

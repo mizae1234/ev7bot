@@ -82,6 +82,9 @@ export async function GET(req: NextRequest) {
           AND activeRep.IsActive = 1 
           AND activeRep.ReplacementReturnDate IS NULL
           AND am.IsActive = 1
+        ORDER BY 
+          CASE WHEN am.CarStatusCode NOT IN ('COMPLETE', 'GARAGE_COMPLETE') THEN 0 ELSE 1 END,
+          activeRep.ReplacementItemID DESC
       ) mainCarInfo
       WHERE m.IsActive = 1
         AND m.CarStatusCode IN ('WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE', 'STILL_WORK', 'READY_PICKUP_MAINTENANCE', 'COMPLETE')
@@ -153,6 +156,9 @@ export async function GET(req: NextRequest) {
           AND activeRep.IsActive = 1 
           AND activeRep.ReplacementReturnDate IS NULL
           AND am.IsActive = 1
+        ORDER BY 
+          CASE WHEN am.CarStatusCode NOT IN ('COMPLETE', 'GARAGE_COMPLETE') THEN 0 ELSE 1 END,
+          activeRep.ReplacementItemID DESC
       ) mainCarInfo
       WHERE i.Status = 'AVAILABLE' AND i.IsActive = 1
     `)

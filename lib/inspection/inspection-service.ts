@@ -299,7 +299,7 @@ export async function updateInspection(params: {
         .query(`
           SELECT i.VinNo, i.RegisterNo, i.ReturnItemID, i.Mileage, i.ReturnDate, i.Location,
                  v.Model, i.RentItemID, i.ContractNo, i.InspectionType, i.CarStatus, i.CarStatusType,
-                 i.ContractCancellationDate
+                 i.ContractCancellationDate, i.ReturnReason
           FROM dbo.EV_Inspection i
           LEFT JOIN dbo.EV_InventoryItem v ON i.VinNo = v.VinNo
           WHERE i.InspectionID = @inspectionId
@@ -338,6 +338,7 @@ export async function updateInspection(params: {
           const finalLocation = params.location || inspect.Location
           const finalMileage = resolvedMileage || params.mileage || inspect.Mileage
           const finalRentItemId = inspect.RentItemID
+          const finalReturnReason = params.returnReason || inspect.ReturnReason || null
 
           let targetRentItemId = finalRentItemId
           if (!targetRentItemId && returnItemId) {
@@ -387,15 +388,16 @@ export async function updateInspection(params: {
               .input('mileage', sql.Int, finalMileage || null)
               .input('parkLocation', sql.NVarChar, finalLocation || null)
               .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('returnReason', sql.NVarChar, finalReturnReason)
               .input('createUserID', sql.Int, params.ev7UserId)
               .query(`
                 INSERT INTO dbo.EV_ReturnItem (
                   RentItemID, VinNo, Model, RegisterNo, CustomerName, PhoneNo,
-                  Mileage, ParkLocation, ReturnDate, Status, IsActive, CreateDate, CreateUserID, IsSentToK2
+                  Mileage, ParkLocation, ReturnDate, [Group], Status, IsActive, CreateDate, CreateUserID, IsSentToK2
                 )
                 VALUES (
                   @rentItemId, @vinNo, @model, @registerNo, @customerName, @phoneNo,
-                  @mileage, @parkLocation, @returnDate, 'SUBMIT', 1, GETDATE(), @createUserID, 0
+                  @mileage, @parkLocation, @returnDate, @returnReason, 'SUBMIT', 1, GETDATE(), @createUserID, 0
                 );
                 SELECT SCOPE_IDENTITY() AS ReturnItemID;
               `)
@@ -415,12 +417,14 @@ export async function updateInspection(params: {
               .input('mileage', sql.Int, finalMileage || null)
               .input('parkLocation', sql.NVarChar, finalLocation || null)
               .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('returnReason', sql.NVarChar, finalReturnReason)
               .input('updateUserID', sql.Int, params.ev7UserId)
               .query(`
                 UPDATE dbo.EV_ReturnItem
                 SET Mileage = COALESCE(@mileage, Mileage),
                     ParkLocation = COALESCE(@parkLocation, ParkLocation),
                     ReturnDate = COALESCE(@returnDate, ReturnDate),
+                    [Group] = COALESCE(@returnReason, [Group]),
                     Status = 'SUBMIT',
                     UpdateDate = GETDATE(),
                     UpdateUserID = @updateUserID
@@ -525,18 +529,36 @@ export async function updateInspection(params: {
           if (activeVinNo) {
             const finalReturnDate = params.returnDate || inspect.ReturnDate
             const finalLocation = params.location || inspect.Location
-            // 1. Update EV_ReplacementItem (Set return date, IsActive = 0, audit fields)
+            const finalReturnReason = params.returnReason || inspect.ReturnReason || null
+            // 1. Update EV_ReplacementItem (Set return date, ReturnReason, IsActive = 0, audit fields)
             await transaction.request()
               .input('vinNo', sql.VarChar, activeVinNo)
               .input('returnDate', sql.Date, finalReturnDate || null)
+              .input('returnReason', sql.NVarChar, finalReturnReason)
               .input('updateUserID', sql.Int, params.ev7UserId)
               .query(`
-                UPDATE dbo.EV_ReplacementItem
-                SET ReplacementReturnDate = @returnDate,
-                    IsActive = 0,
-                    UpdateDate = GETDATE(),
-                    UpdateUserID = @updateUserID
-                WHERE VinNo = @vinNo AND IsActive = 1 AND ReplacementReturnDate IS NULL;
+                IF COL_LENGTH('dbo.EV_ReplacementItem', 'ReturnReason') IS NOT NULL
+                BEGIN
+                  EXEC sp_executesql 
+                    N'UPDATE dbo.EV_ReplacementItem 
+                      SET ReplacementReturnDate = @returnDate,
+                          ReturnReason = @returnReason,
+                          IsActive = 0,
+                          UpdateDate = GETDATE(),
+                          UpdateUserID = @updateUserID
+                      WHERE VinNo = @vinNo AND IsActive = 1 AND ReplacementReturnDate IS NULL;',
+                    N'@returnDate DATE, @returnReason NVARCHAR(50), @updateUserID INT, @vinNo VARCHAR(50)',
+                    @returnDate, @returnReason, @updateUserID, @vinNo;
+                END
+                ELSE
+                BEGIN
+                  UPDATE dbo.EV_ReplacementItem
+                  SET ReplacementReturnDate = @returnDate,
+                      IsActive = 0,
+                      UpdateDate = GETDATE(),
+                      UpdateUserID = @updateUserID
+                  WHERE VinNo = @vinNo AND IsActive = 1 AND ReplacementReturnDate IS NULL;
+                END
               `)
 
             // Get original vehicle status before update

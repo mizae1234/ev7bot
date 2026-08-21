@@ -27,6 +27,8 @@ export interface ReplacementActiveItem {
   replacementReturnDate: string | null
   daysInUse: number
   durationStatus: 'NORMAL' | 'WARNING' | 'CRITICAL' // <14d, 14-30d, >30d
+  returnReason?: string | null
+  returnReasonName?: string | null
   remark: string | null
   createUserName: string | null
   createDate: string | null
@@ -71,6 +73,8 @@ export interface ReplacementHistoryItem {
   replacementReturnDate: string | null
   daysUsed: number | null
   location: string | null
+  returnReason?: string | null
+  returnReasonName?: string | null
   remark: string | null
   isActive: boolean
   replacementStatus: string | null

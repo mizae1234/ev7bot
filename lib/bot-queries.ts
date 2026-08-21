@@ -447,14 +447,41 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       GROUP BY ReturnType
     `),
     returnReasonReq.query(`
+      WITH LatestInspection AS (
+        SELECT 
+          ReturnItemID,
+          VinNo,
+          ReturnReason,
+          ROW_NUMBER() OVER(PARTITION BY COALESCE(ReturnItemID, 0), VinNo ORDER BY InspectionDate DESC, InspectionID DESC) as rn
+        FROM dbo.EV_Inspection
+        WHERE IsActive = 1
+      ),
+      EffectiveReturns AS (
+        SELECT 
+          v.VinNo,
+          COALESCE(
+            NULLIF(v.ReturnReasonName, ''),
+            rs_insp.DescriptionStatus,
+            rs_insp.StatusName,
+            NULLIF(insp.ReturnReason, ''),
+            CASE 
+              WHEN v.RemarkForReturnCar LIKE '%Auto-return%' THEN 'เวียนคนขับใหม่ (Lineman)'
+              ELSE NULL 
+            END,
+            'ไม่ระบุเหตุผล'
+          ) AS Reason
+        FROM dbo.View_AccumarateReturnItem v
+        LEFT JOIN LatestInspection insp ON (v.ReturnItemID = insp.ReturnItemID OR (insp.ReturnItemID IS NULL AND v.VinNo = insp.VinNo)) AND insp.rn = 1
+        LEFT JOIN dbo.EV_MsSubStatus rs_insp ON insp.ReturnReason = rs_insp.StatusCode
+        WHERE v.ReturnIsActive = 1
+          AND v.ReturnDate >= @startDate AND v.ReturnDate <= @endDate
+      )
       SELECT 
-        ISNULL(ReturnReasonName, 'ไม่ระบุเหตุผล') AS Reason,
+        Reason,
         COUNT(*) AS TotalCount,
         COUNT(DISTINCT VinNo) AS UniqueVIN
-      FROM dbo.View_AccumarateReturnItem
-      WHERE ReturnIsActive = 1
-        AND ReturnDate >= @startDate AND ReturnDate <= @endDate
-      GROUP BY ReturnReasonName
+      FROM EffectiveReturns
+      GROUP BY Reason
       ORDER BY TotalCount DESC
     `),
     repairReq.query(`

@@ -766,13 +766,30 @@ export async function POST(req: NextRequest) {
           repUpdReq.input('loc', sql.NVarChar, replacementLocation || null)
           repUpdReq.input('userId', sql.Int, dbUserId)
           await repUpdReq.query(`
-            UPDATE dbo.EV_ReplacementItem
-            SET ReplacementReturnDate = COALESCE(@retDate, ReplacementReturnDate),
-                Location = COALESCE(@loc, Location),
-                IsActive = CASE WHEN @retDate IS NOT NULL THEN 0 ELSE IsActive END,
-                UpdateUserID = @userId,
-                UpdateDate = GETDATE()
-            WHERE ReplacementItemID = @repId
+            IF COL_LENGTH('dbo.EV_ReplacementItem', 'ReturnReason') IS NOT NULL
+            BEGIN
+              EXEC sp_executesql 
+                N'UPDATE dbo.EV_ReplacementItem
+                  SET ReplacementReturnDate = COALESCE(@retDate, ReplacementReturnDate),
+                      Location = COALESCE(@loc, Location),
+                      ReturnReason = COALESCE(ReturnReason, ''RETURN_REPLACEMENT_GET_MAIN''),
+                      IsActive = CASE WHEN @retDate IS NOT NULL THEN 0 ELSE IsActive END,
+                      UpdateUserID = @userId,
+                      UpdateDate = GETDATE()
+                  WHERE ReplacementItemID = @repId;',
+                N'@retDate DATE, @loc NVARCHAR(250), @userId INT, @repId BIGINT',
+                @retDate, @loc, @userId, @repId;
+            END
+            ELSE
+            BEGIN
+              UPDATE dbo.EV_ReplacementItem
+              SET ReplacementReturnDate = COALESCE(@retDate, ReplacementReturnDate),
+                  Location = COALESCE(@loc, Location),
+                  IsActive = CASE WHEN @retDate IS NOT NULL THEN 0 ELSE IsActive END,
+                  UpdateUserID = @userId,
+                  UpdateDate = GETDATE()
+              WHERE ReplacementItemID = @repId;
+            END
           `)
           console.log(`[Replacement Return Update] ReplacementItemID=${repId}: ReturnDate=${replacementReturnDate}, Location=${replacementLocation}`)
 
