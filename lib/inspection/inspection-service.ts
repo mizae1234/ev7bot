@@ -459,7 +459,7 @@ export async function updateInspection(params: {
             const vehicleResult = await transaction.request()
               .input('vinNo', sql.VarChar, activeVinNo)
               .query(`
-                SELECT InventoryItemID, Status, StatusType
+                SELECT InventoryItemID, Status, StatusType, CurrentLocation
                 FROM dbo.EV_InventoryItem
                 WHERE VinNo = @vinNo
               `)
@@ -480,6 +480,31 @@ export async function updateInspection(params: {
               `)
 
             if (vehicle) {
+              // Record location change log if location is updated
+              if (finalLocation && finalLocation !== vehicle.CurrentLocation) {
+                try {
+                  await transaction.request()
+                    .input('itemId', sql.Int, vehicle.InventoryItemID)
+                    .input('vin', sql.VarChar, activeVinNo)
+                    .input('oldLoc', sql.NVarChar, vehicle.CurrentLocation || null)
+                    .input('newLoc', sql.NVarChar, finalLocation)
+                    .input('action', sql.VarChar, 'INSPECTION_RETURN')
+                    .input('refType', sql.VarChar, 'INSPECTION')
+                    .input('refId', sql.Int, Number(params.inspectionId))
+                    .input('userId', sql.Int, params.ev7UserId || 1)
+                    .query(`
+                      INSERT INTO dbo.EV_VehicleLocationLog (
+                        InventoryItemID, VinNo, OldLocation, NewLocation, ActionCode, RefType, RefID, CreateDate, CreateUserID
+                      )
+                      VALUES (
+                        @itemId, @vin, @oldLoc, @newLoc, @action, @refType, @refId, GETDATE(), @userId
+                      )
+                    `)
+                } catch (locLogErr) {
+                  console.error('[LocationLog Error in Inspection Case A]', locLogErr)
+                }
+              }
+
               const oldStatusStr = `${vehicle.Status || 'NULL'}${vehicle.StatusType ? ` (${vehicle.StatusType})` : ''}`
               const noteDetail = `ระบบตรวจคืนรถ: เปลี่ยนสถานะรถจาก ${oldStatusStr} เป็น AVAILABLE (AVAILABLE_USE) (บันทึกอัตโนมัติจากการทำใบตรวจคืนรถ Inspection ID: ${params.inspectionId})`
               await transaction.request()
@@ -518,7 +543,7 @@ export async function updateInspection(params: {
             const vehicleResult = await transaction.request()
               .input('vinNo', sql.VarChar, activeVinNo)
               .query(`
-                SELECT InventoryItemID, Status, StatusType
+                SELECT InventoryItemID, Status, StatusType, CurrentLocation
                 FROM dbo.EV_InventoryItem
                 WHERE VinNo = @vinNo
               `)
@@ -540,6 +565,31 @@ export async function updateInspection(params: {
               `)
 
             if (vehicle) {
+              // Record location change log if location is updated
+              if (finalLocation && finalLocation !== vehicle.CurrentLocation) {
+                try {
+                  await transaction.request()
+                    .input('itemId', sql.Int, vehicle.InventoryItemID)
+                    .input('vin', sql.VarChar, activeVinNo)
+                    .input('oldLoc', sql.NVarChar, vehicle.CurrentLocation || null)
+                    .input('newLoc', sql.NVarChar, finalLocation)
+                    .input('action', sql.VarChar, 'INSPECTION_RETURN')
+                    .input('refType', sql.VarChar, 'INSPECTION')
+                    .input('refId', sql.Int, Number(params.inspectionId))
+                    .input('userId', sql.Int, params.ev7UserId || 1)
+                    .query(`
+                      INSERT INTO dbo.EV_VehicleLocationLog (
+                        InventoryItemID, VinNo, OldLocation, NewLocation, ActionCode, RefType, RefID, CreateDate, CreateUserID
+                      )
+                      VALUES (
+                        @itemId, @vin, @oldLoc, @newLoc, @action, @refType, @refId, GETDATE(), @userId
+                      )
+                    `)
+                } catch (locLogErr) {
+                  console.error('[LocationLog Error in Inspection Case B]', locLogErr)
+                }
+              }
+
               const oldStatusStr = `${vehicle.Status || 'NULL'}${vehicle.StatusType ? ` (${vehicle.StatusType})` : ''}`
               const noteDetail = `ระบบตรวจคืนรถ: เปลี่ยนสถานะรถจาก ${oldStatusStr} เป็น REPLACEMENT (REPLACEMENT_AVAILABLE) (บันทึกอัตโนมัติจากการทำใบตรวจคืนรถ Inspection ID: ${params.inspectionId})`
               await transaction.request()
