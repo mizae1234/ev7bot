@@ -691,6 +691,7 @@ export async function listInspections(filters: {
       i.Location AS location,
       sub.StatusName AS locationName,
       i.ReturnReason AS returnReason,
+      COALESCE(rs.DescriptionStatus, rs.StatusName, i.ReturnReason) AS returnReasonName,
       i.AssessmentResult AS assessmentResult,
       ${repairHeaderCol},
       i.CustomerName AS customerName,
@@ -719,6 +720,7 @@ export async function listInspections(filters: {
       ) AS damagedItemsJson
     FROM dbo.EV_Inspection i
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_MsSubStatus rs ON i.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
     LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
     LEFT JOIN dbo.EV_User uu ON i.UpdateUserID = uu.UserID
     WHERE ${conditions.join(' AND ')}
@@ -745,26 +747,33 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
     ? 'ResolveStatus AS resolveStatus, ResolveRemark AS resolveRemark, ResolveUserID AS resolveUserId, ResolveDate AS resolveDate'
     : 'CAST(NULL AS VARCHAR(30)) AS resolveStatus, CAST(NULL AS NVARCHAR(500)) AS resolveRemark, CAST(NULL AS INT) AS resolveUserId, CAST(NULL AS DATETIME) AS resolveDate'
   const repairHeaderCol = hasResolveCols
-    ? 'RepairStatus AS repairStatus, RepairRemark AS repairRemark'
+    ? 'i.RepairStatus AS repairStatus, i.RepairRemark AS repairRemark'
     : 'CAST(NULL AS VARCHAR(30)) AS repairStatus, CAST(NULL AS NVARCHAR(500)) AS repairRemark'
 
   const [headerRes, itemsRes, photosRes] = await Promise.all([
     pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
-      SELECT InspectionID AS inspectionId, VinNo AS vinNo, RegisterNo AS registerNo,
-             InspectionType AS inspectionType, ReturnItemID AS returnItemId,
-             InspectionSessionID AS inspectionSessionId, Mileage AS mileage,
-             InspectionDate AS inspectionDate, InspectorUserID AS inspectorUserID,
-             InspectorName AS inspectorName, Status AS status, Remark AS remark,
-             ReturnDate AS returnDate, Location AS location, RentItemID AS rentItemId, ContractNo AS contractNo,
-             ReturnReason AS returnReason, AssessmentResult AS assessmentResult,
+      SELECT i.InspectionID AS inspectionId, i.VinNo AS vinNo, i.RegisterNo AS registerNo,
+             inv.InventoryItemID AS inventoryItemId, inv.Model AS model, inv.Project AS project,
+             i.InspectionType AS inspectionType, i.ReturnItemID AS returnItemId,
+             i.InspectionSessionID AS inspectionSessionId, i.Mileage AS mileage,
+             i.InspectionDate AS inspectionDate, i.InspectorUserID AS inspectorUserID,
+             i.InspectorName AS inspectorName, i.Status AS status, i.Remark AS remark,
+             i.ReturnDate AS returnDate, i.Location AS location, sub.StatusName AS locationName,
+             i.RentItemID AS rentItemId, i.ContractNo AS contractNo,
+             i.ReturnReason AS returnReason,
+             COALESCE(rs.DescriptionStatus, rs.StatusName, i.ReturnReason) AS returnReasonName,
+             i.AssessmentResult AS assessmentResult,
              ${repairHeaderCol},
-             IsDistributed AS isDistributed, DistributionDate AS distributionDate,
-             DistributionUserID AS distributionUserID,
-             CustomerName AS customerName, CustomerContact AS customerContact,
-             ContractCancellationDate AS contractCancellationDate,
-             IsPendingChecklist AS isPendingChecklist
-      FROM dbo.EV_Inspection
-      WHERE InspectionID = @inspectionId AND IsActive = 1
+             i.IsDistributed AS isDistributed, i.DistributionDate AS distributionDate,
+             i.DistributionUserID AS distributionUserID,
+             i.CustomerName AS customerName, i.CustomerContact AS customerContact,
+             i.ContractCancellationDate AS contractCancellationDate,
+             i.IsPendingChecklist AS isPendingChecklist
+      FROM dbo.EV_Inspection i
+      LEFT JOIN dbo.EV_InventoryItem inv ON i.VinNo = inv.VinNo
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
+      LEFT JOIN dbo.EV_MsSubStatus rs ON i.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
+      WHERE i.InspectionID = @inspectionId AND i.IsActive = 1
     `),
     pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
       SELECT InspectionItemID AS inspectionItemId, Category AS category, ItemCode AS itemCode,

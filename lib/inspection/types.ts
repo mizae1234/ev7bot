@@ -90,6 +90,7 @@ export interface InspectionData {
   inspectionId?: number
   vinNo: string
   registerNo: string | null
+  inventoryItemId?: number | null
   inspectionType: InspectionType
   returnItemId: number | null
   inspectionSessionId: number | null
@@ -106,6 +107,7 @@ export interface InspectionData {
   rentItemId?: number | null
   contractNo?: string | null
   returnReason?: string | null
+  returnReasonName?: string | null
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
@@ -135,6 +137,7 @@ export interface InspectionListItem {
   location?: string | null
   locationName?: string
   returnReason?: string | null
+  returnReasonName?: string | null
   assessmentResult?: string | null
   repairStatus?: ItemResolveStatus | null
   repairRemark?: string | null

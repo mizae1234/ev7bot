@@ -13,6 +13,7 @@ import {
   BODY_CONDITION_OPTIONS,
 } from './constants'
 import ImageLightbox from './ImageLightbox'
+import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 
 interface InspectionDrawerProps {
   inspectionId: number
@@ -20,7 +21,7 @@ interface InspectionDrawerProps {
   onClose: () => void
 }
 
-type TabKey = 'info' | 'checklist' | 'photos'
+type TabKey = 'info' | 'checklist' | 'photos' | 'notes'
 
 export default function InspectionDrawer({ inspectionId, masterItems, onClose }: InspectionDrawerProps) {
   const [inspectionDetail, setInspectionDetail] = useState<InspectionData | null>(null)
@@ -165,7 +166,7 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
           ) : (
             <>
               {/* Tabs */}
-              <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1 gap-1">
+              <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1 gap-1 overflow-x-auto">
                 <TabButton active={activeTab === 'info'} onClick={() => setActiveTab('info')}>
                   ℹ️ ข้อมูลรับคืน & สรุปผล
                 </TabButton>
@@ -174,6 +175,9 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
                 </TabButton>
                 <TabButton active={activeTab === 'photos'} onClick={() => setActiveTab('photos')}>
                   📷 ภาพแนบ ({inspectionDetail.photos?.filter(p => p.category !== 'SIGNATURE').length || 0})
+                </TabButton>
+                <TabButton active={activeTab === 'notes'} onClick={() => setActiveTab('notes')}>
+                  💬 โน้ต/แชทติดตามรถ
                 </TabButton>
               </div>
 
@@ -188,6 +192,7 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
                     spacesCDN={SPACES_CDN}
                     onImageClick={setLightboxUrl}
                     onNavigateToChecklist={() => setActiveTab('checklist')}
+                    onNavigateToNotes={() => setActiveTab('notes')}
                     onRequestResolveChange={handleOpenResolveModal}
                     resolvingKey={resolvingKey}
                   />
@@ -211,6 +216,41 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
                     spacesCDN={SPACES_CDN}
                     onImageClick={setLightboxUrl}
                   />
+                )}
+
+                {/* NOTES & CHAT TAB */}
+                {activeTab === 'notes' && (
+                  <div className="space-y-4">
+                    {inspectionDetail.inventoryItemId ? (
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                        <div className="pb-3 mb-4 border-b border-slate-100 flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                              <span>💬</span> บันทึกโน้ต & แชทติดตามความคืบหน้ารถยนต์
+                            </h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              ทะเบียน: {inspectionDetail.registerNo || '-'} | เลขตัวถัง (VIN): {inspectionDetail.vinNo}
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            #INSPECTION-{inspectionId}
+                          </span>
+                        </div>
+                        <VehicleNotesSection
+                          inventoryItemId={inspectionDetail.inventoryItemId}
+                          registerNo={inspectionDetail.registerNo || ''}
+                          sourceProcess="INSPECTION"
+                          refDocNo={String(inspectionId)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="py-16 text-center text-xs text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2">
+                        <span className="text-2xl block">💬</span>
+                        <p className="font-semibold text-slate-600">ไม่พบรหัสสต็อกคลัง (Inventory Item) ของรถคันนี้</p>
+                        <p className="text-[11px] text-slate-400">ระบบจำเป็นต้องมีข้อมูลสต็อกคลังเพื่อผูกประวัติแชทและโน้ตติดตามรถยนต์</p>
+                      </div>
+                    )}
+                  </div>
                 )}
 
               </div>
@@ -326,6 +366,7 @@ function InfoTab({
   spacesCDN,
   onImageClick,
   onNavigateToChecklist,
+  onNavigateToNotes,
   onRequestResolveChange,
   resolvingKey,
 }: {
@@ -334,6 +375,7 @@ function InfoTab({
   spacesCDN: string
   onImageClick: (url: string) => void
   onNavigateToChecklist?: () => void
+  onNavigateToNotes?: () => void
   onRequestResolveChange?: (item: IssueItem, status: ItemResolveStatus) => void
   resolvingKey?: string | null
 }) {
@@ -741,7 +783,7 @@ function InfoTab({
           })()}
           <div className="space-y-0.5 col-span-2">
             <span className="text-[10px] text-slate-400">เหตุผลในการคืนรถ</span>
-            <p className="font-medium text-slate-800">{getReasonLabel(detail.returnReason)}</p>
+            <p className="font-medium text-slate-800">{detail.returnReasonName || getReasonLabel(detail.returnReason)}</p>
           </div>
           <div className="space-y-0.5 col-span-2 border-t border-slate-200 pt-2 mt-1">
             <span className="text-[10px] text-slate-400">เจ้าหน้าที่ผู้ตรวจเช็ค</span>
@@ -778,6 +820,31 @@ function InfoTab({
             </div>
           )}
         </div>
+      </div>
+
+      {/* ─── 6. Vehicle Notes & Chat Quick Jump Card ─── */}
+      <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-base shadow-xs shrink-0">
+            💬
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-xs font-bold text-indigo-950 truncate">โน้ต & แชทติดตามความคืบหน้ารถยนต์</h4>
+            <p className="text-[10px] text-indigo-700 truncate mt-0.5">
+              ดูประวัติการติดตาม, แท็กพนักงาน, แนบภาพเอกสาร และบันทึกโน้ตของรถคันนี้
+            </p>
+          </div>
+        </div>
+        {onNavigateToNotes && (
+          <button
+            type="button"
+            onClick={onNavigateToNotes}
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shrink-0 shadow-xs active:scale-95 flex items-center gap-1 cursor-pointer"
+          >
+            <span>เปิดหน้าแชท</span>
+            <span>➔</span>
+          </button>
+        )}
       </div>
 
     </div>

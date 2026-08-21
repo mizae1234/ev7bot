@@ -135,7 +135,7 @@ export default function ReturnsMonitorPage() {
       item.isPendingChecklist ? 'ใช่' : '-',
       item.inspectorName || '-',
       item.mileage != null ? item.mileage : '-',
-      getReasonLabel(item.returnReason),
+      item.returnReasonName || getReasonLabel(item.returnReason),
       getThaiDateTime(item.createDate),
       item.createdByName || '-',
       getThaiDateTime(item.updateDate),

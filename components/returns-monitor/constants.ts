@@ -44,9 +44,24 @@ export function getAssessmentLabel(code: string | null | undefined): string {
 }
 
 // ─── Return Reason Labels ────────────────────────────
-const RETURN_REASON_MAP: Record<string, string> = {
-  RETURN_CONTRACT_END: 'คืนรถครบสัญญาเช่า',
+export const RETURN_REASON_MAP: Record<string, string> = {
+  RETURN_INCOME_INSUFFICIENT: 'รายได้ไม่เพียงพอ',
+  RETURN_CONTRACT_CANCEL: 'ลูกค้าขอยกเลิกสัญญา',
+  CONTRACT_CANCEL: 'ยกเลิกสัญญา',
+  RETURN_LOW_JOB_OR_APP_ISSUE: 'งานวิ่งน้อย หรือมีปัญหาจาก Taxi App',
+  RETURN_RENT_UNAFFORDABLE: 'ไม่สามารถชำระค่าเช่าได้',
+  RETURN_PERSONAL_ISSUE: 'ปัญหาส่วนตัว',
+  RETURN_RELOCATED: 'กลับต่างจังหวัด',
+  RETURN_CONTACT_LOST: 'ไม่สามารถติดต่อลูกค้าได้',
+  RETURN_JOB_CHANGE: 'เปลี่ยนงาน',
+  RETURN_SWITCH_PROVIDER: 'ย้ายค่าย / เปลี่ยนบริษัท',
   RETURN_REPOSSESSED: 'ยึดคืนรถยนต์เนื่องจากค้างค่างวด',
+  RETURN_PRODUCT_ISSUE: 'ปัญหาด้านผลิตภัณฑ์ / ตัวรถ',
+  RETURN_CHANGE_VEHICLE: 'ลูกค้าขอเปลี่ยนคัน',
+  RETURN_REPLACEMENT_CANCEL: 'คืนรถทดแทนเนื่องจากยกเลิกสัญญา',
+  RETURN_REPLACEMENT_GET_MAIN: 'คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ',
+  RETURN_CONTRACK_COMPLETED: 'ครบสัญญาเช่า',
+  RETURN_CONTRACT_END: 'ครบสัญญาเช่า',
   RETURN_ACCIDENT: 'คืนเนื่องจากอุบัติเหตุหนัก/ทุนประกันชำรุด',
   RETURN_VOLUNTARY: 'ยกเลิกสัญญาก่อนกำหนด/คืนสมัครใจ',
   RETURN_UPGRADE: 'คืนเพื่อเปลี่ยนรุ่นรถยนต์ (Upgrade)',
