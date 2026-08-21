@@ -453,3 +453,94 @@ export function createEmptyItemsFromMaster(masterItems: MasterItemDef[]): import
     expiryDate: null,
   }))
 }
+
+export interface FormattedDamagedItem {
+  category: string
+  categoryLabel: string
+  categoryIcon: string
+  itemCode: string
+  label: string
+  value: string
+  valueLabel: string
+  detail?: string | null
+}
+
+export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | undefined): FormattedDamagedItem[] {
+  if (!rawItemsJsonOrArray) return []
+  let items: any[] = []
+  if (typeof rawItemsJsonOrArray === 'string') {
+    try {
+      items = JSON.parse(rawItemsJsonOrArray)
+    } catch {
+      return []
+    }
+  } else if (Array.isArray(rawItemsJsonOrArray)) {
+    items = rawItemsJsonOrArray
+  }
+  if (!Array.isArray(items)) return []
+
+  const result: FormattedDamagedItem[] = []
+
+  for (const it of items) {
+    const category = it.category || it.Category
+    const itemCode = it.itemCode || it.ItemCode
+    const value = it.value || it.Value
+    const detail = it.detail || it.Detail || null
+
+    if (!category || !itemCode || !value) continue
+
+    const section = CHECKLIST_SECTIONS.find(s => s.category === category)
+    const itemDef = section?.items.find(i => i.itemCode === itemCode)
+
+    let isDamaged = false
+    let valueLabel = value
+
+    if (category === 'ACCIDENT') {
+      if (value === 'YES') {
+        isDamaged = true
+        valueLabel = 'พบร่องรอย/ประวัติอุบัติเหตุ'
+      }
+    } else if (category === 'CAR_PHOTOS') {
+      // Photos only
+    } else if (itemDef?.inputType === 'three_way') {
+      if (value === 'DENT') {
+        isDamaged = true
+        valueLabel = 'บุบ-แตก / เสียหาย'
+      } else if (value === 'SCRATCH') {
+        isDamaged = true
+        valueLabel = 'มีรอยขีดข่วน / ชำรุด'
+      }
+    } else if (itemDef?.inputType === 'select') {
+      if (value === 'NONE') {
+        isDamaged = true
+        valueLabel = 'ไม่มีป้ายทะเบียนรถ'
+      } else if (value === 'FRONT_ONLY') {
+        isDamaged = true
+        valueLabel = 'มีเฉพาะป้ายหน้า (ป้ายหลังหาย)'
+      } else if (value === 'BACK_ONLY') {
+        isDamaged = true
+        valueLabel = 'มีเฉพาะป้ายหลัง (ป้ายหน้าหาย)'
+      }
+    } else if (itemDef?.inputType === 'boolean' || itemDef?.inputType === 'boolean_expiry') {
+      if (value === 'NO') {
+        isDamaged = true
+        valueLabel = 'ไม่มี / ชำรุดไม่ปกติ'
+      }
+    }
+
+    if (isDamaged) {
+      result.push({
+        category,
+        categoryLabel: section?.label || category,
+        categoryIcon: section?.icon || '🔍',
+        itemCode,
+        label: itemDef?.label || itemCode,
+        value,
+        valueLabel,
+        detail,
+      })
+    }
+  }
+
+  return result
+}

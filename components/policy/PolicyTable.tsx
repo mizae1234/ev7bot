@@ -57,6 +57,7 @@ export function PolicyTable({
             <th className="py-3 px-4 whitespace-nowrap">🗓️ วันที่จดทะเบียน</th>
             <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
             <th className="py-3 px-4">⏱️ ภาษีมิเตอร์แท็กซี่</th>
+            <th className="py-3 px-4 min-w-[210px]">🔍 ตรวจรับคืนล่าสุด</th>
             <th className="py-3 px-4">สถานะรถ / สถานที่</th>
             {onOpenEdit && <th className="py-3 px-4 text-center">จัดการ</th>}
           </tr>
@@ -269,7 +270,60 @@ export function PolicyTable({
                   )}
                 </td>
 
-                {/* 6. Vehicle Status & Location */}
+                {/* 6. Latest Return Inspection & Damaged Points */}
+                <td className="py-3 px-4 min-w-[210px]">
+                  {rec.latestInspectionId ? (
+                    <div className="space-y-1.5">
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {rec.latestIsPendingChecklist ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                            🔄 รอตรวจเช็คลิสต์
+                          </span>
+                        ) : rec.latestDamageCount && rec.latestDamageCount > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            ⚠️ พบจุดชำรุด ({rec.latestDamageCount} จุด)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            ✅ สภาพปกติ
+                          </span>
+                        )}
+                        {rec.latestInspectionDate && (
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                            {formatThaiDate(rec.latestInspectionDate)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Damaged items pills */}
+                      {rec.latestDamagedItems && rec.latestDamagedItems.length > 0 ? (
+                        <div className="bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-800/60 rounded-xl p-2 space-y-1">
+                          <p className="text-[10px] font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1">
+                            <span>🛠️</span> จุดที่พบความเสียหาย ({rec.latestDamagedItems.length}):
+                          </p>
+                          <div className="flex flex-wrap gap-1 max-w-[280px]">
+                            {rec.latestDamagedItems.map((d, dIdx) => (
+                              <span
+                                key={dIdx}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-rose-200 dark:border-rose-800 text-[10px] text-zinc-800 dark:text-zinc-200 font-medium shadow-2xs"
+                                title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.detail ? ` (${d.detail})` : ''}`}
+                              >
+                                <span className="text-[9px]">{d.categoryIcon}</span>
+                                <span className="font-semibold">{d.label}</span>
+                                <span className="text-rose-600 dark:text-rose-400 font-bold">({d.valueLabel})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400 dark:text-zinc-500 italic text-[11px]">-</span>
+                  )}
+                </td>
+
+                {/* 7. Vehicle Status & Location */}
                 <td className="py-3 px-4">
                   <div className="space-y-1">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusStyle}`}>

@@ -91,5 +91,19 @@ export function getThaiDateTime(dateStr: string | null | undefined): string {
   }
 }
 
+// ─── Name Masking (Data Privacy Rule: show only first name) ───
+export function maskName(name?: string | null): string {
+  if (!name) return '-'
+  const trimmed = name.trim()
+  if (!trimmed) return '-'
+  const parts = trimmed.split(/\s+/)
+  if (parts.length <= 1) return trimmed
+  if (parts[0] === 'คุณ' && parts.length > 1) {
+    return `คุณ ${parts[1]}`
+  }
+  return parts[0]
+}
+
 // ─── Pagination Defaults ─────────────────────────────
 export const PAGE_SIZE = 25
+

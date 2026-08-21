@@ -13,6 +13,7 @@ import type {
   AuditSessionData,
   InspectionStatus,
 } from './types'
+import { parseDamagedItems } from './checklist-config'
 
 // =====================================================
 // User Resolution: LINE userId → EV_User
@@ -668,7 +669,21 @@ export async function listInspections(filters: {
       ISNULL(NULLIF(cu.FirstName + CASE WHEN cu.LastName IS NOT NULL AND cu.LastName != '' THEN ' ' + LEFT(cu.LastName, 1) + '.' ELSE '' END, ''), cu.UserName) AS createdByName,
       ISNULL(NULLIF(uu.FirstName + CASE WHEN uu.LastName IS NOT NULL AND uu.LastName != '' THEN ' ' + LEFT(uu.LastName, 1) + '.' ELSE '' END, ''), uu.UserName) AS updatedByName,
       (SELECT COUNT(*) FROM dbo.EV_InspectionItem WHERE InspectionID = i.InspectionID AND (Value IS NOT NULL OR NumericValue IS NOT NULL)) AS itemCount,
-      (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount
+      (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount,
+      (
+        SELECT 
+          it.Category AS category,
+          it.ItemCode AS itemCode,
+          it.Value AS [value],
+          it.Detail AS detail
+        FROM dbo.EV_InspectionItem it
+        WHERE it.InspectionID = i.InspectionID
+          AND (
+            (it.Category = 'ACCIDENT' AND it.Value = 'YES')
+            OR (it.Category <> 'CAR_PHOTOS' AND it.Category <> 'ACCIDENT' AND it.Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+          )
+        FOR JSON PATH
+      ) AS damagedItemsJson
     FROM dbo.EV_Inspection i
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
     LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
@@ -677,7 +692,14 @@ export async function listInspections(filters: {
     ORDER BY i.CreateDate DESC
   `)
 
-  return result.recordset
+  return result.recordset.map((row: any) => {
+    const damagedItems = parseDamagedItems(row.damagedItemsJson)
+    return {
+      ...row,
+      damagedCount: damagedItems.length,
+      damagedItems,
+    }
+  })
 }
 
 /** ดึง Inspection detail เต็ม */

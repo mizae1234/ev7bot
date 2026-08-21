@@ -70,6 +70,24 @@ export interface PolicyVehicleRecord {
   customerName?: string | null
   phoneNo?: string | null
 
+  // Latest Return Inspection (การตรวจรับคืนรถล่าสุด)
+  latestInspectionId?: number | null
+  latestInspectionDate?: string | null
+  latestAssessmentResult?: string | null // 'NORMAL' | 'NEED_REPAIR' | null
+  latestIsPendingChecklist?: boolean | null
+  latestDamageCount?: number
+  latestDamagedItems?: Array<{
+    category: string
+    categoryLabel: string
+    categoryIcon: string
+    itemCode: string
+    label: string
+    value: string
+    valueLabel: string
+    detail?: string | null
+  }>
+  latestDamagedSummary?: string | null
+
   updatedAt?: string | null
 }
 

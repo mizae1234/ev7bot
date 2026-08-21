@@ -7,6 +7,7 @@ import {
   PolicyLogItem
 } from './policy-types'
 import { DEFAULT_INSURANCE_TYPES, computeExpiryStatus } from './policy-constants'
+import { parseDamagedItems } from '@/lib/inspection/checklist-config'
 
 /**
  * 1. Fetch Master Insurance Types from dbo.EV_MsInsuranceType
@@ -263,6 +264,13 @@ export async function getPolicyList(params: {
         CONVERT(VARCHAR(10), p.MeterTaxEndDate, 120) AS meterTaxEndDate,
         p.MeterTaxFilePath AS meterTaxFilePath,
 
+        -- Latest Return Inspection
+        insp.latestInspectionId,
+        insp.latestInspectionDate,
+        insp.latestAssessmentResult,
+        insp.latestIsPendingChecklist,
+        insp.latestDamagedItemsJson,
+
         CONVERT(VARCHAR(19), p.UpdateDate, 120) AS updatedAt
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_Policy p ON i.VinNo = p.VinNo AND p.IsActive = 1
@@ -270,6 +278,32 @@ export async function getPolicyList(params: {
       LEFT JOIN dbo.EV_MsSubStatus sub_st ON i.StatusType = sub_st.StatusCode AND sub_st.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus sub_s ON i.Status = sub_s.StatusCode AND sub_s.Type = 'STATUS'
       LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+      OUTER APPLY (
+        SELECT TOP 1 
+          ins.InspectionID AS latestInspectionId,
+          CONVERT(VARCHAR(10), ins.InspectionDate, 120) AS latestInspectionDate,
+          ins.AssessmentResult AS latestAssessmentResult,
+          ins.IsPendingChecklist AS latestIsPendingChecklist,
+          (
+            SELECT 
+              it.Category AS category,
+              it.ItemCode AS itemCode,
+              it.Value AS [value],
+              it.Detail AS detail
+            FROM dbo.EV_InspectionItem it
+            WHERE it.InspectionID = ins.InspectionID
+              AND (
+                (it.Category = 'ACCIDENT' AND it.Value = 'YES')
+                OR (it.Category <> 'CAR_PHOTOS' AND it.Category <> 'ACCIDENT' AND it.Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+              )
+            FOR JSON PATH
+          ) AS latestDamagedItemsJson
+        FROM dbo.EV_Inspection ins
+        WHERE ins.VinNo = i.VinNo 
+          AND ins.InspectionType = 'RETURN' 
+          AND ins.IsActive = 1
+        ORDER BY ins.InspectionDate DESC, ins.InspectionID DESC
+      ) insp
       ${whereClause}
     )
     SELECT * FROM VehicleData
@@ -340,6 +374,9 @@ export async function getPolicyList(params: {
     if (isMissingAll) totalMissingAll++
     if (isMissingAny) totalMissingAny++
 
+    const damagedItems = parseDamagedItems(row.latestDamagedItemsJson)
+    const damagedSummary = damagedItems.map(d => `${d.label} (${d.valueLabel})`).join(', ')
+
     return {
       ...row,
       insuranceStatus: ins.status,
@@ -349,7 +386,14 @@ export async function getPolicyList(params: {
       vehicleTaxStatus: tax.status,
       vehicleTaxDaysLeft: tax.daysLeft,
       meterTaxStatus: meter.status,
-      meterTaxDaysLeft: meter.daysLeft
+      meterTaxDaysLeft: meter.daysLeft,
+      latestInspectionId: row.latestInspectionId ? Number(row.latestInspectionId) : null,
+      latestInspectionDate: row.latestInspectionDate || null,
+      latestAssessmentResult: row.latestAssessmentResult || null,
+      latestIsPendingChecklist: row.latestIsPendingChecklist === 1 || row.latestIsPendingChecklist === true,
+      latestDamageCount: damagedItems.length,
+      latestDamagedItems: damagedItems,
+      latestDamagedSummary: damagedSummary || null,
     }
   })
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import type { InspectionListItem } from '@/lib/inspection/types'
-import { getThaiDate, getAssessmentLabel, PAGE_SIZE } from './constants'
+import { getThaiDate, getAssessmentLabel, maskName, PAGE_SIZE } from './constants'
 
 interface InspectionTableProps {
   inspections: InspectionListItem[]
@@ -72,7 +72,7 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
 
                     {/* Customer */}
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-800">{item.customerName || '-'}</p>
+                      <p className="font-medium text-slate-800">{maskName(item.customerName)}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">{item.customerContact || '-'}</p>
                     </td>
 
@@ -97,31 +97,56 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
                       </span>
                     </td>
 
-                    {/* Assessment Badge */}
-                    <td className="px-5 py-4 text-center">
+                    {/* Assessment Badge & Damaged Points */}
+                    <td className="px-5 py-4 min-w-[200px]">
                       {item.isPendingChecklist ? (
                         <span className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-violet-50 text-violet-600 border border-violet-200">
                           🔄 รอตรวจภายหลัง
                         </span>
                       ) : (
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
-                          assessmentLabel === 'ปกติ'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : assessmentLabel === 'ต้องส่งเข้าซ่อม'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}>
-                          <span>
-                            {assessmentLabel === 'ปกติ' ? '✅' : assessmentLabel === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
+                        <div className="space-y-1.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                            assessmentLabel === 'ปกติ'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : assessmentLabel === 'ต้องส่งเข้าซ่อม'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            <span>
+                              {assessmentLabel === 'ปกติ' ? '✅' : assessmentLabel === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
+                            </span>
+                            {assessmentLabel}
+                            {item.damagedCount && item.damagedCount > 0 ? ` (${item.damagedCount} จุด)` : ''}
                           </span>
-                          {assessmentLabel}
-                        </span>
+
+                          {/* Damaged points breakdown pills */}
+                          {item.damagedItems && item.damagedItems.length > 0 && (
+                            <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-2 space-y-1">
+                              <p className="text-[9px] font-bold text-rose-800 flex items-center gap-1">
+                                <span>🛠️</span> จุดที่พบความเสียหาย:
+                              </p>
+                              <div className="flex flex-wrap gap-1 max-w-[260px]">
+                                {item.damagedItems.map((d, dIdx) => (
+                                  <span
+                                    key={dIdx}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-rose-200 text-[9px] text-slate-800 font-medium shadow-2xs"
+                                    title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.detail ? ` (${d.detail})` : ''}`}
+                                  >
+                                    <span>{d.categoryIcon}</span>
+                                    <span className="font-semibold">{d.label}</span>
+                                    <span className="text-rose-600 font-bold">({d.valueLabel})</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
 
                     {/* Inspector */}
                     <td className="px-5 py-4 font-medium text-slate-600">
-                      {item.inspectorName || '-'}
+                      {maskName(item.inspectorName)}
                     </td>
 
                     {/* Mileage */}

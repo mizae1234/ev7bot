@@ -133,6 +133,17 @@ export interface InspectionListItem {
   isPendingChecklist?: boolean | null
   createdByName?: string | null
   updatedByName?: string | null
+  damagedCount?: number
+  damagedItems?: Array<{
+    category: string
+    categoryLabel: string
+    categoryIcon: string
+    itemCode: string
+    label: string
+    value: string
+    valueLabel: string
+    detail?: string | null
+  }>
 }
 
 /** Audit Session */

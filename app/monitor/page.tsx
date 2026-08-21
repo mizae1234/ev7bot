@@ -178,7 +178,10 @@ function MonitorPageContent() {
         'วันหมดอายุภาษีรถ': formatThaiDate(r.vehicleTaxEndDate),
         'สถานะภาษีรถ': r.vehicleTaxDaysLeft !== null ? (r.vehicleTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.vehicleTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
         'วันหมดอายุภาษีมิเตอร์': formatThaiDate(r.meterTaxEndDate),
-        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล'
+        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
+        'ผลตรวจรับคืนล่าสุด': r.latestAssessmentResult === 'NORMAL' ? 'ปกติ' : r.latestAssessmentResult === 'NEED_REPAIR' ? `ต้องส่งซ่อม (${r.latestDamageCount || 0} จุด)` : r.latestIsPendingChecklist ? 'รอตรวจเช็คลิสต์' : '-',
+        'วันที่ตรวจคืนล่าสุด': r.latestInspectionDate ? formatThaiDate(r.latestInspectionDate) : '-',
+        'รายการความเสียหายที่ตรวจพบ': r.latestDamagedSummary || (r.latestAssessmentResult === 'NORMAL' ? 'ไม่พบจุดเสียหาย' : '-')
       }))
 
       const ws = XLSX.utils.json_to_sheet(exportRows)
