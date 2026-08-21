@@ -72,19 +72,51 @@ export default function ReturnsMonitorPage() {
     fetchData()
   }, [fetchData])
 
-  // Filtered Inspections — client-side search + assessment filter
+  // Filtered Inspections — client-side search (flexible plate matching) + assessment filter
   const filteredInspections = useMemo(() => {
-    return inspections.filter(item => {
-      const matchSearch =
-        (item.registerNo || '').toLowerCase().includes(search.toLowerCase()) ||
-        (item.vinNo || '').toLowerCase().includes(search.toLowerCase()) ||
-        (item.customerName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (item.inspectorName || '').toLowerCase().includes(search.toLowerCase())
+    const rawSearch = search.trim().toLowerCase()
+    const cleanSearch = search.replace(/[\s\-_]/g, '').toLowerCase()
 
+    return inspections.filter(item => {
       const assessmentLabel = getAssessmentLabel(item.assessmentResult)
       const matchAssessment = !selectedAssessment || assessmentLabel === selectedAssessment
+      if (!matchAssessment) return false
 
-      return matchSearch && matchAssessment
+      if (!rawSearch) return true
+
+      const regRaw = (item.registerNo || '').toLowerCase()
+      const regClean = (item.registerNo || '').replace(/[\s\-_]/g, '').toLowerCase()
+
+      const vinRaw = (item.vinNo || '').toLowerCase()
+      const vinClean = (item.vinNo || '').replace(/[\s\-_]/g, '').toLowerCase()
+
+      const custRaw = (item.customerName || '').toLowerCase()
+      const custClean = (item.customerName || '').replace(/[\s\-_]/g, '').toLowerCase()
+
+      const inspRaw = (item.inspectorName || '').toLowerCase()
+      const inspClean = (item.inspectorName || '').replace(/[\s\-_]/g, '').toLowerCase()
+
+      const reasonRaw = (item.returnReasonName || item.returnReason || '').toLowerCase()
+      const reasonClean = reasonRaw.replace(/[\s\-_]/g, '')
+
+      const locRaw = (item.locationName || item.location || '').toLowerCase()
+      const locClean = locRaw.replace(/[\s\-_]/g, '')
+
+      const matchSearch =
+        regRaw.includes(rawSearch) ||
+        regClean.includes(cleanSearch) ||
+        vinRaw.includes(rawSearch) ||
+        vinClean.includes(cleanSearch) ||
+        custRaw.includes(rawSearch) ||
+        custClean.includes(cleanSearch) ||
+        inspRaw.includes(rawSearch) ||
+        inspClean.includes(cleanSearch) ||
+        reasonRaw.includes(rawSearch) ||
+        reasonClean.includes(cleanSearch) ||
+        locRaw.includes(rawSearch) ||
+        locClean.includes(cleanSearch)
+
+      return matchSearch
     })
   }, [inspections, search, selectedAssessment])
 

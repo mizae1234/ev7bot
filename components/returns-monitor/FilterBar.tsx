@@ -49,7 +49,7 @@ export default function FilterBar({
           <label className="text-[9px] font-bold text-slate-500">คำค้นหา</label>
           <input
             type="text"
-            placeholder="ทะเบียน, VIN, ลูกค้า, ผู้ตรวจ..."
+            placeholder="ทะเบียน (เช่น ทอ4981, ทอ-4981), VIN, ลูกค้า..."
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
