@@ -102,8 +102,8 @@ const quickReplyItems = {
       type: 'action',
       action: {
         type: 'message',
-        label: '📅 สรุปส่งมอบประจำเดือน',
-        text: 'สรุปส่งมอบประจำเดือน'
+        label: '📅 สรุปประจำเดือน',
+        text: 'สรุปประจำเดือน'
       }
     },
     {

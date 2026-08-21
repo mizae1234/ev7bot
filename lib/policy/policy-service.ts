@@ -8,6 +8,7 @@ import {
 } from './policy-types'
 import { DEFAULT_INSURANCE_TYPES, computeExpiryStatus } from './policy-constants'
 import { parseDamagedItems } from '@/lib/inspection/checklist-config'
+import { checkResolveColumnsExist } from '@/lib/inspection/inspection-service'
 
 /**
  * 1. Fetch Master Insurance Types from dbo.EV_MsInsuranceType
@@ -296,6 +297,14 @@ export async function getPolicyList(params: {
     whereClause += ' AND (p.InsuranceType = @insType OR (p.ActPolicyNo IS NOT NULL AND @insType = \'DAC\'))'
   }
 
+  const hasResolveCols = await checkResolveColumnsExist(pool)
+  const resolveItemCols = hasResolveCols
+    ? 'it.ResolveStatus AS resolveStatus, it.ResolveRemark AS resolveRemark, it.ResolveDate AS resolveDate'
+    : 'CAST(NULL AS VARCHAR(30)) AS resolveStatus, CAST(NULL AS NVARCHAR(500)) AS resolveRemark, CAST(NULL AS DATETIME) AS resolveDate'
+  const repairHeaderCol = hasResolveCols
+    ? 'ins.RepairStatus AS latestRepairStatus'
+    : 'CAST(NULL AS VARCHAR(30)) AS latestRepairStatus'
+
   // Base Query joining EV_InventoryItem with EV_Policy
   const query = `
     WITH VehicleData AS (
@@ -348,6 +357,7 @@ export async function getPolicyList(params: {
         insp.latestInspectionId,
         insp.latestInspectionDate,
         insp.latestAssessmentResult,
+        insp.latestRepairStatus,
         insp.latestIsPendingChecklist,
         insp.latestDamagedItemsJson,
 
@@ -363,13 +373,16 @@ export async function getPolicyList(params: {
           ins.InspectionID AS latestInspectionId,
           CONVERT(VARCHAR(10), ins.InspectionDate, 120) AS latestInspectionDate,
           ins.AssessmentResult AS latestAssessmentResult,
+          ${repairHeaderCol},
           ins.IsPendingChecklist AS latestIsPendingChecklist,
           (
             SELECT 
+              it.InspectionItemID AS inspectionItemId,
               it.Category AS category,
               it.ItemCode AS itemCode,
               it.Value AS [value],
-              it.Detail AS detail
+              it.Detail AS detail,
+              ${resolveItemCols}
             FROM dbo.EV_InspectionItem it
             WHERE it.InspectionID = ins.InspectionID
               AND (
@@ -455,7 +468,13 @@ export async function getPolicyList(params: {
     if (isMissingAny) totalMissingAny++
 
     const damagedItems = parseDamagedItems(row.latestDamagedItemsJson)
+    const activeItems = damagedItems.filter(d => d.resolveStatus === 'PENDING' || d.resolveStatus === 'IN_PROGRESS')
     const damagedSummary = damagedItems.map(d => `${d.label} (${d.valueLabel})`).join(', ')
+
+    let assessmentResult = row.latestAssessmentResult || null
+    if (damagedItems.length > 0 && activeItems.length === 0) {
+      assessmentResult = 'RESOLVED'
+    }
 
     return {
       ...row,
@@ -469,9 +488,11 @@ export async function getPolicyList(params: {
       meterTaxDaysLeft: meter.daysLeft,
       latestInspectionId: row.latestInspectionId ? Number(row.latestInspectionId) : null,
       latestInspectionDate: row.latestInspectionDate || null,
-      latestAssessmentResult: row.latestAssessmentResult || null,
+      latestAssessmentResult: assessmentResult,
+      latestRepairStatus: row.latestRepairStatus || (damagedItems.length > 0 && activeItems.length === 0 ? 'RESOLVED' : null),
       latestIsPendingChecklist: row.latestIsPendingChecklist === 1 || row.latestIsPendingChecklist === true,
       latestDamageCount: damagedItems.length,
+      activeDamageCount: activeItems.length,
       latestDamagedItems: damagedItems,
       latestDamagedSummary: damagedSummary || null,
     }

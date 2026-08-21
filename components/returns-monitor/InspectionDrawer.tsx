@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import type { InspectionData, MasterItemDef, InspectionPhotoData } from '@/lib/inspection/types'
-import { buildDynamicSections, CHECKLIST_SECTIONS } from '@/lib/inspection/checklist-config'
+import { buildDynamicSections, CHECKLIST_SECTIONS, RESOLVE_STATUS_CONFIG, type ItemResolveStatus } from '@/lib/inspection/checklist-config'
 import {
   getSpacesCDN,
   getThaiDate,
@@ -27,8 +27,22 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('info')
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null)
+  const [resolveModalData, setResolveModalData] = useState<{
+    item: IssueItem
+    targetStatus: ItemResolveStatus
+    initialRemark: string
+  } | null>(null)
+  const [isSavingResolution, setIsSavingResolution] = useState(false)
 
   const SPACES_CDN = getSpacesCDN()
+
+  // Auto-dismiss toast after 3.5s
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3500)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // Fetch detail
   useEffect(() => {
@@ -41,20 +55,83 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
         setInspectionDetail(data.inspection)
         setActiveTab('info')
       } catch (err: any) {
-        alert(err.message || 'เกิดข้อผิดพลาด')
-        onClose()
+        setToast({ type: 'error', message: err.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล' })
       } finally {
         setLoading(false)
       }
     }
 
     fetchDetail()
-  }, [inspectionId, onClose])
+  }, [inspectionId])
 
   // Dynamic sections from masterItems
   const dynamicSections = useMemo(() => {
     return buildDynamicSections(masterItems)
   }, [masterItems])
+
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null)
+
+  const handleOpenResolveModal = (item: IssueItem, targetStatus: ItemResolveStatus) => {
+    setResolveModalData({
+      item,
+      targetStatus,
+      initialRemark: item.resolveRemark || '',
+    })
+  }
+
+  const handleConfirmResolve = async (customRemark: string) => {
+    if (!resolveModalData) return
+    const { item, targetStatus } = resolveModalData
+    const key = `${item.category}_${item.itemCode}`
+    setResolvingKey(key)
+    setIsSavingResolution(true)
+    try {
+      const res = await fetch(`/api/inspection/${inspectionId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inspectionItemId: item.inspectionItemId,
+          category: item.category,
+          itemCode: item.itemCode,
+          resolveStatus: targetStatus,
+          resolveRemark: customRemark || null,
+        }),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'บันทึกสถานะไม่สำเร็จ')
+      }
+      const data = await res.json()
+
+      // Update local state
+      setInspectionDetail(prev => {
+        if (!prev) return prev
+        const updatedItems = (prev.items || []).map(it => {
+          if (it.category === item.category && it.itemCode === item.itemCode) {
+            return {
+              ...it,
+              resolveStatus: targetStatus,
+              resolveRemark: customRemark || null,
+              resolveDate: new Date().toISOString(),
+            }
+          }
+          return it
+        })
+        return {
+          ...prev,
+          repairStatus: data.updatedRepairStatus,
+          items: updatedItems,
+        }
+      })
+      setResolveModalData(null)
+      setToast({ type: 'success', message: 'บันทึกสถานะการจัดการจุดชำรุดเรียบร้อยแล้ว' })
+    } catch (err: any) {
+      setToast({ type: 'error', message: err.message || 'เกิดข้อผิดพลาดในการบันทึกสถานะ' })
+    } finally {
+      setResolvingKey(null)
+      setIsSavingResolution(false)
+    }
+  }
 
   return (
     <>
@@ -111,6 +188,8 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
                     spacesCDN={SPACES_CDN}
                     onImageClick={setLightboxUrl}
                     onNavigateToChecklist={() => setActiveTab('checklist')}
+                    onRequestResolveChange={handleOpenResolveModal}
+                    resolvingKey={resolvingKey}
                   />
                 )}
 
@@ -153,8 +232,47 @@ export default function InspectionDrawer({ inspectionId, masterItems, onClose }:
               </div>
             </>
           )}
+
+          {/* Toast Notification */}
+          {toast && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-[90%] pointer-events-auto">
+              <div
+                className={`px-4 py-2.5 rounded-xl shadow-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all ${
+                  toast.type === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : toast.type === 'error'
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                    : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 truncate">
+                  <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+                  <span className="truncate">{toast.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="text-slate-400 hover:text-slate-600 shrink-0 font-bold px-1"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Resolve Status Modal Dialog */}
+      {resolveModalData && (
+        <ResolveStatusModal
+          data={resolveModalData}
+          isSaving={isSavingResolution}
+          onConfirm={handleConfirmResolve}
+          onClose={() => {
+            if (!isSavingResolution) setResolveModalData(null)
+          }}
+        />
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && (
@@ -183,6 +301,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 // ─── Damaged / Issue Item Structure ─────────────────
 interface IssueItem {
+  inspectionItemId?: number | null
   category: string
   categoryLabel: string
   categoryIcon: string
@@ -192,6 +311,9 @@ interface IssueItem {
   valueLabel: string
   detailNote?: string | null
   expiryDate?: string | null
+  resolveStatus?: ItemResolveStatus | null
+  resolveRemark?: string | null
+  resolveDate?: string | null
   photos: InspectionPhotoData[]
   severity: 'danger' | 'warning'
 }
@@ -204,12 +326,16 @@ function InfoTab({
   spacesCDN,
   onImageClick,
   onNavigateToChecklist,
+  onRequestResolveChange,
+  resolvingKey,
 }: {
   detail: InspectionData
   dynamicSections: ReturnType<typeof buildDynamicSections>
   spacesCDN: string
   onImageClick: (url: string) => void
   onNavigateToChecklist?: () => void
+  onRequestResolveChange?: (item: IssueItem, status: ItemResolveStatus) => void
+  resolvingKey?: string | null
 }) {
   // Compute comprehensive inspection analysis
   const {
@@ -217,6 +343,7 @@ function InfoTab({
     totalChecked,
     normalCount,
     issueCount,
+    activeIssueCount,
     nonSignaturePhotosCount,
     overallStatus,
     categoryBreakdown,
@@ -297,6 +424,7 @@ function InfoTab({
             p => p.category === sec.category && p.itemCode === itemDef.itemCode
           )
           issues.push({
+            inspectionItemId: savedItem.inspectionItemId,
             category: sec.category,
             categoryLabel: sec.label,
             categoryIcon: sec.icon,
@@ -306,6 +434,9 @@ function InfoTab({
             valueLabel,
             detailNote: savedItem.detail,
             expiryDate: savedItem.expiryDate,
+            resolveStatus: (savedItem.resolveStatus || 'PENDING') as ItemResolveStatus,
+            resolveRemark: savedItem.resolveRemark,
+            resolveDate: savedItem.resolveDate,
             photos: matchedPhotos,
             severity,
           })
@@ -314,10 +445,13 @@ function InfoTab({
     })
 
     const nonSigPhotos = (detail.photos || []).filter(p => p.category !== 'SIGNATURE')
+    const activeIssues = issues.filter(i => i.resolveStatus === 'PENDING' || i.resolveStatus === 'IN_PROGRESS')
 
-    let statusType: 'NORMAL' | 'NEED_REPAIR' | 'PENDING_CHECKLIST' | 'PENDING' = 'PENDING'
+    let statusType: 'NORMAL' | 'RESOLVED' | 'NEED_REPAIR' | 'PENDING_CHECKLIST' | 'PENDING' = 'PENDING'
     if (detail.isPendingChecklist) {
       statusType = 'PENDING_CHECKLIST'
+    } else if (issues.length > 0 && activeIssues.length === 0) {
+      statusType = 'RESOLVED'
     } else if (issues.length > 0 || detail.assessmentResult === 'NEED_REPAIR') {
       statusType = 'NEED_REPAIR'
     } else if (checkedItemsCount > 0 || detail.assessmentResult === 'NORMAL') {
@@ -331,6 +465,7 @@ function InfoTab({
       totalChecked: checkedItemsCount,
       normalCount: Math.max(0, checkedItemsCount - issues.length),
       issueCount: issues.length,
+      activeIssueCount: activeIssues.length,
       nonSignaturePhotosCount: nonSigPhotos.length,
       overallStatus: statusType,
       categoryBreakdown: categoriesList,
@@ -342,7 +477,7 @@ function InfoTab({
 
       {/* ─── 1. สรุปผลการตรวจสภาพ (Inspection Condition Hero Card) ─── */}
       <div className={`p-4 rounded-2xl border transition-all shadow-sm ${
-        overallStatus === 'NORMAL'
+        overallStatus === 'NORMAL' || overallStatus === 'RESOLVED'
           ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
           : overallStatus === 'NEED_REPAIR'
           ? 'bg-rose-50/90 border-rose-200 text-rose-950'
@@ -354,7 +489,7 @@ function InfoTab({
         <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-black/5">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-xs shrink-0 ${
-              overallStatus === 'NORMAL'
+              overallStatus === 'NORMAL' || overallStatus === 'RESOLVED'
                 ? 'bg-emerald-500 text-white'
                 : overallStatus === 'NEED_REPAIR'
                 ? 'bg-rose-500 text-white'
@@ -362,15 +497,17 @@ function InfoTab({
                 ? 'bg-purple-500 text-white'
                 : 'bg-slate-400 text-white'
             }`}>
-              {overallStatus === 'NORMAL' ? '✅' : overallStatus === 'NEED_REPAIR' ? '⚠️' : overallStatus === 'PENDING_CHECKLIST' ? '🔄' : '⏳'}
+              {overallStatus === 'NORMAL' || overallStatus === 'RESOLVED' ? '✅' : overallStatus === 'NEED_REPAIR' ? '⚠️' : overallStatus === 'PENDING_CHECKLIST' ? '🔄' : '⏳'}
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">สรุปผลการตรวจสภาพรถยนต์</p>
               <h4 className="text-base font-black text-slate-900">
                 {overallStatus === 'NORMAL'
                   ? 'สภาพปกติสมบูรณ์ ผ่านเกณฑ์ 100%'
+                  : overallStatus === 'RESOLVED'
+                  ? `จัดการจุดชำรุดครบถ้วนแล้ว (${issueCount} รายการได้รับการซ่อม/ยอมรับสภาพ)`
                   : overallStatus === 'NEED_REPAIR'
-                  ? `ต้องส่งเข้าซ่อมแซม (พบ ${issueCount} รายการ)`
+                  ? `พบจุดชำรุดเสียหาย ${issueCount} รายการ (ค้างจัดการ ${activeIssueCount} จุด)`
                   : overallStatus === 'PENDING_CHECKLIST'
                   ? 'รับคืนรถแล้ว (รอตรวจเช็คลิสต์ภายหลัง)'
                   : 'รอการตรวจสภาพ'}
@@ -378,7 +515,7 @@ function InfoTab({
             </div>
           </div>
           <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border shrink-0 ${
-            overallStatus === 'NORMAL'
+            overallStatus === 'NORMAL' || overallStatus === 'RESOLVED'
               ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
               : overallStatus === 'NEED_REPAIR'
               ? 'bg-rose-100 text-rose-800 border-rose-300'
@@ -386,7 +523,7 @@ function InfoTab({
               ? 'bg-purple-100 text-purple-800 border-purple-300'
               : 'bg-slate-200 text-slate-700 border-slate-300'
           }`}>
-            {overallStatus === 'NORMAL' ? 'NORMAL' : overallStatus === 'NEED_REPAIR' ? 'NEED REPAIR' : overallStatus === 'PENDING_CHECKLIST' ? 'PENDING CHECK' : 'PENDING'}
+            {overallStatus === 'NORMAL' ? 'NORMAL' : overallStatus === 'RESOLVED' ? 'RESOLVED' : overallStatus === 'NEED_REPAIR' ? 'NEED REPAIR' : overallStatus === 'PENDING_CHECKLIST' ? 'PENDING CHECK' : 'PENDING'}
           </span>
         </div>
 
@@ -420,7 +557,7 @@ function InfoTab({
         <div className="bg-rose-50/60 border border-rose-200 rounded-2xl p-4 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-              <span>🛠️</span> รายการจุดที่พบความเสียหาย / ต้องส่งซ่อม ({issueCount} จุด)
+              <span>🛠️</span> รายการจุดที่พบความเสียหาย / ติดตามการซ่อม ({issueCount} จุด)
             </h4>
             {onNavigateToChecklist && (
               <button
@@ -433,60 +570,113 @@ function InfoTab({
             )}
           </div>
 
-          <div className="space-y-2">
-            {damagedList.map((item, idx) => (
-              <div
-                key={`${item.category}_${item.itemCode}_${idx}`}
-                className="bg-white rounded-xl p-3 border border-rose-100 shadow-xs space-y-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs">{item.categoryIcon}</span>
-                      <span className="text-xs font-bold text-slate-800">{item.label}</span>
-                      <span className="text-[10px] text-slate-400">({item.categoryLabel})</span>
+          <div className="space-y-2.5">
+            {damagedList.map((item, idx) => {
+              const currentResolve = item.resolveStatus || 'PENDING'
+              const resolveCfg = RESOLVE_STATUS_CONFIG[currentResolve]
+              const isResolving = resolvingKey === `${item.category}_${item.itemCode}`
+
+              return (
+                <div
+                  key={`${item.category}_${item.itemCode}_${idx}`}
+                  className="bg-white rounded-xl p-3 border border-slate-200 shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs">{item.categoryIcon}</span>
+                        <span className="text-xs font-bold text-slate-800">{item.label}</span>
+                        <span className="text-[10px] text-slate-400">({item.categoryLabel})</span>
+                      </div>
+                      {item.detailNote && (
+                        <p className="text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100 mt-1">
+                          📝 <span className="font-semibold">โน้ต:</span> {item.detailNote}
+                        </p>
+                      )}
                     </div>
-                    {item.detailNote && (
-                      <p className="text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100 mt-1">
-                        📝 <span className="font-semibold">โน้ต:</span> {item.detailNote}
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                      item.severity === 'danger'
+                        ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                    }`}>
+                      {item.valueLabel}
+                    </span>
+                  </div>
+
+                  {/* Thumbnails of damaged item */}
+                  {item.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
+                      {item.photos.map((photo, pIdx) => (
+                        <div
+                          key={photo.inspectionPhotoId || pIdx}
+                          onClick={() => onImageClick(`${spacesCDN}/${photo.s3Key}`)}
+                          className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 shadow-2xs cursor-pointer hover:scale-105 hover:border-indigo-400 transition relative group"
+                          title="คลิกเพื่อดูภาพขนาดเต็ม"
+                        >
+                          <img
+                            src={`${spacesCDN}/${photo.s3Key}`}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                          {photo.photoPosition && (
+                            <span className="absolute bottom-0 inset-x-0 bg-black/65 text-white text-[7px] text-center font-bold py-0.5 leading-none">
+                              {photo.photoPosition}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ─── Resolution Management Action Bar ─── */}
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 font-semibold">สถานะจัดการ:</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${resolveCfg.badgeClass}`}>
+                          <span>{resolveCfg.icon}</span>
+                          <span>{resolveCfg.label}</span>
+                        </span>
+                      </div>
+
+                      {/* Quick action buttons */}
+                      {onRequestResolveChange && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {(['PENDING', 'IN_PROGRESS', 'RESOLVED', 'NO_ACTION_NEEDED'] as ItemResolveStatus[]).map(stKey => {
+                            const isSelected = currentResolve === stKey
+                            const cfg = RESOLVE_STATUS_CONFIG[stKey]
+                            return (
+                              <button
+                                key={stKey}
+                                type="button"
+                                disabled={isSelected || isResolving}
+                                onClick={() => onRequestResolveChange(item, stKey)}
+                                className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition flex items-center gap-0.5 cursor-pointer disabled:cursor-not-allowed ${
+                                  isSelected
+                                    ? 'bg-slate-800 text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200 hover:border-slate-300'
+                                }`}
+                                title={cfg.description}
+                              >
+                                <span>{cfg.icon}</span>
+                                <span>{cfg.label}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {item.resolveRemark && (
+                      <p className="text-[10px] text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60 flex items-center gap-1">
+                        <span>💬</span>
+                        <span className="font-semibold text-slate-700">บันทึก:</span> {item.resolveRemark}
                       </p>
                     )}
                   </div>
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
-                    item.severity === 'danger'
-                      ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                      : 'bg-amber-100 text-amber-800 border border-amber-200'
-                  }`}>
-                    {item.valueLabel}
-                  </span>
                 </div>
-
-                {/* Thumbnails of damaged item */}
-                {item.photos.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100">
-                    {item.photos.map((photo, pIdx) => (
-                      <div
-                        key={photo.inspectionPhotoId || pIdx}
-                        onClick={() => onImageClick(`${spacesCDN}/${photo.s3Key}`)}
-                        className="w-14 h-14 rounded-lg overflow-hidden border border-rose-200 shadow-2xs cursor-pointer hover:scale-105 hover:border-rose-400 transition relative group"
-                        title="คลิกเพื่อดูภาพขนาดเต็ม"
-                      >
-                        <img
-                          src={`${spacesCDN}/${photo.s3Key}`}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                        {photo.photoPosition && (
-                          <span className="absolute bottom-0 inset-x-0 bg-black/65 text-white text-[7px] text-center font-bold py-0.5 leading-none">
-                            {photo.photoPosition}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ) : totalChecked > 0 ? (
@@ -821,6 +1011,165 @@ function PhotosTab({
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─── RESOLVE STATUS MODAL DIALOG ────────────────────
+
+interface ResolveModalData {
+  item: IssueItem
+  targetStatus: ItemResolveStatus
+  initialRemark: string
+}
+
+function ResolveStatusModal({
+  data,
+  isSaving,
+  onConfirm,
+  onClose,
+}: {
+  data: ResolveModalData
+  isSaving: boolean
+  onConfirm: (remark: string) => void
+  onClose: () => void
+}) {
+  const [remark, setRemark] = useState(data.initialRemark)
+  const cfg = RESOLVE_STATUS_CONFIG[data.targetStatus]
+
+  const suggestions = useMemo(() => {
+    switch (data.targetStatus) {
+      case 'NO_ACTION_NEEDED':
+        return [
+          'รอยขีดข่วนเล็กน้อย สภาพรับได้ ปล่อยเช่าต่อ',
+          'ลูกค้ารับสภาพ/เคลียร์ค่าเสียหายเรียบร้อย',
+          'อยู่นอกเงื่อนไขเคลม ไม่กระทบการใช้งาน',
+        ]
+      case 'IN_PROGRESS':
+        return [
+          'เปิดใบงานซ่อมแล้ว รอคิวเข้าอู่',
+          'ส่งซ่อมอู่ศูนย์ (รอเบิกอะไหล่)',
+          'อยู่ระหว่างเคาะ/ทำสีตัวถัง',
+        ]
+      case 'RESOLVED':
+        return [
+          'แก้ไขและซ่อมแซมเรียบร้อยแล้ว',
+          'เปลี่ยนอะไหล่ชิ้นส่วนใหม่เรียบร้อย',
+          'ขัดสีลบรอยและทำความสะอาดแล้ว',
+        ]
+      case 'PENDING':
+        return [
+          'รอส่งฝ่ายเทคนิคประเมินความเสียหาย',
+          'รอยืนยันใบเสนอราคาจากอู่',
+        ]
+      default:
+        return []
+    }
+  }, [data.targetStatus])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      {/* Backdrop */}
+      <div className="absolute inset-0" onClick={onClose} />
+
+      {/* Dialog */}
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{cfg.icon}</span>
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">เปลี่ยนสถานะ: {cfg.label}</h4>
+              <p className="text-[11px] text-slate-500">{cfg.description}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="w-7 h-7 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center hover:bg-slate-300 transition"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 space-y-3.5">
+          {/* Target Item Info */}
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base">{data.item.categoryIcon}</span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 truncate">{data.item.label}</p>
+                <p className="text-[10px] text-slate-400">หมวดหมู่: {data.item.categoryLabel}</p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 bg-rose-100 text-rose-700 border border-rose-200">
+              {data.item.valueLabel}
+            </span>
+          </div>
+
+          {/* Quick Preset Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-600">ข้อความแนะนำ (คลิกเพื่อเลือก):</label>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setRemark(s)}
+                    className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 text-slate-600 transition text-left"
+                  >
+                    + {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Remark Input / Textarea */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-semibold text-slate-700">
+              ระบุรายละเอียด / โน้ตเพิ่มเติม / เลขใบงานซ่อม:
+            </label>
+            <textarea
+              rows={3}
+              value={remark}
+              onChange={e => setRemark(e.target.value)}
+              placeholder="เช่น เลขใบงานซ่อม, ชื่ออู่, หรือเหตุผลที่ปล่อยผ่าน..."
+              className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-hidden resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={onClose}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => onConfirm(remark)}
+            className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {isSaving ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>กำลังบันทึก...</span>
+              </>
+            ) : (
+              <span>ยืนยันบันทึก</span>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

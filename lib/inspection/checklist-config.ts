@@ -454,7 +454,47 @@ export function createEmptyItemsFromMaster(masterItems: MasterItemDef[]): import
   }))
 }
 
+export type ItemResolveStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'NO_ACTION_NEEDED'
+
+export const RESOLVE_STATUS_CONFIG: Record<ItemResolveStatus, {
+  label: string
+  icon: string
+  badgeClass: string
+  dotClass: string
+  description: string
+}> = {
+  PENDING: {
+    label: 'รอจัดการ',
+    icon: '🔴',
+    badgeClass: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    dotClass: 'bg-rose-500',
+    description: 'ตรวจพบความเสียหาย รอเปิดงานซ่อมหรือแก้ไข',
+  },
+  IN_PROGRESS: {
+    label: 'เปิดงานซ่อมแล้ว',
+    icon: '🟡',
+    badgeClass: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    dotClass: 'bg-amber-500',
+    description: 'เปิดงานซ่อม/ส่งเรื่องไปยังศูนย์บริการหรือช่างแล้ว',
+  },
+  RESOLVED: {
+    label: 'แก้ไขแล้ว',
+    icon: '🟢',
+    badgeClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    dotClass: 'bg-emerald-500',
+    description: 'ซ่อมแซม/เปลี่ยนอะไหล่/ติดป้ายภาษีเรียบร้อยแล้ว',
+  },
+  NO_ACTION_NEEDED: {
+    label: 'ไม่ต้องทำ / ยอมรับสภาพ',
+    icon: '⚪',
+    badgeClass: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700',
+    dotClass: 'bg-zinc-400',
+    description: 'พิจารณาแล้วว่ารอยเล็กน้อย/สภาพรับได้ ปล่อยวิ่งต่อได้',
+  }
+}
+
 export interface FormattedDamagedItem {
+  inspectionItemId?: number | null
   category: string
   categoryLabel: string
   categoryIcon: string
@@ -463,6 +503,10 @@ export interface FormattedDamagedItem {
   value: string
   valueLabel: string
   detail?: string | null
+  resolveStatus?: ItemResolveStatus | null
+  resolveRemark?: string | null
+  resolveDate?: string | null
+  resolveUserName?: string | null
 }
 
 export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | undefined): FormattedDamagedItem[] {
@@ -486,6 +530,11 @@ export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | u
     const itemCode = it.itemCode || it.ItemCode
     const value = it.value || it.Value
     const detail = it.detail || it.Detail || null
+    const inspectionItemId = it.inspectionItemId || it.InspectionItemID || null
+    const resolveStatus = (it.resolveStatus || it.ResolveStatus || 'PENDING') as ItemResolveStatus
+    const resolveRemark = it.resolveRemark || it.ResolveRemark || null
+    const resolveDate = it.resolveDate || it.ResolveDate || null
+    const resolveUserName = it.resolveUserName || it.ResolveUserName || null
 
     if (!category || !itemCode || !value) continue
 
@@ -530,6 +579,7 @@ export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | u
 
     if (isDamaged) {
       result.push({
+        inspectionItemId,
         category,
         categoryLabel: section?.label || category,
         categoryIcon: section?.icon || '🔍',
@@ -538,6 +588,10 @@ export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | u
         value,
         valueLabel,
         detail,
+        resolveStatus,
+        resolveRemark,
+        resolveDate,
+        resolveUserName,
       })
     }
   }

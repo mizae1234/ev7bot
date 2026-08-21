@@ -73,10 +73,13 @@ export interface PolicyVehicleRecord {
   // Latest Return Inspection (การตรวจรับคืนรถล่าสุด)
   latestInspectionId?: number | null
   latestInspectionDate?: string | null
-  latestAssessmentResult?: string | null // 'NORMAL' | 'NEED_REPAIR' | null
+  latestAssessmentResult?: string | null // 'NORMAL' | 'NEED_REPAIR' | 'RESOLVED' | null
+  latestRepairStatus?: string | null     // 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'NO_ACTION_NEEDED' | null
   latestIsPendingChecklist?: boolean | null
   latestDamageCount?: number
+  activeDamageCount?: number
   latestDamagedItems?: Array<{
+    inspectionItemId?: number | null
     category: string
     categoryLabel: string
     categoryIcon: string
@@ -85,6 +88,10 @@ export interface PolicyVehicleRecord {
     value: string
     valueLabel: string
     detail?: string | null
+    resolveStatus?: string | null
+    resolveRemark?: string | null
+    resolveDate?: string | null
+    resolveUserName?: string | null
   }>
   latestDamagedSummary?: string | null
 

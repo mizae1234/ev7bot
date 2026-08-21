@@ -105,38 +105,76 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
                         </span>
                       ) : (
                         <div className="space-y-1.5">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
-                            assessmentLabel === 'ปกติ'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : assessmentLabel === 'ต้องส่งเข้าซ่อม'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            <span>
-                              {assessmentLabel === 'ปกติ' ? '✅' : assessmentLabel === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
-                            </span>
-                            {assessmentLabel}
-                            {item.damagedCount && item.damagedCount > 0 ? ` (${item.damagedCount} จุด)` : ''}
-                          </span>
+                          {(() => {
+                            const activeItems = (item.damagedItems || []).filter(d => d.resolveStatus === 'PENDING' || d.resolveStatus === 'IN_PROGRESS')
+                            const isAllResolved = (item.damagedItems?.length || 0) > 0 && activeItems.length === 0
+                            
+                            if (isAllResolved) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span>✅</span>
+                                  จัดการครบแล้ว ({item.damagedCount} จุด)
+                                </span>
+                              )
+                            }
+
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                                assessmentLabel === 'ปกติ'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : assessmentLabel === 'ต้องส่งเข้าซ่อม'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                <span>
+                                  {assessmentLabel === 'ปกติ' ? '✅' : assessmentLabel === 'ต้องส่งเข้าซ่อม' ? '⚠️' : '⏳'}
+                                </span>
+                                {assessmentLabel}
+                                {item.damagedCount && item.damagedCount > 0 ? ` (${item.damagedCount} จุด)` : ''}
+                              </span>
+                            )
+                          })()}
 
                           {/* Damaged points breakdown pills */}
                           {item.damagedItems && item.damagedItems.length > 0 && (
-                            <div className="bg-rose-50/80 border border-rose-200/80 rounded-xl p-2 space-y-1">
-                              <p className="text-[9px] font-bold text-rose-800 flex items-center gap-1">
-                                <span>🛠️</span> จุดที่พบความเสียหาย:
+                            <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-2 space-y-1">
+                              <p className="text-[9px] font-bold text-slate-700 flex items-center gap-1">
+                                <span>🛠️</span> จุดที่พบความเสียหาย ({item.damagedItems.length}):
                               </p>
                               <div className="flex flex-wrap gap-1 max-w-[260px]">
-                                {item.damagedItems.map((d, dIdx) => (
-                                  <span
-                                    key={dIdx}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-rose-200 text-[9px] text-slate-800 font-medium shadow-2xs"
-                                    title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.detail ? ` (${d.detail})` : ''}`}
-                                  >
-                                    <span>{d.categoryIcon}</span>
-                                    <span className="font-semibold">{d.label}</span>
-                                    <span className="text-rose-600 font-bold">({d.valueLabel})</span>
-                                  </span>
-                                ))}
+                                {item.damagedItems.map((d, dIdx) => {
+                                  const isResolved = d.resolveStatus === 'RESOLVED'
+                                  const isNoAction = d.resolveStatus === 'NO_ACTION_NEEDED'
+                                  const isInProgress = d.resolveStatus === 'IN_PROGRESS'
+
+                                  return (
+                                    <span
+                                      key={dIdx}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-medium shadow-2xs ${
+                                        isResolved
+                                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700 line-through opacity-80'
+                                          : isNoAction
+                                          ? 'bg-zinc-100 border-zinc-200 text-zinc-600'
+                                          : isInProgress
+                                          ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                          : 'bg-white border-rose-200 text-slate-800'
+                                      }`}
+                                      title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.resolveStatus ? ` [${d.resolveStatus}]` : ''}${d.resolveRemark ? ` (${d.resolveRemark})` : ''}`}
+                                    >
+                                      <span>{d.categoryIcon}</span>
+                                      <span className="font-semibold">{d.label}</span>
+                                      {isResolved ? (
+                                        <span className="text-emerald-600 font-bold">(ซ่อมแล้ว)</span>
+                                      ) : isNoAction ? (
+                                        <span className="text-zinc-500 font-bold">(ไม่ต้องทำ)</span>
+                                      ) : isInProgress ? (
+                                        <span className="text-amber-600 font-bold">(กำลังซ่อม)</span>
+                                      ) : (
+                                        <span className="text-rose-600 font-bold">({d.valueLabel})</span>
+                                      )}
+                                    </span>
+                                  )
+                                })}
                               </div>
                             </div>
                           )}

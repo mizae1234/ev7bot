@@ -339,6 +339,19 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
   actualBreakdownReq.input('startDate', sql.DateTime, start)
   actualBreakdownReq.input('endDate', sql.DateTime, end)
 
+  // Return stats from View_AccumarateReturnItem
+  const returnSummaryReq = pool.request()
+  returnSummaryReq.input('startDate', sql.DateTime, start)
+  returnSummaryReq.input('endDate', sql.DateTime, end)
+
+  const returnTypeReq = pool.request()
+  returnTypeReq.input('startDate', sql.DateTime, start)
+  returnTypeReq.input('endDate', sql.DateTime, end)
+
+  const returnReasonReq = pool.request()
+  returnReasonReq.input('startDate', sql.DateTime, start)
+  returnReasonReq.input('endDate', sql.DateTime, end)
+
   // Repair stats
   const repairReq = pool.request()
   repairReq.input('startDate', sql.DateTime, start)
@@ -351,6 +364,9 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     pendingRes,
     planBreakdownRes,
     actualBreakdownRes,
+    returnSummaryRes,
+    returnTypeRes,
+    returnReasonRes,
     repairRes
   ] = await Promise.all([
     planReq.query(`
@@ -412,6 +428,35 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
         AND r.ReleaseDate IS NOT NULL
       GROUP BY i.ProjectType, i.Model, r.RentType
     `),
+    returnSummaryReq.query(`
+      SELECT 
+        COUNT(*) AS TotalReturnCount,
+        COUNT(DISTINCT VinNo) AS UniqueVIN
+      FROM dbo.View_AccumarateReturnItem
+      WHERE ReturnIsActive = 1
+        AND ReturnDate >= @startDate AND ReturnDate <= @endDate
+    `),
+    returnTypeReq.query(`
+      SELECT 
+        ReturnType,
+        COUNT(*) AS TotalCount,
+        COUNT(DISTINCT VinNo) AS UniqueVIN
+      FROM dbo.View_AccumarateReturnItem
+      WHERE ReturnIsActive = 1
+        AND ReturnDate >= @startDate AND ReturnDate <= @endDate
+      GROUP BY ReturnType
+    `),
+    returnReasonReq.query(`
+      SELECT 
+        ISNULL(ReturnReasonName, 'ไม่ระบุเหตุผล') AS Reason,
+        COUNT(*) AS TotalCount,
+        COUNT(DISTINCT VinNo) AS UniqueVIN
+      FROM dbo.View_AccumarateReturnItem
+      WHERE ReturnIsActive = 1
+        AND ReturnDate >= @startDate AND ReturnDate <= @endDate
+      GROUP BY ReturnReasonName
+      ORDER BY TotalCount DESC
+    `),
     repairReq.query(`
       SELECT
         COUNT(*) AS total,
@@ -443,6 +488,22 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
     else if (r.RentType === 'ONRENT_NEW') pendingNew = r.cnt
   }
 
+  // Extract return stats
+  let normalReturnCount = 0
+  let normalReturnUniqueVin = 0
+  let linemanReturnCount = 0
+  let linemanReturnUniqueVin = 0
+
+  for (const r of returnTypeRes.recordset) {
+    if (r.ReturnType === 'รถเวียนคืน Lineman') {
+      linemanReturnCount = r.TotalCount || 0
+      linemanReturnUniqueVin = r.UniqueVIN || 0
+    } else {
+      normalReturnCount = r.TotalCount || 0
+      normalReturnUniqueVin = r.UniqueVIN || 0
+    }
+  }
+
   const planTotal = planRes.recordset[0]?.planTotal || 0
 
   return {
@@ -459,6 +520,23 @@ export async function getMonthlyStats(params: { year?: number; month?: number })
       completed: completedUsed,
       pendingActual: pendingUsed,
       pending: 0
+    },
+    returns: {
+      totalCount: returnSummaryRes.recordset[0]?.TotalReturnCount || 0,
+      uniqueVin: returnSummaryRes.recordset[0]?.UniqueVIN || 0,
+      normalReturn: {
+        count: normalReturnCount,
+        uniqueVin: normalReturnUniqueVin,
+      },
+      linemanReturn: {
+        count: linemanReturnCount,
+        uniqueVin: linemanReturnUniqueVin,
+      },
+      byReason: (returnReasonRes.recordset || []).map((r: any) => ({
+        reason: r.Reason,
+        count: r.TotalCount,
+        uniqueVin: r.UniqueVIN,
+      })),
     },
     repair: repairRes.recordset[0] || { total: 0, closed: 0, open: 0 },
     plans: planBreakdownRes.recordset,

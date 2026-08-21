@@ -45,7 +45,9 @@ export interface ChecklistSectionDef {
 
 // ------- Data (saved/loaded) -------
 
-/** ค่าที่กรอกใน checklist item 1 ข้อ */
+export type ItemResolveStatus = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'NO_ACTION_NEEDED'
+
+/** ข้อมูล 1 รายการ checklist */
 export interface InspectionItemData {
   inspectionItemId?: number  // จาก DB (ถ้า load มา)
   category: string
@@ -54,6 +56,11 @@ export interface InspectionItemData {
   detail: string | null
   numericValue: number | null
   expiryDate: string | null  // 'YYYY-MM-DD'
+  resolveStatus?: ItemResolveStatus | null
+  resolveRemark?: string | null
+  resolveUserId?: number | null
+  resolveDate?: string | null
+  resolveUserName?: string | null
 }
 
 /** รูปภาพ 1 รูป */
@@ -107,6 +114,8 @@ export interface InspectionData {
   project?: string | null
   locationName?: string | null
   assessmentResult?: string | null
+  repairStatus?: ItemResolveStatus | null
+  repairRemark?: string | null
 }
 
 /** Inspection list item (สำหรับแสดงรายการ) */
@@ -127,6 +136,8 @@ export interface InspectionListItem {
   locationName?: string
   returnReason?: string | null
   assessmentResult?: string | null
+  repairStatus?: ItemResolveStatus | null
+  repairRemark?: string | null
   customerName?: string | null
   customerContact?: string | null
   contractCancellationDate?: string | null
@@ -143,6 +154,11 @@ export interface InspectionListItem {
     value: string
     valueLabel: string
     detail?: string | null
+    resolveStatus?: ItemResolveStatus | null
+    resolveRemark?: string | null
+    resolveDate?: string | null
+    resolveUserName?: string | null
+    inspectionItemId?: number | null
   }>
 }
 

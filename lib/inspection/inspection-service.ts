@@ -593,6 +593,28 @@ async function insertItems(
 // Inspection Read Queries
 // =====================================================
 
+let hasResolveColumnsCache: boolean | null = null
+let lastResolveColCheck = 0
+
+export async function checkResolveColumnsExist(pool: any): Promise<boolean> {
+  const now = Date.now()
+  if (hasResolveColumnsCache !== null && now - lastResolveColCheck < 30000) {
+    return hasResolveColumnsCache
+  }
+  try {
+    const res = await pool.request().query(`
+      SELECT COUNT(*) AS cnt
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'EV_InspectionItem' AND COLUMN_NAME = 'ResolveStatus'
+    `)
+    hasResolveColumnsCache = (res.recordset?.[0]?.cnt || 0) > 0
+    lastResolveColCheck = now
+    return hasResolveColumnsCache
+  } catch {
+    return false
+  }
+}
+
 /** ดึงรายการ Inspections */
 export async function listInspections(filters: {
   vinNo?: string
@@ -642,6 +664,14 @@ export async function listInspections(filters: {
   const limit = filters.limit || 50
   req.input('limit', sql.Int, limit)
 
+  const hasResolveCols = await checkResolveColumnsExist(pool)
+  const resolveItemCols = hasResolveCols
+    ? 'it.ResolveStatus AS resolveStatus, it.ResolveRemark AS resolveRemark, it.ResolveDate AS resolveDate'
+    : 'CAST(NULL AS VARCHAR(30)) AS resolveStatus, CAST(NULL AS NVARCHAR(500)) AS resolveRemark, CAST(NULL AS DATETIME) AS resolveDate'
+  const repairHeaderCol = hasResolveCols
+    ? 'i.RepairStatus AS repairStatus, i.RepairRemark AS repairRemark'
+    : 'CAST(NULL AS VARCHAR(30)) AS repairStatus, CAST(NULL AS NVARCHAR(500)) AS repairRemark'
+
   const result = await req.query(`
     SELECT TOP (@limit)
       i.InspectionID AS inspectionId,
@@ -662,6 +692,7 @@ export async function listInspections(filters: {
       sub.StatusName AS locationName,
       i.ReturnReason AS returnReason,
       i.AssessmentResult AS assessmentResult,
+      ${repairHeaderCol},
       i.CustomerName AS customerName,
       i.CustomerContact AS customerContact,
       i.ContractCancellationDate AS contractCancellationDate,
@@ -672,10 +703,12 @@ export async function listInspections(filters: {
       (SELECT COUNT(*) FROM dbo.EV_InspectionPhoto WHERE InspectionID = i.InspectionID AND IsActive = 1) AS photoCount,
       (
         SELECT 
+          it.InspectionItemID AS inspectionItemId,
           it.Category AS category,
           it.ItemCode AS itemCode,
           it.Value AS [value],
-          it.Detail AS detail
+          it.Detail AS detail,
+          ${resolveItemCols}
         FROM dbo.EV_InspectionItem it
         WHERE it.InspectionID = i.InspectionID
           AND (
@@ -707,6 +740,14 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
   const pool = await getMSSQLPool()
   if (!pool) throw new Error('Database connection failed')
 
+  const hasResolveCols = await checkResolveColumnsExist(pool)
+  const resolveItemCols = hasResolveCols
+    ? 'ResolveStatus AS resolveStatus, ResolveRemark AS resolveRemark, ResolveUserID AS resolveUserId, ResolveDate AS resolveDate'
+    : 'CAST(NULL AS VARCHAR(30)) AS resolveStatus, CAST(NULL AS NVARCHAR(500)) AS resolveRemark, CAST(NULL AS INT) AS resolveUserId, CAST(NULL AS DATETIME) AS resolveDate'
+  const repairHeaderCol = hasResolveCols
+    ? 'RepairStatus AS repairStatus, RepairRemark AS repairRemark'
+    : 'CAST(NULL AS VARCHAR(30)) AS repairStatus, CAST(NULL AS NVARCHAR(500)) AS repairRemark'
+
   const [headerRes, itemsRes, photosRes] = await Promise.all([
     pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
       SELECT InspectionID AS inspectionId, VinNo AS vinNo, RegisterNo AS registerNo,
@@ -716,6 +757,7 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
              InspectorName AS inspectorName, Status AS status, Remark AS remark,
              ReturnDate AS returnDate, Location AS location, RentItemID AS rentItemId, ContractNo AS contractNo,
              ReturnReason AS returnReason, AssessmentResult AS assessmentResult,
+             ${repairHeaderCol},
              IsDistributed AS isDistributed, DistributionDate AS distributionDate,
              DistributionUserID AS distributionUserID,
              CustomerName AS customerName, CustomerContact AS customerContact,
@@ -726,7 +768,8 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
     `),
     pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
       SELECT InspectionItemID AS inspectionItemId, Category AS category, ItemCode AS itemCode,
-             Value AS value, Detail AS detail, NumericValue AS numericValue, ExpiryDate AS expiryDate
+             Value AS value, Detail AS detail, NumericValue AS numericValue, ExpiryDate AS expiryDate,
+             ${resolveItemCols}
       FROM dbo.EV_InspectionItem
       WHERE InspectionID = @inspectionId
       ORDER BY InspectionItemID
@@ -904,3 +947,92 @@ export async function getInspectionItemMaster(): Promise<any[]> {
     return item
   })
 }
+
+/** อัปเดตสถานะการจัดการจุดชำรุดเสียหาย (PENDING / IN_PROGRESS / RESOLVED / NO_ACTION_NEEDED) */
+export async function updateInspectionItemResolution(params: {
+  inspectionId: number
+  inspectionItemId?: number | null
+  category: string
+  itemCode: string
+  resolveStatus: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'NO_ACTION_NEEDED'
+  resolveRemark?: string | null
+  ev7UserId?: number | null
+}): Promise<{ success: boolean; updatedRepairStatus: string }> {
+  const pool = await getMSSQLWritePool()
+  if (!pool) throw new Error('Database connection failed')
+
+  const hasCols = await checkResolveColumnsExist(pool)
+  if (!hasCols) {
+    throw new Error('ฐานข้อมูลยังไม่มีคอลัมน์ ResolveStatus กรุณารัน SQL Migration (Alter_InspectionItem_Add_ResolveStatus.sql) บนฐานข้อมูลก่อน')
+  }
+
+  const req = pool.request()
+  req.input('inspectionId', sql.BigInt, params.inspectionId)
+  req.input('category', sql.NVarChar, params.category)
+  req.input('itemCode', sql.NVarChar, params.itemCode)
+  req.input('resolveStatus', sql.VarChar(30), params.resolveStatus)
+  req.input('resolveRemark', sql.NVarChar(500), params.resolveRemark || null)
+  req.input('resolveUserId', sql.Int, params.ev7UserId || null)
+
+  let whereItem = 'InspectionID = @inspectionId AND Category = @category AND ItemCode = @itemCode'
+  if (params.inspectionItemId) {
+    req.input('inspectionItemId', sql.BigInt, params.inspectionItemId)
+    whereItem = 'InspectionID = @inspectionId AND InspectionItemID = @inspectionItemId'
+  }
+
+  // Update item
+  await req.query(`
+    UPDATE dbo.EV_InspectionItem
+    SET ResolveStatus = @resolveStatus,
+        ResolveRemark = @resolveRemark,
+        ResolveUserID = @resolveUserId,
+        ResolveDate = GETDATE()
+    WHERE ${whereItem}
+  `)
+
+  // Check remaining items to update overall RepairStatus in EV_Inspection
+  const countReq = pool.request()
+  countReq.input('inspectionId', sql.BigInt, params.inspectionId)
+  const itemsRes = await countReq.query(`
+    SELECT Category, ItemCode, Value, ResolveStatus
+    FROM dbo.EV_InspectionItem
+    WHERE InspectionID = @inspectionId
+      AND (
+        (Category = 'ACCIDENT' AND Value = 'YES')
+        OR (Category <> 'CAR_PHOTOS' AND Category <> 'ACCIDENT' AND Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+      )
+  `)
+
+  const damagedItems = itemsRes.recordset || []
+  let newRepairStatus = 'RESOLVED'
+
+  if (damagedItems.length === 0) {
+    newRepairStatus = 'RESOLVED'
+  } else {
+    const hasPending = damagedItems.some((d: any) => !d.ResolveStatus || d.ResolveStatus === 'PENDING')
+    const hasInProgress = damagedItems.some((d: any) => d.ResolveStatus === 'IN_PROGRESS')
+    const allNoAction = damagedItems.every((d: any) => d.ResolveStatus === 'NO_ACTION_NEEDED')
+
+    if (hasPending) {
+      newRepairStatus = 'PENDING'
+    } else if (hasInProgress) {
+      newRepairStatus = 'IN_PROGRESS'
+    } else if (allNoAction) {
+      newRepairStatus = 'NO_ACTION_NEEDED'
+    } else {
+      newRepairStatus = 'RESOLVED'
+    }
+  }
+
+  const updateHeaderReq = pool.request()
+  updateHeaderReq.input('inspectionId', sql.BigInt, params.inspectionId)
+  updateHeaderReq.input('repairStatus', sql.VarChar(30), newRepairStatus)
+  await updateHeaderReq.query(`
+    UPDATE dbo.EV_Inspection
+    SET RepairStatus = @repairStatus
+    WHERE InspectionID = @inspectionId
+  `)
+
+  return { success: true, updatedRepairStatus: newRepairStatus }
+}
+

@@ -281,9 +281,19 @@ export function PolicyTable({
                             🔄 รอตรวจเช็คลิสต์
                           </span>
                         ) : rec.latestDamageCount && rec.latestDamageCount > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                            ⚠️ พบจุดชำรุด ({rec.latestDamageCount} จุด)
-                          </span>
+                          (rec.activeDamageCount ?? rec.latestDamageCount) === 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              ✅ จัดการครบแล้ว ({rec.latestDamageCount} จุด)
+                            </span>
+                          ) : (rec.activeDamageCount ?? rec.latestDamageCount) < rec.latestDamageCount ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              🛠️ ดำเนินการแล้วบางส่วน ({rec.activeDamageCount}/{rec.latestDamageCount} จุด)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                              ⚠️ พบจุดชำรุด ({rec.latestDamageCount} จุด)
+                            </span>
+                          )
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             ✅ สภาพปกติ
@@ -298,22 +308,43 @@ export function PolicyTable({
 
                       {/* Damaged items pills */}
                       {rec.latestDamagedItems && rec.latestDamagedItems.length > 0 ? (
-                        <div className="bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-800/60 rounded-xl p-2 space-y-1">
-                          <p className="text-[10px] font-bold text-rose-800 dark:text-rose-300 flex items-center gap-1">
-                            <span>🛠️</span> จุดที่พบความเสียหาย ({rec.latestDamagedItems.length}):
+                        <div className={`border rounded-xl p-2 space-y-1 ${(rec.activeDamageCount ?? rec.latestDamageCount) === 0 ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-800/60' : 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200/80 dark:border-rose-800/60'}`}>
+                          <p className={`text-[10px] font-bold flex items-center gap-1 ${(rec.activeDamageCount ?? rec.latestDamageCount) === 0 ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}>
+                            <span>{(rec.activeDamageCount ?? rec.latestDamageCount) === 0 ? '✨' : '🛠️'}</span> รายการจุดชำรุด ({rec.latestDamagedItems.length}):
                           </p>
                           <div className="flex flex-wrap gap-1 max-w-[280px]">
-                            {rec.latestDamagedItems.map((d, dIdx) => (
-                              <span
-                                key={dIdx}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-rose-200 dark:border-rose-800 text-[10px] text-zinc-800 dark:text-zinc-200 font-medium shadow-2xs"
-                                title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.detail ? ` (${d.detail})` : ''}`}
-                              >
-                                <span className="text-[9px]">{d.categoryIcon}</span>
-                                <span className="font-semibold">{d.label}</span>
-                                <span className="text-rose-600 dark:text-rose-400 font-bold">({d.valueLabel})</span>
-                              </span>
-                            ))}
+                            {rec.latestDamagedItems.map((d, dIdx) => {
+                              const isResolved = d.resolveStatus === 'RESOLVED'
+                              const isNoAction = d.resolveStatus === 'NO_ACTION_NEEDED'
+                              const isInProgress = d.resolveStatus === 'IN_PROGRESS'
+                              return (
+                                <span
+                                  key={dIdx}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium shadow-2xs ${
+                                    isResolved
+                                      ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 line-through opacity-80'
+                                      : isNoAction
+                                      ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'
+                                      : isInProgress
+                                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+                                      : 'bg-white dark:bg-zinc-900 border-rose-200 dark:border-rose-800 text-zinc-800 dark:text-zinc-200'
+                                  }`}
+                                  title={`${d.categoryLabel} > ${d.label}: ${d.valueLabel}${d.resolveStatus ? ` [${d.resolveStatus}]` : ''}${d.resolveRemark ? ` (${d.resolveRemark})` : ''}`}
+                                >
+                                  <span className="text-[9px]">{d.categoryIcon}</span>
+                                  <span className="font-semibold">{d.label}</span>
+                                  {isResolved ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">(ซ่อมแล้ว)</span>
+                                  ) : isNoAction ? (
+                                    <span className="text-zinc-500 dark:text-zinc-400 font-bold">(ไม่ต้องทำ)</span>
+                                  ) : isInProgress ? (
+                                    <span className="text-amber-600 dark:text-amber-400 font-bold">(กำลังซ่อม)</span>
+                                  ) : (
+                                    <span className="text-rose-600 dark:text-rose-400 font-bold">({d.valueLabel})</span>
+                                  )}
+                                </span>
+                              )
+                            })}
                           </div>
                         </div>
                       ) : null}

@@ -3,8 +3,12 @@
 -- Date: 2026-08-21
 -- Description:
 --   เพิ่มฟิลด์สำหรับติดตามสถานะการเปิดงานซ่อม และการแก้ไขจุดชำรุดจากการตรวจรับคืนรถ
---   - EV_InspectionItem: ResolveStatus ('PENDING', 'IN_PROGRESS', 'RESOLVED'), ResolveRemark, ResolveUserID, ResolveDate
---   - EV_Inspection: RepairStatus ('PENDING', 'IN_PROGRESS', 'RESOLVED'), RepairRemark
+--   - EV_InspectionItem: 
+--       ResolveStatus ('PENDING' = รอจัดการ, 'IN_PROGRESS' = เปิดงานซ่อมแล้ว, 'RESOLVED' = แก้ไขแล้ว, 'NO_ACTION_NEEDED' = ไม่ต้องทำ/ยอมรับสภาพ/ปล่อยผ่าน), 
+--       ResolveRemark, ResolveUserID, ResolveDate
+--   - EV_Inspection: 
+--       RepairStatus ('PENDING', 'IN_PROGRESS', 'RESOLVED', 'NO_ACTION_NEEDED'), 
+--       RepairRemark
 --   ทุกฟิลด์เป็น NULL เพื่อความปลอดภัยและไม่กระทบข้อมูลเดิม 100%
 -- =====================================================
 

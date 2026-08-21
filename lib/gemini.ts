@@ -184,6 +184,74 @@ NumericValue (ค่าตัวเลข), ExpiryDate (วันหมดอา
      FROM EV_RentItem r
      LEFT JOIN View_GetOnrentNewOrUse o ON r.ContractNo = o.ContractNo
      WHERE r.InventoryItemID = <id> AND r.IsActive = 1
+   - ⚠️ **กฎสำคัญเรื่องความเป็นส่วนตัว (Data Privacy)**: แสดงเฉพาะ **ชื่อต้น** ของลูกค้า/ผู้เช่า และผู้ตรวจเช็คสภาพเท่านั้น (ห้ามแสดงนามสกุล)
+
+### ถามหารถคืนที่ขาดอุปกรณ์ / ไม่มีป้ายทะเบียนเล็ก / ไม่มีป้ายภาษี / มีจุดชำรุดเฉพาะ (เช่น "จากการคืนรถ ไม่มีป้ายทะเบียนเล็ก กี่คัน", "รถคืนที่ไม่มีป้ายภาษีมีกี่คัน", "รถคืนที่สายชาร์จหายมีคันไหนบ้าง", "รถคืนที่มีรอยชน")
+- **คำศัพท์สำคัญในการตรวจรับคืน (Inspection Item Mapping)**:
+  - **"ป้ายทะเบียนเล็ก" / "ป้ายภาษี" / "ป้ายวงกลม"** → คือหมวด Category IN ('ROAD_TAX', 'TAX_VEHICLE') (หรือ TAX_METER สำหรับป้ายตรวจมิเตอร์แท็กซี่) โดยถ้า **ไม่มีป้าย / ไม่ได้ติดป้าย** จะมีค่า Value = 'NO'
+  - **"ป้ายทะเบียน" / "ป้ายทะเบียนรถ"** → หมวด Category = 'LICENSE_PLATE' (กรณีไม่มีป้าย Value = 'NONE' หรือหายบางป้าย Value IN ('FRONT_ONLY', 'BACK_ONLY'))
+  - **"สายชาร์จ / ที่ชาร์จฉุกเฉิน"** → Category = 'CONDITION' AND ItemCode = 'CHARGER' (ถ้าไม่มี Value = 'NO')
+  - **"ยางอะไหล่ / ชุดปะยาง / แม่แรง"** → Category = 'CONDITION' AND ItemCode IN ('SPARE_TIRE', 'JACK') (ถ้าไม่มี Value = 'NO')
+  - **"รอยขีดข่วน / บุบ-แตก"** → Category = 'BODY' (มีรอย Value = 'SCRATCH', บุบแตก Value = 'DENT')
+  - **"ร่องรอยอุบัติเหตุ / ประวัติชน"** → Category = 'ACCIDENT' AND Value = 'YES'
+
+- **Query นับจำนวนคันที่ไม่มีป้ายทะเบียนเล็ก / ป้ายภาษี / ป้ายมิเตอร์จากการคืนรถ**:
+  SELECT 
+    COUNT(DISTINCT ins.VinNo) AS TotalCars,
+    COUNT(DISTINCT ins.InspectionID) AS TotalInspections
+  FROM dbo.EV_InspectionItem it
+  JOIN dbo.EV_Inspection ins ON it.InspectionID = ins.InspectionID
+  WHERE ins.InspectionType = 'RETURN' AND ins.IsActive = 1
+    AND (
+      (it.Category IN ('ROAD_TAX', 'TAX_VEHICLE', 'TAX_METER') AND it.Value = 'NO')
+      OR (it.Category = 'LICENSE_PLATE' AND it.Value IN ('NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+    )
+
+- **Query รายชื่อรถ (ทะเบียน / VIN / วันที่ตรวจคืน / รายละเอียด) ที่พบจุดปัญหาดังกล่าว**:
+  SELECT DISTINCT 
+    ins.RegisterNo, 
+    ins.VinNo, 
+    it.Category, 
+    it.ItemCode, 
+    it.Value, 
+    it.Detail, 
+    ins.InspectionDate
+  FROM dbo.EV_InspectionItem it
+  JOIN dbo.EV_Inspection ins ON it.InspectionID = ins.InspectionID
+  WHERE ins.InspectionType = 'RETURN' AND ins.IsActive = 1
+    AND (
+      (it.Category IN ('ROAD_TAX', 'TAX_VEHICLE', 'TAX_METER') AND it.Value = 'NO')
+      OR (it.Category = 'LICENSE_PLATE' AND it.Value IN ('NONE', 'FRONT_ONLY', 'BACK_ONLY'))
+    )
+  ORDER BY ins.InspectionDate DESC
+
+### ถามจำนวนรถคืนที่รอตรวจเช็คลิสต์สภาพ (Pending Checklist)
+- ดึงจำนวนรถคืนที่ยังไม่ได้ตรวจสภาพ:
+  SELECT COUNT(*) AS PendingChecklistCount
+  FROM dbo.EV_Inspection
+  WHERE InspectionType = 'RETURN' AND IsPendingChecklist = 1 AND IsActive = 1
+
+### ถามสรุปผลการตรวจรับคืนรถในช่วงเวลา (เช่น "ผลตรวจรับคืนเดือนนี้", "สรุปตรวจสภาพรถ")
+- สรุปผลการประเมินสภาพ:
+  SELECT 
+    CASE 
+      WHEN IsPendingChecklist = 1 THEN 'รอตรวจเช็คลิสต์'
+      WHEN AssessmentResult = 'NORMAL' THEN 'สภาพปกติสมบูรณ์'
+      WHEN AssessmentResult = 'NEED_REPAIR' THEN 'ต้องส่งซ่อม'
+      ELSE 'อื่นๆ'
+    END AS AssessmentStatus,
+    COUNT(*) AS TotalCount
+  FROM dbo.EV_Inspection
+  WHERE InspectionType = 'RETURN' AND IsActive = 1
+    AND InspectionDate >= @startDate AND InspectionDate <= @endDate
+  GROUP BY 
+    CASE 
+      WHEN IsPendingChecklist = 1 THEN 'รอตรวจเช็คลิสต์'
+      WHEN AssessmentResult = 'NORMAL' THEN 'สภาพปกติสมบูรณ์'
+      WHEN AssessmentResult = 'NEED_REPAIR' THEN 'ต้องส่งซ่อม'
+      ELSE 'อื่นๆ'
+    END
+
    - กรณีดึงข้อมูลปล่อยรถสะสมย้อนหลังทั้งหมด (เช่น การนับจำนวนการปล่อยรถสะสม): ให้ดึงจากวิว View_AccumarateReleaseCar เช่น:
      SELECT RentType, COUNT(*) as cnt
      FROM View_AccumarateReleaseCar
