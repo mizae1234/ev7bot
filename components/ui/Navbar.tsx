@@ -95,6 +95,12 @@ const navGroups: NavGroup[] = [
         icon: '📝'
       },
       {
+        name: 'บันทึกรถเข้า-ออก (Gate Log)',
+        href: '/gate-monitor',
+        desc: 'ติดตามรายงานรถเข้า-ออกจาก รปภ ผ่านกลุ่ม LINE',
+        icon: '🚧'
+      },
+      {
         name: 'งานสัญญา (EV Core)',
         href: '/case-contract',
         desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',

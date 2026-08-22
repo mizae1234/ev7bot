@@ -342,6 +342,159 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
           } catch (err) {
             console.error('[Auto Claim Detect Error]', err)
           }
+
+          // ── Gate Log Detection ──────────────────────────────
+          try {
+            const groupDbGate = await prisma.lineGroup.findUnique({
+              where: { groupId: gid }
+            })
+            if (groupDbGate?.enableGateLog) {
+              const gateKeywords = [/เข้า/, /ออก/, /เข้าลาน/, /ออกลาน/, /ซ่อมเสร็จ/, /ส่งซ่อม/, /เช็คระยะ/, /ส่งมอบ/, /ลูกค้ารับ/, /รถยึด/, /รถใหม่/, /เข้าศูนย์/, /ออกศูนย์/, /รับรถ/, /คืนรถ/]
+              const hasGateKeyword = gateKeywords.some(kw => kw.test(rawText))
+              const hasVehicleNumber = /\d{3,4}/.test(rawText) || /vin/i.test(rawText) || /ทะเบียน/i.test(rawText)
+
+              if (hasGateKeyword && hasVehicleNumber) {
+                const { analyzeGateMessage } = await import('@/lib/gemini')
+                const gateAnalysis = await analyzeGateMessage(rawText)
+
+                // Log gate log token usage
+                if (gateAnalysis.inputTokens > 0) {
+                  try {
+                    await prisma.chatLog.create({
+                      data: {
+                        sourceType: 'gatelog',
+                        sourceId: event.source.userId || gid || null,
+                        userName: 'GateLog',
+                        userMessage: rawText.substring(0, 500),
+                        botReply: gateAnalysis.isGateLog ? `isGateLog=true, ref=${gateAnalysis.vehicleRef || 'N/A'}, dir=${gateAnalysis.direction || 'N/A'}` : 'isGateLog=false',
+                        inputTokens: gateAnalysis.inputTokens,
+                        outputTokens: gateAnalysis.outputTokens,
+                        modelName: gateAnalysis.modelName,
+                      }
+                    })
+                  } catch (logErr) {
+                    console.error('[GateLog Token Log Error]', logErr)
+                  }
+                }
+
+                if (gateAnalysis.isGateLog && gateAnalysis.direction) {
+                  const vehicleRef = gateAnalysis.vehicleRef?.trim() || null
+                  const vinNo = gateAnalysis.vinNo?.trim() || null
+
+                  // ถ้าไม่มีทั้งทะเบียนและ VIN → ข้ามไม่บันทึก
+                  if (!vehicleRef && !vinNo) {
+                    console.log('[Gate Log Detect] Skipped — no vehicleRef or vinNo found.')
+                  } else {
+                    let profileName = 'รปภ'
+                    try {
+                      if (!env.MOCK_MODE && event.source.userId) {
+                        const profile = await lineClient.getProfile(event.source.userId)
+                        profileName = profile.displayName
+                      }
+                    } catch { /* ignore */ }
+
+                    const { getMSSQLWritePool: getWritePool } = await import('@/lib/mssql')
+                    const mssqlPool = await getWritePool()
+
+                    if (mssqlPool) {
+                      const direction = gateAnalysis.direction
+                      const category = gateAnalysis.category || null
+                      const displayRef = vehicleRef || vinNo || 'ไม่ระบุ'
+
+                      if (direction === 'IN') {
+                        // INSERT ใหม่เสมอ (ตาม requirement: บันทึกเลยไม่ต้องเช็คซ้ำ)
+                        const insertReq = mssqlPool.request()
+                        insertReq.input('vehicleRef', sql.NVarChar, vehicleRef)
+                        insertReq.input('vinNo', sql.NVarChar, vinNo)
+                        insertReq.input('checkInCategory', sql.NVarChar, category)
+                        insertReq.input('checkInMessage', sql.NVarChar, rawText)
+                        insertReq.input('checkInByName', sql.NVarChar, profileName)
+                        insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
+                        insertReq.input('groupId', sql.NVarChar, gid)
+
+                        await insertReq.query(`
+                          INSERT INTO dbo.EV_GateLog
+                            (VehicleRef, VinNo, CheckInTime, CheckInCategory, CheckInMessage, CheckInByName, CheckInByLineUserId, GroupId, Status, CreateDate, UpdateDate)
+                          VALUES
+                            (@vehicleRef, @vinNo, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'IN', GETDATE(), GETDATE())
+                        `)
+
+                        await replyText(
+                          event.replyToken,
+                          `✅ บันทึกเข้า: ${displayRef}${category ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}`
+                        )
+                        return
+                      } else if (direction === 'OUT') {
+                        // หา record ล่าสุดที่ Status = 'IN' ของทะเบียนนี้
+                        const findReq = mssqlPool.request()
+                        if (vehicleRef) {
+                          findReq.input('vehicleRef', sql.NVarChar, vehicleRef)
+                          const findRes = await findReq.query(`
+                            SELECT TOP 1 GateLogID FROM dbo.EV_GateLog
+                            WHERE VehicleRef = @vehicleRef AND Status = 'IN'
+                            ORDER BY CreateDate DESC
+                          `)
+
+                          if (findRes.recordset.length > 0) {
+                            // UPDATE record เดิม
+                            const updateReq = mssqlPool.request()
+                            updateReq.input('gateLogId', sql.Int, findRes.recordset[0].GateLogID)
+                            updateReq.input('checkOutCategory', sql.NVarChar, category)
+                            updateReq.input('checkOutMessage', sql.NVarChar, rawText)
+                            updateReq.input('checkOutByName', sql.NVarChar, profileName)
+                            updateReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
+
+                            await updateReq.query(`
+                              UPDATE dbo.EV_GateLog SET
+                                CheckOutTime = GETDATE(),
+                                CheckOutCategory = @checkOutCategory,
+                                CheckOutMessage = @checkOutMessage,
+                                CheckOutByName = @checkOutByName,
+                                CheckOutByLineUserId = @checkOutByLineUserId,
+                                Status = 'OUT',
+                                UpdateDate = GETDATE()
+                              WHERE GateLogID = @gateLogId
+                            `)
+
+                            await replyText(
+                              event.replyToken,
+                              `✅ บันทึกออก: ${displayRef}${category ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}`
+                            )
+                            return
+                          }
+                        }
+
+                        // ไม่พบ record IN → INSERT ใหม่เป็น OUT_ONLY
+                        const insertOutReq = mssqlPool.request()
+                        insertOutReq.input('vehicleRef', sql.NVarChar, vehicleRef)
+                        insertOutReq.input('vinNo', sql.NVarChar, vinNo)
+                        insertOutReq.input('checkOutCategory', sql.NVarChar, category)
+                        insertOutReq.input('checkOutMessage', sql.NVarChar, rawText)
+                        insertOutReq.input('checkOutByName', sql.NVarChar, profileName)
+                        insertOutReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
+                        insertOutReq.input('groupId', sql.NVarChar, gid)
+
+                        await insertOutReq.query(`
+                          INSERT INTO dbo.EV_GateLog
+                            (VehicleRef, VinNo, CheckOutTime, CheckOutCategory, CheckOutMessage, CheckOutByName, CheckOutByLineUserId, GroupId, Status, CreateDate, UpdateDate)
+                          VALUES
+                            (@vehicleRef, @vinNo, GETDATE(), @checkOutCategory, @checkOutMessage, @checkOutByName, @checkOutByLineUserId, @groupId, 'OUT_ONLY', GETDATE(), GETDATE())
+                        `)
+
+                        await replyText(
+                          event.replyToken,
+                          `✅ บันทึกออก: ${displayRef}${category ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}\n(ℹ️ ไม่พบบันทึกเข้าก่อนหน้า)`
+                        )
+                        return
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error('[Gate Log Detect Error]', err)
+          }
         }
         return
       }
@@ -400,6 +553,49 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
             )
           } catch (err: any) {
             console.error('[Disable Claim Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
+      // ── เปิด/ปิดบันทึกเข้าออก (Gate Log) ──────────────────────
+      if (lower === 'เปิดบันทึกเข้าออก' || lower === 'เปิดระบบบันทึกเข้าออก') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableGateLog: true },
+            })
+            await replyText(
+              event.replyToken,
+              `✅ เปิดระบบบันทึกรถเข้า-ออกในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะเริ่มตรวจจับและบันทึกข้อความรายงานรถเข้า-ออกจาก รปภ โดยอัตโนมัติค่ะ 🚗💛`
+            )
+          } catch (err: any) {
+            console.error('[Enable Gate Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
+      if (lower === 'ปิดบันทึกเข้าออก' || lower === 'ปิดระบบบันทึกเข้าออก') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableGateLog: false },
+            })
+            await replyText(
+              event.replyToken,
+              `🚫 ปิดระบบบันทึกรถเข้า-ออกในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะหยุดตรวจจับข้อความรายงานเข้า-ออกของกลุ่มนี้ค่ะ 🧈`
+            )
+          } catch (err: any) {
+            console.error('[Disable Gate Log Group Error]', err)
             await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
           }
         }

@@ -1055,3 +1055,101 @@ export async function analyzeClaimMessage(message: string): Promise<{
 }
 
 
+export async function analyzeGateMessage(message: string): Promise<{
+  isGateLog: boolean
+  vehicleRef?: string
+  vinNo?: string
+  direction?: 'IN' | 'OUT'
+  category?: string
+  time?: string
+  inputTokens: number
+  outputTokens: number
+  modelName: string
+}> {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_MODEL_LITE,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            isGateLog: {
+              type: SchemaType.BOOLEAN,
+              description: 'Whether the message is a security guard (รปภ) reporting a vehicle entering or exiting the premises/yard/lot.',
+            },
+            vehicleRef: {
+              type: SchemaType.STRING,
+              description: 'The vehicle license plate number. Extract as-is including Thai prefix (e.g. "ทอ 4905", "1กก1234"). Return null or empty string if not found.',
+            },
+            vinNo: {
+              type: SchemaType.STRING,
+              description: 'The vehicle VIN (chassis number) if mentioned instead of plate number. Return null or empty string if not found.',
+            },
+            direction: {
+              type: SchemaType.STRING,
+              description: 'Vehicle direction: "IN" if entering/arriving, "OUT" if leaving/exiting. Determine from context: words like เข้า/มา/เข้าลาน/ส่งซ่อม/เช็คระยะ(เข้า) = IN. Words like ออก/ออกลาน/ซ่อมเสร็จ(ออก)/กลับ/ลูกค้ารับ/ส่งมอบ(ออก) = OUT. If unclear, return null.',
+            },
+            category: {
+              type: SchemaType.STRING,
+              description: 'Brief category/reason for the entry or exit. Extract from the message as-is (e.g. "ซ่อมเสร็จ", "เช็คระยะ", "ส่งซ่อม", "ส่งมอบ", "ลูกค้ารับรถ", "รถยึด", "รถใหม่เข้าลาน"). Return null if not clear.',
+            },
+            time: {
+              type: SchemaType.STRING,
+              description: 'If the guard explicitly mentions a specific time in the message (e.g. "เข้า 14:30", "ออก 15:00"), extract that time as "HH:mm" format. Return null if no specific time is mentioned.',
+            },
+          },
+          required: ['isGateLog'],
+        },
+      },
+      systemInstruction: `คุณคือผู้ช่วยตรวจจับข้อความจาก รปภ (เจ้าหน้าที่รักษาความปลอดภัย) ที่รายงานการเข้า-ออกของรถยนต์ในกลุ่ม LINE
+
+หน้าที่ของคุณคือตรวจสอบว่าข้อความเป็น "การรายงานรถเข้า-ออก" จาก รปภ หรือไม่
+
+✅ isGateLog = true → ข้อความรายงานรถเข้าหรือออก เช่น:
+  - "ทอ 4905 ซ่อมเสร็จแล้วออก" (ทะเบียน: ทอ 4905, ทิศทาง: OUT, ประเภท: ซ่อมเสร็จ)
+  - "ทอ 2855 เช็คระยะ" (ทะเบียน: ทอ 2855, ทิศทาง: IN, ประเภท: เช็คระยะ — ถ้าไม่ระบุทิศทางชัดเจนและเป็นงานที่ต้องเข้ามา ให้เป็น IN)
+  - "ทอ 3296 ส่งซ่อมเข้า" (ทะเบียน: ทอ 3296, ทิศทาง: IN, ประเภท: ส่งซ่อม)
+  - "1กก1234 ลูกค้ามารับรถออก" (ทะเบียน: 1กก1234, ทิศทาง: OUT, ประเภท: ลูกค้ารับรถ)
+  - "VIN LSJA12345 ส่งมอบออก" (VIN: LSJA12345, ทิศทาง: OUT, ประเภท: ส่งมอบ)
+
+❌ isGateLog = false → ข้อความทั่วไป สนทนา ถามคำถาม หรือไม่เกี่ยวกับรถเข้าออก เช่น:
+  - "สวัสดีครับ" (ทักทาย)
+  - "วันนี้มีรถกี่คัน" (ถามคำถาม)
+  - "ใครอยู่เวรบ้าง" (คำถามทั่วไป)
+
+⚠️ การกำหนดทิศทาง:
+- ถ้าข้อความมีคำว่า "ออก", "กลับ", "ซ่อมเสร็จ" (โดยไม่มี "เข้า") → OUT
+- ถ้าข้อความมีคำว่า "เข้า", "มา", "ส่งซ่อม", "เช็คระยะ" (โดยไม่มี "ออก") → IN
+- ถ้ามีทั้ง "เข้า" และ "ออก" → ใช้คำสุดท้ายเป็นตัวกำหนด
+- ถ้าไม่ชัดเจน → ใช้บริบท เช่น "ซ่อมเสร็จ" มักหมายถึง OUT, "ส่งซ่อม" มักหมายถึง IN
+
+ตอบกลับเป็น JSON ตามโครงสร้างที่ระบุ`,
+    })
+
+    const result = await model.generateContent(message)
+    const text = result.response.text()
+    console.log('[analyzeGateMessage] Gemini response text:', text)
+
+    const usage = result.response.usageMetadata
+    const inputTokens = usage?.promptTokenCount || 0
+    const outputTokens = usage?.candidatesTokenCount || 0
+
+    const data = JSON.parse(text)
+
+    return {
+      isGateLog: !!data.isGateLog,
+      vehicleRef: data.vehicleRef || undefined,
+      vinNo: data.vinNo || undefined,
+      direction: data.direction === 'IN' || data.direction === 'OUT' ? data.direction : undefined,
+      category: data.category || undefined,
+      time: data.time || undefined,
+      inputTokens,
+      outputTokens,
+      modelName: GEMINI_MODEL_LITE,
+    }
+  } catch (error) {
+    console.error('[analyzeGateMessage Error]', error)
+    return { isGateLog: false, inputTokens: 0, outputTokens: 0, modelName: GEMINI_MODEL_LITE }
+  }
+}
