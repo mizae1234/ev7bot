@@ -498,7 +498,8 @@ Note, CreateDate, UpdateDate
   SELECT AVG(DATEDIFF(DAY, CreatedDate, ProductionCompleteDate)) as AvgDays FROM EV_InventoryItem WHERE ProductionCompleteDate IS NOT NULL AND CreatedDate IS NOT NULL AND IsActive = 1
 - วิธีที่ 3: ถ้ายังไม่ได้ผลให้ลองรัน: EXEC GetEV_Report_ProductionCar แล้วดูว่ามีคอลัมน์อะไรบ้าง และนำ StartDate กับ ProductionCompleteDate มาคำนวณ DATEDIFF
 
-### การจัดการงาน/โน้ตค้าง (Task & Note Tracking)
+### การจัดการงาน/โน้ตค้าง (Task & Note Tracking) — ⚠️ เฉพาะ Admin เท่านั้น
+**สิทธิ์**: ฟีเจอร์นี้ใช้ได้เฉพาะผู้ใช้ที่มี role เป็น ADMIN หรือ SUPER_ADMIN เท่านั้น หากผู้ใช้ที่ไม่ใช่ Admin พยายามจดโน้ต/ดูงาน/ปิดงาน ให้ตอบว่า "ขออภัยค่ะ ฟีเจอร์จัดการภารกิจใช้ได้เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นค่ะ 🧈"
 - จดโน้ตใหม่: เรียกใช้ 'createTaskNote' โดยระบุรายละเอียดงาน คนทำ (ถ้ามี) และวันส่งมอบ (แปลงเวลาเช่น "วันศุกร์นี้" หรือ "พรุ่งนี้" เป็นวันที่จริง เช่น 2026-06-19) เมื่อบันทึกงานสำเร็จ คุณต้องพิมพ์ระบุรหัสงานในรูปแบบ ID #X (เช่น ID #5) ในข้อความตอบกลับเสมอเพื่อให้ระบบแสดงผลการ์ดชิ้นเดียวได้ถูกต้อง
 - **กฎเหล็กการจดโน้ตใหม่ (Task Tracking)**: เมื่อมีคำสั่งให้จดโน้ตหรือบันทึกงานใหม่ คุณต้องทำการบันทึกข้อมูลรายละเอียดทั้งหมดที่ผู้ใช้ป้อนเข้ามาเป็น **"Task เดียวชิ้นเดียวเท่านั้น"** ห้ามแยกเรียกใช้เครื่องมือหลายครั้ง และห้ามแบ่งข้อความออกเป็นหลาย Task เด็ดขาด โดยในฟิลด์ 'taskDetail' คุณต้องบันทึกรายละเอียดเนื้อหาทุกบรรทัด ทุกคำ และทุกตัวอักษรแบบครบถ้วนสมบูรณ์ ห้ามทำการสรุปย่อหรือตัดทอนข้อความออกเด็ดขาด
 - ดูรายการงานค้าง: เรียกใช้ 'listTaskNotes' (สถานะงานดีฟอลต์เป็น PENDING) กรองตามเลขทะเบียนรถ/VIN ได้
@@ -884,10 +885,10 @@ async function _askButterOnce(
       if (fn) {
         try {
           const args: any = { ...fc.args }
-          if (fc.name === 'createTaskNote' || fc.name === 'completeTaskNote') {
+          if (fc.name === 'createTaskNote' || fc.name === 'completeTaskNote' || fc.name === 'listTaskNotes') {
             const role = userContext?.userRole
-            if (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'USER') {
-              throw new Error('คุณไม่มีสิทธิ์จัดการภารกิจค่ะ 💛')
+            if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+              throw new Error('ขออภัยค่ะ เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถจัดการภารกิจได้ค่ะ 🧈')
             }
           }
 
