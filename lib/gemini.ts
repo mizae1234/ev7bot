@@ -1080,7 +1080,7 @@ export async function analyzeGateMessage(message: string): Promise<{
             },
             vehicleRef: {
               type: SchemaType.STRING,
-              description: 'The vehicle license plate number. Extract as-is including Thai prefix (e.g. "ทอ 4905", "1กก1234"). Return null or empty string if not found.',
+              description: 'The vehicle license plate number. ALWAYS normalize to this format: Thai prefix + hyphen + number, e.g. "ทอ-4905", "ทอ-1234", "1กก-1234". Whether the user writes "ทอ 4905", "ทอ4905", or "ทอ-4905", always output as "ทอ-4905" (with hyphen, no space). Return null or empty string if not found.',
             },
             vinNo: {
               type: SchemaType.STRING,
