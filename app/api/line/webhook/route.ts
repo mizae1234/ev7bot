@@ -378,7 +378,9 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                 }
 
                 if (gateAnalysis.isGateLog && gateAnalysis.direction) {
-                  const vehicleRef = gateAnalysis.vehicleRef?.trim() || null
+                  // Normalize ทะเบียน: "ทอ 1234" / "ทอ1234" / "ทอ-1234" → "ทอ-1234"
+                  const rawRef = gateAnalysis.vehicleRef?.trim() || null
+                  const vehicleRef = rawRef ? rawRef.replace(/[\s\-_]+/g, '').replace(/([ก-ฮ]+)(\d)/g, '$1-$2') : null
                   const vinNo = gateAnalysis.vinNo?.trim() || null
 
                   // ถ้าไม่มีทั้งทะเบียนและ VIN → ข้ามไม่บันทึก
