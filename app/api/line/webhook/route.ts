@@ -833,6 +833,15 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               where: { groupId: gid }
             })
             if (groupCheck?.enableGateLog) {
+              // ถ้าพิมพ์แค่ "butter" หรือ "butter เมนู" ในกลุ่ม Gate Log → แจ้งสถานะของกลุ่มให้ทราบ
+              if (!strippedText || strippedText === 'เมนู' || strippedText === 'menu') {
+                await replyText(
+                  event.replyToken,
+                  `ℹ️ กลุ่มนี้เปิดโหมด "บันทึกรถเข้า-ออกลาน (Gate Log)" อยู่ค่ะ 🚗\n\n• บัตเตอร์จะทำเฉพาะ Auto Tracking ตรวจจับรถเข้า-ออก และไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ\n• หากต้องการปิดโหมดนี้เพื่อให้บัตเตอร์ตอบคำถามตามปกติ ให้พิมพ์:\n👉 "butter ปิดบันทึกเข้าออก" 🧈💛`
+                )
+                return
+              }
+
               console.log('[Gate Log Group] Butter disabled in this group, silently ignoring.')
               return
             }
