@@ -615,6 +615,24 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
+      // ── กลุ่มที่เปิด Gate Log → Butter ไม่ตอบอะไร (auto track อย่างเดียว) ──
+      {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            const groupCheck = await prisma.lineGroup.findUnique({
+              where: { groupId: gid }
+            })
+            if (groupCheck?.enableGateLog) {
+              // อนุญาตเฉพาะคำสั่งเปิด/ปิดบันทึกเข้าออก (ตรวจจับแล้วด้านบน)
+              // นอกนั้น → ไม่ตอบ
+              console.log('[Gate Log Group] Butter disabled in this group, silently ignoring.')
+              return
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
       // ถ้าพิมพ์แค่ "butter" เฉยๆ (ไม่มีการ bypass และ strippedText ว่าง) → ทักทาย
       if (!isBypass && !strippedText) {
         await replyText(
