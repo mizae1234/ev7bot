@@ -425,13 +425,13 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                         )
                         return
                       } else if (direction === 'OUT') {
-                        // หา record ล่าสุดที่ Status = 'IN' ของทะเบียนนี้
+                        // หา record ล่าสุดที่ Status = 'IN' ของทะเบียนนี้ (normalize ช่องว่าง)
                         const findReq = mssqlPool.request()
                         if (vehicleRef) {
-                          findReq.input('vehicleRef', sql.NVarChar, vehicleRef)
+                          findReq.input('vehicleRef', sql.NVarChar, vehicleRef.replace(/\s+/g, ''))
                           const findRes = await findReq.query(`
                             SELECT TOP 1 GateLogID FROM dbo.EV_GateLog
-                            WHERE VehicleRef = @vehicleRef AND Status = 'IN'
+                            WHERE REPLACE(VehicleRef, ' ', '') = @vehicleRef AND Status = 'IN'
                             ORDER BY CreateDate DESC
                           `)
 
