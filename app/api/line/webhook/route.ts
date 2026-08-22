@@ -78,7 +78,19 @@ lineClient.replyMessage = async function(replyToken: string, messages: any, ...a
 } as any
 
 const BOT_NAME = 'Butter'
-const BOT_TRIGGERS = ['butter', 'บัตเตอร์', 'บัทเตอร์', 'butter,', 'butter:']
+const BOT_TRIGGERS = [
+  '@butter',
+  '@บัตเตอร์',
+  '@บัทเตอร์',
+  'butter',
+  'บัตเตอร์',
+  'บัทเตอร์',
+  'butter,',
+  'butter:',
+  'butter ',
+  'บัตเตอร์ ',
+  'บัทเตอร์ '
+]
 
 const quickReplyItems = {
   items: [
@@ -173,6 +185,7 @@ async function isRegisteredUser(userId: string): Promise<boolean> {
     /* ignore fallback */
   }
 
+  console.log(`[isRegisteredUser] User ${userId} is not registered or active`)
   return false
 }
 
@@ -331,9 +344,14 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
       if (isBypass) {
         triggerFound = true
       } else {
-        const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
+        const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t) || cleanLower.startsWith(t))
         if (trigger) {
-          strippedText = rawText.substring(trigger.length).trim()
+          const baseText = rawLower.startsWith(trigger) ? rawText : (cleanLower || rawText)
+          strippedText = baseText.substring(trigger.length).trim()
+          triggerFound = true
+        } else if ((event.message as any).mention?.mentionees?.length) {
+          // If LINE official @mention was used
+          strippedText = rawText.replace(/^@[^\s]+\s*/, '').trim()
           triggerFound = true
         }
       }
