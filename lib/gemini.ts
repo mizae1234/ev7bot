@@ -1062,6 +1062,7 @@ export async function analyzeGateMessage(message: string): Promise<{
   direction?: 'IN' | 'OUT'
   category?: string
   time?: string
+  quantity?: number
   inputTokens: number
   outputTokens: number
   modelName: string
@@ -1098,6 +1099,10 @@ export async function analyzeGateMessage(message: string): Promise<{
               type: SchemaType.STRING,
               description: 'If the guard explicitly mentions a specific time in the message (e.g. "เข้า 14:30", "ออก 15:00"), extract that time as "HH:mm" format. Return null if no specific time is mentioned.',
             },
+            quantity: {
+              type: SchemaType.INTEGER,
+              description: 'Number of vehicles if the message mentions multiple cars (e.g. "รถใหม่เข้า 7 คัน" → 7, "รถใหม่เข้ามาจอด 3 คัน" → 3). Return 1 or null if only a single vehicle or not specified.',
+            },
           },
           required: ['isGateLog'],
         },
@@ -1107,11 +1112,13 @@ export async function analyzeGateMessage(message: string): Promise<{
 หน้าที่ของคุณคือตรวจสอบว่าข้อความเป็น "การรายงานรถเข้า-ออก" จาก รปภ หรือไม่
 
 ✅ isGateLog = true → ข้อความรายงานรถเข้าหรือออก เช่น:
-  - "ทอ 4905 ซ่อมเสร็จแล้วออก" (ทะเบียน: ทอ 4905, ทิศทาง: OUT, ประเภท: ซ่อมเสร็จ)
-  - "ทอ 2855 เช็คระยะ" (ทะเบียน: ทอ 2855, ทิศทาง: IN, ประเภท: เช็คระยะ — ถ้าไม่ระบุทิศทางชัดเจนและเป็นงานที่ต้องเข้ามา ให้เป็น IN)
-  - "ทอ 3296 ส่งซ่อมเข้า" (ทะเบียน: ทอ 3296, ทิศทาง: IN, ประเภท: ส่งซ่อม)
-  - "1กก1234 ลูกค้ามารับรถออก" (ทะเบียน: 1กก1234, ทิศทาง: OUT, ประเภท: ลูกค้ารับรถ)
+  - "ทอ 4905 ซ่อมเสร็จแล้วออก" (ทะเบียน: ทอ-4905, ทิศทาง: OUT, ประเภท: ซ่อมเสร็จ)
+  - "ทอ 2855 เช็คระยะ" (ทะเบียน: ทอ-2855, ทิศทาง: IN, ประเภท: เช็คระยะ — ถ้าไม่ระบุทิศทางชัดเจนและเป็นงานที่ต้องเข้ามา ให้เป็น IN)
+  - "ทอ 3296 ส่งซ่อมเข้า" (ทะเบียน: ทอ-3296, ทิศทาง: IN, ประเภท: ส่งซ่อม)
+  - "1กก1234 ลูกค้ามารับรถออก" (ทะเบียน: 1กก-1234, ทิศทาง: OUT, ประเภท: ลูกค้ารับรถ)
   - "VIN LSJA12345 ส่งมอบออก" (VIN: LSJA12345, ทิศทาง: OUT, ประเภท: ส่งมอบ)
+  - "รถใหม่เข้ามาจอด 7 คัน" (ไม่มีทะเบียน, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 7)
+  - "รถใหม่เข้า 3 คัน" (ไม่มีทะเบียน, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 3)
 
 ❌ isGateLog = false → ข้อความทั่วไป สนทนา ถามคำถาม หรือไม่เกี่ยวกับรถเข้าออก เช่น:
   - "สวัสดีครับ" (ทักทาย)
@@ -1144,6 +1151,7 @@ export async function analyzeGateMessage(message: string): Promise<{
       direction: data.direction === 'IN' || data.direction === 'OUT' ? data.direction : undefined,
       category: data.category || undefined,
       time: data.time || undefined,
+      quantity: data.quantity && data.quantity > 1 ? data.quantity : undefined,
       inputTokens,
       outputTokens,
       modelName: GEMINI_MODEL_LITE,

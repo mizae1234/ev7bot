@@ -352,8 +352,9 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               const gateKeywords = [/เข้า/, /ออก/, /เข้าลาน/, /ออกลาน/, /ซ่อมเสร็จ/, /ส่งซ่อม/, /เช็คระยะ/, /ส่งมอบ/, /ลูกค้ารับ/, /รถยึด/, /รถใหม่/, /เข้าศูนย์/, /ออกศูนย์/, /รับรถ/, /คืนรถ/]
               const hasGateKeyword = gateKeywords.some(kw => kw.test(rawText))
               const hasVehicleNumber = /\d{3,4}/.test(rawText) || /vin/i.test(rawText) || /ทะเบียน/i.test(rawText)
+              const isNewCarMessage = /รถใหม่/.test(rawText)
 
-              if (hasGateKeyword && hasVehicleNumber) {
+              if (hasGateKeyword && (hasVehicleNumber || isNewCarMessage)) {
                 const { analyzeGateMessage } = await import('@/lib/gemini')
                 const gateAnalysis = await analyzeGateMessage(rawText)
 
@@ -383,9 +384,62 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                   const vehicleRef = rawRef ? rawRef.replace(/[\s\-_]+/g, '').replace(/([ก-ฮ]+)(\d)/g, '$1-$2') : null
                   const vinNo = gateAnalysis.vinNo?.trim() || null
 
-                  // ถ้าไม่มีทั้งทะเบียนและ VIN → ข้ามไม่บันทึก
+                  // ถ้าไม่มีทั้งทะเบียนและ VIN → เช็คว่าเป็นรถใหม่หรือไม่
                   if (!vehicleRef && !vinNo) {
-                    console.log('[Gate Log Detect] Skipped — no vehicleRef or vinNo found.')
+                    if (!isNewCarMessage) {
+                      console.log('[Gate Log Detect] Skipped — no vehicleRef or vinNo found.')
+                    } else {
+                      // รถใหม่ไม่มีทะเบียน → สร้าง records ตามจำนวน
+                      let profileName = 'รปภ'
+                      try {
+                        if (!env.MOCK_MODE && event.source.userId) {
+                          const profile = await lineClient.getProfile(event.source.userId)
+                          profileName = profile.displayName
+                        }
+                      } catch { /* ignore */ }
+
+                      const { getMSSQLWritePool: getWritePool } = await import('@/lib/mssql')
+                      const mssqlPool = await getWritePool()
+
+                      if (mssqlPool) {
+                        const direction = gateAnalysis.direction || 'IN'
+                        const category = gateAnalysis.category || 'รถใหม่'
+                        const qty = gateAnalysis.quantity || 1
+
+                        for (let i = 0; i < qty; i++) {
+                          const insertReq = mssqlPool.request()
+                          insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
+                          insertReq.input('checkInCategory', sql.NVarChar, category)
+                          insertReq.input('checkInMessage', sql.NVarChar, rawText)
+                          insertReq.input('checkInByName', sql.NVarChar, profileName)
+                          insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
+                          insertReq.input('groupId', sql.NVarChar, gid)
+
+                          if (direction === 'IN') {
+                            await insertReq.query(`
+                              INSERT INTO dbo.EV_GateLog
+                                (VehicleRef, CheckInTime, CheckInCategory, CheckInMessage, CheckInByName, CheckInByLineUserId, GroupId, Status, CreateDate, UpdateDate)
+                              VALUES
+                                (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'IN', GETDATE(), GETDATE())
+                            `)
+                          } else {
+                            await insertReq.query(`
+                              INSERT INTO dbo.EV_GateLog
+                                (VehicleRef, CheckOutTime, CheckOutCategory, CheckOutMessage, CheckOutByName, CheckOutByLineUserId, GroupId, Status, CreateDate, UpdateDate)
+                              VALUES
+                                (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'OUT_ONLY', GETDATE(), GETDATE())
+                            `)
+                          }
+                        }
+
+                        const dirLabel = direction === 'IN' ? 'เข้า' : 'ออก'
+                        await replyText(
+                          event.replyToken,
+                          `✅ บันทึก${dirLabel}: รถใหม่ ${qty} คัน${category !== 'รถใหม่' ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}`
+                        )
+                        return
+                      }
+                    }
                   } else {
                     let profileName = 'รปภ'
                     try {
