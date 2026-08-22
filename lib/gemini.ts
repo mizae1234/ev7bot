@@ -138,8 +138,23 @@ NumericValue (ค่าตัวเลข), ExpiryDate (วันหมดอา
 ### ตาราง: dbo.EV_InspectionPhoto (รูปถ่ายสภาพรถ)
 คอลัมน์: PhotoID (PK), InspectionID (FK → EV_Inspection.InspectionID), Category, ItemCode, Position ('FRONT', 'BACK', 'LEFT', 'RIGHT'), PhotoUrl, IsActive
 
+### ตาราง: dbo.EV_GateLog (บันทึกรถเข้า-ออกลาน จาก รปภ ผ่าน LINE)
+คอลัมน์: GateLogID (PK), VehicleRef (ทะเบียน เช่น ทอ-4905, หรือ 'รถใหม่' สำหรับรถที่ยังไม่มีทะเบียน), VinNo (เลข VIN ถ้ามี),
+CheckInTime (เวลาเข้า), CheckInCategory (เหตุผลเข้า เช่น เช็คระยะ, ส่งซ่อม, รถใหม่), CheckInMessage (ข้อความต้นฉบับตอนเข้า), CheckInByName (ชื่อ รปภ ที่บันทึกเข้า),
+CheckOutTime (เวลาออก), CheckOutCategory (เหตุผลออก เช่น ซ่อมเสร็จ, ส่งมอบ, ลูกค้ารับรถ), CheckOutMessage (ข้อความต้นฉบับตอนออก), CheckOutByName (ชื่อ รปภ ที่บันทึกออก),
+QuantityIn (จำนวนรถเข้า, default=1, ใช้กับรถใหม่หลายคัน), QuantityOut (จำนวนรถออก, default=0),
+GroupId (LINE Group ID), Status ('IN'=อยู่ในลาน, 'OUT'=ออกแล้ว, 'OUT_ONLY'=บันทึกแค่ออกไม่มีเข้า, 'CANCELLED'=ยกเลิก),
+Note, CreateDate, UpdateDate
+
 ### ตาราง: task_notes (จดโน้ต/ติดตามงาน - อยู่ใน PostgreSQL)
 คอลัมน์: id (int), vehicle_ref (ทะเบียนรถ หรือ เลข VIN, ถ้าเป็นงานทั่วไปให้เป็น NULL), assignee_name (ชื่อผู้รับผิดชอบงาน เช่น พี่วิทยา, ถ้าไม่ระบุให้เป็น "ยังไม่ทราบผู้รับผิดชอบ"), task_detail (รายละเอียดงาน เช่น ตามเอกสาร), due_date (กำหนดเสร็จ YYYY-MM-DD), status (PENDING/COMPLETED)
+
+ตัวอย่างคำถามรถเข้า-ออกที่ตอบได้:
+- "วันนี้มีรถเข้ากี่คัน" → SELECT COUNT(*) FROM dbo.EV_GateLog WHERE CheckInTime IS NOT NULL AND CAST(CreateDate AS DATE) = CAST(GETDATE() AS DATE)
+- "ตอนนี้รถอยู่ในลานกี่คัน" → SELECT SUM(QuantityIn - QuantityOut) FROM dbo.EV_GateLog WHERE Status = 'IN'
+- "ทอ-4905 เข้ามาเมื่อไหร่" → SELECT TOP 1 * FROM dbo.EV_GateLog WHERE REPLACE(VehicleRef, ' ', '') LIKE '%ทอ4905%' ORDER BY CreateDate DESC
+- "วันนี้รถอะไรบ้างที่ยังไม่ออก" → SELECT VehicleRef, CheckInTime, CheckInCategory FROM dbo.EV_GateLog WHERE Status = 'IN' AND CAST(CreateDate AS DATE) = CAST(GETDATE() AS DATE)
+- "รถใหม่เข้ามากี่คันวันนี้" → SELECT SUM(QuantityIn) FROM dbo.EV_GateLog WHERE VehicleRef = N'รถใหม่' AND CAST(CreateDate AS DATE) = CAST(GETDATE() AS DATE) AND CheckInTime IS NOT NULL
 
 ## ความสัมพันธ์ระหว่างตาราง
 - EV_Policy.VinNo = EV_InventoryItem.VinNo
@@ -156,6 +171,7 @@ NumericValue (ค่าตัวเลข), ExpiryDate (วันหมดอา
 - EV_ReturnItem เก็บข้อมูลแยก (ใช้ VinNo เชื่อม)
 - EV_VehicleNote.InventoryItemID → EV_InventoryItem.InventoryItemID
 - EV_MsSubStatus (Type='LOCATION') — EV_InventoryItem.CurrentLocation = EV_MsSubStatus.StatusCode / EV_Inspection.Location = EV_MsSubStatus.StatusCode
+- EV_GateLog.VehicleRef สามารถเทียบกับ EV_InventoryItem.RegisterNo ได้ (แต่ไม่มี FK เพราะบางรถยังไม่มีทะเบียนในระบบ)
 
 ### ถามข้อมูลประกันภัย พ.ร.บ. หรือภาษีรถ (เช่น "ทะเบียน ทอ-4623 ประกันหมดเมื่อไหร่ ของที่ไหน")
 1. ดึงจาก dbo.EV_Policy โดยเชื่อมกับ EV_InventoryItem ด้วย VinNo:
