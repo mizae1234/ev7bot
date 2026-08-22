@@ -406,28 +406,73 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                         const category = gateAnalysis.category || 'รถใหม่'
                         const qty = gateAnalysis.quantity || 1
 
-                        for (let i = 0; i < qty; i++) {
-                          const insertReq = mssqlPool.request()
-                          insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
-                          insertReq.input('checkInCategory', sql.NVarChar, category)
-                          insertReq.input('checkInMessage', sql.NVarChar, rawText)
-                          insertReq.input('checkInByName', sql.NVarChar, profileName)
-                          insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
-                          insertReq.input('groupId', sql.NVarChar, gid)
+                        if (direction === 'IN') {
+                          // INSERT ใหม่ตามจำนวน
+                          for (let i = 0; i < qty; i++) {
+                            const insertReq = mssqlPool.request()
+                            insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
+                            insertReq.input('checkInCategory', sql.NVarChar, category)
+                            insertReq.input('checkInMessage', sql.NVarChar, rawText)
+                            insertReq.input('checkInByName', sql.NVarChar, profileName)
+                            insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
+                            insertReq.input('groupId', sql.NVarChar, gid)
 
-                          if (direction === 'IN') {
                             await insertReq.query(`
                               INSERT INTO dbo.EV_GateLog
                                 (VehicleRef, CheckInTime, CheckInCategory, CheckInMessage, CheckInByName, CheckInByLineUserId, GroupId, Status, CreateDate, UpdateDate)
                               VALUES
                                 (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'IN', GETDATE(), GETDATE())
                             `)
-                          } else {
+                          }
+                        } else {
+                          // OUT → FIFO: หา record เก่าสุดที่ Status='IN' + VehicleRef='รถใหม่' แล้ว UPDATE
+                          const findReq = mssqlPool.request()
+                          findReq.input('qty', sql.Int, qty)
+                          const findRes = await findReq.query(`
+                            SELECT TOP (@qty) GateLogID FROM dbo.EV_GateLog
+                            WHERE VehicleRef = N'รถใหม่' AND Status = 'IN'
+                            ORDER BY CreateDate ASC
+                          `)
+
+                          let matched = 0
+                          for (const row of findRes.recordset) {
+                            const updateReq = mssqlPool.request()
+                            updateReq.input('gateLogId', sql.Int, row.GateLogID)
+                            updateReq.input('checkOutCategory', sql.NVarChar, category)
+                            updateReq.input('checkOutMessage', sql.NVarChar, rawText)
+                            updateReq.input('checkOutByName', sql.NVarChar, profileName)
+                            updateReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
+
+                            await updateReq.query(`
+                              UPDATE dbo.EV_GateLog SET
+                                CheckOutTime = GETDATE(),
+                                CheckOutCategory = @checkOutCategory,
+                                CheckOutMessage = @checkOutMessage,
+                                CheckOutByName = @checkOutByName,
+                                CheckOutByLineUserId = @checkOutByLineUserId,
+                                Status = 'OUT',
+                                UpdateDate = GETDATE()
+                              WHERE GateLogID = @gateLogId
+                            `)
+                            matched++
+                          }
+
+                          // ถ้า IN records ไม่พอ → สร้าง OUT_ONLY สำหรับส่วนที่เหลือ
+                          const remaining = qty - matched
+                          for (let i = 0; i < remaining; i++) {
+                            const insertReq = mssqlPool.request()
+                            insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
+                            insertReq.input('checkOutCategory', sql.NVarChar, category)
+                            insertReq.input('checkOutMessage', sql.NVarChar, rawText)
+                            insertReq.input('checkOutByName', sql.NVarChar, profileName)
+                            insertReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
+                            insertReq.input('groupId', sql.NVarChar, gid)
+
                             await insertReq.query(`
                               INSERT INTO dbo.EV_GateLog
                                 (VehicleRef, CheckOutTime, CheckOutCategory, CheckOutMessage, CheckOutByName, CheckOutByLineUserId, GroupId, Status, CreateDate, UpdateDate)
                               VALUES
-                                (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'OUT_ONLY', GETDATE(), GETDATE())
+                                (@vehicleRef, GETDATE(), @checkOutCategory, @checkOutMessage, @checkOutByName, @checkOutByLineUserId, @groupId, 'OUT_ONLY', GETDATE(), GETDATE())
                             `)
                           }
                         }
