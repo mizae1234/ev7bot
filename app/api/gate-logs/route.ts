@@ -73,6 +73,8 @@ export async function GET(req: NextRequest) {
         g.CheckOutCategory,
         g.CheckOutMessage,
         g.CheckOutByName,
+        g.QuantityIn,
+        g.QuantityOut,
         g.Status,
         g.Note,
         g.CreateDate,

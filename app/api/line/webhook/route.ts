@@ -389,7 +389,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                     if (!isNewCarMessage) {
                       console.log('[Gate Log Detect] Skipped — no vehicleRef or vinNo found.')
                     } else {
-                      // รถใหม่ไม่มีทะเบียน → สร้าง records ตามจำนวน
+                      // รถใหม่ไม่มีทะเบียน → 1 record + จำนวน
                       let profileName = 'รปภ'
                       try {
                         if (!env.MOCK_MODE && event.source.userId) {
@@ -407,41 +407,52 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                         const qty = gateAnalysis.quantity || 1
 
                         if (direction === 'IN') {
-                          // INSERT ใหม่ตามจำนวน
-                          for (let i = 0; i < qty; i++) {
-                            const insertReq = mssqlPool.request()
-                            insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
-                            insertReq.input('checkInCategory', sql.NVarChar, category)
-                            insertReq.input('checkInMessage', sql.NVarChar, rawText)
-                            insertReq.input('checkInByName', sql.NVarChar, profileName)
-                            insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
-                            insertReq.input('groupId', sql.NVarChar, gid)
+                          // INSERT 1 record พร้อม QuantityIn
+                          const insertReq = mssqlPool.request()
+                          insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
+                          insertReq.input('checkInCategory', sql.NVarChar, category)
+                          insertReq.input('checkInMessage', sql.NVarChar, rawText)
+                          insertReq.input('checkInByName', sql.NVarChar, profileName)
+                          insertReq.input('checkInByLineUserId', sql.NVarChar, event.source.userId || null)
+                          insertReq.input('groupId', sql.NVarChar, gid)
+                          insertReq.input('quantityIn', sql.Int, qty)
 
-                            await insertReq.query(`
-                              INSERT INTO dbo.EV_GateLog
-                                (VehicleRef, CheckInTime, CheckInCategory, CheckInMessage, CheckInByName, CheckInByLineUserId, GroupId, Status, CreateDate, UpdateDate)
-                              VALUES
-                                (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, 'IN', GETDATE(), GETDATE())
-                            `)
-                          }
+                          await insertReq.query(`
+                            INSERT INTO dbo.EV_GateLog
+                              (VehicleRef, CheckInTime, CheckInCategory, CheckInMessage, CheckInByName, CheckInByLineUserId, GroupId, QuantityIn, QuantityOut, Status, CreateDate, UpdateDate)
+                            VALUES
+                              (@vehicleRef, GETDATE(), @checkInCategory, @checkInMessage, @checkInByName, @checkInByLineUserId, @groupId, @quantityIn, 0, 'IN', GETDATE(), GETDATE())
+                          `)
+
+                          await replyText(
+                            event.replyToken,
+                            `✅ บันทึกเข้า: รถใหม่ ${qty} คัน${category !== 'รถใหม่' ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}`
+                          )
+                          return
                         } else {
-                          // OUT → FIFO: หา record เก่าสุดที่ Status='IN' + VehicleRef='รถใหม่' แล้ว UPDATE
+                          // OUT → หา record เก่าสุดที่ยังมีรถอยู่ในลาน (QuantityOut < QuantityIn)
                           const findReq = mssqlPool.request()
-                          findReq.input('qty', sql.Int, qty)
+                          findReq.input('groupId', sql.NVarChar, gid)
                           const findRes = await findReq.query(`
-                            SELECT TOP (@qty) GateLogID FROM dbo.EV_GateLog
-                            WHERE VehicleRef = N'รถใหม่' AND Status = 'IN'
+                            SELECT TOP 1 GateLogID, QuantityIn, QuantityOut
+                            FROM dbo.EV_GateLog
+                            WHERE VehicleRef = N'รถใหม่' AND Status = 'IN' AND GroupId = @groupId AND QuantityOut < QuantityIn
                             ORDER BY CreateDate ASC
                           `)
 
-                          let matched = 0
-                          for (const row of findRes.recordset) {
+                          if (findRes.recordset.length > 0) {
+                            const record = findRes.recordset[0]
+                            const newQtyOut = Math.min(record.QuantityOut + qty, record.QuantityIn)
+                            const newStatus = newQtyOut >= record.QuantityIn ? 'OUT' : 'IN'
+
                             const updateReq = mssqlPool.request()
-                            updateReq.input('gateLogId', sql.Int, row.GateLogID)
+                            updateReq.input('gateLogId', sql.Int, record.GateLogID)
+                            updateReq.input('qtyOut', sql.Int, newQtyOut)
                             updateReq.input('checkOutCategory', sql.NVarChar, category)
                             updateReq.input('checkOutMessage', sql.NVarChar, rawText)
                             updateReq.input('checkOutByName', sql.NVarChar, profileName)
                             updateReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
+                            updateReq.input('newStatus', sql.NVarChar, newStatus)
 
                             await updateReq.query(`
                               UPDATE dbo.EV_GateLog SET
@@ -450,16 +461,20 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                                 CheckOutMessage = @checkOutMessage,
                                 CheckOutByName = @checkOutByName,
                                 CheckOutByLineUserId = @checkOutByLineUserId,
-                                Status = 'OUT',
+                                QuantityOut = @qtyOut,
+                                Status = @newStatus,
                                 UpdateDate = GETDATE()
                               WHERE GateLogID = @gateLogId
                             `)
-                            matched++
-                          }
 
-                          // ถ้า IN records ไม่พอ → สร้าง OUT_ONLY สำหรับส่วนที่เหลือ
-                          const remaining = qty - matched
-                          for (let i = 0; i < remaining; i++) {
+                            const remaining = record.QuantityIn - newQtyOut
+                            await replyText(
+                              event.replyToken,
+                              `✅ บันทึกออก: รถใหม่ ${qty} คัน${category !== 'รถใหม่' ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}${remaining > 0 ? `\n📊 เหลือในลาน: ${remaining} คัน` : '\n✅ ออกครบแล้ว'}`
+                            )
+                            return
+                          } else {
+                            // ไม่มี record IN → สร้าง OUT_ONLY ใหม่
                             const insertReq = mssqlPool.request()
                             insertReq.input('vehicleRef', sql.NVarChar, 'รถใหม่')
                             insertReq.input('checkOutCategory', sql.NVarChar, category)
@@ -467,22 +482,22 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                             insertReq.input('checkOutByName', sql.NVarChar, profileName)
                             insertReq.input('checkOutByLineUserId', sql.NVarChar, event.source.userId || null)
                             insertReq.input('groupId', sql.NVarChar, gid)
+                            insertReq.input('qty', sql.Int, qty)
 
                             await insertReq.query(`
                               INSERT INTO dbo.EV_GateLog
-                                (VehicleRef, CheckOutTime, CheckOutCategory, CheckOutMessage, CheckOutByName, CheckOutByLineUserId, GroupId, Status, CreateDate, UpdateDate)
+                                (VehicleRef, CheckOutTime, CheckOutCategory, CheckOutMessage, CheckOutByName, CheckOutByLineUserId, GroupId, QuantityIn, QuantityOut, Status, CreateDate, UpdateDate)
                               VALUES
-                                (@vehicleRef, GETDATE(), @checkOutCategory, @checkOutMessage, @checkOutByName, @checkOutByLineUserId, @groupId, 'OUT_ONLY', GETDATE(), GETDATE())
+                                (@vehicleRef, GETDATE(), @checkOutCategory, @checkOutMessage, @checkOutByName, @checkOutByLineUserId, @groupId, 0, @qty, 'OUT_ONLY', GETDATE(), GETDATE())
                             `)
+
+                            await replyText(
+                              event.replyToken,
+                              `✅ บันทึกออก: รถใหม่ ${qty} คัน${category !== 'รถใหม่' ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}\n(ℹ️ ไม่พบบันทึกเข้าก่อนหน้า)`
+                            )
+                            return
                           }
                         }
-
-                        const dirLabel = direction === 'IN' ? 'เข้า' : 'ออก'
-                        await replyText(
-                          event.replyToken,
-                          `✅ บันทึก${dirLabel}: รถใหม่ ${qty} คัน${category !== 'รถใหม่' ? ` (${category})` : ''}\n👤 ${profileName}\n🕐 ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}`
-                        )
-                        return
                       }
                     }
                   } else {

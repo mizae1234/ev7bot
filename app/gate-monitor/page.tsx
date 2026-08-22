@@ -17,6 +17,8 @@ interface GateLog {
   CheckOutCategory: string | null
   CheckOutMessage: string | null
   CheckOutByName: string | null
+  QuantityIn: number
+  QuantityOut: number
   Status: string
   Note: string | null
   CreateDate: string
@@ -326,6 +328,7 @@ function GateMonitorContent() {
             <thead className="bg-zinc-50 border-b border-zinc-200">
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">ทะเบียน / VIN</th>
+                <th className="text-center px-4 py-3 font-semibold text-zinc-600">จำนวน</th>
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">เหตุผล(เข้า)</th>
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">เวลาเข้า</th>
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">รปภ(เข้า)</th>
@@ -339,7 +342,7 @@ function GateMonitorContent() {
             <tbody className="divide-y divide-zinc-100">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12">
+                  <td colSpan={10} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-zinc-400 text-xs">กำลังโหลด...</span>
@@ -348,7 +351,7 @@ function GateMonitorContent() {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-zinc-400">
+                  <td colSpan={10} className="text-center py-12 text-zinc-400">
                     ไม่พบข้อมูล
                   </td>
                 </tr>
@@ -364,6 +367,20 @@ function GateMonitorContent() {
                         {log.VinNo && (
                           <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{log.VinNo}</div>
                         )}
+                      </td>
+
+                      {/* จำนวน (เข้า/ออก) */}
+                      <td className="px-4 py-3 text-center">
+                        {log.QuantityIn > 1 || log.QuantityOut > 0 ? (
+                          <div>
+                            <span className="text-blue-600 font-bold">{log.QuantityIn}</span>
+                            <span className="text-zinc-400 mx-0.5">/</span>
+                            <span className="text-emerald-600 font-bold">{log.QuantityOut}</span>
+                            {log.Status === 'IN' && log.QuantityIn > log.QuantityOut && (
+                              <div className="text-[10px] text-orange-500 mt-0.5">เหลือ {log.QuantityIn - log.QuantityOut}</div>
+                            )}
+                          </div>
+                        ) : <span className="text-zinc-300">—</span>}
                       </td>
 
                       {/* เหตุผล(เข้า) */}
