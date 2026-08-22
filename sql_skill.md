@@ -1488,7 +1488,67 @@ WHERE RegisterNo = 'ทอ-3260' OR VinNo = 'LNADHAB31R1E09651'
 ORDER BY MovementDate DESC;
 ```
 
+## 11. Gate Log & Security Tracking
 
+### `dbo.EV_GateLog` (ตารางบันทึกการเข้า-ออกของรถยนต์ในลานจอด)
+ตารางจัดเก็บข้อมูลประวัติรถยนต์ที่เข้าและออกจากลานจอดรถ/ศูนย์บริการ ที่ได้รับรายงานจากเจ้าหน้าที่ รปภ ผ่านกลุ่ม LINE
 
+**คอลัมน์สำคัญ:**
+- `GateLogID` (int, PK, IDENTITY)
+- `VehicleRef` (nvarchar(50)) — เลขทะเบียนรถ (เช่น 'ทอ-4905') หรือระบุ 'รถใหม่'
+- `VinNo` (nvarchar(50)) — เลขตัวถัง (ถ้ามี)
+- `CheckInTime` (datetime) — เวลาเข้า
+- `CheckInCategory` (nvarchar(100)) — เหตุผลการเข้า (เช่น เช็คระยะ, ส่งซ่อม, รถใหม่เข้าลาน)
+- `CheckInMessage` (nvarchar(500)) — ข้อความต้นฉบับตอนเข้า
+- `CheckInByName` (nvarchar(100)) — ชื่อ รปภ ผู้บันทึกตอนเข้า
+- `CheckInByLineUserId` (nvarchar(100)) — LINE User ID ผู้บันทึกเข้า
+- `CheckOutTime` (datetime) — เวลาออก
+- `CheckOutCategory` (nvarchar(100)) — เหตุผลการออก (เช่น ซ่อมเสร็จ, ส่งมอบ, ลูกค้ารับรถ)
+- `CheckOutMessage` (nvarchar(500)) — ข้อความต้นฉบับตอนออก
+- `CheckOutByName` (nvarchar(100)) — ชื่อ รปภ ผู้บันทึกตอนออก
+- `CheckOutByLineUserId` (nvarchar(100)) — LINE User ID ผู้บันทึกออก
+- `QuantityIn` (int) — จำนวนรถที่เข้า (default: 1)
+- `QuantityOut` (int) — จำนวนรถที่ออก (default: 0)
+- `GroupId` (nvarchar(100)) — รหัสกลุ่ม LINE
+- `Status` (nvarchar(20)) — 'IN' (อยู่ในลาน), 'OUT' (ออกแล้ว), 'OUT_ONLY' (บันทึกออกโดยไม่มีประวัติเข้า), 'CANCELLED'
+- `CreateDate`, `UpdateDate` (datetime)
 
+**ตัวอย่าง Queries:**
 
+1. ดึงรายการรถที่กำลังจอดอยู่ในลานทั้งหมด (Real-time in Yard):
+```sql
+SELECT 
+  GateLogID,
+  VehicleRef,
+  VinNo,
+  CheckInTime,
+  CheckInCategory,
+  CheckInByName,
+  QuantityIn,
+  QuantityOut,
+  (QuantityIn - QuantityOut) AS RemainingCount,
+  Status
+FROM dbo.EV_GateLog
+WHERE Status = 'IN'
+ORDER BY CheckInTime DESC;
+```
+
+2. สรุปสถิติรถเข้า-ออกประจำวัน:
+```sql
+SELECT 
+  COUNT(CASE WHEN CheckInTime IS NOT NULL THEN 1 END) AS TotalInRecords,
+  SUM(QuantityIn) AS TotalInVehicles,
+  COUNT(CASE WHEN CheckOutTime IS NOT NULL THEN 1 END) AS TotalOutRecords,
+  SUM(QuantityOut) AS TotalOutVehicles,
+  SUM(CASE WHEN Status = 'IN' THEN (QuantityIn - QuantityOut) ELSE 0 END) AS CurrentlyInYard
+FROM dbo.EV_GateLog
+WHERE CAST(CreateDate AS DATE) = CAST(GETDATE() AS DATE);
+```
+
+3. ประวัติการเข้า-ออกของรถรายคัน:
+```sql
+SELECT *
+FROM dbo.EV_GateLog
+WHERE REPLACE(VehicleRef, '-', '') = 'ทอ4905' OR VinNo LIKE '%4905%'
+ORDER BY CreateDate DESC;
+```

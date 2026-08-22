@@ -137,6 +137,45 @@ function verifySignature(body: string, signature: string): boolean {
   return hash === signature
 }
 
+// Check if user is registered and active in EV7 system
+async function isRegisteredUser(userId: string): Promise<boolean> {
+  if (!userId) return false
+
+  // 1. Check admin env
+  const adminEnv = process.env.ADMIN_LINE_USER_IDS || ''
+  const adminIds = adminEnv.split(',').map(id => id.trim()).filter(Boolean)
+  if (adminIds.includes(userId)) return true
+
+  // 2. Check LineRegistration in PostgreSQL (isActive)
+  try {
+    const reg = await prisma.lineRegistration.findUnique({
+      where: { lineUserId: userId }
+    })
+    if (reg && reg.isActive) return true
+  } catch (err) {
+    console.error('[isRegisteredUser Check Error]', err)
+  }
+
+  // 3. Fallback check in SQL Server EV_User
+  try {
+    const { getMSSQLPool } = await import('@/lib/mssql')
+    const pool = await getMSSQLPool()
+    if (pool) {
+      const q = pool.request()
+      q.input('uid', sql.NVarChar, userId)
+      const res = await q.query(`
+        SELECT TOP 1 UserID FROM dbo.EV_User 
+        WHERE (LineUserID = @uid OR LineID = @uid) AND IsActive = 1
+      `)
+      if (res.recordset && res.recordset.length > 0) return true
+    }
+  } catch (err) {
+    /* ignore fallback */
+  }
+
+  return false
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Extract app URL dynamically from request headers
@@ -231,30 +270,65 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     const rawText = event.message.text.trim()
     const rawLower = rawText.toLowerCase()
 
-    // ─── Group mode: ต้องพิมพ์ "butter" นำหน้าก่อน ─────────────
+    // ─── Group mode: ต้องพิมพ์ "butter" นำหน้าก่อน (ยกเว้น Quick Menu / คำสั่งทางลัด) ───
     if (isGroup) {
       // Check if message is a quick menu keyword (allow bypass without prefix)
       const bypassKeywords = [
         'สรุปวันนี้',
         'สรุปเมื่อวาน',
         'สรุปส่งมอบประจำเดือน',
+        'สรุปประจำเดือน',
+        'ส่งมอบประจำเดือน',
+        'สรุปส่งมอบ',
+        'สรุปเดือนนี้',
+        'สรุปรถคืนประจำเดือน',
+        'สรุปคืนรถประจำเดือน',
+        'สรุปรถคืนเดือนนี้',
+        'รายงานประจำวัน',
+        'สรุปรายงาน',
+        'สรุปประจำวัน',
+        'ข่าวเช้า',
+        'รายงานวัน',
         'ดูรถค้างซ่อมแต่ละพื้นที่',
+        'ค้างซ่อมรายพื้นที่',
+        'ค้างซ่อมแต่ละพื้นที่',
+        'ค้างซ่อมพื้นที่',
         'เมนู',
+        'menu',
+        'help',
+        'ช่วย',
+        'คำสั่ง',
+        'ทำอะไรได้บ้าง',
         'dashboard',
         'แดชบอร์ด',
         'ลงทะเบียน',
         'register',
         'วิธีใช้งาน',
         'คู่มือ',
-        'วิธีใช้'
+        'วิธีใช้',
+        'manual',
+        'guide',
+        'my id',
+        'line id',
+        'my line id'
       ]
-      const isBypass = bypassKeywords.includes(rawLower) || /^(ปิดงาน\s*#?\s*\d+)/i.test(rawLower)
 
-      let strippedText = rawText
+      // Strip emojis and symbols for robust matching
+      const cleanLower = rawLower
+        .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
+        .trim()
+
+      const isBypass = bypassKeywords.some(kw => 
+        rawLower === kw || 
+        cleanLower === kw || 
+        rawLower.startsWith(kw) || 
+        cleanLower.startsWith(kw)
+      ) || /^(ปิดงาน\s*#?\s*\d+)/i.test(rawLower) || /^(ปิดงาน\s*#?\s*\d+)/i.test(cleanLower)
+
+      let strippedText = isBypass ? (cleanLower || rawText) : rawText
       let triggerFound = false
 
       if (isBypass) {
-        strippedText = rawText
         triggerFound = true
       } else {
         const trigger = BOT_TRIGGERS.find(t => rawLower.startsWith(t))
@@ -615,81 +689,12 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
-      // ── กลุ่มที่เปิด Gate Log → Butter ไม่ตอบอะไร (auto track อย่างเดียว) ──
-      {
-        const gid = (event.source as any).groupId || (event.source as any).roomId
-        if (gid) {
-          try {
-            const groupCheck = await prisma.lineGroup.findUnique({
-              where: { groupId: gid }
-            })
-            if (groupCheck?.enableGateLog) {
-              // อนุญาตเฉพาะคำสั่งเปิด/ปิดบันทึกเข้าออก (ตรวจจับแล้วด้านบน)
-              // นอกนั้น → ไม่ตอบ
-              console.log('[Gate Log Group] Butter disabled in this group, silently ignoring.')
-              return
-            }
-          } catch { /* ignore */ }
-        }
-      }
-
-      // ถ้าพิมพ์แค่ "butter" เฉยๆ (ไม่มีการ bypass และ strippedText ว่าง) → ทักทาย
-      if (!isBypass && !strippedText) {
-        await replyText(
-          event.replyToken,
-          `ว่าไงคะ~ 🧈✨ ${BOT_NAME} พร้อมช่วยเหลือแล้วค่ะ!\n\nลองถาม เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter เมนู"\n💬 "butter ซ่อมค้างกี่คัน" 💛`
-        )
-        return
-      }
-
       const lower = strippedText.toLowerCase()
 
+      // ── คำสั่งจัดการระบบ (ทำงานได้แม้ในกลุ่ม Gate Log หรือยังไม่ลงทะเบียน) ──
       // Registration
       if (lower === 'ลงทะเบียน' || lower === 'register') {
         await handleRegister(event.source.userId!, event.replyToken)
-        return
-      }
-
-      // ตั้งค่าตรวจจับเคลมกลุ่มนี้ → บันทึก Group ID + เปิด enableClaimLog
-      if (lower === 'เปิดระบบตรวจจับเคลม' || lower === 'เปิดบันทึกเคลม') {
-        const gid = (event.source as any).groupId || (event.source as any).roomId
-        if (gid) {
-          try {
-            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
-            await prisma.lineGroup.update({
-              where: { groupId: gid },
-              data: { enableClaimLog: true },
-            })
-            await replyText(
-              event.replyToken,
-              `✅ เปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะเริ่มตรวจสอบและบันทึกประวัติการแจ้งซ่อมของกลุ่มนี้ลง log โดยอัตโนมัติค่ะ เพื่อให้ท่านนำไปบันทึกลงการแจ้งซ่อมจริงๆ 🛠️💛`
-            )
-          } catch (err: any) {
-            console.error('[Enable Claim Log Group Error]', err)
-            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
-          }
-        }
-        return
-      }
-
-      if (lower === 'ปิดระบบตรวจจับเคลม' || lower === 'ปิดบันทึกเคลม') {
-        const gid = (event.source as any).groupId || (event.source as any).roomId
-        if (gid) {
-          try {
-            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
-            await prisma.lineGroup.update({
-              where: { groupId: gid },
-              data: { enableClaimLog: false },
-            })
-            await replyText(
-              event.replyToken,
-              `🚫 ปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะหยุดการตรวจสอบข้อความแจ้งซ่อมของกลุ่มนี้อัตโนมัติค่ะ 🧈`
-            )
-          } catch (err: any) {
-            console.error('[Disable Claim Log Group Error]', err)
-            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
-          }
-        }
         return
       }
 
@@ -736,6 +741,49 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
+      // ตั้งค่าตรวจจับเคลมกลุ่มนี้ → บันทึก Group ID + เปิด enableClaimLog
+      if (lower === 'เปิดระบบตรวจจับเคลม' || lower === 'เปิดบันทึกเคลม') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableClaimLog: true },
+            })
+            await replyText(
+              event.replyToken,
+              `✅ เปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะเริ่มตรวจสอบและบันทึกประวัติการแจ้งซ่อมของกลุ่มนี้ลง log โดยอัตโนมัติค่ะ เพื่อให้ท่านนำไปบันทึกลงการแจ้งซ่อมจริงๆ 🛠️💛`
+            )
+          } catch (err: any) {
+            console.error('[Enable Claim Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
+      if (lower === 'ปิดระบบตรวจจับเคลม' || lower === 'ปิดบันทึกเคลม') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableClaimLog: false },
+            })
+            await replyText(
+              event.replyToken,
+              `🚫 ปิดระบบตรวจจับเคลมในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะหยุดการตรวจสอบข้อความแจ้งซ่อมของกลุ่มนี้อัตโนมัติค่ะ 🧈`
+            )
+          } catch (err: any) {
+            console.error('[Disable Claim Log Group Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
       // ตั้งค่ากลุ่มนี้ → บันทึก Group ID + เปิด enableReport
       if (lower === 'ตั้งค่ากลุ่มนี้' || lower === 'ตั้งค่ากลุ่ม') {
         const gid = (event.source as any).groupId || (event.source as any).roomId
@@ -758,6 +806,41 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
+      // ── กลุ่มที่เปิด Gate Log → Butter ไม่ตอบคำถามทั่วไป (auto track อย่างเดียว) ──
+      {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            const groupCheck = await prisma.lineGroup.findUnique({
+              where: { groupId: gid }
+            })
+            if (groupCheck?.enableGateLog) {
+              console.log('[Gate Log Group] Butter disabled in this group, silently ignoring.')
+              return
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      // ถ้าพิมพ์แค่ "butter" เฉยๆ (ไม่มีการ bypass และ strippedText ว่าง) → ทักทาย
+      if (!isBypass && !strippedText) {
+        await replyText(
+          event.replyToken,
+          `ว่าไงคะ~ 🧈✨ ${BOT_NAME} พร้อมช่วยเหลือแล้วค่ะ!\n\nลองถาม เช่น:\n💬 "butter วันนี้ส่งรถกี่คัน"\n💬 "butter เมนู"\n💬 "butter ซ่อมค้างกี่คัน" 💛`
+        )
+        return
+      }
+
+      // ── ตรวจสอบว่าผู้ใช้งานลงทะเบียนในระบบ EV7 หรือไม่ ──
+      const isRegistered = await isRegisteredUser(event.source.userId!)
+      if (!isRegistered) {
+        await replyText(
+          event.replyToken,
+          `ขออภัยค่ะ บัตเตอร์ให้บริการเฉพาะผู้ใช้งานที่ลงทะเบียนในระบบ EV7 เท่านั้นนะคะ 💛\n\nพิมพ์ "ลงทะเบียน" เพื่อส่งคำขอเข้าใช้งานระบบค่ะ 🧈`
+        )
+        return
+      }
+
       // Chat with stripped message
       const srcId = (event.source as any).groupId || (event.source as any).roomId || event.source.userId
       await handleChat(strippedText, lower, event.source.userId!, event.replyToken, appUrl, sourceType, srcId || null)
@@ -777,6 +860,16 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     // Registration keywords
     if (lower === 'ลงทะเบียน' || lower === 'register') {
       await handleRegister(event.source.userId!, event.replyToken)
+      return
+    }
+
+    // ── ตรวจสอบว่าผู้ใช้งานลงทะเบียนในระบบ EV7 หรือไม่ ──
+    const isRegistered = await isRegisteredUser(event.source.userId!)
+    if (!isRegistered) {
+      await replyText(
+        event.replyToken,
+        `ขออภัยค่ะ บัตเตอร์ให้บริการเฉพาะผู้ใช้งานที่ลงทะเบียนในระบบ EV7 เท่านั้นนะคะ 💛\n\nพิมพ์ "ลงทะเบียน" เพื่อส่งคำขอเข้าใช้งานระบบค่ะ 🧈`
+      )
       return
     }
 
