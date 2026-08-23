@@ -868,7 +868,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                 const modeText = modes.length > 0 ? modes.join(' และ ') : 'ปิดแชท'
                 await replyText(
                   event.replyToken,
-                  `ℹ️ กลุ่มนี้ปิดโหมดแชทอยู่ค่ะ (${modeText}) 🚗\n\n• บัตเตอร์จะไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ\n• หากต้องการเปิดให้บัตเตอร์ตอบคำถามตามปกติ ให้พิมพ์:\n👉 "butter เปิดแชท"\n\nหรือตั้งค่าได้ที่หน้า Settings บนเว็บ Dashboard 🧈💛`
+                  `ℹ️ กลุ่มนี้เปิดเฉพาะโหมด ${modeText} ค่ะ\n\n• บัตเตอร์จะไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ\n• หากต้องการเปลี่ยนแปลงการตั้งค่า กรุณาติดต่อผู้ดูแลระบบค่ะ 🧈💛`
                 )
                 return
               }
