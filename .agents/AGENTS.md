@@ -8,7 +8,7 @@
 - **GROUP_CHAT_CONTROL**: การตอบคำถามของ Butter ในกลุ่ม LINE ถูกควบคุมด้วย field `enableChat` (default: `true`) ใน LineGroup:
   - **enableChat = true**: Butter ตอบคำถามได้เมื่อถูกเรียก (ต้องพิมพ์ "butter" นำหน้า หรือ @mention Bot)
   - **enableChat = false**: Butter จะไม่ตอบคำถามทั่วไป ทำเฉพาะ auto-detection (Gate Log / Claim Log) เท่านั้น
-  - **การตั้งค่า**: ตั้งค่าได้ 2 ทาง — (1) หน้า Settings บนเว็บ Dashboard หรือ (2) คำสั่ง LINE: `butter เปิดแชท` / `butter ปิดแชท`
+  - **การตั้งค่า**: ตั้งค่าได้ที่หน้า Settings บนเว็บ Dashboard เท่านั้น
   - **กลุ่ม Gate Log / Claim Log**: ควรตั้ง `enableChat = false` เพื่อไม่ให้ Butter ตอบคำถามทั่วไปในกลุ่มเหล่านี้
 - **GATE_LOG_MONITOR**:
   - **License Plate Normalization**: เมื่อบันทึกหรือค้นหาทะเบียนรถ ให้ normalize ให้อยู่ในฟอร์แมตมาตรฐาน `[หมวดตัวอักษร]-[ตัวเลข]` เสมอ (เช่น `ทอ-1234`, `1กก-1234`) เพื่อให้การค้นหาจับคู่เข้า-ออกเป็นมาตรฐานเดียวกัน
