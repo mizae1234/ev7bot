@@ -920,9 +920,11 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     // ── ตรวจสอบว่าผู้ใช้งานลงทะเบียนในระบบ EV7 หรือไม่ ──
     const isRegistered = await isRegisteredUser(event.source.userId!)
     if (!isRegistered) {
+      const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || ''
+      const registerUrl = liffId ? `https://liff.line.me/${liffId}/liff/register` : ''
       await replyText(
         event.replyToken,
-        `ขออภัยค่ะ บัตเตอร์ให้บริการเฉพาะผู้ใช้งานที่ลงทะเบียนในระบบแล้วเท่านั้นนะคะ 💛\n\nหากต้องการเข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบค่ะ 🧈`
+        `ขออภัยค่ะ บัตเตอร์ให้บริการเฉพาะผู้ใช้งานที่ลงทะเบียนในระบบแล้วเท่านั้นนะคะ 💛\n\n📋 สมัครลงทะเบียนได้ที่:\n${registerUrl}\n\nหลังจากลงทะเบียน รอเจ้าหน้าที่อนุมัติก่อนนะคะ 🧈`
       )
       return
     }
