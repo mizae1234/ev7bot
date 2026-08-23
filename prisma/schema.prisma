@@ -53,7 +53,7 @@ model LineGroup {
   enableReport    Boolean  @default(false) @map("enable_report")
   enableClaimLog  Boolean  @default(false) @map("enable_claim_log")
   enableGateLog   Boolean  @default(false) @map("enable_gate_log")
-  enableChat      Boolean  @default(true) @map("enable_chat")
+  enableChat      Boolean  @default(false) @map("enable_chat")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
