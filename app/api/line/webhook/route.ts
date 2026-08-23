@@ -286,7 +286,8 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
     // ─── Group mode: ต้องพิมพ์ "butter" นำหน้าก่อน (ยกเว้น Quick Menu / คำสั่งทางลัด) ───
     if (isGroup) {
       // Check if message is a quick menu keyword (allow bypass without prefix)
-      const bypassKeywords = [
+      // Keywords ที่ยาว/เฉพาะเจาะจง → อนุญาตให้ใช้ startsWith ได้
+      const startsWithKeywords = [
         'สรุปวันนี้',
         'สรุปเมื่อวาน',
         'สรุปส่งมอบประจำเดือน',
@@ -300,23 +301,27 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         'รายงานประจำวัน',
         'สรุปรายงาน',
         'สรุปประจำวัน',
-        'ข่าวเช้า',
         'รายงานวัน',
         'ดูรถค้างซ่อมแต่ละพื้นที่',
         'ค้างซ่อมรายพื้นที่',
         'ค้างซ่อมแต่ละพื้นที่',
         'ค้างซ่อมพื้นที่',
+        'วิธีใช้งาน',
+        'ทำอะไรได้บ้าง',
+      ]
+
+      // Keywords สั้น/ทั่วไป → ต้อง exact match เท่านั้น ป้องกัน false positive
+      const exactMatchKeywords = [
         'เมนู',
         'menu',
         'help',
         'ช่วย',
         'คำสั่ง',
-        'ทำอะไรได้บ้าง',
+        'ข่าวเช้า',
         'dashboard',
         'แดชบอร์ด',
         'ลงทะเบียน',
         'register',
-        'วิธีใช้งาน',
         'คู่มือ',
         'วิธีใช้',
         'manual',
@@ -331,11 +336,14 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]/g, '')
         .trim()
 
-      const isBypass = bypassKeywords.some(kw => 
+      const isBypass = startsWithKeywords.some(kw => 
         rawLower === kw || 
         cleanLower === kw || 
         rawLower.startsWith(kw) || 
         cleanLower.startsWith(kw)
+      ) || exactMatchKeywords.some(kw =>
+        rawLower === kw ||
+        cleanLower === kw
       ) || /^(ปิดงาน\s*#?\s*\d+)/i.test(rawLower) || /^(ปิดงาน\s*#?\s*\d+)/i.test(cleanLower)
 
       let strippedText = isBypass ? (cleanLower || rawText) : rawText
