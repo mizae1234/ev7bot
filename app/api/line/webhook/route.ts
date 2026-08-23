@@ -862,13 +862,9 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
             if (groupCheck && groupCheck.enableChat === false) {
               // ถ้าพิมพ์แค่ "butter" หรือ "butter เมนู" → แจ้งสถานะของกลุ่มให้ทราบ
               if (!strippedText || strippedText === 'เมนู' || strippedText === 'menu') {
-                const modes: string[] = []
-                if (groupCheck.enableGateLog) modes.push('บันทึกรถเข้า-ออกลาน (Gate Log)')
-                if (groupCheck.enableClaimLog) modes.push('ตรวจจับแจ้งซ่อม (Claim Log)')
-                const modeText = modes.length > 0 ? modes.join(' และ ') : 'ปิดแชท'
                 await replyText(
                   event.replyToken,
-                  `ℹ️ กลุ่มนี้ยังไม่ได้เปิดให้บัตเตอร์ตอบคำถามค่ะ\n\nขณะนี้บัตเตอร์ทำหน้าที่เฉพาะ${modeText}เท่านั้น ไม่สามารถตอบคำถามทั่วไปในกลุ่มนี้ได้ค่ะ\n\nหากต้องการให้บัตเตอร์ตอบคำถามได้ กรุณาแจ้งผู้ดูแลระบบเพื่อเปิดใช้งานนะคะ 🧈💛`
+                  `ℹ️ กลุ่มนี้ยังไม่ได้เปิดให้บัตเตอร์ตอบคำถามค่ะ\n\nหากต้องการให้บัตเตอร์ตอบคำถามได้ กรุณาแจ้งผู้ดูแลระบบเพื่อเปิดใช้งานนะคะ 🧈💛`
                 )
                 return
               }
