@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || 'ALL'
+    const vehicleType = searchParams.get('vehicleType') || 'ALL' // 'ALL' | 'NEW_CAR' | 'PLATE'
     const startDate = searchParams.get('startDate') || ''
     const endDate = searchParams.get('endDate') || ''
     const offset = (page - 1) * limit
@@ -24,13 +25,19 @@ export async function GET(req: NextRequest) {
     const request = pool.request()
 
     if (search) {
-      conditions.push(`(g.VehicleRef LIKE @search OR g.VinNo LIKE @search OR g.CheckInByName LIKE @search OR g.CheckOutByName LIKE @search OR g.CheckInCategory LIKE @search OR g.CheckOutCategory LIKE @search)`)
+      conditions.push(`(g.VehicleRef LIKE @search OR g.VinNo LIKE @search OR g.CheckInByName LIKE @search OR g.CheckOutByName LIKE @search OR g.CheckInCategory LIKE @search OR g.CheckOutCategory LIKE @search OR g.CheckInMessage LIKE @search OR g.CheckOutMessage LIKE @search)`)
       request.input('search', sql.NVarChar, `%${search}%`)
     }
 
     if (status !== 'ALL') {
       conditions.push(`g.Status = @status`)
       request.input('status', sql.NVarChar, status)
+    }
+
+    if (vehicleType === 'NEW_CAR') {
+      conditions.push(`(g.VehicleRef LIKE '%รถใหม่%' OR g.QuantityIn > 1 OR g.QuantityOut > 1)`)
+    } else if (vehicleType === 'PLATE') {
+      conditions.push(`(g.VehicleRef NOT LIKE '%รถใหม่%' AND g.QuantityIn <= 1)`)
     }
 
     if (startDate) {
@@ -89,11 +96,14 @@ export async function GET(req: NextRequest) {
     const statsRequest = pool.request()
     const statsRes = await statsRequest.query(`
       SELECT
-        COUNT(*) as totalToday,
-        SUM(CASE WHEN Status = 'IN' THEN 1 ELSE 0 END) as inYard,
-        SUM(CASE WHEN Status = 'OUT' THEN 1 ELSE 0 END) as outPaired,
-        SUM(CASE WHEN Status = 'OUT_ONLY' THEN 1 ELSE 0 END) as outOnly,
-        SUM(CASE WHEN Status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelled
+        COUNT(*) as totalRecordsToday,
+        SUM(QuantityIn) as totalVehiclesInToday,
+        SUM(CASE WHEN Status = 'IN' THEN (CASE WHEN QuantityIn > QuantityOut THEN (QuantityIn - QuantityOut) ELSE 1 END) ELSE 0 END) as inYardVehicles,
+        SUM(CASE WHEN Status = 'IN' AND (VehicleRef LIKE '%รถใหม่%' OR QuantityIn > 1) THEN (CASE WHEN QuantityIn > QuantityOut THEN (QuantityIn - QuantityOut) ELSE 0 END) ELSE 0 END) as inYardNewCars,
+        SUM(CASE WHEN Status = 'IN' AND (VehicleRef NOT LIKE '%รถใหม่%' AND QuantityIn <= 1) THEN 1 ELSE 0 END) as inYardPlateCars,
+        SUM(CASE WHEN Status = 'OUT' THEN QuantityIn WHEN Status = 'OUT_ONLY' THEN (CASE WHEN QuantityOut > 0 THEN QuantityOut ELSE 1 END) ELSE QuantityOut END) as outTodayVehicles,
+        SUM(CASE WHEN Status = 'OUT_ONLY' THEN 1 ELSE 0 END) as outOnlyRecords,
+        SUM(CASE WHEN Status = 'CANCELLED' THEN 1 ELSE 0 END) as cancelledRecords
       FROM dbo.EV_GateLog
       WHERE CAST(CreateDate AS DATE) = CAST(GETDATE() AS DATE)
     `)
@@ -107,11 +117,14 @@ export async function GET(req: NextRequest) {
       limit,
       totalPages: Math.ceil(total / limit),
       stats: {
-        totalToday: stats.totalToday || 0,
-        inYard: stats.inYard || 0,
-        outPaired: stats.outPaired || 0,
-        outOnly: stats.outOnly || 0,
-        cancelled: stats.cancelled || 0,
+        totalToday: stats.totalRecordsToday || 0,
+        totalVehiclesInToday: stats.totalVehiclesInToday || 0,
+        inYard: stats.inYardVehicles || 0,
+        inYardNewCars: stats.inYardNewCars || 0,
+        inYardPlateCars: stats.inYardPlateCars || 0,
+        outPaired: stats.outTodayVehicles || 0,
+        outOnly: stats.outOnlyRecords || 0,
+        cancelled: stats.cancelledRecords || 0,
       }
     })
   } catch (error: any) {
