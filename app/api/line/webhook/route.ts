@@ -77,6 +77,18 @@ lineClient.replyMessage = async function(replyToken: string, messages: any, ...a
   return res
 } as any
 
+let cachedBotUserId: string | null = null
+async function getBotUserId(): Promise<string | null> {
+  if (cachedBotUserId) return cachedBotUserId
+  try {
+    const info = await lineClient.getBotInfo()
+    cachedBotUserId = info.userId
+    return cachedBotUserId
+  } catch {
+    return null
+  }
+}
+
 const BOT_NAME = 'Butter'
 const BOT_TRIGGERS = [
   '@butter',
@@ -358,9 +370,16 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
           strippedText = baseText.substring(trigger.length).trim()
           triggerFound = true
         } else if ((event.message as any).mention?.mentionees?.length) {
-          // If LINE official @mention was used
-          strippedText = rawText.replace(/^@[^\s]+\s*/, '').trim()
-          triggerFound = true
+          // Check if BOT was @mentioned (not just any user)
+          const mentionees = (event.message as any).mention.mentionees as Array<{ userId?: string; type?: string }>
+          const botUserId = await getBotUserId()
+          const isBotMentioned = botUserId
+            ? mentionees.some(m => m.userId === botUserId)
+            : false // ถ้าดึง bot info ไม่ได้ → ไม่ trigger เพื่อความปลอดภัย
+          if (isBotMentioned) {
+            strippedText = rawText.replace(/^@[^\s]+\s*/, '').trim()
+            triggerFound = true
+          }
         }
       }
       if (!triggerFound) {
