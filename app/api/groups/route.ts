@@ -19,7 +19,7 @@ export async function GET() {
 // PATCH — อัปเดตการตั้งค่าของกลุ่ม (enableReport หรือ enableClaimLog)
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, enableReport, enableClaimLog } = await req.json()
+    const { id, enableReport, enableClaimLog, enableGateLog, enableChat } = await req.json()
 
     if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
@@ -31,6 +31,12 @@ export async function PATCH(req: NextRequest) {
     }
     if (typeof enableClaimLog === 'boolean') {
       data.enableClaimLog = enableClaimLog
+    }
+    if (typeof enableGateLog === 'boolean') {
+      data.enableGateLog = enableGateLog
+    }
+    if (typeof enableChat === 'boolean') {
+      data.enableChat = enableChat
     }
 
     if (Object.keys(data).length === 0) {

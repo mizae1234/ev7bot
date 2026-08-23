@@ -829,6 +829,49 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
+      // ── เปิด/ปิดแชท Butter ──────────────────────────────
+      if (lower === 'เปิดแชท' || lower === 'เปิดแชต' || lower === 'enable chat') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableChat: true },
+            })
+            await replyText(
+              event.replyToken,
+              `✅ เปิดโหมดแชทในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะตอบคำถามได้ตามปกติเมื่อเรียก "butter" ค่ะ 🧈💛`
+            )
+          } catch (err: any) {
+            console.error('[Enable Chat Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
+      if (lower === 'ปิดแชท' || lower === 'ปิดแชต' || lower === 'disable chat') {
+        const gid = (event.source as any).groupId || (event.source as any).roomId
+        if (gid) {
+          try {
+            await saveGroupToDb(gid, sourceType === 'group' ? 'group' : 'room')
+            await prisma.lineGroup.update({
+              where: { groupId: gid },
+              data: { enableChat: false },
+            })
+            await replyText(
+              event.replyToken,
+              `🚫 ปิดโหมดแชทในกลุ่มนี้เรียบร้อยค่ะ!\n\nบัตเตอร์จะไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ (auto-detect ยังทำงานตามปกติ)\nเปิดอีกครั้งได้โดยพิมพ์ "butter เปิดแชท" หรือตั้งค่าที่หน้า Settings 🧈`
+            )
+          } catch (err: any) {
+            console.error('[Disable Chat Error]', err)
+            await replyText(event.replyToken, `❌ ดำเนินการไม่สำเร็จค่ะ ลองใหม่อีกครั้งนะคะ 🧈`)
+          }
+        }
+        return
+      }
+
       // ตั้งค่ากลุ่มนี้ → บันทึก Group ID + เปิด enableReport
       if (lower === 'ตั้งค่ากลุ่มนี้' || lower === 'ตั้งค่ากลุ่ม') {
         const gid = (event.source as any).groupId || (event.source as any).roomId
@@ -851,7 +894,7 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
         return
       }
 
-      // ── กลุ่มที่เปิด Gate Log → Butter ไม่ตอบคำถามทั่วไป (auto track อย่างเดียว) ──
+      // ── กลุ่มที่ปิด enableChat → Butter ไม่ตอบคำถามทั่วไป (auto track/detect อย่างเดียว) ──
       {
         const gid = (event.source as any).groupId || (event.source as any).roomId
         if (gid) {
@@ -859,17 +902,21 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
             const groupCheck = await prisma.lineGroup.findUnique({
               where: { groupId: gid }
             })
-            if (groupCheck?.enableGateLog) {
-              // ถ้าพิมพ์แค่ "butter" หรือ "butter เมนู" ในกลุ่ม Gate Log → แจ้งสถานะของกลุ่มให้ทราบ
+            if (groupCheck && groupCheck.enableChat === false) {
+              // ถ้าพิมพ์แค่ "butter" หรือ "butter เมนู" → แจ้งสถานะของกลุ่มให้ทราบ
               if (!strippedText || strippedText === 'เมนู' || strippedText === 'menu') {
+                const modes: string[] = []
+                if (groupCheck.enableGateLog) modes.push('บันทึกรถเข้า-ออกลาน (Gate Log)')
+                if (groupCheck.enableClaimLog) modes.push('ตรวจจับแจ้งซ่อม (Claim Log)')
+                const modeText = modes.length > 0 ? modes.join(' และ ') : 'ปิดแชท'
                 await replyText(
                   event.replyToken,
-                  `ℹ️ กลุ่มนี้เปิดโหมด "บันทึกรถเข้า-ออกลาน (Gate Log)" อยู่ค่ะ 🚗\n\n• บัตเตอร์จะทำเฉพาะ Auto Tracking ตรวจจับรถเข้า-ออก และไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ\n• หากต้องการปิดโหมดนี้เพื่อให้บัตเตอร์ตอบคำถามตามปกติ ให้พิมพ์:\n👉 "butter ปิดบันทึกเข้าออก" 🧈💛`
+                  `ℹ️ กลุ่มนี้ปิดโหมดแชทอยู่ค่ะ (${modeText}) 🚗\n\n• บัตเตอร์จะไม่ตอบคำถามทั่วไปในกลุ่มนี้ค่ะ\n• หากต้องการเปิดให้บัตเตอร์ตอบคำถามตามปกติ ให้พิมพ์:\n👉 "butter เปิดแชท"\n\nหรือตั้งค่าได้ที่หน้า Settings บนเว็บ Dashboard 🧈💛`
                 )
                 return
               }
 
-              console.log('[Gate Log Group] Butter disabled in this group, silently ignoring.')
+              console.log(`[Chat Disabled Group] Butter chat disabled in group ${gid}, silently ignoring.`)
               return
             }
           } catch { /* ignore */ }
