@@ -136,6 +136,12 @@ export function ReplacementDetailModal({
                     {item.mainStatus || 'อยู่ระหว่างซ่อม'}
                   </div>
                 </div>
+                <div>
+                  <span className="text-zinc-500">สถานที่ปัจจุบัน:</span>
+                  <div className="font-medium text-zinc-800 dark:text-zinc-200">
+                    📍 {item.mainLocationName || item.mainLocation || '-'}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

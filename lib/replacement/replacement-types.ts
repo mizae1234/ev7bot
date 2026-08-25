@@ -15,6 +15,7 @@ export interface ReplacementActiveItem {
   mainModel: string | null
   mainStatus: string | null
   mainLocation: string | null
+  mainLocationName?: string | null
   // Maintenance Details
   issueTitle: string | null
   maintenanceStartDate: string | null

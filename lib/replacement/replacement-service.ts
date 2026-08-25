@@ -34,8 +34,8 @@ export async function getActiveReplacements(
       r.VinNo AS replacementVin,
       replCar.RegisterNo AS replacementRegisterNo,
       replCar.Model AS replacementModel,
-      COALESCE(r.Location, replCar.CurrentLocation, replCar.ReplacementLocation) AS replacementLocation,
-      locSub.StatusName AS replacementLocationName,
+      COALESCE(replCar.CurrentLocation, r.Location) AS replacementLocation,
+      ISNULL(locSubRepl.StatusName, COALESCE(replCar.CurrentLocation, r.Location)) AS replacementLocationName,
       replCar.StatusType AS replacementStatus,
       m.InventoryItemID AS mainInventoryItemId,
       mainCar.RegisterNo AS mainRegisterNo,
@@ -43,6 +43,7 @@ export async function getActiveReplacements(
       mainCar.Model AS mainModel,
       mainCar.StatusType AS mainStatus,
       mainCar.CurrentLocation AS mainLocation,
+      ISNULL(locSubMain.StatusName, mainCar.CurrentLocation) AS mainLocationName,
       m.IssueTitle AS issueTitle,
       m.MaintenanceStartDate AS maintenanceStartDate,
       m.MaintenanceFinishDate AS maintenanceFinishDate,
@@ -61,8 +62,9 @@ export async function getActiveReplacements(
     FROM dbo.EV_ReplacementItem r
     INNER JOIN dbo.EV_MaintenanceItem m ON r.MaintenanceItemID = m.MaintenanceItemID
     LEFT JOIN dbo.EV_InventoryItem mainCar ON m.InventoryItemID = mainCar.InventoryItemID
+    LEFT JOIN dbo.EV_MsSubStatus locSubMain ON mainCar.CurrentLocation = locSubMain.StatusCode AND locSubMain.Type = 'LOCATION'
     LEFT JOIN dbo.EV_InventoryItem replCar ON r.VinNo = replCar.VinNo
-    LEFT JOIN dbo.EV_MsSubStatus locSub ON COALESCE(r.Location, replCar.CurrentLocation) = locSub.StatusCode AND locSub.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_MsSubStatus locSubRepl ON COALESCE(replCar.CurrentLocation, r.Location) = locSubRepl.StatusCode AND locSubRepl.Type = 'LOCATION'
     LEFT JOIN dbo.EV_MsSubStatus rs ON r.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
     LEFT JOIN dbo.EV_User createUser ON r.CreateUserID = createUser.UserID
     LEFT JOIN dbo.EV_User updateUser ON r.UpdateUserID = updateUser.UserID
@@ -90,6 +92,7 @@ export async function getActiveReplacements(
       mainModel: (row.mainModel as string) || null,
       mainStatus: (row.mainStatus as string) || null,
       mainLocation: (row.mainLocation as string) || null,
+      mainLocationName: (row.mainLocationName as string) || (row.mainLocation as string) || null,
       issueTitle: (row.issueTitle as string) || null,
       maintenanceStartDate: row.maintenanceStartDate ? new Date(row.maintenanceStartDate as string).toISOString() : null,
       maintenanceFinishDate: row.maintenanceFinishDate ? new Date(row.maintenanceFinishDate as string).toISOString() : null,
@@ -211,6 +214,31 @@ export async function getReplacementPoolCars(
     }
   }
 
+  // Look up CurrentLocation from EV_InventoryItem for pool cars
+  const allPoolVins = Array.from(new Set(rawList.map(r => r.VinNo as string).filter(Boolean)))
+  const poolLocMap = new Map<string, string>()
+  if (allPoolVins.length > 0) {
+    try {
+      const chunkSize = 200
+      for (let i = 0; i < allPoolVins.length; i += chunkSize) {
+        const chunk = allPoolVins.slice(i, i + chunkSize)
+        const locRes = await pool.request().query(`
+          SELECT 
+            inv.VinNo,
+            ISNULL(locSub.StatusName, inv.CurrentLocation) AS LocationName
+          FROM dbo.EV_InventoryItem inv
+          LEFT JOIN dbo.EV_MsSubStatus locSub ON inv.CurrentLocation = locSub.StatusCode AND locSub.Type = 'LOCATION'
+          WHERE inv.VinNo IN (${chunk.map(v => `'${v.replace(/'/g, "''")}'`).join(',')})
+        `)
+        locRes.recordset.forEach((t: Record<string, unknown>) => {
+          if (t.VinNo && t.LocationName) poolLocMap.set(t.VinNo as string, t.LocationName as string)
+        })
+      }
+    } catch (e) {
+      console.error('Failed to fetch pool car locations:', e)
+    }
+  }
+
   let mapped: ReplacementPoolCar[] = rawList.map((r: Record<string, unknown>) => {
     const statusTypeStr = (r.StatusType as string) || ''
     const statusStr = (r.Status as string) || ''
@@ -241,7 +269,7 @@ export async function getReplacementPoolCars(
       project: (r.Project as string) || null,
       status: statusStr,
       statusType: statusTypeStr,
-      location: (r.Location as string) || null,
+      location: (r.VinNo ? poolLocMap.get(r.VinNo as string) : null) || (r.Location as string) || null,
       isReserved,
       isReadyToPick,
       isStandbyAvailable,
@@ -558,6 +586,31 @@ export async function getReplacementHistory(
     console.error('Failed to execute GetEV_Report_ReplacementHistory:', err)
   }
 
+  // Look up CurrentLocation from EV_InventoryItem for history records
+  const histReplVins = Array.from(new Set(rawHistory.map(r => r.VinNoReplacement as string).filter(Boolean)))
+  const histLocMap = new Map<string, string>()
+  if (histReplVins.length > 0) {
+    try {
+      const chunkSize = 200
+      for (let i = 0; i < histReplVins.length; i += chunkSize) {
+        const chunk = histReplVins.slice(i, i + chunkSize)
+        const locRes = await pool.request().query(`
+          SELECT 
+            inv.VinNo,
+            ISNULL(locSub.StatusName, inv.CurrentLocation) AS LocationName
+          FROM dbo.EV_InventoryItem inv
+          LEFT JOIN dbo.EV_MsSubStatus locSub ON inv.CurrentLocation = locSub.StatusCode AND locSub.Type = 'LOCATION'
+          WHERE inv.VinNo IN (${chunk.map(v => `'${v.replace(/'/g, "''")}'`).join(',')})
+        `)
+        locRes.recordset.forEach((t: Record<string, unknown>) => {
+          if (t.VinNo && t.LocationName) histLocMap.set(t.VinNo as string, t.LocationName as string)
+        })
+      }
+    } catch (e) {
+      console.error('Failed to fetch history car locations:', e)
+    }
+  }
+
   let mapped: ReplacementHistoryItem[] = rawHistory.map((r) => {
     const daysUsed = calculateDaysInUse(r.ReplacementStartDate as string | null, r.ReplacementReturnDate as string | null)
 
@@ -571,7 +624,7 @@ export async function getReplacementHistory(
       replacementStartDate: r.ReplacementStartDate ? new Date(r.ReplacementStartDate as string).toISOString() : null,
       replacementReturnDate: r.ReplacementReturnDate ? new Date(r.ReplacementReturnDate as string).toISOString() : null,
       daysUsed,
-      location: (r.Location as string) || null,
+      location: (r.VinNoReplacement ? histLocMap.get(r.VinNoReplacement as string) : null) || (r.Location as string) || null,
       remark: (r.Remark as string) || null,
       isActive: !!r.IsActive,
       replacementStatus: (r.ReplacementStatus as string) || null,

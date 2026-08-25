@@ -138,9 +138,13 @@ function GateMonitorContent() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Set default date to today
+  // Set default date to today (local time)
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const today = `${year}-${month}-${day}`
     setStartDate(today)
     setEndDate(today)
   }, [])
@@ -398,7 +402,11 @@ function GateMonitorContent() {
               setSearch('')
               setStatusFilter('ALL')
               setVehicleTypeFilter('ALL')
-              const today = new Date().toISOString().split('T')[0]
+              const now = new Date()
+              const year = now.getFullYear()
+              const month = String(now.getMonth() + 1).padStart(2, '0')
+              const day = String(now.getDate()).padStart(2, '0')
+              const today = `${year}-${month}-${day}`
               setStartDate(today)
               setEndDate(today)
               setPage(1)

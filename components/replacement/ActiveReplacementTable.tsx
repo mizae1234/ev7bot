@@ -103,10 +103,15 @@ export function ActiveReplacementTable({
                   <div className="text-[11px] text-zinc-500 font-mono tracking-tight mt-0.5">
                     {rec.mainVinNo || '-'}
                   </div>
-                  <div className="mt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                       {rec.mainModel || '-'} (คันหลัก)
                     </span>
+                    {(rec.mainLocationName || rec.mainLocation) && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                        📍 {rec.mainLocationName || rec.mainLocation}
+                      </span>
+                    )}
                   </div>
                 </td>
 
