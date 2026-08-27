@@ -36,6 +36,22 @@ interface GateStats {
   cancelled: number
 }
 
+interface EditFormState {
+  GateLogID: number
+  VehicleRef: string
+  VinNo: string
+  Status: string
+  QuantityIn: number
+  QuantityOut: number
+  CheckInTime: string
+  CheckInCategory: string
+  CheckInByName: string
+  CheckOutTime: string
+  CheckOutCategory: string
+  CheckOutByName: string
+  Note: string
+}
+
 function formatTime(dateStr: string | null): string {
   if (!dateStr) return '—'
   const d = new Date(dateStr)
@@ -53,6 +69,18 @@ function formatDateTime(dateStr: string | null): string {
   const d = new Date(dateStr)
   return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' }) + ' ' +
     d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+}
+
+function isoToDateTimeLocal(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const h = String(d.getUTCHours()).padStart(2, '0')
+  const min = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${y}-${m}-${day}T${h}:${min}`
 }
 
 function calcDuration(checkIn: string | null, checkOut: string | null): string {
@@ -105,6 +133,9 @@ function getStatusBadge(status: string, remaining: number = 0, isNewCar: boolean
   }
 }
 
+const CHECK_IN_CATEGORIES = ['เช็คระยะ', 'ส่งซ่อม', 'รถใหม่', 'รถยึด', 'ตรวจสภาพ', 'สลับคัน', 'อื่นๆ']
+const CHECK_OUT_CATEGORIES = ['ซ่อมเสร็จ', 'ส่งมอบ', 'ลูกค้ารับรถ', 'ย้ายไปอู่', 'สไลด์ไปศูนย์', 'คืนรถ', 'อื่นๆ']
+
 function GateMonitorContent() {
   const [logs, setLogs] = useState<GateLog[]>([])
   const [stats, setStats] = useState<GateStats>({
@@ -129,14 +160,27 @@ function GateMonitorContent() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Message modal
+  // Modals
   const [selectedMessage, setSelectedMessage] = useState<{ title: string; text: string; sender: string; time: string } | null>(null)
+  const [editingLog, setEditingLog] = useState<EditFormState | null>(null)
+  const [deletingLog, setDeletingLog] = useState<GateLog | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Auto-refresh
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [nextRefreshIn, setNextRefreshIn] = useState(180) // 3 min
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Toast auto-clear
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 4000)
+      return () => clearTimeout(t)
+    }
+  }, [toast])
 
   // Set default date to today (local time)
   useEffect(() => {
@@ -197,6 +241,105 @@ function GateMonitorContent() {
   const handleStatusFilterChange = (val: string) => { setStatusFilter(val); setPage(1) }
   const handleVehicleTypeFilterChange = (val: string) => { setVehicleTypeFilter(val); setPage(1) }
 
+  // Open Edit Modal
+  const handleOpenEdit = (log: GateLog) => {
+    setEditingLog({
+      GateLogID: log.GateLogID,
+      VehicleRef: log.VehicleRef || '',
+      VinNo: log.VinNo || '',
+      Status: log.Status || 'IN',
+      QuantityIn: log.QuantityIn || 1,
+      QuantityOut: log.QuantityOut || 0,
+      CheckInTime: isoToDateTimeLocal(log.CheckInTime),
+      CheckInCategory: log.CheckInCategory || '',
+      CheckInByName: log.CheckInByName || '',
+      CheckOutTime: isoToDateTimeLocal(log.CheckOutTime),
+      CheckOutCategory: log.CheckOutCategory || '',
+      CheckOutByName: log.CheckOutByName || '',
+      Note: log.Note || '',
+    })
+  }
+
+  // Submit Edit
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingLog) return
+
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/gate-logs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingLog)
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setToast({ type: 'success', message: '✅ บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว' })
+        setEditingLog(null)
+        fetchLogs()
+      } else {
+        setToast({ type: 'error', message: data.error || 'บันทึกการแก้ไขไม่สำเร็จ' })
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: ' + err.message })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Submit Delete
+  const handleConfirmDelete = async () => {
+    if (!deletingLog) return
+
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/gate-logs?id=${deletingLog.GateLogID}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setToast({ type: 'success', message: '🗑️ ลบรายการเรียบร้อยแล้ว' })
+        setDeletingLog(null)
+        fetchLogs()
+      } else {
+        setToast({ type: 'error', message: data.error || 'ลบรายการไม่สำเร็จ' })
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: 'เกิดข้อผิดพลาดในการลบรายการ: ' + err.message })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Quick Action: Cancel status instead of hard delete
+  const handleSetCancelledStatus = async () => {
+    if (!deletingLog) return
+
+    setIsDeleting(true)
+    try {
+      const res = await fetch('/api/gate-logs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deletingLog.GateLogID, action: 'cancel' })
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setToast({ type: 'success', message: '❌ เปลี่ยนสถานะเป็นยกเลิกแล้ว' })
+        setDeletingLog(null)
+        fetchLogs()
+      } else {
+        setToast({ type: 'error', message: data.error || 'ดำเนินการไม่สำเร็จ' })
+      }
+    } catch (err: any) {
+      setToast({ type: 'error', message: 'เกิดข้อผิดพลาด: ' + err.message })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Export Excel
   const handleExportExcel = () => {
     const headers = [
@@ -247,6 +390,18 @@ function GateMonitorContent() {
 
   return (
     <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-top-3 duration-200 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+            : 'bg-red-50 text-red-800 border-red-200'
+        }`}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 text-zinc-400 hover:text-zinc-600 cursor-pointer">✕</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -255,7 +410,7 @@ function GateMonitorContent() {
             Gate Log — บันทึกรถเข้า-ออกลาน
           </h1>
           <p className="text-xs text-zinc-500 mt-1">
-            ติดตามสถานะรถเข้า-ออกลานและคลังรถใหม่แบบ Real-time จากรายงานของ รปภ ในกลุ่ม LINE
+            ติดตามสถานะรถเข้า-ออกลานและคลังรถใหม่แบบ Real-time พร้อมระบบแก้ไขและลบรายการ
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -434,12 +589,13 @@ function GateMonitorContent() {
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">รปภ (ออก)</th>
                 <th className="text-left px-4 py-3 font-semibold text-zinc-600">ระยะเวลา</th>
                 <th className="text-center px-4 py-3 font-semibold text-zinc-600">สถานะ</th>
+                <th className="text-center px-4 py-3 font-semibold text-zinc-600">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-12">
+                  <td colSpan={11} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-zinc-400 text-xs">กำลังโหลดข้อมูล...</span>
@@ -448,7 +604,7 @@ function GateMonitorContent() {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-zinc-400">
+                  <td colSpan={11} className="text-center py-12 text-zinc-400">
                     ไม่พบข้อมูลรายการรถเข้า-ออกตามเงื่อนไขที่เลือก
                   </td>
                 </tr>
@@ -606,6 +762,30 @@ function GateMonitorContent() {
                           {badge.label}
                         </span>
                       </td>
+
+                      {/* จัดการ (Actions) */}
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(log)}
+                            className="p-1.5 text-zinc-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                            title="แก้ไขรายละเอียด"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeletingLog(log)}
+                            className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                            title="ลบรายการ"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })
@@ -631,7 +811,312 @@ function GateMonitorContent() {
         </div>
       )}
 
-      {/* Original LINE Message Modal */}
+      {/* ── Modal: Edit Gate Log ── */}
+      {editingLog && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-150 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
+                <span>✏️</span>
+                แก้ไขข้อมูลบันทึกรถเข้า-ออก (ID: #{editingLog.GateLogID})
+              </h3>
+              <button
+                onClick={() => setEditingLog(null)}
+                className="text-zinc-400 hover:text-zinc-600 text-lg leading-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="mt-4 space-y-4 text-xs">
+              {/* Row 1: Vehicle Ref & VIN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-zinc-700">🚗 ทะเบียน / ข้อมูลรถ <span className="text-red-500">*</span></label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingLog({ ...editingLog, VehicleRef: 'รถใหม่' })}
+                      className="text-[10px] text-purple-600 font-bold hover:underline cursor-pointer"
+                    >
+                      + รถใหม่ (ไม่มีทะเบียน)
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={editingLog.VehicleRef}
+                    onChange={e => setEditingLog({ ...editingLog, VehicleRef: e.target.value })}
+                    placeholder="เช่น ทอ-4905 หรือ รถใหม่"
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">🔢 เลขตัวถัง (VIN)</label>
+                  <input
+                    type="text"
+                    value={editingLog.VinNo}
+                    onChange={e => setEditingLog({ ...editingLog, VinNo: e.target.value })}
+                    placeholder="เช่น LSJA123..."
+                    className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Status & Quantities */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-200">
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">📌 สถานะ</label>
+                  <select
+                    value={editingLog.Status}
+                    onChange={e => setEditingLog({ ...editingLog, Status: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300 font-medium"
+                  >
+                    <option value="IN">🔵 อยู่ในลาน (IN)</option>
+                    <option value="OUT">✅ ออกครบแล้ว (OUT)</option>
+                    <option value="OUT_ONLY">🟡 ออกไม่มีเข้า (OUT_ONLY)</option>
+                    <option value="CANCELLED">❌ ยกเลิก (CANCELLED)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">📥 จำนวนเข้า (คัน)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingLog.QuantityIn}
+                    onChange={e => setEditingLog({ ...editingLog, QuantityIn: parseInt(e.target.value, 10) || 1 })}
+                    className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-zinc-700 mb-1">📤 จำนวนออก (คัน)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingLog.QuantityOut}
+                    onChange={e => setEditingLog({ ...editingLog, QuantityOut: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+              </div>
+
+              {/* Section: Check In Info */}
+              <div className="p-3 bg-blue-50/40 rounded-xl border border-blue-100 space-y-2.5">
+                <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <span>📥 ข้อมูลตอนเข้าลาน (Check In)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-zinc-700 mb-1">วันเวลาเข้า</label>
+                    <input
+                      type="datetime-local"
+                      value={editingLog.CheckInTime}
+                      onChange={e => setEditingLog({ ...editingLog, CheckInTime: e.target.value })}
+                      className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-zinc-700 mb-1">ชื่อ รปภ / ผู้บันทึก (เข้า)</label>
+                    <input
+                      type="text"
+                      value={editingLog.CheckInByName}
+                      onChange={e => setEditingLog({ ...editingLog, CheckInByName: e.target.value })}
+                      placeholder="เช่น รปภ สมชาย"
+                      className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 mb-1">เหตุผล / หมวดหมู่งานตอนเข้า</label>
+                  <input
+                    type="text"
+                    value={editingLog.CheckInCategory}
+                    onChange={e => setEditingLog({ ...editingLog, CheckInCategory: e.target.value })}
+                    placeholder="เช่น เช็คระยะ, ส่งซ่อม, รถใหม่เข้าลาน"
+                    className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300 mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {CHECK_IN_CATEGORIES.map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setEditingLog({ ...editingLog, CheckInCategory: cat })}
+                        className="px-2 py-0.5 bg-blue-100/70 hover:bg-blue-200 text-blue-800 rounded text-[10px] transition cursor-pointer"
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Check Out Info */}
+              <div className="p-3 bg-emerald-50/40 rounded-xl border border-emerald-100 space-y-2.5">
+                <div className="font-bold text-emerald-900 flex items-center justify-between">
+                  <span>📤 ข้อมูลตอนออกลาน (Check Out)</span>
+                  {editingLog.CheckOutTime && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingLog({ ...editingLog, CheckOutTime: '', CheckOutCategory: '', CheckOutByName: '', QuantityOut: 0, Status: 'IN' })}
+                      className="text-[10px] text-red-600 hover:underline font-normal cursor-pointer"
+                    >
+                      ล้างข้อมูลออก (ตั้งเป็นยังไม่ออก)
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-zinc-700 mb-1">วันเวลาออก</label>
+                    <input
+                      type="datetime-local"
+                      value={editingLog.CheckOutTime}
+                      onChange={e => setEditingLog({ ...editingLog, CheckOutTime: e.target.value })}
+                      className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-zinc-700 mb-1">ชื่อ รปภ / ผู้บันทึก (ออก)</label>
+                    <input
+                      type="text"
+                      value={editingLog.CheckOutByName}
+                      onChange={e => setEditingLog({ ...editingLog, CheckOutByName: e.target.value })}
+                      placeholder="เช่น รปภ สมศักดิ์"
+                      className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-700 mb-1">เหตุผล / หมวดหมู่งานตอนออก</label>
+                  <input
+                    type="text"
+                    value={editingLog.CheckOutCategory}
+                    onChange={e => setEditingLog({ ...editingLog, CheckOutCategory: e.target.value })}
+                    placeholder="เช่น ซ่อมเสร็จ, ส่งมอบ, ลูกค้ารับรถ, ย้ายไปอู่"
+                    className="w-full px-2.5 py-1.5 border border-zinc-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-300 mb-1.5"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {CHECK_OUT_CATEGORIES.map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setEditingLog({ ...editingLog, CheckOutCategory: cat })}
+                        className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200 text-emerald-800 rounded text-[10px] transition cursor-pointer"
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="block font-semibold text-zinc-700 mb-1">📝 บันทึกเพิ่มเติม / หมายเหตุ</label>
+                <textarea
+                  rows={2}
+                  value={editingLog.Note}
+                  onChange={e => setEditingLog({ ...editingLog, Note: e.target.value })}
+                  placeholder="เช่น รปภ พิมพ์ทะเบียนผิด ทำการแก้ไขโดยแอดมิน"
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-400 outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingLog(null)}
+                  disabled={isSaving}
+                  className="px-4 py-2 text-xs font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-xl transition cursor-pointer disabled:opacity-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      กำลังบันทึก...
+                    </>
+                  ) : (
+                    '💾 บันทึกการแก้ไข'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Delete Confirmation ── */}
+      {deletingLog && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl shrink-0">
+                🗑️
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900">
+                  ยืนยันการลบรายการ Gate Log (ID: #{deletingLog.GateLogID})
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  ต้องการลบรายการนี้ออกจากระบบอย่างถาวรหรือไม่?
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-zinc-50 rounded-xl p-3.5 border border-zinc-200 text-xs space-y-1.5 mb-5 font-mono">
+              <div>🚗 <strong>รถ/ทะเบียน:</strong> {deletingLog.VehicleRef || 'รถใหม่ (ไม่มีทะเบียน)'}</div>
+              {deletingLog.VinNo && <div>🔢 <strong>VIN:</strong> {deletingLog.VinNo}</div>}
+              <div>📥 <strong>เข้า:</strong> {formatDateTime(deletingLog.CheckInTime)} ({deletingLog.CheckInCategory || '-'})</div>
+              {deletingLog.CheckOutTime && <div>📤 <strong>ออก:</strong> {formatDateTime(deletingLog.CheckOutTime)} ({deletingLog.CheckOutCategory || '-'})</div>}
+              <div>👤 <strong>ผู้บันทึก:</strong> {maskName(deletingLog.CheckInByName || deletingLog.CheckOutByName)}</div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    กำลังลบรายการ...
+                  </>
+                ) : (
+                  '🗑️ ยืนยันลบรายการนี้ถาวร'
+                )}
+              </button>
+
+              <button
+                onClick={handleSetCancelledStatus}
+                disabled={isDeleting}
+                className="w-full py-2 px-4 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              >
+                ❌ เปลี่ยนเป็นสถานะยกเลิกแทน (ไม่ลบข้อมูล)
+              </button>
+
+              <button
+                onClick={() => setDeletingLog(null)}
+                disabled={isDeleting}
+                className="w-full py-2 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-medium transition cursor-pointer disabled:opacity-50"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Original LINE Message ── */}
       {selectedMessage && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-zinc-200 animate-in fade-in zoom-in-95 duration-150">

@@ -171,13 +171,39 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function toMssqlDate(d: string | null | undefined): string | null {
+  if (!d || !d.trim()) return null
+  let result = d.trim().replace('T', ' ')
+  if (result.split(':').length === 2) result += ':00'
+  return result
+}
+
+function normalizeVehicleRef(ref: string | null | undefined): string | null {
+  if (!ref || !ref.trim()) return null
+  const trimmed = ref.trim()
+  if (trimmed === 'รถใหม่' || trimmed.includes('รถใหม่')) {
+    return 'รถใหม่'
+  }
+  // Standardize plate: "ทอ 1234", "ทอ-1234", "1กก 1234" -> "ทอ-1234", "1กก-1234"
+  return trimmed.replace(/[\s\-_]+/g, '').replace(/([ก-ฮ]+)(\d)/g, '$1-$2')
+}
+
 export async function PATCH(req: NextRequest) {
+  return handleUpdate(req)
+}
+
+export async function PUT(req: NextRequest) {
+  return handleUpdate(req)
+}
+
+async function handleUpdate(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, action } = body
+    const rawId = body.id || body.GateLogID
+    const id = parseInt(String(rawId), 10)
 
-    if (!id || !action) {
-      return NextResponse.json({ error: 'Missing id or action' }, { status: 400 })
+    if (!id || isNaN(id)) {
+      return NextResponse.json({ error: 'Missing or invalid GateLog ID' }, { status: 400 })
     }
 
     const pool = await getMSSQLWritePool()
@@ -185,9 +211,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Database connection failed' }, { status: 500 })
     }
 
-    if (action === 'cancel') {
+    // Quick action: cancel
+    if (body.action === 'cancel') {
       const updateReq = pool.request()
-      updateReq.input('id', sql.Int, parseInt(id))
+      updateReq.input('id', sql.Int, id)
       await updateReq.query(`
         UPDATE dbo.EV_GateLog SET Status = 'CANCELLED', UpdateDate = GETDATE()
         WHERE GateLogID = @id
@@ -195,9 +222,98 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, status: 'CANCELLED' })
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    // Full update of fields
+    const vehicleRef = normalizeVehicleRef(body.VehicleRef ?? body.vehicleRef)
+    const vinNo = (body.VinNo ?? body.vinNo)?.trim() || null
+    const checkInTime = toMssqlDate(body.CheckInTime ?? body.checkInTime)
+    const checkInCategory = (body.CheckInCategory ?? body.checkInCategory)?.trim() || null
+    const checkInByName = (body.CheckInByName ?? body.checkInByName)?.trim() || null
+    const checkOutTime = toMssqlDate(body.CheckOutTime ?? body.checkOutTime)
+    const checkOutCategory = (body.CheckOutCategory ?? body.checkOutCategory)?.trim() || null
+    const checkOutByName = (body.CheckOutByName ?? body.checkOutByName)?.trim() || null
+    const quantityIn = Math.max(1, parseInt(String(body.QuantityIn ?? body.quantityIn ?? 1), 10) || 1)
+    const quantityOut = Math.max(0, parseInt(String(body.QuantityOut ?? body.quantityOut ?? 0), 10) || 0)
+    const status = (body.Status ?? body.status)?.trim() || 'IN'
+    const note = (body.Note ?? body.note)?.trim() || null
+
+    const updateReq = pool.request()
+    updateReq.input('id', sql.Int, id)
+    updateReq.input('vehicleRef', sql.NVarChar, vehicleRef)
+    updateReq.input('vinNo', sql.NVarChar, vinNo)
+    updateReq.input('checkInTime', sql.DateTime, checkInTime ? new Date(checkInTime) : null)
+    updateReq.input('checkInCategory', sql.NVarChar, checkInCategory)
+    updateReq.input('checkInByName', sql.NVarChar, checkInByName)
+    updateReq.input('checkOutTime', sql.DateTime, checkOutTime ? new Date(checkOutTime) : null)
+    updateReq.input('checkOutCategory', sql.NVarChar, checkOutCategory)
+    updateReq.input('checkOutByName', sql.NVarChar, checkOutByName)
+    updateReq.input('quantityIn', sql.Int, quantityIn)
+    updateReq.input('quantityOut', sql.Int, quantityOut)
+    updateReq.input('status', sql.NVarChar, status)
+    updateReq.input('note', sql.NVarChar, note)
+
+    await updateReq.query(`
+      UPDATE dbo.EV_GateLog
+      SET
+        VehicleRef = @vehicleRef,
+        VinNo = @vinNo,
+        CheckInTime = @checkInTime,
+        CheckInCategory = @checkInCategory,
+        CheckInByName = @checkInByName,
+        CheckOutTime = @checkOutTime,
+        CheckOutCategory = @checkOutCategory,
+        CheckOutByName = @checkOutByName,
+        QuantityIn = @quantityIn,
+        QuantityOut = @quantityOut,
+        Status = @status,
+        Note = @note,
+        UpdateDate = GETDATE()
+      WHERE GateLogID = @id
+    `)
+
+    return NextResponse.json({
+      success: true,
+      message: 'บันทึกการแก้ไขข้อมูลสำเร็จ'
+    })
   } catch (error: any) {
-    console.error('[Gate Logs API PATCH Error]', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('[Gate Logs API Update Error]', error)
+    return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    let id: number | null = null
+    const paramId = req.nextUrl.searchParams.get('id')
+    if (paramId) {
+      id = parseInt(paramId, 10)
+    } else {
+      const body = await req.json().catch(() => ({}))
+      if (body.id || body.GateLogID) {
+        id = parseInt(String(body.id || body.GateLogID), 10)
+      }
+    }
+
+    if (!id || isNaN(id)) {
+      return NextResponse.json({ error: 'Missing or invalid GateLog ID' }, { status: 400 })
+    }
+
+    const pool = await getMSSQLWritePool()
+    if (!pool) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 })
+    }
+
+    const delReq = pool.request()
+    delReq.input('id', sql.Int, id)
+    await delReq.query(`
+      DELETE FROM dbo.EV_GateLog WHERE GateLogID = @id
+    `)
+
+    return NextResponse.json({
+      success: true,
+      message: 'ลบรายการสำเร็จ'
+    })
+  } catch (error: any) {
+    console.error('[Gate Logs API DELETE Error]', error)
+    return NextResponse.json({ error: 'Internal Server Error: ' + error.message }, { status: 500 })
   }
 }

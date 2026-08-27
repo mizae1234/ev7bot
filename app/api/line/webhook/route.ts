@@ -468,7 +468,12 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
               where: { groupId: gid }
             })
             if (groupDbGate?.enableGateLog) {
-              const gateKeywords = [/เข้า/, /ออก/, /เข้าลาน/, /ออกลาน/, /ซ่อมเสร็จ/, /ส่งซ่อม/, /เช็คระยะ/, /ส่งมอบ/, /ลูกค้ารับ/, /รถยึด/, /รถใหม่/, /เข้าศูนย์/, /ออกศูนย์/, /รับรถ/, /คืนรถ/]
+              const gateKeywords = [
+                /เข้า/, /ออก/, /เข้าลาน/, /ออกลาน/, /ซ่อมเสร็จ/, /ส่งซ่อม/, /เข้าซ่อม/, /เช็คระยะ/, 
+                /ตรวจสภาพ/, /ส่งมอบ/, /ลูกค้ารับ/, /รถยึด/, /ยึดรถ/, /รถใหม่/, /เข้าศูนย์/, /ออกศูนย์/, 
+                /รับรถ/, /คืนรถ/, /รับคืน/, /ฝากจอด/, /ฝากรถ/, /ย้าย/, /ไปอู่/, /มาจาก/, /ส่งไป/, 
+                /ส่งมา/, /สไลด์/, /ยกไป/, /นำรถ/, /เทรลเลอร์/
+              ]
               const hasGateKeyword = gateKeywords.some(kw => kw.test(rawText))
               const hasVehicleNumber = /\d{3,4}/.test(rawText) || /vin/i.test(rawText) || /ทะเบียน/i.test(rawText)
               const isNewCarMessage = /รถใหม่/.test(rawText)
@@ -500,12 +505,19 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                 if (gateAnalysis.isGateLog && gateAnalysis.direction) {
                   // Normalize ทะเบียน: "ทอ 1234" / "ทอ1234" / "ทอ-1234" → "ทอ-1234"
                   const rawRef = gateAnalysis.vehicleRef?.trim() || null
-                  const vehicleRef = rawRef ? rawRef.replace(/[\s\-_]+/g, '').replace(/([ก-ฮ]+)(\d)/g, '$1-$2') : null
-                  const vinNo = gateAnalysis.vinNo?.trim() || null
+                  const isNewCar = isNewCarMessage || 
+                                   rawRef === 'รถใหม่' || 
+                                   rawRef?.includes('รถใหม่') || 
+                                   gateAnalysis.category === 'รถใหม่' || 
+                                   (!rawRef && !gateAnalysis.vinNo && isNewCarMessage) ||
+                                   (!rawRef && gateAnalysis.quantity && gateAnalysis.quantity > 1)
 
-                  // ถ้าไม่มีทั้งทะเบียนและ VIN → เช็คว่าเป็นรถใหม่หรือไม่
-                  if (!vehicleRef && !vinNo) {
-                    if (!isNewCarMessage) {
+                  const vehicleRef = (!isNewCar && rawRef) ? rawRef.replace(/[\s\-_]+/g, '').replace(/([ก-ฮ]+)(\d)/g, '$1-$2') : null
+                  const vinNo = (!isNewCar && gateAnalysis.vinNo?.trim()) || null
+
+                  // ถ้าเป็นรถใหม่ หรือไม่มีทั้งทะเบียนและ VIN
+                  if (isNewCar || (!vehicleRef && !vinNo)) {
+                    if (!isNewCar && !isNewCarMessage) {
                       console.log('[Gate Log Detect] Skipped — no vehicleRef or vinNo found.')
                     } else {
                       // รถใหม่ไม่มีทะเบียน → 1 record + จำนวน
@@ -523,7 +535,11 @@ async function handleEvent(event: WebhookEvent, appUrl: string) {
                       if (mssqlPool) {
                         const direction = gateAnalysis.direction || 'IN'
                         const category = gateAnalysis.category || 'รถใหม่'
-                        const qty = gateAnalysis.quantity || 1
+                        
+                        // Robust qty extraction: check regex in message first, then gateAnalysis, default 1
+                        const qtyMatch = rawText.match(/(\d+)\s*(?:คัน|ลำ)/)
+                        const extractedQty = qtyMatch ? parseInt(qtyMatch[1], 10) : null
+                        const qty = (extractedQty && extractedQty > 0) ? extractedQty : ((gateAnalysis.quantity && gateAnalysis.quantity > 0) ? gateAnalysis.quantity : 1)
 
                         if (direction === 'IN') {
                           // INSERT 1 record พร้อม QuantityIn

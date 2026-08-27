@@ -1098,7 +1098,7 @@ export async function analyzeGateMessage(message: string): Promise<{
             },
             vehicleRef: {
               type: SchemaType.STRING,
-              description: 'The vehicle license plate number. ALWAYS normalize to this format: Thai prefix + hyphen + number, e.g. "ทอ-4905", "ทอ-1234", "1กก-1234". Whether the user writes "ทอ 4905", "ทอ4905", or "ทอ-4905", always output as "ทอ-4905" (with hyphen, no space). Return null or empty string if not found.',
+              description: 'The vehicle license plate number. ALWAYS normalize to this format: Thai prefix + hyphen + number, e.g. "ทอ-4905", "ทอ-1234", "1กก-1234". Whether the user writes "ทอ 4905", "ทอ4905", or "ทอ-4905", always output as "ทอ-4905" (with hyphen, no space). If the message is about new cars without plate numbers (เช่น รถใหม่), return null.',
             },
             vinNo: {
               type: SchemaType.STRING,
@@ -1106,11 +1106,11 @@ export async function analyzeGateMessage(message: string): Promise<{
             },
             direction: {
               type: SchemaType.STRING,
-              description: 'Vehicle direction: "IN" if entering/arriving, "OUT" if leaving/exiting. Determine from context: words like เข้า/มา/เข้าลาน/ส่งซ่อม/เช็คระยะ(เข้า) = IN. Words like ออก/ออกลาน/ซ่อมเสร็จ(ออก)/กลับ/ลูกค้ารับ/ส่งมอบ(ออก) = OUT. If unclear, return null.',
+              description: 'Vehicle direction: "IN" if entering/arriving (e.g. เข้า, เข้าลาน, มา, ส่งซ่อม, เช็คระยะ, รถใหม่เข้า, รับรถเข้าลาน), "OUT" if leaving/exiting (e.g. ออก, ออกลาน, ย้ายรถไปอู่, ส่งไปอู่, สไลด์ไปอู่, ไปอู่, ซ่อมเสร็จ, ลูกค้ารับ, ส่งมอบ, คืนรถ). If unclear, return null.',
             },
             category: {
               type: SchemaType.STRING,
-              description: 'Brief category/reason for the entry or exit. Extract from the message as-is (e.g. "ซ่อมเสร็จ", "เช็คระยะ", "ส่งซ่อม", "ส่งมอบ", "ลูกค้ารับรถ", "รถยึด", "รถใหม่เข้าลาน"). Return null if not clear.',
+              description: 'Brief category/reason for the entry or exit (e.g. "ซ่อมเสร็จ", "เช็คระยะ", "ส่งซ่อม", "ย้ายไปอู่", "ส่งมอบ", "ลูกค้ารับรถ", "รถยึด", "รถใหม่"). Return null if not clear.',
             },
             time: {
               type: SchemaType.STRING,
@@ -1118,7 +1118,7 @@ export async function analyzeGateMessage(message: string): Promise<{
             },
             quantity: {
               type: SchemaType.INTEGER,
-              description: 'Number of vehicles if the message mentions multiple cars (e.g. "รถใหม่เข้า 7 คัน" → 7, "รถใหม่เข้ามาจอด 3 คัน" → 3). Return 1 or null if only a single vehicle or not specified.',
+              description: 'Number of vehicles if the message specifies a quantity or multiple cars (e.g. "รถใหม่เข้า 7 คัน" -> 7, "รถใหม่ 7 คัน" -> 7, "รถใหม่ออก 3 คัน" -> 3). Default to 1.',
             },
           },
           required: ['isGateLog'],
@@ -1129,24 +1129,51 @@ export async function analyzeGateMessage(message: string): Promise<{
 หน้าที่ของคุณคือตรวจสอบว่าข้อความเป็น "การรายงานรถเข้า-ออก" จาก รปภ หรือไม่
 
 ✅ isGateLog = true → ข้อความรายงานรถเข้าหรือออก เช่น:
+  [ตัวอย่างการเข้าลาน — IN]:
+  - "ทอ 2855 เช็คระยะ" (ทะเบียน: ทอ-2855, ทิศทาง: IN, ประเภท: เช็คระยะ)
+  - "ทอ 3296 ส่งซ่อมเข้า" หรือ "ทอ 3296 เข้าซ่อม" (ทะเบียน: ทอ-3296, ทิศทาง: IN, ประเภท: ส่งซ่อม)
+  - "ทอ 4905 ย้ายมาจากอู่ช่างเอ" หรือ "ทอ 4905 รับกลับมาจากอู่" (ทะเบียน: ทอ-4905, ทิศทาง: IN, ประเภท: ย้ายมาจากอู่ — การย้ายมาจากที่อื่นเข้าลาน = IN)
+  - "ทอ 1234 รถสไลด์นำเข้าลาน" หรือ "ทอ 1234 นำเข้ามาจอด" (ทะเบียน: ทอ-1234, ทิศทาง: IN, ประเภท: รถสไลด์นำเข้า)
+  - "ทอ 5555 ลูกค้านำรถมาคืน" หรือ "ทอ 5555 รับคืนรถ" (ทะเบียน: ทอ-5555, ทิศทาง: IN, ประเภท: คืนรถ)
+  - "ทอ 9999 ยึดรถเข้ามาจอด" หรือ "ทีมยึดนำรถ ทอ-9999 เข้ามา" (ทะเบียน: ทอ-9999, ทิศทาง: IN, ประเภท: รถยึด)
+  - "ทอ 7777 ตรวจสภาพ" หรือ "ทอ 7777 ฝากจอด" (ทะเบียน: ทอ-7777, ทิศทาง: IN, ประเภท: ตรวจสภาพ / ฝากจอด)
+  - "รถใหม่เข้า 7 คัน" หรือ "เทรลเลอร์ส่งรถใหม่ 7 คัน" (ทะเบียน: null, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 7)
+  - "รถใหม่เข้ามาจอด 3 คัน" (ทะเบียน: null, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 3)
+
+  [ตัวอย่างการออกลาน — OUT]:
   - "ทอ 4905 ซ่อมเสร็จแล้วออก" (ทะเบียน: ทอ-4905, ทิศทาง: OUT, ประเภท: ซ่อมเสร็จ)
-  - "ทอ 2855 เช็คระยะ" (ทะเบียน: ทอ-2855, ทิศทาง: IN, ประเภท: เช็คระยะ — ถ้าไม่ระบุทิศทางชัดเจนและเป็นงานที่ต้องเข้ามา ให้เป็น IN)
-  - "ทอ 3296 ส่งซ่อมเข้า" (ทะเบียน: ทอ-3296, ทิศทาง: IN, ประเภท: ส่งซ่อม)
+  - "ทอ 4905 ย้ายรถไปอู่" หรือ "ทอ 4905 ส่งไปอู่ช่างเอ" (ทะเบียน: ทอ-4905, ทิศทาง: OUT, ประเภท: ย้ายไปอู่ — การย้ายรถหรือส่งรถไปอู่นอกลานคือรถออกจากลาน = OUT)
+  - "ทอ 1234 สไลด์ไปศูนย์" (ทะเบียน: ทอ-1234, ทิศทาง: OUT, ประเภท: สไลด์ไปศูนย์)
   - "1กก1234 ลูกค้ามารับรถออก" (ทะเบียน: 1กก-1234, ทิศทาง: OUT, ประเภท: ลูกค้ารับรถ)
   - "VIN LSJA12345 ส่งมอบออก" (VIN: LSJA12345, ทิศทาง: OUT, ประเภท: ส่งมอบ)
-  - "รถใหม่เข้ามาจอด 7 คัน" (ไม่มีทะเบียน, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 7)
-  - "รถใหม่เข้า 3 คัน" (ไม่มีทะเบียน, ทิศทาง: IN, ประเภท: รถใหม่, จำนวน: 3)
+  - "รถใหม่ออก 3 คัน" (ทะเบียน: null, ทิศทาง: OUT, ประเภท: รถใหม่, จำนวน: 3)
 
 ❌ isGateLog = false → ข้อความทั่วไป สนทนา ถามคำถาม หรือไม่เกี่ยวกับรถเข้าออก เช่น:
   - "สวัสดีครับ" (ทักทาย)
   - "วันนี้มีรถกี่คัน" (ถามคำถาม)
   - "ใครอยู่เวรบ้าง" (คำถามทั่วไป)
 
-⚠️ การกำหนดทิศทาง:
-- ถ้าข้อความมีคำว่า "ออก", "กลับ", "ซ่อมเสร็จ" (โดยไม่มี "เข้า") → OUT
-- ถ้าข้อความมีคำว่า "เข้า", "มา", "ส่งซ่อม", "เช็คระยะ" (โดยไม่มี "ออก") → IN
-- ถ้ามีทั้ง "เข้า" และ "ออก" → ใช้คำสุดท้ายเป็นตัวกำหนด
-- ถ้าไม่ชัดเจน → ใช้บริบท เช่น "ซ่อมเสร็จ" มักหมายถึง OUT, "ส่งซ่อม" มักหมายถึง IN
+⚠️ กฎและบริบทการกำหนดทิศทาง (Direction Rules):
+1. 🔵 ทิศทาง IN (เข้าลาน / เข้าศูนย์):
+   - มีคำบ่งบอกการเข้า: "เข้า", "มา", "เข้าลาน", "เข้าศูนย์", "เข้ามาจอด", "นำเข้า"
+   - งานบริการนำรถเข้า: "ส่งซ่อม", "เข้าซ่อม", "เช็คระยะ", "ตรวจสภาพ", "เคลมสี", "สลับแบต", "รอซ่อม"
+   - รับคืน/ฝาก: "รับคืนรถ", "ลูกค้านำรถมาคืน", "คืนรถ", "รับรถคืน", "นำมาฝาก", "ฝากจอด"
+   - รถยึด: "ยึดรถเข้ามา", "ทีมยึดนำรถมาส่ง", "รถยึดเข้าลาน", "ยึดรถ"
+   - รถใหม่นำเข้า: "รถใหม่เข้า", "เทรลเลอร์มาส่งรถใหม่", "รถใหม่ลงลาน", "รับมอบรถใหม่"
+   - ย้ายกลับเข้ามา: "ย้ายมาจาก...", "รับรถกลับมาจาก...", "ส่งกลับมาจาก...", "นำรถกลับเข้าลาน"
+
+2. 🔴 ทิศทาง OUT (ออกลาน / ออกศูนย์):
+   - มีคำบ่งบอกการออก: "ออก", "ออกลาน", "ออกศูนย์", "ออกจากลาน"
+   - รถเสร็จ / ส่งมอบ: "ซ่อมเสร็จ", "ลูกค้ารับรถออก", "ส่งมอบรถ", "ปล่อยรถ", "ลูกค้ารับ"
+   - ย้ายออกไปภายนอก: "ย้ายรถไปอู่...", "ส่งไปอู่...", "ไปอู่...", "สไลด์ไปศูนย์/อู่", "ยกไปอู่...", "นำรถไป..."
+
+3. ⚖️ กรณีเปรียบเทียบบริบทที่ต้องระวัง:
+   - "ย้ายไป..." (ไปที่อื่นภายนอก) = OUT vs "ย้ายมาจาก..." (มาจากที่อื่นเข้าลาน) = IN
+   - "ลูกค้ารับรถออก" (ลูกค้ารับกลับ) = OUT vs "รับรถเข้าซ่อม" / "รับรถคืน" (ศูนย์รับรถเข้า) = IN
+   - "ซ่อมเสร็จแล้วนำกลับเข้ามาจอด" (นำกลับเข้าลาน) = IN vs "ซ่อมเสร็จแล้วออก" (เสร็จแล้วนำออก) = OUT
+
+⚠️ การระบุจำนวนคัน (Quantity Rules):
+- หากมีตัวเลขระบุจำนวน เช่น "7 คัน", "3 คัน" ให้ดึงค่าตัวเลขเป็น quantity เสมอ
 
 ตอบกลับเป็น JSON ตามโครงสร้างที่ระบุ`,
     })
@@ -1168,7 +1195,7 @@ export async function analyzeGateMessage(message: string): Promise<{
       direction: data.direction === 'IN' || data.direction === 'OUT' ? data.direction : undefined,
       category: data.category || undefined,
       time: data.time || undefined,
-      quantity: data.quantity && data.quantity > 1 ? data.quantity : undefined,
+      quantity: data.quantity && data.quantity >= 1 ? data.quantity : (data.quantity === 0 ? 0 : 1),
       inputTokens,
       outputTokens,
       modelName: GEMINI_MODEL_LITE,
