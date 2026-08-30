@@ -150,12 +150,20 @@ function AuditDashboard() {
             </h1>
             <p className="text-xs text-indigo-300 mt-0.5">ระบบตรวจสอบและบันทึกพิกัดตำแหน่งรถยนต์ไฟฟ้า</p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-sm px-4 py-2 rounded-xl transition duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
-          >
-            <span>➕</span> เริ่มตรวจเช็กใหม่
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/audit/missing')}
+              className="bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-amber-500/30 font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-xl transition duration-200 shadow-sm flex items-center gap-1.5"
+            >
+              <span>⚠️</span> รายงานรถที่ไม่อยู่ตามการตรวจ
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-xl transition duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
+            >
+              <span>➕</span> เริ่มตรวจเช็กใหม่
+            </button>
+          </div>
         </div>
       </div>
 

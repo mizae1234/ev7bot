@@ -1276,6 +1276,12 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 📥 Export Excel
               </button>
             )}
+            <button
+              onClick={() => router.push(`/audit/missing?sessionId=${sessionId}`)}
+              className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 px-3 py-1 rounded-lg transition flex items-center gap-1"
+            >
+              ⚠️ รถที่ไม่อยู่ตามการตรวจ
+            </button>
           </div>
 
           {/* Filter Pills */}

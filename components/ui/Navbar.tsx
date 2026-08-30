@@ -101,6 +101,18 @@ const navGroups: NavGroup[] = [
         icon: '🚧'
       },
       {
+        name: 'ตรวจนับสต็อกรถ (Stock Audit)',
+        href: '/audit',
+        desc: 'สแกนตรวจนับและติดตามตำแหน่งรถในลาน',
+        icon: '🔍'
+      },
+      {
+        name: 'รายงานรถที่ไม่อยู่ตามการตรวจ',
+        href: '/audit/missing',
+        desc: 'ตรวจสอบรถที่ยังไม่ถูกสแกนในรอบ Audit',
+        icon: '⚠️'
+      },
+      {
         name: 'งานสัญญา (EV Core)',
         href: '/case-contract',
         desc: 'ตรวจสอบสัญญาและสถานะทางสัญญา',
