@@ -141,7 +141,7 @@ function ScanSessionContent() {
   }, [previewVehicle])
 
   // Filter state for scanned items list
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM'>('ALL')
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'MATCHED' | 'MISMATCH' | 'NOT_IN_SYSTEM' | 'DOUBLE_PARKED' | 'OUTSIDE_SLOT'>('ALL')
 
   // Row/Slot state
   const [auditRow, setAuditRow] = useState('')
@@ -776,7 +776,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
             </div>
           </button>
           {statsExpanded && (
-            <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
+            <div className="px-4 pb-4 border-t border-slate-700/30 pt-3 space-y-2">
               <div className="grid grid-cols-3 gap-2 text-center">
                 {/* Matched */}
                 <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl py-2 px-1 flex flex-col justify-center items-center">
@@ -797,6 +797,22 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   <span className="text-[10px] font-bold text-rose-400">ไม่มีในระบบ</span>
                   <span className="text-lg font-black text-rose-300 mt-0.5">
                     {scannedItems.filter(item => item.DetectedStatus === 'NOT_IN_SYSTEM').length}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                {/* Double Parked */}
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl py-1.5 px-3 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-amber-400">🚗 ซ้อนคัน</span>
+                  <span className="text-sm font-black text-amber-300">
+                    {scannedItems.filter(item => item.SlotPosition === 1).length}
+                  </span>
+                </div>
+                {/* Outside Slot */}
+                <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl py-1.5 px-3 flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-rose-400">🚫 นอกช่อง</span>
+                  <span className="text-sm font-black text-rose-300">
+                    {scannedItems.filter(item => item.AuditRow && !item.AuditSlot).length}
                   </span>
                 </div>
               </div>
@@ -1229,7 +1245,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   const rows = scannedItems.map((item, idx) => ({
                     'ลำดับ': scannedItems.length - idx,
                     'แถว': item.AuditRow || '-',
-                    'ช่อง': item.AuditSlot || '(นอกช่อง)',
+                    'ช่อง': !item.AuditRow ? '-' : item.AuditSlot ? item.AuditSlot : '(นอกช่อง)',
+                    'ซ้อนคัน': item.SlotPosition === 1 ? 'ซ้อนคัน' : '-',
                     'ทะเบียน': item.RegisterNo || '-',
                     'VinNo': item.VinNo,
                     'รุ่น': item.Model || '-',
@@ -1248,6 +1265,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   const exportTime = new Date().toLocaleString('th-TH')
                   const matchedCount = scannedItems.filter(i => i.DetectedStatus === 'MATCHED').length
                   const mismatchCount = scannedItems.filter(i => i.DetectedStatus === 'MISMATCH').length
+                  const doubleParkedCount = scannedItems.filter(i => i.SlotPosition === 1).length
+                  const outsideSlotCount = scannedItems.filter(i => i.AuditRow && !i.AuditSlot).length
 
                   // Build sheet with header info rows
                   const headerRows = [
@@ -1255,7 +1274,7 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                     ['สถานที่ตรวจ', locationName],
                     ['วันที่ตรวจ', auditDateStr],
                     ['ผู้ตรวจ', session?.CreatedBy || '-'],
-                    ['จำนวนรถทั้งหมด', scannedItems.length, '', 'ตรงพิกัด', matchedCount, '', 'ผิดพิกัด', mismatchCount],
+                    ['จำนวนรถทั้งหมด', scannedItems.length, '', 'ตรงพิกัด', matchedCount, '', 'ผิดพิกัด', mismatchCount, '', 'ซ้อนคัน', doubleParkedCount, '', 'นอกช่อง', outsideSlotCount],
                     ['วันที่ Export', exportTime],
                     [], // blank row separator
                   ]
@@ -1264,7 +1283,26 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                   XLSX.utils.sheet_add_json(ws, rows, { origin: `A${headerRows.length + 1}` })
 
                   // Auto-size title merge
-                  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }]
+                  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }]
+
+                  // Set column widths for readability
+                  ws['!cols'] = [
+                    { wch: 8 },  // ลำดับ
+                    { wch: 12 }, // แถว
+                    { wch: 14 }, // ช่อง
+                    { wch: 12 }, // ซ้อนคัน
+                    { wch: 16 }, // ทะเบียน
+                    { wch: 22 }, // VinNo
+                    { wch: 20 }, // รุ่น
+                    { wch: 12 }, // สี
+                    { wch: 20 }, // สถานะรถ
+                    { wch: 14 }, // ผลตรวจ
+                    { wch: 24 }, // พิกัดก่อนหน้า
+                    { wch: 12 }, // วิธีสแกน
+                    { wch: 22 }, // เวลาสแกน
+                    { wch: 16 }, // ผู้บันทึก
+                    { wch: 25 }  // หมายเหตุ
+                  ]
 
                   const wb = XLSX.utils.book_new()
                   XLSX.utils.book_append_sheet(wb, ws, 'Audit Detail')
@@ -1292,6 +1330,8 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
                 { key: 'MATCHED' as const, label: '✅ ตรงพิกัด', count: scannedItems.filter(i => i.DetectedStatus === 'MATCHED').length, activeClass: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
                 { key: 'MISMATCH' as const, label: '⚠️ ผิดพิกัด', count: scannedItems.filter(i => i.DetectedStatus === 'MISMATCH').length, activeClass: 'bg-amber-500/20 border-amber-500/40 text-amber-300' },
                 { key: 'NOT_IN_SYSTEM' as const, label: '❌ ไม่มีในระบบ', count: scannedItems.filter(i => i.DetectedStatus === 'NOT_IN_SYSTEM').length, activeClass: 'bg-rose-500/20 border-rose-500/40 text-rose-300' },
+                { key: 'DOUBLE_PARKED' as const, label: '🚗 ซ้อนคัน', count: scannedItems.filter(i => i.SlotPosition === 1).length, activeClass: 'bg-amber-500/25 border-amber-500/50 text-amber-300' },
+                { key: 'OUTSIDE_SLOT' as const, label: '🚫 นอกช่อง', count: scannedItems.filter(i => i.AuditRow && !i.AuditSlot).length, activeClass: 'bg-rose-500/25 border-rose-500/50 text-rose-300' },
               ]).map(f => (
                 <button
                   key={f.key}
@@ -1309,7 +1349,13 @@ function compressImage(file: File, maxWidth = 1200, maxHeight = 1200, quality = 
           )}
 
           {(() => {
-            const filtered = filterStatus === 'ALL' ? scannedItems : scannedItems.filter(i => i.DetectedStatus === filterStatus)
+            const filtered = filterStatus === 'ALL'
+              ? scannedItems
+              : filterStatus === 'DOUBLE_PARKED'
+                ? scannedItems.filter(i => i.SlotPosition === 1)
+                : filterStatus === 'OUTSIDE_SLOT'
+                  ? scannedItems.filter(i => i.AuditRow && !i.AuditSlot)
+                  : scannedItems.filter(i => i.DetectedStatus === filterStatus)
 
             if (filtered.length === 0 && scannedItems.length > 0) {
               return (

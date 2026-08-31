@@ -257,6 +257,7 @@ export async function GET(request: NextRequest) {
         ii.ProjectType,
         ai.AuditRow,
         ai.AuditSlot,
+        ai.SlotPosition,
         ai.ScanTime,
         ai.CreatedBy AS AuditedBy,
         ai.DetectedStatus

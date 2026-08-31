@@ -64,6 +64,7 @@ interface MismatchedVehicle {
   ProjectType?: string
   AuditRow?: string
   AuditSlot?: string
+  SlotPosition?: number | null
   ScanTime?: string
   AuditedBy?: string
   DetectedStatus?: string
@@ -227,6 +228,9 @@ function MissingAuditContent() {
       'สถานะหลัก': v.Status || '-',
       'สถานะย่อย': v.StatusType || '-',
       'Project Type': v.ProjectType || '-',
+      'แถว': v.AuditRow || '-',
+      'ช่อง': !v.AuditRow ? '-' : v.AuditSlot ? v.AuditSlot : '(นอกช่อง)',
+      'ซ้อนคัน': v.SlotPosition === 1 ? 'ซ้อนคัน' : '-',
       'พิกัดปัจจุบันในระบบ': v.CurrentLocation || 'ไม่ระบุ',
       [`พิกัดที่ตรวจพบ (Session ${sessionId})`]: v.AuditLocation || sessionLocation
     }))
@@ -242,6 +246,9 @@ function MissingAuditContent() {
       { wch: 18 }, // สถานะหลัก
       { wch: 24 }, // สถานะย่อย
       { wch: 18 }, // Project Type
+      { wch: 12 }, // แถว
+      { wch: 14 }, // ช่อง
+      { wch: 12 }, // ซ้อนคัน
       { wch: 28 }, // พิกัดปัจจุบันในระบบ
       { wch: 30 }, // พิกัดที่ตรวจพบ
     ]
