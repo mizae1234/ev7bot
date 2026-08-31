@@ -1056,20 +1056,21 @@ const toMssqlDate = (d: string | null | undefined): string | null => {
   * `MaintenanceStartDate` = วันที่เริ่มซ่อม
   * `ServiceLocationCode` และ `ServiceLocationName` = รหัสและชื่อสถานที่จัดเก็บรถ/อู่
 
-#### ข. เมื่อซ่อมเสร็จสิ้น (COMPLETE)
+#### ข. เมื่อซ่อมเสร็จสิ้น (COMPLETE) หรือใบงานที่เหลือเป็นรถยังขับใช้งานได้ทั้งหมด (STILL_WORK)
 1. **ตรวจสอบความปลอดภัยการอัปเดตตัวรถ (`EV_InventoryItem`)**:
-   * จะทำการอัปเดตสถานะตัวรถได้ ก็ต่อเมื่อ **"ไม่มีใบงานซ่อมค้าง (Pending) หรืองานอื่นคงเหลืออยู่สำหรับรถคันนี้แล้ว"** (โดยเช็คว่า `COUNT(ใบงานค้างที่มี CarStatusCode NOT IN ('COMPLETE', 'READY_PICKUP_MAINTENANCE')) = 0`)
-   * หากยังมีใบงานอื่นของรถคันเดียวกันค้างซ่อมอยู่แม้แต่ใบเดียว ให้ปรับเฉพาะสถานะใบงานใน `EV_MaintenanceItem` เท่านั้น และ **ห้ามอัปเดต** ข้อมูลในตาราง `EV_InventoryItem` เด็ดขาด
+   * จะทำการอัปเดตสถานะตัวรถได้ ก็ต่อเมื่อ **"ไม่มีใบงานซ่อมติดค้าง (IN_MAINTENANCE / WAITING_FOR_MAINTENANCE) และไม่มี READY_PICKUP_MAINTENANCE"**
+   * หากใบงานปิดครบทั้งหมด (`allClosed`) หรือทุกใบงานที่เหลือเป็นสถานะรถยังขับใช้งานได้ทั้งหมด (`allStillWork = STILL_WORK`) ระบบจะคืนค่าสถานะตัวรถกลับสู่สถานะพร้อมใช้งาน
+   * หากยังมีใบงานอื่นของรถคันเดียวกันค้างซ่อมจริงอยู่ ให้ปรับเฉพาะสถานะใบงานใน `EV_MaintenanceItem` เท่านั้น และ **ห้ามอัปเดต** ข้อมูลในตาราง `EV_InventoryItem` เด็ดขาด
 
 2. **กฎการปรับสถานะใบงานและสถานะตัวรถตาม `StatusType` ของรถ**:
    หากผ่านเงื่อนไขไม่มีใบงานค้างแล้ว ให้ปรับปรุงตามตารางจับคู่ (Mapping) ด้านล่างนี้:
 
 | `StatusType` ปัจจุบันของรถ | การอัปเดตใบงาน (`EV_MaintenanceItem`) | การอัปเดตตัวรถ (`EV_InventoryItem`) |
 |---|---|---|
-| **`ON_RENT_MAINTENANCE`** | `CarStatusCode` = `'READY_PICKUP_MAINTENANCE'` | **ไม่ต้องแก้ไขตัวรถ** (คงสถานะ `ON_RENT` ไว้เหมือนเดิม) |
-| **`USE_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE_USE'` |
-| **`NEW_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE'` |
-| **`REPLACEMENT_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` | ปรับ `Status` = `'REPLACEMENT'` และ `StatusType` = `'REPLACEMENT_AVAILABLE'` |
+| **`ON_RENT_MAINTENANCE`** | `CarStatusCode` = `'READY_PICKUP_MAINTENANCE'` หรือ `'STILL_WORK'` | ปรับ `Status` = `'ON_RENT'` และ `StatusType` = `NULL` (หรือคง ON_RENT) |
+| **`USE_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` หรือ `'STILL_WORK'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE_USE'` |
+| **`NEW_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` หรือ `'STILL_WORK'` | ปรับ `Status` = `'AVAILABLE'` และ `StatusType` = `'AVAILABLE'` |
+| **`REPLACEMENT_MAINTENANCE`** | `CarStatusCode` = `'COMPLETE'` หรือ `'STILL_WORK'` | ปรับ `Status` = `'REPLACEMENT'` และ `StatusType` = `'REPLACEMENT_AVAILABLE'` |
 
 *(หมายเหตุ: ทุกการอัปเดตต้องระบุ `UpdateUserID` และตั้งค่า `UpdateDate = GETDATE()` ด้วยเสมอ)*
 

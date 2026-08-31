@@ -833,17 +833,18 @@ export async function POST(req: NextRequest) {
             AND IsActive = 1
         `)
         const activeTickets = countRes.recordset
-        const hasReadyPickup = activeTickets.some(item => item.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
-        const hasInRepair = activeTickets.some(item => ['IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE'].includes(item.CarStatusCode))
-        const allStillWork = activeTickets.length > 0 && activeTickets.every(item => item.CarStatusCode === 'STILL_WORK')
-        const allClosed = activeTickets.length === 0 || activeTickets.every(item => ['COMPLETE', 'GARAGE_COMPLETE'].includes(item.CarStatusCode))
+        const openTickets = activeTickets.filter(item => !['COMPLETE', 'GARAGE_COMPLETE'].includes(item.CarStatusCode))
+        const hasReadyPickup = openTickets.some(item => item.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
+        const hasInRepair = openTickets.some(item => ['IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE'].includes(item.CarStatusCode))
+        const allStillWork = openTickets.length > 0 && openTickets.every(item => item.CarStatusCode === 'STILL_WORK')
+        const allClosed = openTickets.length === 0
 
         // รถจะกลับไป ON_RENT หรือ AVAILABLE ได้ ก็ต่อเมื่อ:
         // 1. ไม่มีใบงาน READY_PICKUP_MAINTENANCE ค้างอยู่เด็ดขาด (เพราะรถยังต้องอยู่ที่อู่ รอลูกค้ามารับ/รอปิดเคส)
         // 2. ไม่มีใบงานติดซ่อม (IN_MAINTENANCE / WAITING_FOR_MAINTENANCE)
-        // 3. ปิดเคสครบทั้งหมด (allClosed) หรือทุกใบที่เหลือเป็น STILL_WORK ทั้งหมด (allStillWork)
-        const shouldRevertToAvailable = !hasReadyPickup && !hasInRepair && (isLastPending || allClosed || allStillWork)
-        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Total Active=${activeTickets.length}, hasReadyPickup=${hasReadyPickup}, hasInRepair=${hasInRepair}, allStillWork=${allStillWork}, allClosed=${allClosed}, shouldRevert=${shouldRevertToAvailable}`)
+        // 3. ปิดเคสครบทั้งหมด (allClosed) หรือ "ทุกใบงานที่ยังค้างอยู่" เป็น STILL_WORK ทั้งหมด (allStillWork)
+        const shouldRevertToAvailable = !hasReadyPickup && !hasInRepair && (allClosed || allStillWork)
+        console.log(`[Pending Check] InventoryItemID=${inventoryItemId}, Total Tickets=${activeTickets.length}, Open Tickets=${openTickets.length}, hasReadyPickup=${hasReadyPickup}, hasInRepair=${hasInRepair}, allStillWork=${allStillWork}, allClosed=${allClosed}, shouldRevert=${shouldRevertToAvailable}`)
 
         if (shouldRevertToAvailable) {
           let newStatus: string | null = null
@@ -856,15 +857,15 @@ export async function POST(req: NextRequest) {
               newStatusType = null
               shouldUpdate = true
             }
-          } else if (allClosed && vehicleStatusType === 'USE_MAINTENANCE') {
+          } else if ((allClosed || allStillWork) && vehicleStatusType === 'USE_MAINTENANCE') {
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE_USE'
             shouldUpdate = true
-          } else if (allClosed && vehicleStatusType === 'NEW_MAINTENANCE') {
+          } else if ((allClosed || allStillWork) && vehicleStatusType === 'NEW_MAINTENANCE') {
             newStatus = 'AVAILABLE'
             newStatusType = 'AVAILABLE'
             shouldUpdate = true
-          } else if (allClosed && vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
+          } else if ((allClosed || allStillWork) && vehicleStatusType === 'REPLACEMENT_MAINTENANCE') {
             newStatus = 'REPLACEMENT'
             newStatusType = 'REPLACEMENT_AVAILABLE'
             shouldUpdate = true
@@ -895,12 +896,24 @@ export async function POST(req: NextRequest) {
             console.log(`[Inventory Status Update Success] InventoryItemID=${inventoryItemId} set Status=${newStatus}, StatusType=${newStatusType}`)
 
             // ─── INSERT LOGS ───
-            if (newStatus === 'ON_RENT' && newStatusType === null) {
-              try {
-                // 1. Vehicle Note
-                const vehicleNoteDetail = allStillWork
+            try {
+              // 1. Vehicle Note
+              let vehicleNoteDetail = ''
+              if (newStatus === 'ON_RENT' && newStatusType === null) {
+                vehicleNoteDetail = allStillWork
                   ? `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
                   : `📍 ระบบปรับสถานะเป็นรถเช่าอัตโนมัติ (ON_RENT) เนื่องจากปิดเคสงานซ่อมบำรุงครบถ้วนแล้ว`
+              } else if (newStatus === 'REPLACEMENT' && newStatusType === 'REPLACEMENT_AVAILABLE') {
+                vehicleNoteDetail = allStillWork
+                  ? `📍 ระบบปรับสถานะเป็นรถทดแทนพร้อมใช้ (REPLACEMENT_AVAILABLE) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                  : `📍 ระบบปรับสถานะเป็นรถทดแทนพร้อมใช้ (REPLACEMENT_AVAILABLE) เนื่องจากปิดเคสงานซ่อมบำรุงครบถ้วนแล้ว`
+              } else if (newStatus === 'AVAILABLE') {
+                vehicleNoteDetail = allStillWork
+                  ? `📍 ระบบปรับสถานะเป็นรถพร้อมใช้งาน (${newStatusType || 'AVAILABLE'}) เนื่องจากใบแจ้งซ่อมที่ค้างอยู่สามารถใช้งานได้ทั้งหมด`
+                  : `📍 ระบบปรับสถานะเป็นรถพร้อมใช้งาน (${newStatusType || 'AVAILABLE'}) เนื่องจากปิดเคสงานซ่อมบำรุงครบถ้วนแล้ว`
+              }
+
+              if (vehicleNoteDetail) {
                 await pool.request()
                   .input('itemId', sql.Int, inventoryItemId)
                   .input('note', sql.NVarChar, vehicleNoteDetail)
@@ -909,30 +922,30 @@ export async function POST(req: NextRequest) {
                     INSERT INTO dbo.EV_VehicleNote (InventoryItemID, NoteDetail, CreateDate, CreateUserID, IsActive)
                     VALUES (@itemId, @note, GETDATE(), @userId, 1)
                   `)
-
-                // 2. Maintenance Follow Up
-                if (maintenanceId) {
-                  const oldStatusName = oldCarStatusCode ? (carStatusMap[oldCarStatusCode] || oldCarStatusCode) : 'ไม่ระบุ';
-                  const newStatusName = resolvedCarStatusCode ? (carStatusMap[resolvedCarStatusCode] || resolvedCarStatusCode) : 'ไม่ระบุ';
-                  const followUpMsg = `ระบบอัปเดต : เปลี่ยนสถานะจาก ${oldStatusName} เป็น ${newStatusName}`;
-                  await pool.request()
-                    .input('maintId', sql.Int, maintenanceId)
-                    .input('detail', sql.NVarChar, followUpMsg)
-                    .input('userId', sql.Int, dbUserId)
-                    .query(`
-                      INSERT INTO dbo.EV_MaintenanceFollowUp (
-                        MaintenanceItemID, FollowUpDate, FollowUpDetail, IsActive,
-                        CreateDate, CreateUserID, UpdateDate, UpdateUserID
-                      )
-                      VALUES (
-                        @maintId, GETDATE(), @detail, 1,
-                        GETDATE(), @userId, GETDATE(), @userId
-                      )
-                    `)
-                }
-              } catch (logErr) {
-                console.error('[Auto Revert Log Error]', logErr)
               }
+
+              // 2. Maintenance Follow Up
+              if (maintenanceId) {
+                const oldStatusName = oldCarStatusCode ? (carStatusMap[oldCarStatusCode] || oldCarStatusCode) : 'ไม่ระบุ';
+                const newStatusName = resolvedCarStatusCode ? (carStatusMap[resolvedCarStatusCode] || resolvedCarStatusCode) : 'ไม่ระบุ';
+                const followUpMsg = `ระบบอัปเดต : เปลี่ยนสถานะจาก ${oldStatusName} เป็น ${newStatusName}`;
+                await pool.request()
+                  .input('maintId', sql.Int, maintenanceId)
+                  .input('detail', sql.NVarChar, followUpMsg)
+                  .input('userId', sql.Int, dbUserId)
+                  .query(`
+                    INSERT INTO dbo.EV_MaintenanceFollowUp (
+                      MaintenanceItemID, FollowUpDate, FollowUpDetail, IsActive,
+                      CreateDate, CreateUserID, UpdateDate, UpdateUserID
+                    )
+                    VALUES (
+                      @maintId, GETDATE(), @detail, 1,
+                      GETDATE(), @userId, GETDATE(), @userId
+                    )
+                  `)
+              }
+            } catch (logErr) {
+              console.error('[Auto Revert Log Error]', logErr)
             }
           }
         } else {
