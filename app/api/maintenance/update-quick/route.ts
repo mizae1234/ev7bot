@@ -810,6 +810,68 @@ export async function POST(req: NextRequest) {
                 WHERE VinNo = @repVin AND IsActive = 1
               `)
               console.log(`[Replacement Car Status Revert] VinNo=${repVinNo}: set Status=REPLACEMENT, StatusType=REPLACEMENT_AVAILABLE`)
+
+              // ─── Auto-Insert EV_Inspection for returned replacement car (ตรวจสภาพภายหลัง) ───
+              try {
+                // Check for existing pending inspection to avoid duplicates
+                const existInspReq = pool.request()
+                existInspReq.input('repVinCheck', sql.VarChar, repVinNo)
+                const existInspRes = await existInspReq.query(`
+                  SELECT TOP 1 InspectionID 
+                  FROM dbo.EV_Inspection 
+                  WHERE VinNo = @repVinCheck 
+                    AND IsActive = 1 
+                    AND Status = 'DRAFT' 
+                    AND IsPendingChecklist = 1
+                  ORDER BY InspectionID DESC
+                `)
+
+                if (existInspRes.recordset.length === 0) {
+                  // Fetch RegisterNo of the replacement car
+                  const repCarInfoReq = pool.request()
+                  repCarInfoReq.input('repVinInfo', sql.VarChar, repVinNo)
+                  const repCarInfoRes = await repCarInfoReq.query(`
+                    SELECT RegisterNo FROM dbo.EV_InventoryItem WHERE VinNo = @repVinInfo AND IsActive = 1
+                  `)
+                  const repRegisterNo = repCarInfoRes.recordset[0]?.RegisterNo || null
+
+                  const inspRemark = `สร้างอัตโนมัติจากการปิดเคสซ่อม #${maintenanceId} (คืนรถทดแทน)`
+                  const inspInsertReq = pool.request()
+                  inspInsertReq.input('inspVin', sql.NVarChar, repVinNo)
+                  inspInsertReq.input('inspRegNo', sql.NVarChar, repRegisterNo)
+                  inspInsertReq.input('inspRemark', sql.NVarChar, inspRemark)
+                  inspInsertReq.input('inspLoc', sql.VarChar, replacementLocation || null)
+                  inspInsertReq.input('inspRetDate', sql.Date, replacementReturnDate ? toMssqlDate(replacementReturnDate) : null)
+                  inspInsertReq.input('inspUserId', sql.Int, dbUserId)
+                  inspInsertReq.input('inspUserName', sql.NVarChar, senderName)
+                  inspInsertReq.input('inspRetReason', sql.VarChar, 'RETURN_REPLACEMENT_GET_MAIN')
+
+                  const inspResult = await inspInsertReq.query(`
+                    INSERT INTO dbo.EV_Inspection (
+                      VinNo, RegisterNo, InspectionType, 
+                      InspectionDate, InspectorUserID, InspectorName,
+                      Status, Remark, IsActive, CreateDate, CreateUserID,
+                      ReturnDate, Location, ReturnReason,
+                      CarStatus, CarStatusType, IsPendingChecklist
+                    )
+                    VALUES (
+                      @inspVin, @inspRegNo, 'RETURN',
+                      CAST(GETDATE() AS DATE), @inspUserId, @inspUserName,
+                      'DRAFT', @inspRemark, 1, GETDATE(), @inspUserId,
+                      @inspRetDate, @inspLoc, @inspRetReason,
+                      'REPLACEMENT', 'REPLACEMENT_CAR', 1
+                    );
+                    SELECT SCOPE_IDENTITY() AS InspectionID;
+                  `)
+                  const newInspId = inspResult.recordset[0]?.InspectionID
+                  console.log(`[Auto Inspection] ✅ Created EV_Inspection ID=${newInspId} for replacement car VinNo=${repVinNo} (isPendingChecklist=true, from MaintenanceItemID=${maintenanceId})`)
+                } else {
+                  console.log(`[Auto Inspection] Skipped — existing pending inspection ID=${existInspRes.recordset[0].InspectionID} for VinNo=${repVinNo}`)
+                }
+              } catch (inspErr) {
+                console.error('[Auto Inspection Insert Error]', inspErr)
+                // Don't fail the whole request — replacement return already succeeded
+              }
             } catch (revertErr) {
               console.error('[Replacement Car Status Revert Error]', revertErr)
             }
