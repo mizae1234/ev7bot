@@ -2410,7 +2410,7 @@ export default function QuickReportPage() {
                       {(userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
                         <button
                           type="button"
-                          disabled={pendingTickets.length === 0 || pendingTickets.some(t => !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))}
+                          disabled={pendingTickets.length === 0 || !pendingTickets.some(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || '')) || pendingTickets.some(t => ['WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE'].includes(t.CarStatusCode || ''))}
                           onClick={() => {
                             const nextType = bulkActionType === 'close_case' ? null : 'close_case'
                             setBulkActionType(nextType)
@@ -2434,7 +2434,7 @@ export default function QuickReportPage() {
                             setCloseReplacementLocation('')
                           }}
                           className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
-                            pendingTickets.length === 0 || pendingTickets.some(t => !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                            pendingTickets.length === 0 || !pendingTickets.some(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || '')) || pendingTickets.some(t => ['WAITING_FOR_MAINTENANCE', 'IN_MAINTENANCE'].includes(t.CarStatusCode || ''))
                               ? 'opacity-40 cursor-not-allowed bg-purple-50 border-slate-200 text-slate-400'
                               : (bulkActionType === 'close_case'
                                   ? 'bg-purple-100 border-purple-300 text-purple-800'
