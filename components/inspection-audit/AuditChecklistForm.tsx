@@ -1,7 +1,7 @@
-'use client'
-
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import type { ChecklistSectionDef } from '@/lib/inspection/types'
+import { QC_CHECKLIST_SECTIONS } from '@/lib/inspection/checklist-config'
+import { VehicleNotesSection } from '@/components/vehicle/VehicleNotesSection'
 
 interface FormItemState {
   category: string
@@ -21,15 +21,19 @@ interface UploadedPhoto {
 }
 
 interface AuditChecklistFormProps {
-  sessionStatus: 'OPEN' | 'CLOSED'
+  sessionStatus?: 'OPEN' | 'CLOSED'
   activeVehicle: {
     inspectionId?: number
+    inventoryItemId?: number
     vinNo: string
     registerNo: string | null
     model: string | null
     project?: string | null
+    currentLocation?: string | null
   }
   dynamicSections: ChecklistSectionDef[]
+  inspectionMode?: 'QC' | 'AUDIT'
+  onInspectionModeChange?: (mode: 'QC' | 'AUDIT') => void
   formItems: Record<string, FormItemState>
   mileage: number | ''
   remark: string
@@ -38,8 +42,8 @@ interface AuditChecklistFormProps {
   pendingPhotos: Record<string, File[]>
   saving: boolean
   spacesCdn: string
-  autoAssessment: string
-  damagedItems: Array<{ label: string; valueLabel: string }>
+  autoAssessment?: string
+  damagedItems?: Array<{ label: string; valueLabel: string }>
   onMileageChange: (val: number | '') => void
   onRemarkChange: (val: string) => void
   onInspectorNameChange: (val: string) => void
@@ -50,8 +54,9 @@ interface AuditChecklistFormProps {
   onPhotoSelect: (category: string, itemCode: string, files: FileList | null) => void
   onRemovePendingPhoto: (posKey: string, idx: number) => void
   onDeleteUploadedPhoto: (photoId: number) => void
-  onSave: () => void
+  onSave: (mode?: 'QC' | 'AUDIT') => void
   onCancel: () => void
+  lineUserId?: string | null
 }
 
 const LICENSE_PLATE_OPTIONS = [
@@ -73,9 +78,11 @@ const BODY_CONDITION_OPTIONS = [
 ]
 
 export function AuditChecklistForm({
-  sessionStatus,
+  sessionStatus = 'OPEN',
   activeVehicle,
   dynamicSections,
+  inspectionMode: propInspectionMode,
+  onInspectionModeChange,
   formItems,
   mileage,
   remark,
@@ -84,8 +91,8 @@ export function AuditChecklistForm({
   pendingPhotos,
   saving,
   spacesCdn,
-  autoAssessment,
-  damagedItems,
+  autoAssessment: propAutoAssessment,
+  damagedItems: propDamagedItems,
   onMileageChange,
   onRemarkChange,
   onInspectorNameChange,
@@ -98,35 +105,159 @@ export function AuditChecklistForm({
   onDeleteUploadedPhoto,
   onSave,
   onCancel,
+  lineUserId,
 }: AuditChecklistFormProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [mode, setMode] = useState<'QC' | 'AUDIT'>(propInspectionMode || 'QC')
+  const [initialNoteText, setInitialNoteText] = useState('')
+
+  const handleModeChange = (newMode: 'QC' | 'AUDIT') => {
+    setMode(newMode)
+    if (onInspectionModeChange) onInspectionModeChange(newMode)
+  }
+
+  // Choose sections based on mode: use dynamicSections from DB master if provided, otherwise fallback to QC_CHECKLIST_SECTIONS
+  const currentSections = useMemo(() => {
+    if (mode === 'QC') {
+      return dynamicSections.length > 0 && dynamicSections.some(s => s.category.startsWith('QC_'))
+        ? dynamicSections
+        : QC_CHECKLIST_SECTIONS
+    }
+    return dynamicSections
+  }, [mode, dynamicSections])
+
+  // QC Auto Assessment
+  const { qcAssessment, qcFailedItems } = useMemo(() => {
+    if (mode !== 'QC') {
+      return { qcAssessment: propAutoAssessment || '', qcFailedItems: propDamagedItems || [] }
+    }
+    const failed: Array<{ label: string; valueLabel: string }> = []
+    let filledCount = 0
+
+    currentSections.forEach(sec => {
+      sec.items.forEach(item => {
+        const key = `${sec.category}_${item.itemCode}`
+        const state = formItems[key]
+        if (state && state.value) {
+          filledCount++
+          if (state.value === 'NO' || state.value === 'NOT_CLEAN' || state.value === 'NO_KEY' || state.value === 'NOT_READY' || state.value === 'WORN_OUT') {
+            const optLabel = item.options?.find(o => o.value === state.value)?.label || 'ไม่พร้อม'
+            failed.push({ label: item.label, valueLabel: optLabel })
+          }
+        }
+      })
+    })
+
+    if (failed.length > 0) {
+      return { qcAssessment: 'ไม่ผ่าน QC (พบจุดที่ต้องแก้ไข)', qcFailedItems: failed }
+    }
+    if (filledCount === currentSections.length) {
+      return { qcAssessment: '🟢 ผ่านการตรวจ QC (พร้อมส่งมอบ)', qcFailedItems: [] }
+    }
+    return { qcAssessment: 'รอผลการตรวจ', qcFailedItems: [] }
+  }, [mode, formItems, propAutoAssessment, propDamagedItems, currentSections])
+
+  // Helper to compile QC formatted text for Vehicle Notes
+  const handlePullQCToNote = () => {
+    const reg = activeVehicle.registerNo || activeVehicle.vinNo
+    const lines: string[] = [reg]
+    
+    const qcCatList = [
+      { cat: 'QC_CLEANLINESS', code: 'STATUS', label: 'ความสะอาด ภายนอก - ภายใน', num: 1 },
+      { cat: 'QC_KEY', code: 'STATUS', label: 'กุญแจพร้อม', num: 2 },
+      { cat: 'QC_TAX_VEHICLE', code: 'STATUS', label: 'ทะเบียนเหลือมากกว่า 3 เดือน', num: 3 },
+      { cat: 'QC_TAX_METER', code: 'STATUS', label: 'ภาษีมิเตอร์เหลือมากกว่า 1 เดือน', num: 4 },
+      { cat: 'QC_PARK_POSITION', code: 'STATUS', label: 'รถอยู่ในตำแหน่งพร้อมส่ง', num: 5 },
+      { cat: 'QC_BATTERY_HV', code: 'STATUS', label: 'ไฟแบตลูกใหญ่มากกว่า40%', num: 6 },
+      { cat: 'QC_QR_CODE', code: 'STATUS', label: 'QR code มี-ไม่มี', num: 7 },
+      { cat: 'QC_WIPER', code: 'STATUS', label: 'ยางปัดน้ำฝน', num: 8 },
+      { cat: 'QC_TIRE', code: 'STATUS', label: 'ยางรถ', num: 9 },
+    ]
+
+    qcCatList.forEach(item => {
+      const it = formItems[`${item.cat}_${item.code}`]
+      const val = it?.value
+      const det = it?.detail?.trim()
+      const exp = it?.expiryDate
+      const num = it?.numericValue
+      let statusText = 'พร้อม'
+      if (item.cat === 'QC_QR_CODE') {
+        statusText = val === 'YES' ? 'มี' : val === 'NO' ? 'ไม่มี' : '-'
+      } else if (item.cat === 'QC_TAX_VEHICLE' || item.cat === 'QC_TAX_METER') {
+        statusText = exp ? `${exp}` : (val === 'YES' ? 'พร้อม' : 'ไม่พร้อม')
+      } else if (item.cat === 'QC_BATTERY_HV') {
+        statusText = num != null ? `${num}%` : (val === 'YES' ? '>40%' : 'ไม่พร้อม')
+      } else {
+        statusText = val === 'YES' ? 'พร้อม' : val === 'NO' ? 'ไม่พร้อม' : '-'
+      }
+      const comment = det ? ` //${det}` : ` //${statusText}`
+      lines.push(`${item.num} ${item.label}${comment}`)
+    })
+
+    setInitialNoteText(lines.join('\n'))
+  }
+
+  const effectiveAssessment = mode === 'QC' ? qcAssessment : (propAutoAssessment || '')
+  const effectiveDamagedItems = mode === 'QC' ? qcFailedItems : (propDamagedItems || [])
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-none">
-        <div className="flex items-center">
+      <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-3 flex-none">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <button
+              onClick={onCancel}
+              className="md:hidden mr-3 p-2 bg-slate-200 text-slate-700 hover:bg-slate-300 text-xs font-bold rounded-lg transition"
+            >
+              ⬅ กลับ
+            </button>
+            <div>
+              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                <span>{mode === 'QC' ? '🟢' : '📝'}</span>
+                <span>{mode === 'QC' ? 'ตรวจ QC รถก่อนส่งมอบ' : 'บันทึกผลการตรวจสภาพ'}: {activeVehicle.registerNo || 'ไม่มีทะเบียน'}</span>
+              </h3>
+              <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium mt-0.5">
+                VIN: {activeVehicle.vinNo} • {activeVehicle.model || '-'}
+                {activeVehicle.currentLocation && ` • ลานจอด: ${activeVehicle.currentLocation}`}
+              </p>
+            </div>
+          </div>
           <button
             onClick={onCancel}
-            className="md:hidden mr-3 p-2 bg-slate-200 text-slate-700 hover:bg-slate-300 text-xs font-bold rounded-lg transition"
+            className="hidden md:block text-xs text-slate-400 hover:text-slate-600 transition font-bold"
           >
-            ⬅ กลับ
+            ปิดหน้านี้ ✕
           </button>
-          <div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900">
-              📝 บันทึกผลการตรวจ: {activeVehicle.registerNo || 'ไม่มีทะเบียน'}
-            </h3>
-            <p className="text-[9px] sm:text-[10px] text-slate-500 font-medium mt-0.5">
-              VIN: {activeVehicle.vinNo} • {activeVehicle.model || '-'}
-            </p>
-          </div>
         </div>
-        <button
-          onClick={onCancel}
-          className="hidden md:block text-xs text-slate-400 hover:text-slate-600 transition font-bold"
-        >
-          ปิดหน้านี้ ✕
-        </button>
+
+        {/* Mode Selector Tabs */}
+        <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1 text-xs font-bold shadow-inner">
+          <button
+            type="button"
+            onClick={() => handleModeChange('QC')}
+            className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'QC'
+                ? 'bg-emerald-600 text-white shadow-sm font-extrabold scale-[1.01]'
+                : 'text-slate-600 hover:bg-white/60'
+            }`}
+          >
+            <span>🟢</span>
+            <span>QC รถก่อนส่งมอบ (ชุดง่าย 9 ข้อ)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('AUDIT')}
+            className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'AUDIT'
+                ? 'bg-indigo-600 text-white shadow-sm font-extrabold scale-[1.01]'
+                : 'text-slate-600 hover:bg-white/60'
+            }`}
+          >
+            <span>🔍</span>
+            <span>ตรวจสภาพรถ (เต็มรูปแบบ)</span>
+          </button>
+        </div>
       </div>
 
       {/* Checklist Form Body */}
@@ -159,7 +290,7 @@ export function AuditChecklistForm({
         </div>
 
         {/* Render Sections */}
-        {dynamicSections.map(section => (
+        {currentSections.map(section => (
           <div key={section.category} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center gap-2">
               <span className="text-sm">{section.icon}</span>
@@ -227,10 +358,10 @@ export function AuditChecklistForm({
                             className={`flex-1 px-2 py-2 rounded-lg text-[11px] font-medium border transition text-center leading-tight ${
                               stateItem.value === opt.value
                                 ? opt.value === 'NORMAL'
-                                  ? 'bg-emerald-600 text-white border-emerald-600 font-bold opacity-100'
-                                  : opt.value === 'SCRATCH'
-                                  ? 'bg-amber-500 text-white border-amber-500 font-bold opacity-100'
-                                  : 'bg-rose-500 text-white border-rose-500 font-bold opacity-100'
+                                ? 'bg-emerald-600 text-white border-emerald-600 font-bold opacity-100'
+                                : opt.value === 'SCRATCH'
+                                ? 'bg-amber-500 text-white border-amber-500 font-bold opacity-100'
+                                : 'bg-rose-500 text-white border-rose-500 font-bold opacity-100'
                                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                             }`}
                           >
@@ -274,6 +405,26 @@ export function AuditChecklistForm({
                           onChange={e => onChecklistNumberChange(section.category, itemDef.itemCode, e.target.value === '' ? null : parseFloat(e.target.value))}
                           className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:bg-white text-xs font-mono font-bold outline-none"
                         />
+                      </div>
+                    )}
+
+                    {/* QC Battery HV special SoC % input */}
+                    {section.category === 'QC_BATTERY_HV' && (
+                      <div className="flex items-center gap-2 pt-1 max-w-xs">
+                        <label className="text-[11px] font-bold text-slate-500">ระดับแบตเตอรี่ (SoC %):</label>
+                        <div className="relative flex-1">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            placeholder="เช่น 85"
+                            disabled={sessionStatus === 'CLOSED'}
+                            value={stateItem.numericValue ?? ''}
+                            onChange={e => onChecklistNumberChange(section.category, itemDef.itemCode, e.target.value === '' ? null : parseFloat(e.target.value))}
+                            className="w-full px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-bold outline-none"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">%</span>
+                        </div>
                       </div>
                     )}
 
@@ -388,39 +539,59 @@ export function AuditChecklistForm({
 
         {/* Auto Assessment Card with Damage Summary List */}
         <div className={`p-4 rounded-2xl border flex flex-col gap-2 shadow-sm transition duration-300 ${
-          autoAssessment === 'ต้องส่งเข้าซ่อม' 
+          effectiveAssessment === 'ต้องส่งเข้าซ่อม' || effectiveAssessment.startsWith('ไม่ผ่าน')
             ? 'bg-rose-50 border-rose-200 text-rose-800 shadow-rose-100/50' 
-            : autoAssessment === 'รอผลการตรวจ'
+            : effectiveAssessment === 'รอผลการตรวจ'
             ? 'bg-slate-50 border-slate-200 text-slate-800 shadow-slate-100/50'
             : 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-100/50'
         }`}>
-          <div className="flex items-center gap-3">
-            <span className="text-xl">
-              {autoAssessment === 'ต้องส่งเข้าซ่อม' ? '⚠️' : autoAssessment === 'รอผลการตรวจ' ? '⏳' : '✅'}
-            </span>
-            <div className="flex-1 text-xs">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">ผลประเมินสภาพรถ (ประมวลผลอัตโนมัติ)</p>
-              <p className="text-xs font-extrabold">{autoAssessment}</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">
+                {effectiveAssessment === 'ต้องส่งเข้าซ่อม' || effectiveAssessment.startsWith('ไม่ผ่าน')
+                  ? '⚠️'
+                  : effectiveAssessment === 'รอผลการตรวจ'
+                  ? '⏳'
+                  : '✅'}
+              </span>
+              <div className="text-xs">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                  {mode === 'QC' ? 'ผลประเมิน QC ก่อนส่งมอบ' : 'ผลประเมินสภาพรถ (ประมวลผลอัตโนมัติ)'}
+                </p>
+                <p className="text-xs font-extrabold">{effectiveAssessment}</p>
+              </div>
             </div>
+
+            {mode === 'QC' && (
+              <button
+                type="button"
+                onClick={handlePullQCToNote}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs active:scale-95 transition flex items-center gap-1.5 shadow-sm"
+              >
+                <span>📋</span> ดึงผล QC ลงกล่องบันทึกรถ
+              </button>
+            )}
           </div>
 
-          {autoAssessment === 'ต้องส่งเข้าซ่อม' && damagedItems.length > 0 && (
+          {(effectiveAssessment === 'ต้องส่งเข้าซ่อม' || effectiveAssessment.startsWith('ไม่ผ่าน')) && effectiveDamagedItems.length > 0 && (
             <div className="mt-1 pt-2 border-t border-rose-200/60 text-xs space-y-2">
               <div className="flex justify-between items-center">
-                <p className="font-bold text-[9px] uppercase text-rose-700">🛠️ รายการความเสียหายที่ตรวจพบ:</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const summaryText = `พบจุดเสียหาย:\n` + damagedItems.map((item, idx) => `${idx + 1}. ${item.label} (${item.valueLabel})`).join('\n')
-                    onRemarkChange((summaryText + '\n' + remark).trim())
-                  }}
-                  className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] active:scale-95 transition"
-                >
-                  📋 ดึงลงช่องโน้ต
-                </button>
+                <p className="font-bold text-[9px] uppercase text-rose-700">🛠️ รายการที่ตรวจพบปัญหา / ไม่พร้อม:</p>
+                {mode !== 'QC' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const summaryText = `พบจุดเสียหาย:\n` + effectiveDamagedItems.map((item, idx) => `${idx + 1}. ${item.label} (${item.valueLabel})`).join('\n')
+                      onRemarkChange((summaryText + '\n' + remark).trim())
+                    }}
+                    className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] active:scale-95 transition"
+                  >
+                    📋 ดึงลงช่องโน้ต
+                  </button>
+                )}
               </div>
               <ul className="list-disc list-inside space-y-0.5 text-[10px] text-rose-700 font-medium">
-                {damagedItems.map((item, idx) => (
+                {effectiveDamagedItems.map((item, idx) => (
                   <li key={idx}>
                     {item.label}: <span className="font-bold">{item.valueLabel}</span>
                   </li>
@@ -433,17 +604,36 @@ export function AuditChecklistForm({
         {/* General Remark */}
         <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-1.5 shadow-sm">
           <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-            <span>📝</span> โน้ตรายละเอียดเพิ่มเติม (General Remark)
+            <span>📝</span> หมายเหตุเพิ่มเติม (Remark)
           </label>
           <textarea
-            rows={3}
+            rows={2}
             disabled={sessionStatus === 'CLOSED'}
             placeholder="เขียนรายละเอียดบันทึกสภาพรถยนต์ภายนอกหรือหมายเหตุโดยรวมเพิ่มเติม..."
             value={remark}
             onChange={e => onRemarkChange(e.target.value)}
-            className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+            className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
           />
         </div>
+
+        {/* Vehicle Notes Section with @Mentions */}
+        {activeVehicle.inventoryItemId && activeVehicle.registerNo && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span>💬</span> บันทึกข้อมูลรถและแท็กทีมงาน (Vehicle Note & Mention)
+              </h4>
+              <span className="text-[10px] text-slate-400">พิมพ์ @ เพื่อแท็กเพื่อนร่วมงาน</span>
+            </div>
+            <VehicleNotesSection
+              inventoryItemId={activeVehicle.inventoryItemId}
+              registerNo={activeVehicle.registerNo}
+              lineUserId={lineUserId}
+              sourceProcess={mode === 'QC' ? 'VEHICLE_QC' : 'VEHICLE_AUDIT'}
+              initialNoteText={initialNoteText}
+            />
+          </div>
+        )}
 
       </div>
 
@@ -460,10 +650,18 @@ export function AuditChecklistForm({
           <button
             type="button"
             disabled={saving}
-            onClick={onSave}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm"
+            onClick={() => onSave(mode)}
+            className={`px-4 py-2 rounded-lg disabled:opacity-50 text-white text-xs font-bold transition active:scale-95 shadow-sm flex items-center gap-1.5 ${
+              mode === 'QC' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
           >
-            {saving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลตรวจสภาพ'}
+            {saving ? (
+              'กำลังบันทึกข้อมูล...'
+            ) : mode === 'QC' ? (
+              '✅ ยืนยันผลการตรวจ QC (จบการตรวจ)'
+            ) : (
+              'บันทึกข้อมูลตรวจสภาพ'
+            )}
           </button>
         )}
       </div>

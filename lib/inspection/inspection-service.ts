@@ -63,6 +63,7 @@ export async function createInspection(params: {
   mileage?: number
   inspectionDate: string
   remark?: string
+  status?: InspectionStatus
   items: InspectionItemData[]
   ev7UserId: number
   ev7UserName: string
@@ -87,29 +88,40 @@ export async function createInspection(params: {
   await transaction.begin()
 
   try {
-    // Query active or latest contract for the VinNo to populate RentItemID, ContractNo, and default customer name
-    const rentResult = await transaction.request()
-      .input('vinNo', sql.VarChar, params.vinNo)
-      .query(`
-        SELECT TOP 1 RentItemID, ContractNo, FirstName, LastName
-        FROM dbo.EV_RentItem
-        WHERE VinNo = @vinNo AND IsActive = 1
-        ORDER BY ReleaseDate DESC, RentItemID DESC
-      `)
-    const activeRent = rentResult.recordset[0]
-    const resolvedRentItemId = activeRent?.RentItemID || null
-    const resolvedContractNo = activeRent?.ContractNo || null
+    // 1. Insert header
+    // Resolve active contract and customer details if not provided
+    let resolvedRentItemId = params.returnItemId || null
+    let resolvedContractNo = null
+    let resolvedCustomerName = params.customerName || null
+    let resolvedCustomerContact = params.customerContact || null
 
-    let resolvedCustomerName = params.customerName
-    if (!resolvedCustomerName && activeRent) {
-      resolvedCustomerName = (activeRent.FirstName + (activeRent.LastName ? ' ' + activeRent.LastName : '')).trim() || null
+    if (!resolvedRentItemId || !resolvedCustomerName) {
+      try {
+        const rentQuery = await transaction.request()
+          .input('vinNo', sql.VarChar, params.vinNo)
+          .query(`
+            SELECT TOP 1 r.RentItemID, r.ContractNo,
+                   LTRIM(RTRIM(ISNULL(r.FirstName, '') + ' ' + ISNULL(r.LastName, ''))) AS CustomerFullName,
+                   r.PhoneNo
+            FROM dbo.EV_RentItem r
+            WHERE r.VinNo = @vinNo AND r.IsActive = 1
+            ORDER BY r.RentItemID DESC
+          `)
+        const activeRent = rentQuery.recordset[0]
+        if (activeRent) {
+          if (!resolvedRentItemId) resolvedRentItemId = activeRent.RentItemID
+          if (!resolvedContractNo) resolvedContractNo = activeRent.ContractNo
+          if (!resolvedCustomerName && activeRent.CustomerFullName) resolvedCustomerName = activeRent.CustomerFullName
+          if (!resolvedCustomerContact && activeRent.PhoneNo) resolvedCustomerContact = activeRent.PhoneNo
+        }
+      } catch (rentErr) {
+        console.warn('[createInspection] Failed to resolve active rent:', rentErr)
+      }
     }
-    const resolvedCustomerContact = params.customerContact || null
 
     const mileageFromItems = params.items?.find(it => it.category === 'MILEAGE' && it.itemCode === 'VALUE')?.numericValue
     const resolvedMileage = params.mileage ?? (mileageFromItems != null ? Math.round(Number(mileageFromItems)) : null)
 
-    // 1. Insert header
     const headerResult = await transaction.request()
       .input('vinNo', sql.NVarChar, params.vinNo)
       .input('registerNo', sql.NVarChar, params.registerNo || null)
@@ -120,6 +132,7 @@ export async function createInspection(params: {
       .input('inspectionDate', sql.Date, params.inspectionDate)
       .input('inspectorUserID', sql.Int, params.inspectorUserId || params.ev7UserId)
       .input('inspectorName', sql.NVarChar, params.inspectorName || params.ev7UserName)
+      .input('status', sql.VarChar, params.status || 'DRAFT')
       .input('remark', sql.NVarChar, params.remark || null)
       .input('createUserID', sql.Int, params.ev7UserId)
       .input('returnDate', sql.Date, params.returnDate || null)
@@ -131,7 +144,7 @@ export async function createInspection(params: {
       .input('carStatusType', sql.VarChar, params.carStatusType || null)
       .input('assessmentResult', sql.VarChar, params.assessmentResult || null)
       .input('customerName', sql.NVarChar, resolvedCustomerName)
-      .input('customerContact', sql.VarChar, resolvedCustomerContact)
+      .input('customerContact', sql.NVarChar, resolvedCustomerContact)
       .input('contractCancellationDate', sql.Date, params.contractCancellationDate || null)
       .input('isPendingChecklist', sql.Bit, params.isPendingChecklist ? 1 : 0)
       .query(`
@@ -146,7 +159,7 @@ export async function createInspection(params: {
         VALUES (
           @vinNo, @registerNo, @inspectionType, @returnItemId, @inspectionSessionId,
           @mileage, @inspectionDate, @inspectorUserID, @inspectorName,
-          'DRAFT', @remark, 1, GETDATE(), @createUserID,
+          @status, @remark, 1, GETDATE(), @createUserID,
           @returnDate, @location, @rentItemId, @contractNo, @returnReason,
           @carStatus, @carStatusType, @assessmentResult, @customerName, @customerContact,
           @contractCancellationDate, @isPendingChecklist
@@ -643,13 +656,22 @@ async function insertItems(
   items: InspectionItemData[]
 ): Promise<void> {
   for (const item of items) {
+    const category = (item as any).category || (item as any).Category
+    const itemCode = (item as any).itemCode || (item as any).ItemCode
+
+    // Defensive check: Skip if category or itemCode is missing or null to prevent database constraint violation
+    if (!category || !itemCode) {
+      console.warn('[insertItems] Skipping invalid item without category or itemCode:', item)
+      continue
+    }
+
     // Skip items with no value at all
     if (!item.value && item.numericValue == null && !item.detail && !item.expiryDate) continue
 
     await transaction.request()
       .input('inspectionId', sql.BigInt, inspectionId)
-      .input('category', sql.VarChar, item.category)
-      .input('itemCode', sql.VarChar, item.itemCode)
+      .input('category', sql.VarChar, category)
+      .input('itemCode', sql.VarChar, itemCode)
       .input('value', sql.NVarChar, item.value || null)
       .input('detail', sql.NVarChar, item.detail || null)
       .input('numericValue', sql.Decimal(10, 2), item.numericValue ?? null)
@@ -682,6 +704,28 @@ export async function checkResolveColumnsExist(pool: any): Promise<boolean> {
     hasResolveColumnsCache = (res.recordset?.[0]?.cnt || 0) > 0
     lastResolveColCheck = now
     return hasResolveColumnsCache
+  } catch {
+    return false
+  }
+}
+
+let hasMasterTypeColumnCache: boolean | null = null
+let lastMasterTypeColCheck = 0
+
+export async function checkMasterTypeColumnExist(pool: any): Promise<boolean> {
+  const now = Date.now()
+  if (hasMasterTypeColumnCache !== null && now - lastMasterTypeColCheck < 30000) {
+    return hasMasterTypeColumnCache
+  }
+  try {
+    const res = await pool.request().query(`
+      SELECT COUNT(*) AS cnt
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'EV_InspectionItemMaster' AND COLUMN_NAME = 'InspectionType'
+    `)
+    hasMasterTypeColumnCache = (res.recordset?.[0]?.cnt || 0) > 0
+    lastMasterTypeColCheck = now
+    return hasMasterTypeColumnCache
   } catch {
     return false
   }
@@ -1008,16 +1052,36 @@ export async function deleteInspectionPhoto(photoId: number, updateUserId?: numb
 }
 
 /** ดึงข้อมูลรายการเช็คลิสต์ตรวจสภาพรถจาก Master Table */
-export async function getInspectionItemMaster(): Promise<any[]> {
+export async function getInspectionItemMaster(inspectionType?: string): Promise<any[]> {
   const pool = await getMSSQLPool()
   if (!pool) throw new Error('Database connection failed')
 
-  const result = await pool.request().query(`
-    SELECT Category, ItemCode, Label, InputType, SortOrder
+  const hasTypeCol = await checkMasterTypeColumnExist(pool)
+
+  // If column does not exist yet in DB and requesting QC, return empty array so frontend falls back to static QC items
+  if (!hasTypeCol && inspectionType === 'QC') {
+    return []
+  }
+
+  let query = `
+    SELECT Category, ItemCode, Label, InputType, SortOrder${hasTypeCol ? ', InspectionType' : ''}
     FROM dbo.EV_InspectionItemMaster
     WHERE IsActive = 1
-    ORDER BY SortOrder
-  `)
+  `
+
+  const req = pool.request()
+  if (hasTypeCol) {
+    if (inspectionType === 'QC') {
+      req.input('inspectionType', sql.VarChar(20), 'QC')
+      query += ` AND InspectionType = @inspectionType`
+    } else {
+      // Default: RETURN or null (for return/audit checklist)
+      query += ` AND (InspectionType = 'RETURN' OR InspectionType IS NULL)`
+    }
+  }
+
+  query += ` ORDER BY SortOrder ASC`
+  const result = await req.query(query)
   return result.recordset.map((item: any) => {
     if (item.Category === 'BATTERY_HV' && item.ItemCode === 'LEVEL') {
       return {

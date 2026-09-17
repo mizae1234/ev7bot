@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       mileage,
       inspectionDate,
       remark,
+      status: status || 'DRAFT',
       items,
       ev7UserId: ev7User.userId,
       ev7UserName: ev7User.name,

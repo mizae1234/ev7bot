@@ -87,10 +87,12 @@ export default function SessionWorkspacePage() {
   // Active Vehicle / Form State
   const [activeVehicle, setActiveVehicle] = useState<{
     inspectionId?: number
+    inventoryItemId?: number
     vinNo: string
     registerNo: string | null
     model: string | null
     project?: string | null
+    currentLocation?: string | null
   } | null>(null)
 
   const [formItems, setFormItems] = useState<Record<string, {
@@ -202,10 +204,12 @@ export default function SessionWorkspacePage() {
 
       setActiveVehicle({
         inspectionId: inspDetail.inspectionId,
+        inventoryItemId: inspDetail.inventoryItemId ?? undefined,
         vinNo: inspDetail.vinNo,
         registerNo: inspDetail.registerNo,
         model: inspDetail.model ?? null,
         project: inspDetail.project ?? null,
+        currentLocation: inspDetail.location ?? null,
       })
 
       const itemsMap: Record<string, any> = {}
@@ -322,6 +326,8 @@ export default function SessionWorkspacePage() {
         registerNo: v.RegisterNo,
         model: v.Model,
         project: v.Project,
+        inventoryItemId: v.InventoryItemID,
+        currentLocation: v.CurrentLocation,
       })
 
       const itemsMap: Record<string, any> = {}
@@ -367,34 +373,74 @@ export default function SessionWorkspacePage() {
 
   const handleChecklistValueChange = (category: string, itemCode: string, value: string | null) => {
     const key = `${category}_${itemCode}`
-    setFormItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], value }
-    }))
+    setFormItems(prev => {
+      const existing = prev[key]
+      return {
+        ...prev,
+        [key]: {
+          category: existing?.category || category,
+          itemCode: existing?.itemCode || itemCode,
+          detail: existing?.detail ?? null,
+          numericValue: existing?.numericValue ?? null,
+          expiryDate: existing?.expiryDate ?? null,
+          value,
+        }
+      }
+    })
   }
 
   const handleChecklistDetailChange = (category: string, itemCode: string, detail: string) => {
     const key = `${category}_${itemCode}`
-    setFormItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], detail }
-    }))
+    setFormItems(prev => {
+      const existing = prev[key]
+      return {
+        ...prev,
+        [key]: {
+          category: existing?.category || category,
+          itemCode: existing?.itemCode || itemCode,
+          value: existing?.value ?? null,
+          numericValue: existing?.numericValue ?? null,
+          expiryDate: existing?.expiryDate ?? null,
+          detail,
+        }
+      }
+    })
   }
 
   const handleChecklistNumberChange = (category: string, itemCode: string, val: number | null) => {
     const key = `${category}_${itemCode}`
-    setFormItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], numericValue: val }
-    }))
+    setFormItems(prev => {
+      const existing = prev[key]
+      return {
+        ...prev,
+        [key]: {
+          category: existing?.category || category,
+          itemCode: existing?.itemCode || itemCode,
+          value: existing?.value ?? null,
+          detail: existing?.detail ?? null,
+          expiryDate: existing?.expiryDate ?? null,
+          numericValue: val,
+        }
+      }
+    })
   }
 
   const handleChecklistExpiryChange = (category: string, itemCode: string, expiry: string) => {
     const key = `${category}_${itemCode}`
-    setFormItems(prev => ({
-      ...prev,
-      [key]: { ...prev[key], expiryDate: expiry || null }
-    }))
+    setFormItems(prev => {
+      const existing = prev[key]
+      return {
+        ...prev,
+        [key]: {
+          category: existing?.category || category,
+          itemCode: existing?.itemCode || itemCode,
+          value: existing?.value ?? null,
+          detail: existing?.detail ?? null,
+          numericValue: existing?.numericValue ?? null,
+          expiryDate: expiry || null,
+        }
+      }
+    })
   }
 
   const handlePhotoSelect = (category: string, itemCode: string, files: FileList | null) => {
@@ -434,7 +480,7 @@ export default function SessionWorkspacePage() {
     )
   }
 
-  const handleSaveAuditItem = async () => {
+  const handleSaveAuditItem = async (savedMode?: 'QC' | 'AUDIT') => {
     if (!activeVehicle) return
     if (!inspectorName.trim()) {
       showToast('กรุณากรอกชื่อผู้ตรวจสอบก่อนบันทึก', 'error')
@@ -445,32 +491,40 @@ export default function SessionWorkspacePage() {
     try {
       const cleanRem = remark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
       const finalRemark = `[ผลการประเมิน: ${autoAssessment}] ${cleanRem}`.trim()
-      const mappedAssessment = autoAssessment === 'ปกติ' ? 'NORMAL' : autoAssessment === 'ต้องส่งเข้าซ่อม' ? 'NEED_REPAIR' : null
+      const mappedAssessment = autoAssessment === 'ปกติ' || autoAssessment?.includes('ผ่าน') ? 'NORMAL' : (autoAssessment === 'ต้องส่งเข้าซ่อม' || autoAssessment?.includes('ไม่ผ่าน')) ? 'NEED_REPAIR' : null
+
+      const resolvedInspectionType = savedMode === 'QC' ? 'QC' : 'AUDIT'
 
       const payload = {
         vinNo: activeVehicle.vinNo,
         registerNo: activeVehicle.registerNo,
-        inspectionType: 'AUDIT',
+        inspectionType: resolvedInspectionType,
         inspectionSessionId: sessionId,
         mileage: mileage !== '' ? mileage : null,
         inspectionDate: session?.sessionDate || new Date().toISOString().split('T')[0],
         remark: finalRemark || null,
         assessmentResult: mappedAssessment,
-        items: Object.values(formItems).map(item => {
-          if (item.category === 'MILEAGE' && item.itemCode === 'VALUE') {
+        items: Object.values(formItems).map((item: any) => {
+          const cat = item.category || item.Category
+          const code = item.itemCode || item.ItemCode
+          if (cat === 'MILEAGE' && code === 'VALUE') {
             return {
+              category: cat,
+              itemCode: code,
               ...item,
               numericValue: mileage !== '' ? mileage : null,
               value: mileage !== '' ? String(mileage) : null,
             }
           }
-          return item
-        }),
+          return {
+            ...item,
+            category: cat,
+            itemCode: code,
+          }
+        }).filter((it: any) => !!it.category && !!it.itemCode),
         lineUserId: profile?.userId || undefined,
         location: session?.location,
         inspectorName,
-        carStatus: 'AVAILABLE',
-        carStatusType: 'AVAILABLE_USE',
         status: 'COMPLETED',
       }
 

@@ -3,7 +3,7 @@
 // =====================================================
 
 /** ประเภทการตรวจ */
-export type InspectionType = 'RETURN' | 'AUDIT'
+export type InspectionType = 'RETURN' | 'AUDIT' | 'QC'
 
 /** สถานะ Inspection */
 export type InspectionStatus = 'DRAFT' | 'COMPLETED'

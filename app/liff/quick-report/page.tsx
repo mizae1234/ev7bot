@@ -4289,7 +4289,32 @@ export default function QuickReportPage() {
               className="fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-[1px]" 
               onClick={() => setShowMoreMenu(false)}
             />
-            <div className="fixed bottom-20 right-4 z-50 bg-white border border-slate-150 rounded-2xl shadow-xl p-1.5 min-w-[150px] animate-scale-up flex flex-col gap-1">
+            <div className="fixed bottom-20 right-4 z-50 bg-white border border-slate-150 rounded-2xl shadow-xl p-1.5 min-w-[170px] animate-scale-up flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const query = selectedCar?.RegisterNo
+                    ? `?mode=qc&registerNo=${encodeURIComponent(selectedCar.RegisterNo)}`
+                    : '?mode=qc'
+                  router.push(`/dashboard/inspection-audit${query}`)
+                  setShowMoreMenu(false)
+                }}
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-xs font-bold rounded-xl transition text-emerald-750 bg-emerald-50/70 hover:bg-emerald-100/80 active:scale-98"
+              >
+                <span className="text-base">🟢</span>
+                <span>QC รถก่อนส่งมอบ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  router.push('/dashboard/inspection-audit')
+                  setShowMoreMenu(false)
+                }}
+                className="flex items-center gap-2.5 w-full px-4 py-3 text-xs font-bold rounded-xl transition text-slate-700 hover:bg-slate-50 active:scale-98"
+              >
+                <span className="text-base">🔍</span>
+                <span>ตรวจสภาพรถ (Audit)</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {

@@ -415,14 +415,14 @@ export function buildDynamicSections(masterItems: MasterItemDef[]): ChecklistSec
   const sectionsMap = new Map<string, ChecklistSectionDef>()
 
   for (const master of masterItems) {
-    const staticSection = CHECKLIST_SECTIONS.find(s => s.category === master.Category)
+    const staticSection = CHECKLIST_SECTIONS.find(s => s.category === master.Category) || QC_CHECKLIST_SECTIONS.find(s => s.category === master.Category)
     const staticItem = staticSection?.items.find(i => i.itemCode === master.ItemCode)
 
     if (!sectionsMap.has(master.Category)) {
       sectionsMap.set(master.Category, {
         category: master.Category,
-        label: staticSection?.label || master.Category,
-        icon: staticSection?.icon || '🔍',
+        label: staticSection?.label || master.Label || master.Category,
+        icon: staticSection?.icon || (master.Category.startsWith('QC_') ? '🟢' : '🔍'),
         items: []
       })
     }
@@ -598,3 +598,196 @@ export function parseDamagedItems(rawItemsJsonOrArray: string | any[] | null | u
 
   return result
 }
+
+// =====================================================
+// Pre-Delivery QC Checklist Template (ชุดง่าย 9 ข้อ)
+// =====================================================
+
+export const QC_CLEANLINESS_OPTIONS = [
+  { value: 'YES', label: 'สะอาด / พร้อม' },
+  { value: 'NO', label: 'ไม่พร้อม (ต้องล้าง/ดูดฝุ่น/มีรอย)' },
+]
+
+export const QC_KEY_OPTIONS = [
+  { value: 'YES', label: 'พร้อม (กดติด/แบตเต็ม)' },
+  { value: 'NO', label: 'ไม่พร้อม (กดไม่ติด/แบตหมด)' },
+]
+
+export const QC_TAX_3M_OPTIONS = [
+  { value: 'YES', label: 'มากกว่า 3 เดือน' },
+  { value: 'NO', label: 'เหลือน้อยกว่า 3 เดือน' },
+]
+
+export const QC_METER_1M_OPTIONS = [
+  { value: 'YES', label: 'มากกว่า 1 เดือน' },
+  { value: 'NO', label: 'เหลือน้อยกว่า 1 เดือน' },
+]
+
+export const QC_PARK_POSITION_OPTIONS = [
+  { value: 'YES', label: 'อยู่ในตำแหน่งพร้อมส่ง' },
+  { value: 'NO', label: 'ยังไม่พร้อม / อยู่นอกตำแหน่ง' },
+]
+
+export const QC_BATTERY_HV_OPTIONS = [
+  { value: 'YES', label: 'มากกว่า 40%' },
+  { value: 'NO', label: 'น้อยกว่า 40% / ดูไม่ได้' },
+]
+
+export const QC_READY_OPTIONS = [
+  { value: 'YES', label: 'พร้อมใช้งาน' },
+  { value: 'NO', label: 'ไม่พร้อม' },
+]
+
+export const QC_CHECKLIST_SECTIONS: ChecklistSectionDef[] = [
+  {
+    category: 'QC_CLEANLINESS',
+    label: '1. ความสะอาด ภายนอก - ภายใน',
+    icon: '✨',
+    items: [
+      {
+        category: 'QC_CLEANLINESS',
+        itemCode: 'STATUS',
+        label: 'ความสะอาด ภายนอก - ภายใน',
+        inputType: 'boolean',
+        options: QC_CLEANLINESS_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_KEY',
+    label: '2. กุญแจพร้อม',
+    icon: '🔑',
+    items: [
+      {
+        category: 'QC_KEY',
+        itemCode: 'STATUS',
+        label: 'กุญแจพร้อมใช้งาน (สัญญาณรีโมท / แบตเตอรี่)',
+        inputType: 'boolean',
+        options: QC_KEY_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_TAX_VEHICLE',
+    label: '3. ทะเบียนเหลือมากกว่า 3 เดือน',
+    icon: '🪪',
+    items: [
+      {
+        category: 'QC_TAX_VEHICLE',
+        itemCode: 'STATUS',
+        label: 'ภาษี/ป้ายทะเบียนรถ (เหลือ > 3 เดือน)',
+        inputType: 'boolean_expiry',
+        options: QC_TAX_3M_OPTIONS,
+        hasExpiry: true,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_TAX_METER',
+    label: '4. ภาษีมิเตอร์เหลือมากกว่า 1 เดือน',
+    icon: '📄',
+    items: [
+      {
+        category: 'QC_TAX_METER',
+        itemCode: 'STATUS',
+        label: 'ภาษีมิเตอร์ (เหลือ > 1 เดือน)',
+        inputType: 'boolean_expiry',
+        options: QC_METER_1M_OPTIONS,
+        hasExpiry: true,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_PARK_POSITION',
+    label: '5. รถอยู่ในตำแหน่งพร้อมส่ง',
+    icon: '📍',
+    items: [
+      {
+        category: 'QC_PARK_POSITION',
+        itemCode: 'STATUS',
+        label: 'รถอยู่ในตำแหน่งพร้อมส่งมอบ (ช่องจอดพร้อมส่ง)',
+        inputType: 'boolean',
+        options: QC_PARK_POSITION_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_BATTERY_HV',
+    label: '6. ไฟแบตลูกใหญ่มากกว่า 40%',
+    icon: '🔋',
+    items: [
+      {
+        category: 'QC_BATTERY_HV',
+        itemCode: 'STATUS',
+        label: 'ระดับแบตเตอรี่ลูกใหญ่ (SoC % > 40%)',
+        inputType: 'boolean',
+        options: QC_BATTERY_HV_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_QR_CODE',
+    label: '7. QR code มี-ไม่มี',
+    icon: '📱',
+    items: [
+      {
+        category: 'QC_QR_CODE',
+        itemCode: 'STATUS',
+        label: 'ป้าย QR Code ชำระเงิน/สแกน',
+        inputType: 'boolean',
+        options: BOOLEAN_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_WIPER',
+    label: '8. ยางปัดน้ำฝน',
+    icon: '🌧️',
+    items: [
+      {
+        category: 'QC_WIPER',
+        itemCode: 'STATUS',
+        label: 'ยางปัดน้ำฝน (สภาพพร้อมใช้งาน ไม่ฉีกขาด)',
+        inputType: 'boolean',
+        options: QC_READY_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+  {
+    category: 'QC_TIRE',
+    label: '9. ยางรถ',
+    icon: '🛞',
+    items: [
+      {
+        category: 'QC_TIRE',
+        itemCode: 'STATUS',
+        label: 'ยางรถ 4 เส้น (สภาพพร้อมใช้งาน ดอกยางดี ไม่บวม)',
+        inputType: 'boolean',
+        options: QC_READY_OPTIONS,
+        hasPhoto: true,
+      },
+    ],
+  },
+]
+
+export function createEmptyQCItems(): import('./types').InspectionItemData[] {
+  return QC_CHECKLIST_SECTIONS.flatMap(section =>
+    section.items.map(item => ({
+      category: item.category,
+      itemCode: item.itemCode,
+      value: null,
+      detail: null,
+      numericValue: null,
+      expiryDate: null,
+    }))
+  )
+}
+

@@ -62,6 +62,12 @@ const navGroups: NavGroup[] = [
         href: '/dashboard/returns-monitor',
         desc: 'ติดตามและตรวจสอบรายการรับคืนรถ',
         icon: '🔄'
+      },
+      {
+        name: 'ตรวจสภาพ & QC รถยนต์ (Audit & QC)',
+        href: '/dashboard/inspection-audit',
+        desc: 'ตรวจสอบสภาพรถในลาน และตรวจ QC ก่อนส่งมอบ',
+        icon: '🔍'
       }
     ]
   },
