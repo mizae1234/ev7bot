@@ -11,6 +11,21 @@ import {
   buildDynamicSections, 
   createEmptyItemsFromMaster 
 } from '@/lib/inspection/checklist-config'
+import { QCRecord, QCDatePreset, QCViewMode, QCStatusFilter } from '@/components/inspection-audit/types'
+import {
+  getBangkokTodayYMD,
+  getYesterdayBangkokYMD,
+  getSevenDaysAgoBangkokYMD,
+  getInspectionDateYMD,
+  maskStaffName,
+  getThaiDate,
+  getQCItemLabel,
+} from '@/components/inspection-audit/qc-helpers'
+import { QCExecutiveKPIs } from '@/components/inspection-audit/QCExecutiveKPIs'
+import { QCFilterBar } from '@/components/inspection-audit/QCFilterBar'
+import { QCCardsGrid } from '@/components/inspection-audit/QCCardsGrid'
+import { QCTableView } from '@/components/inspection-audit/QCTableView'
+import { QCDetailModal } from '@/components/inspection-audit/QCDetailModal'
 
 const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
 const spacesBucket = 'space-ev7tracking-prod'
@@ -28,133 +43,11 @@ interface AuditSession {
   inspectionCount: number
 }
 
-interface QCRecord {
-  inspectionId: number
-  vinNo: string
-  registerNo: string | null
-  inspectionType: string
-  inspectionDate: string
-  inspectorName: string
-  status: string
-  mileage?: number
-  createDate?: string
-  location?: string
-  locationName?: string
-  assessmentResult?: string
-  remark?: string
-  itemCount: number
-  photoCount: number
-  items?: Array<{
-    inspectionItemId: number
-    category: string
-    itemCode: string
-    value: string | null
-    detail: string | null
-    numericValue?: number | null
-    expiryDate?: string | null
-  }>
-}
-
-function getThaiDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-'
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('th-TH', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC'
-    })
-  } catch {
-    return String(dateStr)
-  }
-}
-
-function maskStaffName(name?: string | null): string {
-  if (!name) return '-'
-  const trimmed = name.trim()
-  if (!trimmed) return '-'
-  const parts = trimmed.split(/\s+/)
-  return parts[0]
-}
-
-function getInspectionDateYMD(dateStr: string | null | undefined): string {
-  if (!dateStr) return ''
-  try {
-    const d = new Date(dateStr)
-    const y = d.getUTCFullYear()
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-    const day = String(d.getUTCDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  } catch {
-    return (dateStr || '').slice(0, 10)
-  }
-}
-
-function getQCItemLabel(category: string, itemCode: string, masterItems?: any[]): string {
-  if (masterItems && masterItems.length > 0) {
-    const found = masterItems.find(m => m.category === category && m.itemCode === itemCode)
-    if (found?.labelTh) return found.labelTh
-  }
-  switch (category) {
-    case 'QC_CLEAN': return '1. ความสะอาด ภายนอก - ภายใน'
-    case 'QC_KEY': return '2. กุญแจพร้อม'
-    case 'QC_TAX_VEHICLE': return '3. ทะเบียนเหลือมากกว่า 3 เดือน'
-    case 'QC_TAX_METER': return '4. ภาษีมิเตอร์เหลือมากกว่า 1 เดือน'
-    case 'QC_PARK_POSITION': return '5. รถอยู่ในตำแหน่งพร้อมส่ง (ระบุจุดจอด)'
-    case 'QC_BATTERY_HV': return '6. ไฟแบตลูกใหญ่มากกว่า 40%'
-    case 'QC_QR_CODE': return '7. QR code มี-ไม่มี'
-    case 'QC_WIPER': return '8. ยางปัดน้ำฝน'
-    case 'QC_TIRE': return '9. ยางรถ'
-    default: return `${category} - ${itemCode}`
-  }
-}
-
-function renderQCValueBadge(category: string, value: string | null, numericValue?: number | null, detail?: string | null) {
-  if (category === 'QC_BATTERY_HV' && numericValue != null) {
-    const isOk = numericValue >= 40
-    return (
-      <div className="text-right">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg font-mono font-bold text-xs ${
-          isOk ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-        }`}>
-          {numericValue}% {isOk ? '✅' : '⚠️ ต่ำกว่า 40%'}
-        </span>
-        {detail && <p className="text-[10px] text-slate-500 mt-0.5">{detail}</p>}
-      </div>
-    )
-  }
-
-  let label = value || '-'
-  let isGood = true
-
-  if (value === 'CLEAN') label = 'สะอาดพร้อม'
-  else if (value === 'NOT_CLEAN') { label = 'ไม่สะอาด'; isGood = false }
-  else if (value === 'READY') label = 'พร้อมใช้งาน'
-  else if (value === 'NO_KEY') { label = 'ไม่มีกุญแจ'; isGood = false }
-  else if (value === 'YES') label = 'พร้อม / มี'
-  else if (value === 'NO') { label = 'ไม่พร้อม / ไม่มี'; isGood = false }
-  else if (value === 'PARK_READY') label = 'จอดพร้อมส่ง'
-  else if (value === 'NOT_READY') { label = 'ยังไม่พร้อมส่ง'; isGood = false }
-  else if (value === 'WORN_OUT') { label = 'เสื่อมสภาพ'; isGood = false }
-
-  return (
-    <div className="text-right">
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-lg font-bold text-xs ${
-        isGood ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-      }`}>
-        {label}
-      </span>
-      {detail && <p className="text-[10px] text-slate-500 mt-0.5">{detail}</p>}
-    </div>
-  )
-}
-
 export default function InspectionAuditPage() {
   const router = useRouter()
 
-  // Tabs: 'sessions' vs 'qc_records'
-  const [activeTab, setActiveTab] = useState<'sessions' | 'qc_records'>('sessions')
+  // Tabs: 'sessions' vs 'qc_records' (Default: Delivery QC)
+  const [activeTab, setActiveTab] = useState<'sessions' | 'qc_records'>('qc_records')
 
   // Sessions State
   const [sessions, setSessions] = useState<AuditSession[]>([])
@@ -169,12 +62,18 @@ export default function InspectionAuditPage() {
   const [loadingQCDetail, setLoadingQCDetail] = useState(false)
   const [qcMasterItems, setQcMasterItems] = useState<any[]>([])
 
-  // QC Filter State
+  // QC Filter State (Default: Today in Bangkok Time)
+  const [qcDatePreset, setQcDatePreset] = useState<'today' | 'yesterday' | '7days' | 'all' | 'custom'>('today')
   const [qcFilterPlate, setQcFilterPlate] = useState('')
-  const [qcFilterDate, setQcFilterDate] = useState('')
+  const [qcFilterDate, setQcFilterDate] = useState(getBangkokTodayYMD())
   const [qcFilterStatus, setQcFilterStatus] = useState<'ALL' | 'PASS' | 'FAIL'>('ALL')
+  const [qcViewMode, setQcViewMode] = useState<'cards' | 'table'>('cards')
 
   const filteredQCRecords = useMemo(() => {
+    const todayStr = getBangkokTodayYMD()
+    const yesterdayStr = getYesterdayBangkokYMD()
+    const sevenDaysAgoStr = getSevenDaysAgoBangkokYMD()
+
     return qcRecords.filter(item => {
       // Plate / VIN filter
       if (qcFilterPlate.trim()) {
@@ -186,12 +85,16 @@ export default function InspectionAuditPage() {
         }
       }
 
-      // Date filter (Bangkok date / UTC format)
-      if (qcFilterDate) {
-        const itemDateStr = getInspectionDateYMD(item.inspectionDate)
-        if (itemDateStr !== qcFilterDate) {
-          return false
-        }
+      // Date filtering based on preset
+      const itemDateStr = getInspectionDateYMD(item.inspectionDate)
+      if (qcDatePreset === 'today') {
+        if (itemDateStr !== todayStr) return false
+      } else if (qcDatePreset === 'yesterday') {
+        if (itemDateStr !== yesterdayStr) return false
+      } else if (qcDatePreset === '7days') {
+        if (!itemDateStr || itemDateStr < sevenDaysAgoStr) return false
+      } else if (qcDatePreset === 'custom' && qcFilterDate) {
+        if (itemDateStr !== qcFilterDate) return false
       }
 
       // Status filter
@@ -205,7 +108,32 @@ export default function InspectionAuditPage() {
 
       return true
     })
-  }, [qcRecords, qcFilterPlate, qcFilterDate, qcFilterStatus])
+  }, [qcRecords, qcFilterPlate, qcFilterDate, qcDatePreset, qcFilterStatus])
+
+  // KPI Summary for current filtered records
+  const qcKPIs = useMemo(() => {
+    const total = filteredQCRecords.length
+    let passed = 0
+    let failed = 0
+    let totalSoc = 0
+    let socCount = 0
+
+    filteredQCRecords.forEach(item => {
+      const isPassed = item.assessmentResult === 'NORMAL' || (item.remark && !item.remark.includes('ไม่ผ่าน'))
+      if (isPassed) passed++
+      else failed++
+
+      const batteryItem = item.items?.find((it: any) => it.category === 'QC_BATTERY_HV')
+      if (batteryItem?.numericValue != null && !isNaN(Number(batteryItem.numericValue))) {
+        totalSoc += Number(batteryItem.numericValue)
+        socCount++
+      }
+    })
+
+    const avgBattery = socCount > 0 ? Math.round(totalSoc / socCount) : null
+
+    return { total, passed, failed, avgBattery }
+  }, [filteredQCRecords])
 
   const handleViewQCDetail = async (item: any) => {
     setSelectedQCDetail(item)
@@ -337,12 +265,39 @@ export default function InspectionAuditPage() {
     return QC_CHECKLIST_SECTIONS
   }, [qcMasterItems])
 
-  // Check URL query parameters on mount (e.g. ?mode=qc&registerNo=1กก-1234)
+  // Check URL query parameters on mount (e.g. ?mode=qc&registerNo=1กก-1234&tab=qc&date=today)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const mode = params.get('mode')
     const registerNo = params.get('registerNo')
+    const tabParam = params.get('tab')
+    const dateParam = params.get('date')
+    const plateParam = params.get('plate') || params.get('q')
+
+    if (tabParam === 'sessions') {
+      setActiveTab('sessions')
+    } else if (tabParam === 'qc' || tabParam === 'qc_records') {
+      setActiveTab('qc_records')
+    }
+
+    if (dateParam === 'all') {
+      setQcDatePreset('all')
+      setQcFilterDate('')
+    } else if (dateParam === 'yesterday') {
+      setQcDatePreset('yesterday')
+      setQcFilterDate(getYesterdayBangkokYMD())
+    } else if (dateParam === '7days') {
+      setQcDatePreset('7days')
+      setQcFilterDate('')
+    } else if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setQcDatePreset('custom')
+      setQcFilterDate(dateParam)
+    }
+
+    if (plateParam) {
+      setQcFilterPlate(plateParam)
+    }
 
     if (mode === 'qc') {
       setIsQCModalOpen(true)
@@ -607,10 +562,29 @@ export default function InspectionAuditPage() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex border-t border-slate-100 gap-2">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex border-t border-slate-100 gap-2 overflow-x-auto scrollbar-none">
             <button
+              type="button"
+              onClick={() => {
+                setActiveTab('qc_records')
+                fetchQCRecords()
+              }}
+              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === 'qc_records'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span>🟢 ตรวจ QC รถก่อนส่งมอบ (Delivery QC)</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-700">
+                {qcRecords.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab('sessions')}
-              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
+              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === 'sessions'
                   ? 'border-indigo-600 text-indigo-700'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -619,23 +593,6 @@ export default function InspectionAuditPage() {
               <span>📋 รอบการตรวจสภาพรถ (Audit Sessions)</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-100 text-slate-600">
                 {sessions.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab('qc_records')
-                fetchQCRecords()
-              }}
-              className={`py-2.5 px-3.5 text-xs font-bold border-b-2 transition flex items-center gap-2 ${
-                activeTab === 'qc_records'
-                  ? 'border-emerald-600 text-emerald-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <span>🟢 ประวัติการตรวจ QC รถก่อนส่งมอบ (Delivery QC)</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-700">
-                {qcRecords.length}
               </span>
             </button>
           </div>
@@ -791,327 +748,66 @@ export default function InspectionAuditPage() {
 
           {/* TAB 2: QC HISTORY RECORDS */}
           {activeTab === 'qc_records' && (
-            <>
-              {/* Filter Bar */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                  <div className="flex flex-1 flex-wrap items-center gap-2.5">
-                    {/* License Plate / VIN Filter */}
-                    <div className="relative flex-1 min-w-[200px] max-w-sm">
-                      <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                        🔍
-                      </span>
-                      <input
-                        type="text"
-                        value={qcFilterPlate}
-                        onChange={e => setQcFilterPlate(e.target.value)}
-                        placeholder="ค้นหาทะเบียน หรือ VIN (เช่น ทอ-4141)..."
-                        className="w-full pl-8 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition"
-                      />
-                      {qcFilterPlate && (
-                        <button
-                          type="button"
-                          onClick={() => setQcFilterPlate('')}
-                          className="absolute inset-y-0 right-2 flex items-center text-slate-400 hover:text-slate-600 px-1 text-xs"
-                          title="ล้างข้อความค้นหา"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {/* Executive KPI Summary (2x2 on Mobile, 4-col on Desktop) */}
+              <QCExecutiveKPIs kpis={qcKPIs} isToday={qcDatePreset === 'today'} />
 
-                    {/* Date Filter */}
-                    <div className="relative flex items-center gap-1.5 min-w-[160px]">
-                      <span className="text-[11px] text-slate-500 font-medium shrink-0">วันที่ตรวจ:</span>
-                      <input
-                        type="date"
-                        value={qcFilterDate}
-                        onChange={e => setQcFilterDate(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-700 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition cursor-pointer"
-                      />
-                      {qcFilterDate && (
-                        <button
-                          type="button"
-                          onClick={() => setQcFilterDate('')}
-                          title="ล้างตัวกรองวันที่"
-                          className="text-slate-400 hover:text-slate-600 px-1 text-xs"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+              {/* Responsive Filter Bar (Presets, Search, Date Picker, Status, View Switcher) */}
+              <QCFilterBar
+                datePreset={qcDatePreset}
+                onDatePresetChange={setQcDatePreset}
+                filterDate={qcFilterDate}
+                onFilterDateChange={setQcFilterDate}
+                filterPlate={qcFilterPlate}
+                onFilterPlateChange={setQcFilterPlate}
+                filterStatus={qcFilterStatus}
+                onFilterStatusChange={setQcFilterStatus}
+                viewMode={qcViewMode}
+                onViewModeChange={setQcViewMode}
+                totalCount={qcRecords.length}
+                filteredCount={filteredQCRecords.length}
+                loading={loadingQC}
+                onRefresh={fetchQCRecords}
+                onResetFilters={() => {
+                  setQcDatePreset('today')
+                  setQcFilterPlate('')
+                  setQcFilterDate(getBangkokTodayYMD())
+                  setQcFilterStatus('ALL')
+                }}
+              />
 
-                    {/* Status Filter Buttons */}
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setQcFilterStatus('ALL')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition text-[11px] cursor-pointer ${
-                          qcFilterStatus === 'ALL'
-                            ? 'bg-white text-slate-800 shadow-xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        ทั้งหมด
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setQcFilterStatus('PASS')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition text-[11px] cursor-pointer ${
-                          qcFilterStatus === 'PASS'
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        🟢 ผ่าน QC
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setQcFilterStatus('FAIL')}
-                        className={`px-3 py-1.5 rounded-lg font-bold transition text-[11px] cursor-pointer ${
-                          qcFilterStatus === 'FAIL'
-                            ? 'bg-rose-600 text-white shadow-xs'
-                            : 'text-slate-500 hover:text-slate-700'
-                        }`}
-                      >
-                        🔴 ไม่ผ่าน
-                      </button>
-                    </div>
-                  </div>
+              {/* VIEW 1: INSTANT CARDS VIEW (Dynamic checklist items, 0ms clicks) */}
+              {qcViewMode === 'cards' && (
+                <QCCardsGrid
+                  items={filteredQCRecords}
+                  masterItems={qcMasterItems}
+                  dynamicSections={dynamicQCSections}
+                  loading={loadingQC}
+                  datePreset={qcDatePreset}
+                  onViewDetail={handleViewQCDetail}
+                  onNewQC={() => {
+                    setSelectedQCCar(null)
+                    setIsQCModalOpen(true)
+                  }}
+                  onViewAllDates={() => {
+                    setQcDatePreset('all')
+                    setQcFilterDate('')
+                    setQcFilterPlate('')
+                    setQcFilterStatus('ALL')
+                  }}
+                  spacesCdn={SPACES_CDN}
+                />
+              )}
 
-                  {/* Actions / Reset / Refresh */}
-                  <div className="flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-                    {(qcFilterPlate || qcFilterDate || qcFilterStatus !== 'ALL') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQcFilterPlate('')
-                          setQcFilterDate('')
-                          setQcFilterStatus('ALL')
-                        }}
-                        className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                      >
-                        ✕ ล้างตัวกรอง
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={fetchQCRecords}
-                      disabled={loadingQC}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <span className={loadingQC ? 'animate-spin' : ''}>🔄</span> รีเฟรช
-                    </button>
-                  </div>
-                </div>
-
-                {/* Counter summary */}
-                <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
-                  <span>
-                    แสดงผล <strong className="text-slate-800 font-semibold">{filteredQCRecords.length}</strong> จากทั้งหมด {qcRecords.length} รายการ
-                    {(qcFilterPlate || qcFilterDate || qcFilterStatus !== 'ALL') && (
-                      <span className="text-emerald-700 font-medium ml-2">(กำลังกรองข้อมูล)</span>
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              {/* Desktop Table */}
-              <div className="hidden md:block bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
-                        <th className="px-5 py-4">ทะเบียนรถ (Register No)</th>
-                        <th className="px-5 py-4">วันที่ตรวจ QC</th>
-                        <th className="px-5 py-4">ผลการตรวจ QC</th>
-                        <th className="px-5 py-4 text-center">แบตเตอรี่ (HV SoC)</th>
-                        <th className="px-5 py-4">ผู้ตรวจ QC</th>
-                        <th className="px-5 py-4">หมายเหตุ / สรุป</th>
-                        <th className="px-5 py-4 text-right">การจัดการ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {loadingQC ? (
-                        <tr>
-                          <td colSpan={7} className="px-5 py-12 text-center text-slate-400 font-medium">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                              กำลังโหลดประวัติการตรวจ QC...
-                            </div>
-                          </td>
-                        </tr>
-                      ) : filteredQCRecords.length > 0 ? (
-                        filteredQCRecords.map((item) => {
-                          const isPassed = item.assessmentResult === 'NORMAL' || (item.remark && !item.remark.includes('ไม่ผ่าน'))
-                          const batteryItem = item.items?.find(it => it.category === 'QC_BATTERY_HV')
-                          const socVal = batteryItem?.numericValue != null ? `${batteryItem.numericValue}%` : '-'
-
-                          return (
-                            <tr
-                              key={item.inspectionId}
-                              onClick={() => handleViewQCDetail(item)}
-                              className="hover:bg-slate-50 transition duration-150 cursor-pointer active:bg-slate-100 group"
-                            >
-                              <td className="px-5 py-4 font-bold text-slate-900 text-sm group-hover:text-emerald-700 transition">
-                                {item.registerNo || '-'}
-                                <p className="text-[10px] text-slate-400 font-mono font-normal mt-0.5">{item.vinNo}</p>
-                              </td>
-                              <td className="px-5 py-4 font-medium text-slate-600">
-                                {getThaiDate(item.inspectionDate)}
-                              </td>
-                              <td className="px-5 py-4">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                                  isPassed
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : 'bg-rose-50 text-rose-700 border-rose-200'
-                                }`}>
-                                  {isPassed ? '🟢 ผ่านการตรวจ QC' : '🔴 ไม่ผ่าน QC'}
-                                </span>
-                              </td>
-                              <td className="px-5 py-4 text-center font-bold text-slate-800 font-mono">
-                                {socVal}
-                              </td>
-                              <td className="px-5 py-4 font-medium text-slate-600">
-                                {maskStaffName(item.inspectorName)}
-                              </td>
-                              <td className="px-5 py-4 text-slate-500 max-w-xs truncate text-[11px]">
-                                {item.remark || '-'}
-                              </td>
-                              <td className="px-5 py-4 text-right" onClick={e => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleViewQCDetail(item)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold transition active:scale-95 cursor-pointer flex items-center gap-1 ml-auto"
-                                >
-                                  <span>ดูผลตรวจ</span> <span>🔍</span>
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        })
-                      ) : qcRecords.length > 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-5 py-12 text-center text-slate-400 font-medium">
-                            <p>ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา</p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setQcFilterPlate('')
-                                setQcFilterDate('')
-                                setQcFilterStatus('ALL')
-                              }}
-                              className="mt-2 text-xs text-emerald-600 hover:underline font-semibold"
-                            >
-                              ล้างตัวกรองทั้งหมด
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="px-5 py-12 text-center text-slate-400 font-medium">
-                            ยังไม่มีข้อมูลประวัติการตรวจ QC ในระบบ
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Mobile Cards View */}
-              <div className="block md:hidden space-y-3">
-                {loadingQC ? (
-                  <div className="p-8 text-center text-xs text-slate-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                      กำลังโหลดประวัติการตรวจ QC...
-                    </div>
-                  </div>
-                ) : filteredQCRecords.length > 0 ? (
-                  filteredQCRecords.map((item) => {
-                    const isPassed = item.assessmentResult === 'NORMAL' || (item.remark && !item.remark.includes('ไม่ผ่าน'))
-                    const batteryItem = item.items?.find(it => it.category === 'QC_BATTERY_HV')
-                    const socVal = batteryItem?.numericValue != null ? `${batteryItem.numericValue}%` : '-'
-
-                    return (
-                      <div
-                        key={item.inspectionId}
-                        onClick={() => handleViewQCDetail(item)}
-                        className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:bg-slate-50 transition space-y-2.5 cursor-pointer hover:border-emerald-300"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm">{item.registerNo || item.vinNo}</h4>
-                            <p className="text-[10px] text-slate-400 font-mono">{item.vinNo}</p>
-                          </div>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
-                            isPassed
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}>
-                            {isPassed ? '🟢 ผ่าน QC' : '🔴 ไม่ผ่าน'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1 border-t border-slate-100">
-                          <div>
-                            <span className="text-slate-400 text-[10px]">วันที่ตรวจ: </span>
-                            <span className="font-semibold">{getThaiDate(item.inspectionDate)}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 text-[10px]">แบตเตอรี่: </span>
-                            <span className="font-bold text-slate-800 font-mono">{socVal}</span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-400 text-[10px]">ผู้ตรวจ: </span>
-                            <span className="font-medium text-slate-700">{maskStaffName(item.inspectorName)}</span>
-                          </div>
-                        </div>
-
-                        {item.remark && (
-                          <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100 line-clamp-2">
-                            {item.remark}
-                          </p>
-                        )}
-
-                        <div className="pt-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleViewQCDetail(item)
-                            }}
-                            className="w-full py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <span>ดูผลตรวจ 🔍</span>
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })
-                ) : qcRecords.length > 0 ? (
-                  <div className="py-12 text-center text-xs text-slate-400 font-medium bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <p>ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQcFilterPlate('')
-                        setQcFilterDate('')
-                        setQcFilterStatus('ALL')
-                      }}
-                      className="text-xs text-emerald-600 hover:underline font-semibold"
-                    >
-                      ล้างตัวกรองทั้งหมด
-                    </button>
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-400 font-medium bg-white border border-slate-200 rounded-2xl">
-                    ยังไม่มีข้อมูลประวัติการตรวจ QC ในระบบ
-                  </div>
-                )}
-              </div>
-            </>
+              {/* VIEW 2: COMPACT TABLE VIEW */}
+              {qcViewMode === 'table' && (
+                <QCTableView
+                  items={filteredQCRecords}
+                  loading={loadingQC}
+                  onViewDetail={handleViewQCDetail}
+                />
+              )}
+            </div>
           )}
 
         </div>
@@ -1393,176 +1089,14 @@ export default function InspectionAuditPage() {
           </div>
         )}
 
-        {/* QC RECORD DETAIL VIEWER MODAL */}
-        {selectedQCDetail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-            <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 animate-fade-in space-y-4 max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <span>🔍</span> รายละเอียดผลการตรวจ QC รถก่อนส่งมอบ
-                  </h3>
-                  <p className="text-[10px] text-slate-500">
-                    {selectedQCDetail.registerNo || selectedQCDetail.vinNo} • ตรวจเมื่อ {getThaiDate(selectedQCDetail.inspectionDate)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedQCDetail(null)}
-                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold transition cursor-pointer"
-                  title="ปิดหน้าต่าง"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Status & Inspector Banner */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">ผลการประเมิน: </span>
-                    <span className={`font-extrabold ml-1 ${
-                      selectedQCDetail.assessmentResult === 'NORMAL' || (selectedQCDetail.remark && !selectedQCDetail.remark.includes('ไม่ผ่าน'))
-                        ? 'text-emerald-700'
-                        : 'text-rose-700'
-                    }`}>
-                      {selectedQCDetail.assessmentResult === 'NORMAL' || (selectedQCDetail.remark && !selectedQCDetail.remark.includes('ไม่ผ่าน'))
-                        ? '🟢 ผ่านการตรวจ QC พร้อมส่งมอบ'
-                        : '🔴 ไม่ผ่าน QC (ต้องแก้ไขก่อนส่งมอบ)'}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-600">
-                    ผู้ตรวจ QC: <span className="font-bold text-slate-900">{maskStaffName(selectedQCDetail.inspectorName)}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px]">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">ทะเบียนรถ</span>
-                    <span className="font-bold text-slate-800">{selectedQCDetail.registerNo || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">VIN (เลขตัวถัง)</span>
-                    <span className="font-mono font-medium text-slate-700">{selectedQCDetail.vinNo || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">วันที่ตรวจ</span>
-                    <span className="font-medium text-slate-800">{getThaiDate(selectedQCDetail.inspectionDate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">เลขไมล์</span>
-                    <span className="font-bold text-slate-800 font-mono">
-                      {selectedQCDetail.mileage != null ? `${Number(selectedQCDetail.mileage).toLocaleString()} กม.` : '-'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Loading Indicator */}
-              {loadingQCDetail ? (
-                <div className="py-12 text-center text-xs text-slate-500 bg-slate-50/50 rounded-2xl border border-slate-200/80 space-y-2">
-                  <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="font-medium">กำลังโหลดรายการตรวจเช็ค 9 ข้อและรูปถ่าย...</p>
-                </div>
-              ) : (
-                <>
-                  {/* Checklist Items */}
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs">
-                    <div className="bg-slate-50 px-4 py-2.5 font-bold text-slate-700 border-b border-slate-200 flex items-center justify-between">
-                      <span>รายการตรวจเช็ค QC ({selectedQCDetail.items?.length || 0} รายการ)</span>
-                      <span className="text-[10px] text-slate-400 font-normal">สถานะและผลประเมิน</span>
-                    </div>
-                    {selectedQCDetail.items && selectedQCDetail.items.length > 0 ? (
-                      <div className="divide-y divide-slate-100">
-                        {selectedQCDetail.items.map((it: any, idx: number) => (
-                          <div key={idx} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/50 transition">
-                            <div className="space-y-0.5">
-                              <p className="text-slate-800 font-semibold text-xs">
-                                {getQCItemLabel(it.category, it.itemCode, qcMasterItems)}
-                              </p>
-                              {it.detail && (
-                                <p className="text-[11px] text-slate-500">
-                                  {it.detail}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              {renderQCValueBadge(it.category, it.value, it.numericValue, null)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-6 text-center text-slate-400 text-xs">
-                        ไม่มีข้อมูลรายการตรวจเช็ค
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Attached Photos */}
-                  {selectedQCDetail.photos && selectedQCDetail.photos.length > 0 && (
-                    <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-2.5 text-xs">
-                      <h4 className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <span>📷</span> รูปภาพประกอบการตรวจ ({selectedQCDetail.photos.length} รูป)
-                      </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        {selectedQCDetail.photos.map((photo: any, idx: number) => {
-                          const photoUrl = photo.s3Key?.startsWith('http') ? photo.s3Key : `${SPACES_CDN}/${photo.s3Key}`
-                          return (
-                            <a
-                              key={photo.inspectionPhotoId || idx}
-                              href={photoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="group relative aspect-4/3 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 block shadow-2xs hover:shadow-md transition"
-                            >
-                              <img
-                                src={photoUrl}
-                                alt={photo.fileName || 'QC Photo'}
-                                className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                                loading="lazy"
-                              />
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2">
-                                <p className="text-[10px] text-white font-medium truncate">
-                                  {getQCItemLabel(photo.category, photo.itemCode, qcMasterItems)}
-                                </p>
-                              </div>
-                              <div className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-md px-1.5 py-0.5 text-[9px] font-mono opacity-0 group-hover:opacity-100 transition">
-                                ดูรูปใหญ่ ↗
-                              </div>
-                            </a>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Remark */}
-                  {selectedQCDetail.remark && (
-                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
-                      <p className="font-bold text-slate-600 flex items-center gap-1">
-                        <span>📝</span> หมายเหตุ / รายละเอียดเพิ่มเติม:
-                      </p>
-                      <p className="text-slate-800 whitespace-pre-line text-xs pl-4">{selectedQCDetail.remark}</p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Modal Footer */}
-              <div className="flex justify-end pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setSelectedQCDetail(null)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer"
-                >
-                  ปิดหน้าต่าง
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* STANDALONE QC DETAIL POPUP MODAL */}
+        <QCDetailModal
+          record={selectedQCDetail}
+          loading={loadingQCDetail}
+          masterItems={qcMasterItems}
+          spacesCdn={SPACES_CDN}
+          onClose={() => setSelectedQCDetail(null)}
+        />
 
       </div>
     </AuthGuard>

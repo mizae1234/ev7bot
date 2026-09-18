@@ -793,6 +793,7 @@ export async function listInspections(filters: {
       i.InspectionID AS inspectionId,
       i.VinNo AS vinNo,
       i.RegisterNo AS registerNo,
+      inv.Model AS model,
       i.InspectionType AS inspectionType,
       i.InspectionDate AS inspectionDate,
       i.InspectorName AS inspectorName,
@@ -833,8 +834,36 @@ export async function listInspections(filters: {
             OR (it.Category <> 'CAR_PHOTOS' AND it.Category <> 'ACCIDENT' AND it.Value IN ('SCRATCH', 'DENT', 'NO', 'NONE', 'FRONT_ONLY', 'BACK_ONLY'))
           )
         FOR JSON PATH
-      ) AS damagedItemsJson
+      ) AS damagedItemsJson,
+      (
+        SELECT 
+          it.InspectionItemID AS inspectionItemId,
+          it.Category AS category,
+          it.ItemCode AS itemCode,
+          it.Value AS [value],
+          it.Detail AS detail,
+          it.NumericValue AS numericValue,
+          it.ExpiryDate AS expiryDate
+        FROM dbo.EV_InspectionItem it
+        WHERE it.InspectionID = i.InspectionID
+        ORDER BY it.InspectionItemID
+        FOR JSON PATH
+      ) AS itemsJson,
+      (
+        SELECT 
+          p.InspectionPhotoID AS inspectionPhotoId,
+          p.Category AS category,
+          p.ItemCode AS itemCode,
+          p.PhotoPosition AS photoPosition,
+          p.S3Key AS s3Key,
+          p.FileName AS fileName
+        FROM dbo.EV_InspectionPhoto p
+        WHERE p.InspectionID = i.InspectionID AND p.IsActive = 1
+        ORDER BY p.InspectionPhotoID
+        FOR JSON PATH
+      ) AS photosJson
     FROM dbo.EV_Inspection i
+    LEFT JOIN dbo.EV_InventoryItem inv ON i.VinNo = inv.VinNo
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
     LEFT JOIN dbo.EV_MsSubStatus rs ON i.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
     LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
@@ -845,10 +874,25 @@ export async function listInspections(filters: {
 
   return result.recordset.map((row: any) => {
     const damagedItems = parseDamagedItems(row.damagedItemsJson)
+    let items: any[] = []
+    let photos: any[] = []
+    try {
+      if (row.itemsJson) items = JSON.parse(row.itemsJson)
+    } catch {
+      items = []
+    }
+    try {
+      if (row.photosJson) photos = JSON.parse(row.photosJson)
+    } catch {
+      photos = []
+    }
+
     return {
       ...row,
       damagedCount: damagedItems.length,
       damagedItems,
+      items,
+      photos,
     }
   })
 }

@@ -163,6 +163,9 @@ export interface InspectionListItem {
     resolveUserName?: string | null
     inspectionItemId?: number | null
   }>
+  model?: string | null
+  items?: InspectionItemData[]
+  photos?: any[]
 }
 
 /** Audit Session */
