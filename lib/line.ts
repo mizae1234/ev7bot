@@ -9,7 +9,7 @@ export const lineConfig = {
 export const lineClient = new Client(lineConfig)
 export const lineMiddleware = middleware(lineConfig)
 
-import { getMSSQLPool } from './mssql'
+import { getMSSQLReadOnlyPool } from './mssql'
 import { prisma } from './prisma'
 import sql from 'mssql'
 
@@ -31,7 +31,7 @@ export async function sendMentionNotifications(text: string, ticketId: number, s
   if (matches.length === 0) return
 
   try {
-    const mssqlPool = await getMSSQLPool()
+    const mssqlPool = await getMSSQLReadOnlyPool()
     if (!mssqlPool) return
 
     for (const name of matches) {
@@ -282,7 +282,7 @@ export async function sendVehicleNoteMentionNotifications(
   // ─── Part 1: Send to @mentioned users ──────────────────────────
   if (matches.length > 0) {
     try {
-      const mssqlPool = await getMSSQLPool()
+      const mssqlPool = await getMSSQLReadOnlyPool()
       if (mssqlPool) {
         for (const name of matches) {
           let ev7UserId: number | null = null

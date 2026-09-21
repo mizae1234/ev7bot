@@ -180,9 +180,8 @@ async function isRegisteredUser(userId: string): Promise<boolean> {
     console.error('[isRegisteredUser Check Error]', err)
   }
 
-  // 3. Fallback check in SQL Server EV_User
+  // 3. Fallback check in SQL Server EV_User (read-only)
   try {
-    const { getMSSQLPool } = await import('@/lib/mssql')
     const pool = await getMSSQLPool()
     if (pool) {
       const q = pool.request()
