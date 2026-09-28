@@ -156,7 +156,7 @@ function MaintenanceContent() {
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
       periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel} | ประเภท: ${typeLabel}`,
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ตำแหน่งปัจจุบันของรถ', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ตำแหน่งปัจจุบันของรถ', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข', 'วันที่อัปเดตล่าสุด'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
         item.vin,
@@ -185,6 +185,7 @@ function MaintenanceContent() {
         item.follow_up || '-',
         item.create_user_name || '-',
         item.update_user_name || '-',
+        formatDateForExcelRaw(item.update_date),
       ]),
       fileName: 'รายการงานซ่อม',
     })
@@ -340,6 +341,7 @@ function MaintenanceContent() {
                     <th className="py-3 pr-2">ประเภท</th>
                     <th className="py-3 pr-2">เคส</th>
                     <th className="py-3 pr-2">วันที่แจ้ง</th>
+                    <th className="py-3 pr-2">อัปเดตล่าสุด</th>
                     <th className="py-3 pr-4 text-right">สถานะ</th>
                   </tr>
                 </thead>
@@ -396,6 +398,7 @@ function MaintenanceContent() {
                             {item.car_case === '-' && <span className="text-zinc-400">-</span>}
                           </td>
                           <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{formatDateTh(item.report_date)}</td>
+                          <td className="py-3.5 pr-2 text-zinc-600 dark:text-zinc-400">{formatDateTh(item.update_date)}</td>
                           <td className="py-3.5 pr-4 text-right">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusColor(item.status_code)}`}>
                               {item.status_text}
