@@ -96,7 +96,7 @@ export default function FilterBar({
           >
             <option value="">-- ทั้งหมด --</option>
             <option value="DRAFT">ฉบับร่าง (DRAFT)</option>
-            <option value="SUBMIT">เสร็จสมบูรณ์ (SUBMIT)</option>
+            <option value="COMPLETED">เสร็จสมบูรณ์ (SUBMIT)</option>
           </select>
         </div>
 

@@ -3,8 +3,10 @@ import {
   createInspection,
   updateInspection,
   listInspections,
+  listLegacyReturnItems,
   resolveEv7User,
 } from '@/lib/inspection/inspection-service'
+import type { InspectionListItem } from '@/lib/inspection/types'
 import { saveErrorLog } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -23,19 +25,40 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate') || undefined
     const endDate = searchParams.get('endDate') || undefined
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
+    const unlimited = searchParams.get('unlimited') === 'true'
+    const includeLegacyReturns = searchParams.get('includeLegacyReturns') === 'true'
 
-    const inspections = await listInspections({
-      vinNo,
-      inspectionType,
-      inspectionSessionId,
-      status,
-      location,
-      startDate,
-      endDate,
-      limit,
-    })
+    // Only meaningful for RETURN listings — EV_ReturnItem predates EV_Inspection and only
+    // ever recorded vehicle returns, not audits/QC.
+    const shouldIncludeLegacy = includeLegacyReturns && inspectionType === 'RETURN'
 
-    return NextResponse.json({ inspections })
+    const [inspections, legacyItems] = await Promise.all([
+      listInspections({
+        vinNo,
+        inspectionType,
+        inspectionSessionId,
+        status,
+        location,
+        startDate,
+        endDate,
+        limit,
+        unlimited,
+      }),
+      shouldIncludeLegacy ? listLegacyReturnItems({ location, status, startDate, endDate }) : Promise.resolve([]),
+    ])
+
+    // Fall back to inspectionDate for sort ordering when createDate is missing (older, pre-column
+    // legacy rows) instead of letting `new Date(null)` silently collapse them to epoch 1970.
+    const sortKey = (item: InspectionListItem) => {
+      const raw = item.createDate || item.inspectionDate
+      return raw ? new Date(raw).getTime() : 0
+    }
+
+    const merged: InspectionListItem[] = shouldIncludeLegacy
+      ? [...inspections, ...legacyItems].sort((a, b) => sortKey(b) - sortKey(a))
+      : inspections
+
+    return NextResponse.json({ inspections: merged, total: merged.length })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     const stack = error instanceof Error ? error.stack : null

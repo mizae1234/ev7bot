@@ -49,6 +49,7 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
           <tbody className="divide-y divide-slate-100 text-slate-700">
             {paginatedItems.length > 0 ? (
               paginatedItems.map((item, idx) => {
+                const isLegacy = item.source === 'RETURN_ITEM_LEGACY'
                 const isDraft = item.status === 'DRAFT'
                 const assessmentLabel = getAssessmentLabel(item.assessmentResult)
                 const rowNo = (safePage - 1) * PAGE_SIZE + idx + 1
@@ -56,8 +57,9 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
                 return (
                   <tr
                     key={item.inspectionId}
-                    onClick={() => onSelectInspection(item.inspectionId)}
-                    className="hover:bg-slate-50 transition duration-150 cursor-pointer active:bg-slate-100"
+                    onClick={() => { if (!isLegacy) onSelectInspection(item.inspectionId) }}
+                    title={isLegacy ? 'ข้อมูลเก่าจากระบบก่อนมีใบตรวจสภาพ (EV_ReturnItem) — ไม่มีรายละเอียดเพิ่มเติมให้เปิดดู' : undefined}
+                    className={`transition duration-150 ${isLegacy ? 'bg-slate-50/60' : 'hover:bg-slate-50 cursor-pointer active:bg-slate-100'}`}
                   >
                     {/* Row No */}
                     <td className="px-4 py-4 text-center font-mono text-[11px] text-slate-400 font-semibold">
@@ -99,7 +101,11 @@ export default function InspectionTable({ inspections, onSelectInspection }: Ins
 
                     {/* Assessment Badge & Damaged Points */}
                     <td className="px-5 py-4 min-w-[200px]">
-                      {item.isPendingChecklist ? (
+                      {isLegacy ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-200 text-slate-600 border border-slate-300">
+                          🗄️ ข้อมูลเก่า (ไม่มีใบตรวจสภาพ)
+                        </span>
+                      ) : item.isPendingChecklist ? (
                         <span className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-violet-50 text-violet-600 border border-violet-200">
                           🔄 รอตรวจภายหลัง
                         </span>

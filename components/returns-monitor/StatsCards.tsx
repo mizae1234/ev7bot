@@ -8,6 +8,7 @@ interface StatsCardsProps {
     normal: number
     repair: number
     pending: number
+    legacy: number
   }
 }
 
@@ -16,6 +17,7 @@ const STAT_ITEMS = [
   { key: 'normal', label: 'สภาพปกติ', icon: '✅', unit: 'คัน', colorClass: 'text-emerald-600' },
   { key: 'repair', label: 'ส่งเข้าซ่อม', icon: '⚠️', unit: 'คัน', colorClass: 'text-rose-600' },
   { key: 'pending', label: 'รอผลตรวจ', icon: '⏳', unit: 'คัน', colorClass: 'text-amber-600' },
+  { key: 'legacy', label: 'ข้อมูลเก่า (ไม่มีผลตรวจ)', icon: '🗄️', unit: 'คัน', colorClass: 'text-slate-500' },
 ] as const
 
 const ICON_BG: Record<string, string> = {
@@ -23,11 +25,12 @@ const ICON_BG: Record<string, string> = {
   normal: 'bg-emerald-50 border-emerald-100',
   repair: 'bg-rose-50 border-rose-100',
   pending: 'bg-amber-50 border-amber-100',
+  legacy: 'bg-slate-100 border-slate-200',
 }
 
 export default function StatsCards({ stats }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
       {STAT_ITEMS.map((item) => (
         <div
           key={item.key}

@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import type { InspectionListItem, MasterItemDef } from '@/lib/inspection/types'
 import { exportToExcel, ExportButton } from '@/lib/exportExcel'
-import { getAssessmentLabel, getThaiDate, getThaiDateTime } from '@/components/returns-monitor/constants'
+import { getAssessmentLabel, getThaiDate, getThaiDateTime, maskName } from '@/components/returns-monitor/constants'
 
 import StatsCards from '@/components/returns-monitor/StatsCards'
 import FilterBar from '@/components/returns-monitor/FilterBar'
@@ -39,7 +39,8 @@ export default function ReturnsMonitorPage() {
       // Build query string
       const params = new URLSearchParams()
       params.append('type', 'RETURN')
-      params.append('limit', '200')
+      params.append('unlimited', 'true')
+      params.append('includeLegacyReturns', 'true')
       if (selectedLocation) params.append('location', selectedLocation)
       if (selectedDocStatus) params.append('status', selectedDocStatus)
       if (startDate) params.append('startDate', startDate)
@@ -72,14 +73,23 @@ export default function ReturnsMonitorPage() {
     fetchData()
   }, [fetchData])
 
+  // Deferred so typing in the search box stays responsive — the filter below rescans the full
+  // (now-unbounded, legacy-merged) dataset on every change, which can be a few thousand rows.
+  const deferredSearch = useDeferredValue(search)
+
   // Filtered Inspections — client-side search (flexible plate matching) + assessment filter
   const filteredInspections = useMemo(() => {
+    const search = deferredSearch
     const rawSearch = search.trim().toLowerCase()
     const cleanSearch = search.replace(/[\s\-_]/g, '').toLowerCase()
 
     return inspections.filter(item => {
+      // Legacy EV_ReturnItem rows have no assessment concept at all — they should always be
+      // visible when no assessment filter is applied, but never match a specific assessment
+      // (they'd otherwise all pile into "รอผลการตรวจ", matching the same exclusion `stats` applies).
+      const isLegacy = item.source === 'RETURN_ITEM_LEGACY'
       const assessmentLabel = getAssessmentLabel(item.assessmentResult)
-      const matchAssessment = !selectedAssessment || assessmentLabel === selectedAssessment
+      const matchAssessment = !selectedAssessment || (!isLegacy && assessmentLabel === selectedAssessment)
       if (!matchAssessment) return false
 
       if (!rawSearch) return true
@@ -118,22 +128,30 @@ export default function ReturnsMonitorPage() {
 
       return matchSearch
     })
-  }, [inspections, search, selectedAssessment])
+  }, [inspections, deferredSearch, selectedAssessment])
 
   // Calculate statistics
   const stats = useMemo(() => {
-    let total = inspections.length
     let normal = 0
     let repair = 0
     let pending = 0
+    let legacy = 0
 
     inspections.forEach(item => {
+      // Legacy EV_ReturnItem-only rows predate the checklist feature entirely — they were
+      // never "pending an assessment", they simply have no assessment concept, so they get
+      // their own bucket instead of inflating "รอผลตรวจ" with old data.
+      if (item.source === 'RETURN_ITEM_LEGACY') {
+        legacy++
+        return
+      }
       if (item.assessmentResult === 'NORMAL') normal++
       else if (item.assessmentResult === 'NEED_REPAIR') repair++
       else pending++
     })
 
-    return { total, normal, repair, pending }
+    // total is the sum of every bucket below so the cards always add up.
+    return { total: normal + repair + pending + legacy, normal, repair, pending, legacy }
   }, [inspections])
 
   // Reset all filters
@@ -158,14 +176,14 @@ export default function ReturnsMonitorPage() {
     const rows = filteredInspections.map(item => [
       item.registerNo || '-',
       item.vinNo,
-      item.customerName || '-',
+      maskName(item.customerName),
       item.customerContact || '-',
       item.locationName || item.location || '-',
       getThaiDate(item.inspectionDate),
       item.status === 'DRAFT' ? 'ฉบับร่าง' : 'เสร็จสมบูรณ์',
-      item.isPendingChecklist ? 'รอตรวจภายหลัง' : getAssessmentLabel(item.assessmentResult),
+      item.source === 'RETURN_ITEM_LEGACY' ? 'ข้อมูลเก่า (ไม่มีใบตรวจสภาพ)' : item.isPendingChecklist ? 'รอตรวจภายหลัง' : getAssessmentLabel(item.assessmentResult),
       item.isPendingChecklist ? 'ใช่' : '-',
-      item.inspectorName || '-',
+      maskName(item.inspectorName),
       item.mileage != null ? item.mileage : '-',
       item.returnReasonName || item.returnReason || '-',
       getThaiDateTime(item.createDate),

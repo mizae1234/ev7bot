@@ -166,6 +166,8 @@ export interface InspectionListItem {
   model?: string | null
   items?: InspectionItemData[]
   photos?: any[]
+  /** 'RETURN_ITEM_LEGACY' = แถวที่มาจาก dbo.EV_ReturnItem อย่างเดียว (ไม่มีใบตรวจสภาพ EV_Inspection คู่กัน — ข้อมูลเก่าก่อนมีระบบตรวจสภาพ) */
+  source?: 'INSPECTION' | 'RETURN_ITEM_LEGACY'
 }
 
 /** Audit Session */

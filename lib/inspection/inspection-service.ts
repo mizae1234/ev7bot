@@ -738,6 +738,8 @@ export async function listInspections(filters: {
   inspectionSessionId?: number
   status?: string
   limit?: number
+  /** true = ไม่จำกัดจำนวนแถว (ไม่ใส่ TOP ใน query) — ใช้เมื่อหน้าจอต้องการข้อมูลทั้งหมด ไม่ใช่แค่หน้าล่าสุด */
+  unlimited?: boolean
   location?: string
   startDate?: string
   endDate?: string
@@ -777,8 +779,11 @@ export async function listInspections(filters: {
     conditions.push('i.InspectionDate <= @endDate')
   }
 
-  const limit = filters.limit || 50
-  req.input('limit', sql.Int, limit)
+  const useTop = !filters.unlimited
+  if (useTop) {
+    const limit = filters.limit || 50
+    req.input('limit', sql.Int, limit)
+  }
 
   const hasResolveCols = await checkResolveColumnsExist(pool)
   const resolveItemCols = hasResolveCols
@@ -789,7 +794,7 @@ export async function listInspections(filters: {
     : 'CAST(NULL AS VARCHAR(30)) AS repairStatus, CAST(NULL AS NVARCHAR(500)) AS repairRemark'
 
   const result = await req.query(`
-    SELECT TOP (@limit)
+    SELECT ${useTop ? 'TOP (@limit)' : ''}
       i.InspectionID AS inspectionId,
       i.VinNo AS vinNo,
       i.RegisterNo AS registerNo,
@@ -889,12 +894,118 @@ export async function listInspections(filters: {
 
     return {
       ...row,
+      source: 'INSPECTION',
       damagedCount: damagedItems.length,
       damagedItems,
       items,
       photos,
     }
   })
+}
+
+// =====================================================
+// Legacy Returns (dbo.EV_ReturnItem) — records predating the
+// EV_Inspection checklist feature, with no linked inspection row.
+// Only relevant for InspectionType='RETURN' views.
+// =====================================================
+
+export async function listLegacyReturnItems(filters: {
+  location?: string
+  status?: string
+  startDate?: string
+  endDate?: string
+}): Promise<InspectionListItem[]> {
+  const pool = await getMSSQLPool()
+  if (!pool) throw new Error('Database connection failed')
+
+  const req = pool.request()
+  // EV_ReturnItem is treated as a historical log here, not a live-state table — unlike
+  // EV_Inspection, its IsActive flag isn't checked, so cancelled/soft-deleted rows still show up.
+  // Only an ACTIVE inspection link should hide this row — if that inspection was later
+  // soft-deleted (IsActive=0), the return itself is still real and must not vanish from every view.
+  const conditions = ['NOT EXISTS (SELECT 1 FROM dbo.EV_Inspection ei WHERE ei.ReturnItemID = r.ReturnItemID AND ei.IsActive = 1)']
+
+  if (!filters.status) {
+    // A DRAFT EV_ReturnItem is normally an unfinished return still in the CURRENT flow — it only
+    // gets linked to its EV_Inspection.ReturnItemID once that inspection is COMPLETED (see
+    // updateInspection's sync-on-COMPLETED logic above). Without this, it would show up here as a
+    // false "legacy" duplicate while the real in-progress inspection is still being filled in.
+    // Genuinely legacy (pre-checklist) rows were always finalized as 'SUBMIT' (or have no Status
+    // at all, from before that column existed). Default view excludes DRAFT for this reason; an
+    // explicit status filter (e.g. the user picking "DRAFT") is a deliberate choice and is honored below.
+    conditions.push("(r.Status = 'SUBMIT' OR r.Status IS NULL)")
+  }
+
+  if (filters.location) {
+    req.input('location', sql.VarChar, filters.location)
+    conditions.push('r.ParkLocation = @location')
+  }
+  if (filters.status) {
+    // The UI's status filter speaks EV_Inspection's vocabulary ('DRAFT' / 'COMPLETED'), but this
+    // table's own "finished" rows are stamped 'SUBMIT' (or have no Status at all, pre-dating the
+    // column) — translate so one filter value means the same thing across both merged sources.
+    if (filters.status === 'COMPLETED') {
+      conditions.push("(r.Status = 'SUBMIT' OR r.Status IS NULL)")
+    } else {
+      req.input('status', sql.VarChar, filters.status)
+      conditions.push('r.Status = @status')
+    }
+  }
+  if (filters.startDate) {
+    req.input('startDate', sql.Date, filters.startDate)
+    conditions.push('r.ReturnDate >= @startDate')
+  }
+  if (filters.endDate) {
+    req.input('endDate', sql.Date, filters.endDate)
+    conditions.push('r.ReturnDate <= @endDate')
+  }
+
+  const result = await req.query(`
+    SELECT
+      -r.ReturnItemID AS inspectionId,
+      r.VinNo AS vinNo,
+      COALESCE(r.RegisterNo, inv.RegisterNo) AS registerNo,
+      COALESCE(r.Model, inv.Model) AS model,
+      'RETURN' AS inspectionType,
+      r.ReturnDate AS inspectionDate,
+      CAST(NULL AS NVARCHAR(255)) AS inspectorName,
+      ISNULL(r.Status, 'SUBMIT') AS status,
+      r.Mileage AS mileage,
+      r.CreateDate AS createDate,
+      r.UpdateDate AS updateDate,
+      r.ParkLocation AS location,
+      loc.StatusName AS locationName,
+      r.[Group] AS returnReason,
+      COALESCE(rs.DescriptionStatus, rs.StatusName, r.[Group]) AS returnReasonName,
+      CAST(NULL AS VARCHAR(20)) AS assessmentResult,
+      CAST(NULL AS VARCHAR(30)) AS repairStatus,
+      CAST(NULL AS NVARCHAR(500)) AS repairRemark,
+      r.CustomerName AS customerName,
+      r.PhoneNo AS customerContact,
+      CAST(NULL AS DATE) AS contractCancellationDate,
+      CAST(0 AS BIT) AS isPendingChecklist,
+      ISNULL(NULLIF(cu.FirstName + CASE WHEN cu.LastName IS NOT NULL AND cu.LastName != '' THEN ' ' + LEFT(cu.LastName, 1) + '.' ELSE '' END, ''), cu.UserName) AS createdByName,
+      ISNULL(NULLIF(uu.FirstName + CASE WHEN uu.LastName IS NOT NULL AND uu.LastName != '' THEN ' ' + LEFT(uu.LastName, 1) + '.' ELSE '' END, ''), uu.UserName) AS updatedByName
+    FROM dbo.EV_ReturnItem r
+    LEFT JOIN dbo.EV_InventoryItem inv ON r.VinNo = inv.VinNo
+    LEFT JOIN dbo.EV_MsSubStatus loc ON r.ParkLocation = loc.StatusCode AND loc.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_MsSubStatus rs ON r.[Group] = rs.StatusCode AND rs.Type = 'RETURN_REASON'
+    LEFT JOIN dbo.EV_User cu ON r.CreateUserID = cu.UserID
+    LEFT JOIN dbo.EV_User uu ON r.UpdateUserID = uu.UserID
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY r.ReturnDate DESC
+  `)
+
+  return result.recordset.map((row: any) => ({
+    ...row,
+    source: 'RETURN_ITEM_LEGACY',
+    itemCount: 0,
+    photoCount: 0,
+    damagedCount: 0,
+    damagedItems: [],
+    items: [],
+    photos: [],
+  }))
 }
 
 /** ดึง Inspection detail เต็ม */
