@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { maskStaffName } from './qc-helpers'
 
 interface SearchVehicle {
   InventoryItemID: number
@@ -30,8 +31,10 @@ interface AuditVehicleListProps {
   auditedVehicles: AuditedVehicle[]
   activeVin: string | undefined
   totalChecklistItems: number
+  canDelete?: boolean
   onSelectVehicle: (vehicle: AuditedVehicle) => void
   onAddVehicle: (vehicle: SearchVehicle) => void
+  onDeleteVehicle?: (vehicle: AuditedVehicle) => void
 }
 
 export function AuditVehicleList({
@@ -39,8 +42,10 @@ export function AuditVehicleList({
   auditedVehicles,
   activeVin,
   totalChecklistItems,
+  canDelete,
   onSelectVehicle,
   onAddVehicle,
+  onDeleteVehicle,
 }: AuditVehicleListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchVehicle[]>([])
@@ -161,21 +166,36 @@ export function AuditVehicleList({
                     <h4 className="font-bold text-slate-900 text-xs">{item.registerNo || 'ทะเบียน -'}</h4>
                     <p className="text-[9px] font-mono text-slate-400 mt-0.5">{item.vinNo}</p>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
-                    resVal === 'NORMAL'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : resVal === 'NEED_REPAIR'
-                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-slate-500/10 text-slate-600 border-slate-200'
-                  }`}>
-                    <span>{resVal === 'NORMAL' ? '✅' : resVal === 'NEED_REPAIR' ? '⚠️' : '⏳'}</span>
-                    {resLabel}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                      resVal === 'NORMAL'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : resVal === 'NEED_REPAIR'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-500/10 text-slate-600 border-slate-200'
+                    }`}>
+                      <span>{resVal === 'NORMAL' ? '✅' : resVal === 'NEED_REPAIR' ? '⚠️' : '⏳'}</span>
+                      {resLabel}
+                    </span>
+                    {canDelete && onDeleteVehicle && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeleteVehicle(item)
+                        }}
+                        title="ลบผลการตรวจรถคันนี้"
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition active:scale-90"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-between items-center text-[10px] text-slate-500 pt-1.5 border-t border-slate-100/60">
-                  <span>ผู้ตรวจ: <strong className="text-slate-700 font-semibold">{item.inspectorName || '-'}</strong></span>
-                  <span>ข้อที่ตรวจ: <strong className="text-slate-800 font-mono font-bold">{item.itemCount ?? 0}/{totalChecklistItems || 27}</strong></span>
+                  <span>ผู้ตรวจ: <strong className="text-slate-700 font-semibold">{maskStaffName(item.inspectorName)}</strong></span>
+                  <span>ข้อที่ตรวจ: <strong className="text-slate-800 font-mono font-bold">{item.itemCount ?? 0}{totalChecklistItems > 0 ? `/${totalChecklistItems}` : ''}</strong></span>
                 </div>
               </div>
             )

@@ -180,6 +180,7 @@ export interface AuditSessionData {
   status: AuditSessionStatus
   notes: string | null
   createdBy: number | null
+  creatorName?: string | null
   inspectionCount?: number
 }
 

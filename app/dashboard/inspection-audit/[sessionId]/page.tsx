@@ -4,13 +4,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { buildDynamicSections } from '@/lib/inspection/checklist-config'
-import type { MasterItemDef, InspectionData } from '@/lib/inspection/types'
+import type { MasterItemDef, InspectionData, InspectionPhotoData } from '@/lib/inspection/types'
 import { AuditVehicleList } from '@/components/inspection-audit/AuditVehicleList'
 import { AuditChecklistForm } from '@/components/inspection-audit/AuditChecklistForm'
+import { maskStaffName, getSpacesCDN } from '@/components/inspection-audit/qc-helpers'
 
-const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
-const spacesBucket = 'space-ev7tracking-prod'
-const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
+const SPACES_CDN = getSpacesCDN()
 
 interface SessionDetail {
   inspectionSessionId: number
@@ -21,6 +20,7 @@ interface SessionDetail {
   status: 'OPEN' | 'CLOSED'
   notes?: string
   createdBy: string
+  creatorName?: string | null
 }
 
 interface AuditedVehicle {
@@ -130,16 +130,93 @@ export default function SessionWorkspacePage() {
     setConfirmModal({ title, message, onConfirm })
   }, [])
 
+  // User Role & Permissions (ADMIN / SUPER_ADMIN only for delete)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const canDelete = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN'
+
+  // Delete modal state
+  const [deleteVehicleConfirm, setDeleteVehicleConfirm] = useState<{ inspectionId: number; vinNo: string; registerNo: string | null } | null>(null)
+  const [deletingVehicle, setDeletingVehicle] = useState(false)
+  const [showDeleteSessionModal, setShowDeleteSessionModal] = useState(false)
+  const [deletingSession, setDeletingSession] = useState(false)
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      let uid = ''
       const cached = localStorage.getItem('liff_profile')
       if (cached) {
-        const parsed = JSON.parse(cached)
-        setProfile(parsed)
-        setInspectorName(parsed.displayName || 'Auditor')
+        try {
+          const parsed = JSON.parse(cached)
+          setProfile(parsed)
+          uid = parsed.userId || ''
+          setInspectorName(parsed.displayName || 'Auditor')
+        } catch (e) {
+          console.error('Error parsing profile cache:', e)
+        }
+      }
+
+      const hostname = window.location.hostname
+      const isDev = hostname === 'localhost' || hostname === '127.0.0.1'
+      if (!uid && isDev) {
+        uid = 'usr_mock_dev'
+      }
+
+      if (uid) {
+        fetch(`/api/auth/role?userId=${uid}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.role) setUserRole(data.role)
+          })
+          .catch(err => console.error('Error fetching user role:', err))
       }
     }
   }, [])
+
+  const handleDeleteCurrentSession = async () => {
+    if (!session) return
+    setDeletingSession(true)
+    try {
+      const res = await fetch(`/api/inspection/session?sessionId=${session.inspectionSessionId}&lineUserId=${profile?.userId || 'usr_mock_dev'}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'ลบรอบตรวจไม่สำเร็จ')
+      }
+      showToast('ลบรอบการตรวจสภาพและข้อมูลทั้งหมดเรียบร้อยแล้ว', 'success')
+      setShowDeleteSessionModal(false)
+      setTimeout(() => {
+        router.push('/dashboard/inspection-audit')
+      }, 400)
+    } catch (err: any) {
+      showToast(err.message || 'เกิดข้อผิดพลาดในการลบ', 'error')
+    } finally {
+      setDeletingSession(false)
+    }
+  }
+
+  const handleDeleteVehicle = async (vehicle: { inspectionId: number; vinNo: string; registerNo: string | null }) => {
+    setDeletingVehicle(true)
+    try {
+      const res = await fetch(`/api/inspection/${vehicle.inspectionId}?lineUserId=${profile?.userId || 'usr_mock_dev'}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'ลบข้อมูลการตรวจไม่สำเร็จ')
+      }
+      showToast(`ลบข้อมูลผลการตรวจของรถ ${vehicle.registerNo || vehicle.vinNo} เรียบร้อยแล้ว`, 'success')
+      setDeleteVehicleConfirm(null)
+      if (activeVehicle?.vinNo === vehicle.vinNo) {
+        setActiveVehicle(null)
+      }
+      fetchSessionData()
+    } catch (err: any) {
+      showToast(err.message || 'เกิดข้อผิดพลาดในการลบ', 'error')
+    } finally {
+      setDeletingVehicle(false)
+    }
+  }
 
   // Fetch session details & master items & audited items list
   const fetchSessionData = useCallback(async () => {
@@ -346,6 +423,9 @@ export default function SessionWorkspacePage() {
       setFormItems(itemsMap)
       setMileage('')
       setRemark('')
+      if (!inspectorName && profile?.displayName) {
+        setInspectorName(profile.displayName)
+      }
       setPendingPhotos({})
       setUploadedPhotos([])
     }
@@ -480,11 +560,11 @@ export default function SessionWorkspacePage() {
     )
   }
 
-  const handleSaveAuditItem = async (savedMode?: 'QC' | 'AUDIT') => {
+  const handleSaveAuditItem = async (savedMode?: 'QC' | 'AUDIT', isDraft?: boolean): Promise<number | undefined> => {
     if (!activeVehicle) return
     if (!inspectorName.trim()) {
       showToast('กรุณากรอกชื่อผู้ตรวจสอบก่อนบันทึก', 'error')
-      return
+      throw new Error('กรุณากรอกชื่อผู้ตรวจสอบ')
     }
 
     setSaving(true)
@@ -494,6 +574,7 @@ export default function SessionWorkspacePage() {
       const mappedAssessment = autoAssessment === 'ปกติ' || autoAssessment?.includes('ผ่าน') ? 'NORMAL' : (autoAssessment === 'ต้องส่งเข้าซ่อม' || autoAssessment?.includes('ไม่ผ่าน')) ? 'NEED_REPAIR' : null
 
       const resolvedInspectionType = savedMode === 'QC' ? 'QC' : 'AUDIT'
+      const statusToSave = isDraft ? 'DRAFT' : 'COMPLETED'
 
       const payload = {
         vinNo: activeVehicle.vinNo,
@@ -525,7 +606,7 @@ export default function SessionWorkspacePage() {
         lineUserId: profile?.userId || undefined,
         location: session?.location,
         inspectorName,
-        status: 'COMPLETED',
+        status: statusToSave,
       }
 
       const isEdit = !!activeVehicle.inspectionId
@@ -549,10 +630,18 @@ export default function SessionWorkspacePage() {
       const resData = await res.json()
       const savedId = activeVehicle.inspectionId || resData.inspectionId
 
+      // Update activeVehicle so subsequent steps know its inspectionId
+      if (savedId && (!activeVehicle.inspectionId || activeVehicle.inspectionId !== savedId)) {
+        setActiveVehicle(prev => prev ? { ...prev, inspectionId: savedId } : null)
+      }
+
+      // Upload pending photos for this step
       const posKeys = Object.keys(pendingPhotos)
+      const newlyUploaded: InspectionPhotoData[] = []
+
       for (const posKey of posKeys) {
         const files = pendingPhotos[posKey]
-        if (files.length === 0) continue
+        if (!files || files.length === 0) continue
 
         const [cat, code, pos] = posKey.split('::')
         const itemCode = code === 'null' ? null : code
@@ -569,17 +658,33 @@ export default function SessionWorkspacePage() {
           method: 'POST',
           body: formData,
         })
-        if (!uploadRes.ok) {
+        if (uploadRes.ok) {
+          const upData = await uploadRes.json()
+          if (upData.photos) {
+            newlyUploaded.push(...upData.photos)
+          }
+        } else {
           console.error(`Failed to upload photos for ${posKey}`)
         }
       }
 
-      showToast('บันทึกผลการตรวจสอบสภาพคันนี้สำเร็จ!', 'success')
+      if (newlyUploaded.length > 0) {
+        setUploadedPhotos(prev => [...prev, ...newlyUploaded])
+      }
       setPendingPhotos({})
-      setActiveVehicle(null)
+
+      if (isDraft) {
+        showToast('บันทึกฉบับร่างและอัปโหลดรูปภาพเรียบร้อยแล้ว', 'success')
+      } else {
+        showToast('บันทึกผลการตรวจสอบสภาพคันนี้สำเร็จ!', 'success')
+        setActiveVehicle(null)
+      }
+
       fetchSessionData()
+      return savedId
     } catch (err: any) {
       showToast(err.message || 'เกิดข้อผิดพลาด', 'error')
+      throw err
     } finally {
       setSaving(false)
     }
@@ -624,20 +729,35 @@ export default function SessionWorkspacePage() {
                   </h1>
                   <p className="text-[10px] text-slate-500 font-medium">
                     ลานจอด: {session.locationName || session.location} • วันที่: {getThaiDate(session.sessionDate)}
+                    {(session.creatorName || session.createdBy) && (
+                      <> • ผู้เปิดรอบ: <strong className="font-semibold text-slate-700">{maskStaffName(session.creatorName || `User #${session.createdBy}`)}</strong></>
+                    )}
                   </p>
                 </div>
               )}
             </div>
 
-            {session && session.status === 'OPEN' && (
-              <button
-                onClick={handleCloseSession}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition active:scale-95 flex items-center gap-1 shadow-sm"
-              >
-                <span>🔒</span>
-                ปิดรอบการตรวจสภาพ
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {canDelete && session && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteSessionModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition active:scale-95 flex items-center gap-1 border border-rose-200 cursor-pointer"
+                >
+                  <span>🗑️</span>
+                  <span>ลบรอบตรวจนี้</span>
+                </button>
+              )}
+              {session && session.status === 'OPEN' && (
+                <button
+                  onClick={handleCloseSession}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition active:scale-95 flex items-center gap-1 shadow-sm cursor-pointer"
+                >
+                  <span>🔒</span>
+                  ปิดรอบการตรวจสภาพ
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -652,8 +772,10 @@ export default function SessionWorkspacePage() {
                 auditedVehicles={auditedVehicles}
                 activeVin={activeVehicle?.vinNo}
                 totalChecklistItems={masterItems.length}
+                canDelete={canDelete}
                 onSelectVehicle={selectAuditedVehicle}
                 onAddVehicle={handleSelectSearchVehicle}
+                onDeleteVehicle={(item) => setDeleteVehicleConfirm(item)}
               />
             ) : (
               <div className="p-4 text-center text-xs text-slate-400">กำลังโหลด...</div>
@@ -739,6 +861,105 @@ export default function SessionWorkspacePage() {
                 className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition active:scale-95 shadow-sm"
               >
                 ตกลง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Vehicle Confirmation Modal */}
+      {deleteVehicleConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-2xl flex items-center justify-center mx-auto">
+              🗑️
+            </div>
+            <div className="text-center space-y-1.5">
+              <h4 className="text-base font-bold text-slate-900">
+                ยืนยันการลบผลการตรวจรถคันนี้?
+              </h4>
+              <p className="text-xs text-slate-600">
+                คุณต้องการลบข้อมูลผลการตรวจของรถทะเบียน <strong className="text-slate-900 font-bold">{deleteVehicleConfirm.registerNo || deleteVehicleConfirm.vinNo}</strong> ใช่หรือไม่?
+              </p>
+              <p className="text-[11px] text-rose-600 bg-rose-50/70 p-2.5 rounded-xl border border-rose-150">
+                ⚠️ ข้อมูลเช็คลิสต์และรูปภาพทั้งหมดที่บันทึกของคันนี้จะถูกลบออก
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deletingVehicle}
+                onClick={() => setDeleteVehicleConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={deletingVehicle}
+                onClick={() => handleDeleteVehicle(deleteVehicleConfirm)}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                {deletingVehicle ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>กำลังลบ...</span>
+                  </>
+                ) : (
+                  <span>ยืนยันการลบ</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Current Session Confirmation Modal */}
+      {showDeleteSessionModal && session && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-2xl flex items-center justify-center mx-auto">
+              🗑️
+            </div>
+            <div className="text-center space-y-1.5">
+              <h4 className="text-base font-bold text-slate-900">
+                ยืนยันการลบรอบการตรวจสภาพนี้?
+              </h4>
+              <p className="text-xs text-slate-600">
+                คุณต้องการลบรอบตรวจ <strong className="text-slate-900 font-bold">"{session.sessionName}"</strong> ใช่หรือไม่?
+              </p>
+              <div className="text-[11px] text-rose-700 bg-rose-50/80 p-3 rounded-xl border border-rose-200 text-left space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <span>⚠️</span> คำเตือนสำคัญ:
+                </p>
+                <p>
+                  ข้อมูลการตรวจรถยนต์ในรอบนี้ทั้งหมด ({auditedVehicles.length} คัน) รวมถึงรูปภาพและรายการตรวจเช็คจะถูกลบออกจากระบบอย่างถาวร
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deletingSession}
+                onClick={() => setShowDeleteSessionModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={deletingSession}
+                onClick={handleDeleteCurrentSession}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                {deletingSession ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>กำลังลบ...</span>
+                  </>
+                ) : (
+                  <span>ยืนยันการลบ</span>
+                )}
               </button>
             </div>
           </div>

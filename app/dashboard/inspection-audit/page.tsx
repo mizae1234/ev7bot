@@ -20,6 +20,7 @@ import {
   maskStaffName,
   getThaiDate,
   getQCItemLabel,
+  getSpacesCDN,
 } from '@/components/inspection-audit/qc-helpers'
 import { QCExecutiveKPIs } from '@/components/inspection-audit/QCExecutiveKPIs'
 import { QCFilterBar } from '@/components/inspection-audit/QCFilterBar'
@@ -27,9 +28,7 @@ import { QCCardsGrid } from '@/components/inspection-audit/QCCardsGrid'
 import { QCTableView } from '@/components/inspection-audit/QCTableView'
 import { QCDetailModal } from '@/components/inspection-audit/QCDetailModal'
 
-const spacesEndpoint = 'https://sgp1.digitaloceanspaces.com'
-const spacesBucket = 'space-ev7tracking-prod'
-const SPACES_CDN = (typeof window !== 'undefined' && localStorage.getItem('spaces_cdn')) || spacesEndpoint.replace('https://', `https://${spacesBucket}.`)
+const SPACES_CDN = getSpacesCDN()
 
 interface AuditSession {
   inspectionSessionId: number
@@ -40,6 +39,7 @@ interface AuditSession {
   status: 'OPEN' | 'CLOSED'
   notes?: string
   createdBy: string
+  creatorName?: string | null
   inspectionCount: number
 }
 
@@ -181,20 +181,91 @@ export default function InspectionAuditPage() {
   const [qcPendingPhotos, setQcPendingPhotos] = useState<Record<string, File[]>>({})
   const [savingQC, setSavingQC] = useState(false)
 
+  // User Role & Permissions (ADMIN / SUPER_ADMIN only for delete)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const canDelete = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN'
+
+  // Delete Confirmation Modals State
+  const [deleteConfirmSession, setDeleteConfirmSession] = useState<AuditSession | null>(null)
+  const [deletingSession, setDeletingSession] = useState(false)
+  const [deleteConfirmQC, setDeleteConfirmQC] = useState<QCRecord | null>(null)
+  const [deletingQC, setDeletingQC] = useState(false)
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      let uid = ''
       const cached = localStorage.getItem('liff_profile')
       if (cached) {
         try {
           const parsed = JSON.parse(cached)
           setProfile(parsed)
+          uid = parsed.userId || ''
           setQcInspectorName(parsed.displayName || parsed.ev7UserName || '')
         } catch (e) {
           console.error('Error parsing profile cache:', e)
         }
       }
+
+      const hostname = window.location.hostname
+      const isDev = hostname === 'localhost' || hostname === '127.0.0.1'
+      if (!uid && isDev) {
+        uid = 'usr_mock_dev'
+      }
+
+      if (uid) {
+        fetch(`/api/auth/role?userId=${uid}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.role) setUserRole(data.role)
+          })
+          .catch(err => console.error('Error fetching user role:', err))
+      }
     }
   }, [])
+
+  const handleDeleteSession = async () => {
+    if (!deleteConfirmSession) return
+    setDeletingSession(true)
+    try {
+      const res = await fetch(`/api/inspection/session?sessionId=${deleteConfirmSession.inspectionSessionId}&lineUserId=${profile?.userId || 'usr_mock_dev'}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'ลบรอบตรวจไม่สำเร็จ')
+      }
+      showToast(`ลบรอบการตรวจ "${deleteConfirmSession.sessionName}" เรียบร้อยแล้ว`, 'success')
+      setDeleteConfirmSession(null)
+      fetchSessions()
+    } catch (err: any) {
+      showToast(err.message || 'เกิดข้อผิดพลาดในการลบ', 'error')
+    } finally {
+      setDeletingSession(false)
+    }
+  }
+
+  const handleDeleteQC = async (record: QCRecord) => {
+    setDeletingQC(true)
+    try {
+      const res = await fetch(`/api/inspection/${record.inspectionId}?lineUserId=${profile?.userId || 'usr_mock_dev'}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'ลบผลการตรวจไม่สำเร็จ')
+      }
+      showToast(`ลบผลการตรวจ QC รถทะเบียน ${record.registerNo || record.vinNo} เรียบร้อยแล้ว`, 'success')
+      setDeleteConfirmQC(null)
+      if (selectedQCDetail?.inspectionId === record.inspectionId) {
+        setSelectedQCDetail(null)
+      }
+      fetchQCRecords()
+    } catch (err: any) {
+      showToast(err.message || 'เกิดข้อผิดพลาดในการลบ', 'error')
+    } finally {
+      setDeletingQC(false)
+    }
+  }
 
   // Fetch initial audit sessions & locations
   const fetchSessions = async () => {
@@ -350,11 +421,11 @@ export default function InspectionAuditPage() {
   }
 
   // Handle Save QC inspection
-  const handleSaveQC = async (savedMode?: 'QC' | 'AUDIT') => {
+  const handleSaveQC = async (savedMode?: 'QC' | 'AUDIT', isDraft?: boolean): Promise<number | undefined> => {
     if (!selectedQCCar) return
     if (!qcInspectorName.trim()) {
       showToast('กรุณากรอกชื่อผู้ตรวจ QC ก่อนบันทึก', 'error')
-      return
+      throw new Error('กรุณากรอกชื่อผู้ตรวจ QC')
     }
 
     setSavingQC(true)
@@ -376,6 +447,7 @@ export default function InspectionAuditPage() {
       const cleanRem = qcRemark.replace(/^\[ผลการประเมิน:[^\]]+\]\s*/, '').trim()
       const finalRemark = `[ผลการประเมิน: ${autoAssessmentText}] ${cleanRem}`.trim()
       const mappedAssessment = hasFailed ? 'NEED_REPAIR' : 'NORMAL'
+      const statusToSave = isDraft ? 'DRAFT' : 'COMPLETED'
 
       const payload = {
         vinNo: selectedQCCar.VinNo,
@@ -407,7 +479,7 @@ export default function InspectionAuditPage() {
         lineUserId: profile?.userId || undefined,
         location: selectedQCCar.CurrentLocation,
         inspectorName: qcInspectorName,
-        status: 'COMPLETED',
+        status: statusToSave,
         carStatus: null, // "ไม่ต้องปรับสภานะ อะไร"
       }
 
@@ -448,10 +520,17 @@ export default function InspectionAuditPage() {
         })
       }
 
-      showToast('✅ บันทึกผลการตรวจ QC รถเรียบร้อยแล้ว', 'success')
-      handleCloseQCModal()
-      fetchQCRecords()
-      setActiveTab('qc_records')
+      setQcPendingPhotos({})
+
+      if (isDraft) {
+        showToast('บันทึกฉบับร่างและอัปโหลดรูปภาพเรียบร้อยแล้ว', 'success')
+      } else {
+        showToast('✅ บันทึกผลการตรวจ QC รถเรียบร้อยแล้ว', 'success')
+        handleCloseQCModal()
+        fetchQCRecords()
+        setActiveTab('qc_records')
+      }
+      return savedInspectionId
     } catch (err: any) {
       showToast(err.message || 'เกิดข้อผิดพลาดในการบันทึก QC', 'error')
     } finally {
@@ -667,16 +746,29 @@ export default function InspectionAuditPage() {
                                   {session.status}
                                 </span>
                               </td>
-                              <td className="px-5 py-4.5 font-medium text-slate-500">
-                                {session.createdBy || '-'}
+                              <td className="px-5 py-4.5 font-medium text-slate-600">
+                                {maskStaffName(session.creatorName || (session.createdBy ? `User #${session.createdBy}` : '-'))}
                               </td>
                               <td className="px-5 py-4.5 text-right" onClick={e => e.stopPropagation()}>
-                                <button
-                                  onClick={() => router.push(`/dashboard/inspection-audit/${session.inspectionSessionId}`)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold transition active:scale-95"
-                                >
-                                  เข้าสเปซตรวจ ➡️
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5 ml-auto">
+                                  <button
+                                    onClick={() => router.push(`/dashboard/inspection-audit/${session.inspectionSessionId}`)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold transition active:scale-95"
+                                  >
+                                    เข้าสเปซตรวจ ➡️
+                                  </button>
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteConfirmSession(session)}
+                                      title="ลบรอบตรวจสภาพและข้อมูลทั้งหมด"
+                                      className="px-2 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 text-[10px] font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <span>🗑️</span>
+                                      <span>ลบ</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           )
@@ -720,6 +812,9 @@ export default function InspectionAuditPage() {
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               📅 {getThaiDate(session.sessionDate)}
                             </p>
+                            <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                              <span>👤</span> ผู้เปิดรอบ: <strong className="font-semibold text-slate-700">{maskStaffName(session.creatorName || (session.createdBy ? `User #${session.createdBy}` : '-'))}</strong>
+                            </p>
                           </div>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold border uppercase tracking-wider ${
                             isClosed
@@ -732,7 +827,25 @@ export default function InspectionAuditPage() {
                         
                         <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
                           <span>ตรวจแล้ว: <strong className="text-slate-900 font-mono">{session.inspectionCount}</strong> คัน</span>
-                          <span className="text-[10px] text-indigo-600 font-bold">เข้าห้องตรวจ ➡️</span>
+                          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmSession(session)}
+                                className="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>🗑️</span>
+                                <span>ลบ</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/dashboard/inspection-audit/${session.inspectionSessionId}`)}
+                              className="text-[10px] text-indigo-600 font-bold"
+                            >
+                              เข้าห้องตรวจ ➡️
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
@@ -804,6 +917,8 @@ export default function InspectionAuditPage() {
                 <QCTableView
                   items={filteredQCRecords}
                   loading={loadingQC}
+                  canDelete={canDelete}
+                  onDelete={handleDeleteQC}
                   onViewDetail={handleViewQCDetail}
                 />
               )}
@@ -1095,8 +1210,109 @@ export default function InspectionAuditPage() {
           loading={loadingQCDetail}
           masterItems={qcMasterItems}
           spacesCdn={SPACES_CDN}
+          canDelete={canDelete}
+          onDelete={(rec) => setDeleteConfirmQC(rec)}
           onClose={() => setSelectedQCDetail(null)}
         />
+
+        {/* Delete Session Confirmation Modal */}
+        {deleteConfirmSession && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-2xl flex items-center justify-center mx-auto">
+                🗑️
+              </div>
+              <div className="text-center space-y-1.5">
+                <h3 className="text-base font-bold text-slate-900">
+                  ยืนยันการลบรอบการตรวจสภาพ?
+                </h3>
+                <p className="text-xs text-slate-600">
+                  คุณต้องการลบรอบตรวจ <strong className="text-slate-900 font-bold">"{deleteConfirmSession.sessionName}"</strong> ใช่หรือไม่?
+                </p>
+                <div className="text-[11px] text-rose-700 bg-rose-50/80 p-3 rounded-xl border border-rose-200 text-left space-y-1">
+                  <p className="font-bold flex items-center gap-1">
+                    <span>⚠️</span> คำเตือนสำคัญ:
+                  </p>
+                  <p>
+                    ข้อมูลการตรวจรถยนต์ในรอบนี้ทั้งหมด ({deleteConfirmSession.inspectionCount || 0} คัน) รวมถึงรูปภาพและผลเช็คลิสต์จะถูกลบออกจากระบบอย่างถาวร
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={deletingSession}
+                  onClick={() => setDeleteConfirmSession(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingSession}
+                  onClick={handleDeleteSession}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {deletingSession ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>กำลังลบ...</span>
+                    </>
+                  ) : (
+                    <span>ยืนยันการลบ</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete QC Record Confirmation Modal */}
+        {deleteConfirmQC && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-2xl flex items-center justify-center mx-auto">
+                🗑️
+              </div>
+              <div className="text-center space-y-1.5">
+                <h3 className="text-base font-bold text-slate-900">
+                  ยืนยันการลบผลการตรวจ QC?
+                </h3>
+                <p className="text-xs text-slate-600">
+                  คุณต้องการลบผลการตรวจ QC ของรถทะเบียน <strong className="text-slate-900 font-bold">{deleteConfirmQC.registerNo || deleteConfirmQC.vinNo}</strong> ใช่หรือไม่?
+                </p>
+                <p className="text-[11px] text-rose-600 bg-rose-50/70 p-2.5 rounded-xl border border-rose-150">
+                  ⚠️ ข้อมูลเช็คลิสต์และรูปภาพที่บันทึกไว้ของคันนี้จะถูกลบออก
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={deletingQC}
+                  onClick={() => setDeleteConfirmQC(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  disabled={deletingQC}
+                  onClick={() => handleDeleteQC(deleteConfirmQC)}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {deletingQC ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>กำลังลบ...</span>
+                    </>
+                  ) : (
+                    <span>ยืนยันการลบ</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </AuthGuard>

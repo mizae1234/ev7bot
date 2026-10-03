@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getInspectionDetail, updateInspection, resolveEv7User } from '@/lib/inspection/inspection-service'
+import { getInspectionDetail, updateInspection, deleteInspection, resolveEv7User, verifyAdminRole } from '@/lib/inspection/inspection-service'
 import { saveErrorLog } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -112,3 +112,46 @@ export async function PUT(
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
+// DELETE: ลบผลการตรวจสภาพรถ (เฉพาะ ADMIN หรือ SUPER_ADMIN)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let id = 'unknown'
+  try {
+    const resolvedParams = await params
+    id = resolvedParams.id
+    const inspectionId = parseInt(id, 10)
+    if (isNaN(inspectionId)) {
+      return NextResponse.json({ error: 'Invalid inspection ID' }, { status: 400 })
+    }
+
+    const searchParams = request.nextUrl.searchParams
+    let lineUserId = searchParams.get('lineUserId') || request.headers.get('x-line-userid')
+    if (!lineUserId) {
+      try {
+        const body = await request.json()
+        lineUserId = body.lineUserId || null
+      } catch {}
+    }
+
+    const isAdmin = await verifyAdminRole(lineUserId || undefined)
+    if (!isAdmin) {
+      return NextResponse.json(
+        { error: 'ขออภัย เฉพาะสิทธิ์ ADMIN หรือ SUPER_ADMIN เท่านั้นที่สามารถลบข้อมูลการตรวจได้' },
+        { status: 403 }
+      )
+    }
+
+    const ev7User = await resolveEv7User(lineUserId || undefined)
+    await deleteInspection(inspectionId, ev7User.userId)
+
+    return NextResponse.json({ success: true, message: 'ลบข้อมูลผลการตรวจสภาพเรียบร้อยแล้ว' })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Inspection DELETE Error]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+

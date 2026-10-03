@@ -5,12 +5,16 @@ import { maskStaffName, getThaiDate } from './qc-helpers'
 interface QCTableViewProps {
   items: QCRecord[]
   loading: boolean
+  canDelete?: boolean
+  onDelete?: (item: QCRecord) => void
   onViewDetail: (item: QCRecord) => void
 }
 
 export const QCTableView: React.FC<QCTableViewProps> = ({
   items,
   loading,
+  canDelete,
+  onDelete,
   onViewDetail,
 }) => {
   return (
@@ -87,13 +91,25 @@ export const QCTableView: React.FC<QCTableViewProps> = ({
                         {item.remark || '-'}
                       </td>
                       <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => onViewDetail(item)}
-                          className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold transition active:scale-95 cursor-pointer flex items-center gap-1 ml-auto"
-                        >
-                          <span>ดูผลตรวจ</span> <span>🔍</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => onViewDetail(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold transition active:scale-95 cursor-pointer flex items-center gap-1"
+                          >
+                            <span>ดูผลตรวจ</span> <span>🔍</span>
+                          </button>
+                          {canDelete && onDelete && (
+                            <button
+                              type="button"
+                              onClick={() => onDelete(item)}
+                              title="ลบผลตรวจ QC นี้"
+                              className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                            >
+                              🗑️
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -162,17 +178,30 @@ export const QCTableView: React.FC<QCTableViewProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-1">
+                <div className="pt-1 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       onViewDetail(item)
                     }}
-                    className="w-full py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span>ดูผลตรวจ 🔍</span>
                   </button>
+                  {canDelete && onDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onDelete(item)
+                      }}
+                      className="px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                      title="ลบผลตรวจ"
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             )

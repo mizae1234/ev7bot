@@ -181,3 +181,14 @@ export function formatQCItemStatus(category: string, item?: any): QCItemStatusRe
 
   return { label, isGood, detail: item.detail }
 }
+
+/**
+ * Resolves Spaces CDN URL using env var, localStorage override, or fallback endpoint
+ */
+export function getSpacesCDN(): string {
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem('spaces_cdn')
+    if (cached) return cached
+  }
+  return process.env.NEXT_PUBLIC_SPACES_CDN_URL || 'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com'
+}

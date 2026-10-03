@@ -7,6 +7,8 @@ interface QCDetailModalProps {
   loading: boolean
   masterItems?: any[]
   spacesCdn: string
+  canDelete?: boolean
+  onDelete?: (record: QCRecord) => void
   onClose: () => void
 }
 
@@ -15,6 +17,8 @@ export const QCDetailModal: React.FC<QCDetailModalProps> = ({
   loading,
   masterItems,
   spacesCdn,
+  canDelete,
+  onDelete,
   onClose,
 }) => {
   if (!record) return null
@@ -198,7 +202,20 @@ export const QCDetailModal: React.FC<QCDetailModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex justify-end pt-2 border-t border-slate-100 flex-none">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100 flex-none">
+          {canDelete && onDelete ? (
+            <button
+              type="button"
+              onClick={() => onDelete(record)}
+              className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+            >
+              <span>🗑️</span>
+              <span>ลบผลตรวจ QC นี้</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
           <button
             type="button"
             onClick={onClose}

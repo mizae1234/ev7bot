@@ -25,16 +25,44 @@ export async function resolveEv7User(lineUserId: string | undefined): Promise<{ 
   if (!lineUserId) return fallback
 
   try {
-    const reg = await prisma.lineRegistration.findUnique({
-      where: { lineUserId },
-    })
-    if (!reg?.ev7UserId) return fallback
+    let ev7UserId: number | null = null
+
+    if (/^\d+$/.test(lineUserId)) {
+      ev7UserId = parseInt(lineUserId, 10)
+    } else {
+      const reg = await prisma.lineRegistration.findUnique({
+        where: { lineUserId },
+      })
+      if (reg?.ev7UserId) {
+        ev7UserId = reg.ev7UserId
+      }
+    }
+
+    if (!ev7UserId) {
+      const pool = await getMSSQLPool()
+      if (pool) {
+        const uRes = await pool.request()
+          .input('lineUserId', sql.NVarChar, lineUserId)
+          .query(`
+            SELECT UserID, ISNULL(NULLIF(FirstName + ' ' + ISNULL(LastName, ''), ''), UserName) AS FullName
+            FROM dbo.EV_User
+            WHERE LineUserId = @lineUserId AND IsActive = 1
+          `)
+        if (uRes.recordset[0]?.UserID) {
+          return {
+            userId: uRes.recordset[0].UserID,
+            name: uRes.recordset[0].FullName || 'Unknown',
+          }
+        }
+      }
+      return fallback
+    }
 
     const pool = await getMSSQLPool()
-    if (!pool) return { userId: reg.ev7UserId, name: 'Unknown' }
+    if (!pool) return { userId: ev7UserId, name: 'Unknown' }
 
     const result = await pool.request()
-      .input('userId', sql.Int, reg.ev7UserId)
+      .input('userId', sql.Int, ev7UserId)
       .query(`
         SELECT ISNULL(NULLIF(FirstName + ' ' + ISNULL(LastName, ''), ''), UserName) AS FullName
         FROM dbo.EV_User
@@ -42,12 +70,55 @@ export async function resolveEv7User(lineUserId: string | undefined): Promise<{ 
       `)
 
     return {
-      userId: reg.ev7UserId,
+      userId: ev7UserId,
       name: result.recordset[0]?.FullName || 'Unknown',
     }
   } catch {
     return fallback
   }
+}
+
+/** ตรวจสอบสิทธิ์ว่ามี Role เป็น ADMIN หรือ SUPER_ADMIN หรือไม่ */
+export async function verifyAdminRole(lineUserId: string | undefined): Promise<boolean> {
+  if (!lineUserId) return false
+  if (lineUserId === 'usr_mock_dev') return true
+
+  // 1. Try PostgreSQL (Prisma)
+  try {
+    const reg = await prisma.lineRegistration.findUnique({
+      where: { lineUserId },
+    })
+    if (reg) {
+      const r = (reg.role || '').toUpperCase()
+      if (r === 'ADMIN' || r === 'SUPER_ADMIN') return true
+    }
+  } catch (err) {
+    console.warn('[verifyAdminRole] PostgreSQL unavailable, checking SQL Server EV_User:', err)
+  }
+
+  // 2. Fallback: Check SQL Server EV_User
+  try {
+    const pool = await getMSSQLPool()
+    if (pool) {
+      const isNumeric = /^\d+$/.test(lineUserId)
+      const req = pool.request()
+      let query = ''
+      if (isNumeric) {
+        req.input('userId', sql.Int, parseInt(lineUserId, 10))
+        query = 'SELECT RoleCode FROM dbo.EV_User WHERE UserID = @userId AND IsActive = 1'
+      } else {
+        req.input('lineUserId', sql.NVarChar, lineUserId)
+        query = 'SELECT RoleCode FROM dbo.EV_User WHERE LineUserId = @lineUserId AND IsActive = 1'
+      }
+      const res = await req.query(query)
+      const role = (res.recordset[0]?.RoleCode || '').toUpperCase()
+      return role === 'ADMIN' || role === 'SUPER_ADMIN'
+    }
+  } catch (sqlErr) {
+    console.error('[verifyAdminRole] SQL Server error:', sqlErr)
+  }
+
+  return false
 }
 
 // =====================================================
@@ -801,7 +872,13 @@ export async function listInspections(filters: {
       inv.Model AS model,
       i.InspectionType AS inspectionType,
       i.InspectionDate AS inspectionDate,
-      i.InspectorName AS inspectorName,
+      COALESCE(
+        NULLIF(i.InspectorName, ''),
+        NULLIF(u_insp.FirstName + CASE WHEN u_insp.LastName IS NOT NULL AND u_insp.LastName != '' THEN ' ' + LEFT(u_insp.LastName, 1) + '.' ELSE '' END, ''),
+        u_insp.UserName,
+        NULLIF(cu.FirstName + CASE WHEN cu.LastName IS NOT NULL AND cu.LastName != '' THEN ' ' + LEFT(cu.LastName, 1) + '.' ELSE '' END, ''),
+        cu.UserName
+      ) AS inspectorName,
       i.Status AS status,
       COALESCE(i.Mileage, (
         SELECT TOP 1 CAST(NumericValue AS INT)
@@ -871,6 +948,7 @@ export async function listInspections(filters: {
     LEFT JOIN dbo.EV_InventoryItem inv ON i.VinNo = inv.VinNo
     LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
     LEFT JOIN dbo.EV_MsSubStatus rs ON i.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
+    LEFT JOIN dbo.EV_User u_insp ON i.InspectorUserID = u_insp.UserID
     LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
     LEFT JOIN dbo.EV_User uu ON i.UpdateUserID = uu.UserID
     WHERE ${conditions.join(' AND ')}
@@ -1028,7 +1106,14 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
              i.InspectionType AS inspectionType, i.ReturnItemID AS returnItemId,
              i.InspectionSessionID AS inspectionSessionId, i.Mileage AS mileage,
              i.InspectionDate AS inspectionDate, i.InspectorUserID AS inspectorUserID,
-             i.InspectorName AS inspectorName, i.Status AS status, i.Remark AS remark,
+             COALESCE(
+               NULLIF(i.InspectorName, ''),
+               NULLIF(u_insp.FirstName + CASE WHEN u_insp.LastName IS NOT NULL AND u_insp.LastName != '' THEN ' ' + LEFT(u_insp.LastName, 1) + '.' ELSE '' END, ''),
+               u_insp.UserName,
+               NULLIF(cu.FirstName + CASE WHEN cu.LastName IS NOT NULL AND cu.LastName != '' THEN ' ' + LEFT(cu.LastName, 1) + '.' ELSE '' END, ''),
+               cu.UserName
+             ) AS inspectorName,
+             i.Status AS status, i.Remark AS remark,
              i.ReturnDate AS returnDate, i.Location AS location, sub.StatusName AS locationName,
              i.RentItemID AS rentItemId, i.ContractNo AS contractNo,
              i.ReturnReason AS returnReason,
@@ -1044,6 +1129,8 @@ export async function getInspectionDetail(inspectionId: number): Promise<Inspect
       LEFT JOIN dbo.EV_InventoryItem inv ON i.VinNo = inv.VinNo
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.Location = sub.StatusCode AND sub.Type = 'LOCATION'
       LEFT JOIN dbo.EV_MsSubStatus rs ON i.ReturnReason = rs.StatusCode AND rs.Type = 'RETURN_REASON'
+      LEFT JOIN dbo.EV_User u_insp ON i.InspectorUserID = u_insp.UserID
+      LEFT JOIN dbo.EV_User cu ON i.CreateUserID = cu.UserID
       WHERE i.InspectionID = @inspectionId AND i.IsActive = 1
     `),
     pool.request().input('inspectionId', sql.BigInt, inspectionId).query(`
@@ -1125,10 +1212,35 @@ export async function saveInspectionPhoto(params: {
 // Audit Session Operations
 // =====================================================
 
+let hasSessionIsActiveColumnCache: boolean | null = null
+let lastSessionIsActiveColCheck = 0
+
+export async function checkSessionIsActiveColumnExist(pool: any): Promise<boolean> {
+  const now = Date.now()
+  if (hasSessionIsActiveColumnCache !== null && now - lastSessionIsActiveColCheck < 30000) {
+    return hasSessionIsActiveColumnCache
+  }
+  try {
+    const res = await pool.request().query(`
+      SELECT COUNT(*) AS cnt
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'EV_InspectionSession' AND COLUMN_NAME = 'IsActive'
+    `)
+    hasSessionIsActiveColumnCache = (res.recordset?.[0]?.cnt || 0) > 0
+    lastSessionIsActiveColCheck = now
+    return hasSessionIsActiveColumnCache
+  } catch {
+    return false
+  }
+}
+
 /** ดึงรายการ Audit Sessions */
 export async function listAuditSessions(): Promise<AuditSessionData[]> {
   const pool = await getMSSQLPool()
   if (!pool) throw new Error('Database connection failed')
+
+  const hasIsActive = await checkSessionIsActiveColumnExist(pool)
+  const whereClause = hasIsActive ? 'WHERE (s.IsActive = 1 OR s.IsActive IS NULL)' : ''
 
   const result = await pool.request().query(`
     SELECT
@@ -1140,9 +1252,16 @@ export async function listAuditSessions(): Promise<AuditSessionData[]> {
       s.Status AS status,
       s.Notes AS notes,
       s.CreatedBy AS createdBy,
+      COALESCE(
+        NULLIF(u.FirstName + CASE WHEN u.LastName IS NOT NULL AND u.LastName != '' THEN ' ' + LEFT(u.LastName, 1) + '.' ELSE '' END, ''),
+        u.UserName,
+        CASE WHEN s.CreatedBy IS NOT NULL THEN 'User #' + CAST(s.CreatedBy AS NVARCHAR(20)) ELSE NULL END
+      ) AS creatorName,
       (SELECT COUNT(*) FROM dbo.EV_Inspection WHERE InspectionSessionID = s.InspectionSessionID AND IsActive = 1) AS inspectionCount
     FROM dbo.EV_InspectionSession s
     LEFT JOIN dbo.EV_MsSubStatus sub ON s.Location = sub.StatusCode AND sub.Type = 'LOCATION'
+    LEFT JOIN dbo.EV_User u ON s.CreatedBy = u.UserID
+    ${whereClause}
     ORDER BY s.SessionDate DESC, s.CreateDate DESC
   `)
 
@@ -1187,6 +1306,100 @@ export async function closeAuditSession(sessionId: number): Promise<void> {
       SET Status = 'CLOSED', UpdateDate = GETDATE()
       WHERE InspectionSessionID = @sessionId
     `)
+}
+
+/** ลบรอบตรวจสภาพ (Audit Session) และข้อมูลการตรวจทั้งหมดในรอบนั้น (Soft delete) */
+export async function deleteAuditSession(sessionId: number, updateUserId?: number | null): Promise<boolean> {
+  const pool = await getMSSQLWritePool()
+  if (!pool) throw new Error('Database connection failed')
+
+  // 1. Soft-delete photos for all inspections in this session
+  await pool.request()
+    .input('sessionId', sql.Int, sessionId)
+    .input('updateUserId', sql.Int, updateUserId || null)
+    .query(`
+      UPDATE dbo.EV_InspectionPhoto
+      SET IsActive = 0, UpdateDate = GETDATE(), UpdateUserID = @updateUserId
+      WHERE InspectionID IN (
+        SELECT InspectionID FROM dbo.EV_Inspection WHERE InspectionSessionID = @sessionId
+      );
+    `)
+
+  // 2. Soft-delete all inspections in this session
+  await pool.request()
+    .input('sessionId', sql.Int, sessionId)
+    .input('updateUserId', sql.Int, updateUserId || null)
+    .query(`
+      UPDATE dbo.EV_Inspection
+      SET IsActive = 0, UpdateDate = GETDATE(), UpdateUserID = @updateUserId
+      WHERE InspectionSessionID = @sessionId;
+    `)
+
+  // 3. Mark session as inactive or delete session record
+  const hasIsActive = await checkSessionIsActiveColumnExist(pool)
+  if (hasIsActive) {
+    await pool.request()
+      .input('sessionId', sql.Int, sessionId)
+      .query(`
+        UPDATE dbo.EV_InspectionSession
+        SET IsActive = 0, UpdateDate = GETDATE()
+        WHERE InspectionSessionID = @sessionId;
+      `)
+  } else {
+    try {
+      await pool.request().query(`
+        IF COL_LENGTH('dbo.EV_InspectionSession', 'IsActive') IS NULL
+        BEGIN
+          ALTER TABLE dbo.EV_InspectionSession ADD IsActive BIT NOT NULL DEFAULT 1;
+        END
+      `)
+      hasSessionIsActiveColumnCache = true
+      await pool.request()
+        .input('sessionId', sql.Int, sessionId)
+        .query(`
+          UPDATE dbo.EV_InspectionSession
+          SET IsActive = 0, UpdateDate = GETDATE()
+          WHERE InspectionSessionID = @sessionId;
+        `)
+    } catch {
+      await pool.request()
+        .input('sessionId', sql.Int, sessionId)
+        .query(`
+          DELETE FROM dbo.EV_InspectionSession
+          WHERE InspectionSessionID = @sessionId;
+        `)
+    }
+  }
+
+  return true
+}
+
+/** ลบข้อมูลผลการตรวจสภาพรถ (Inspection) และรูปภาพทั้งหมด (Soft delete) */
+export async function deleteInspection(inspectionId: number, updateUserId?: number | null): Promise<boolean> {
+  const pool = await getMSSQLWritePool()
+  if (!pool) throw new Error('Database connection failed')
+
+  // 1. Soft-delete photos
+  await pool.request()
+    .input('inspectionId', sql.Int, inspectionId)
+    .input('updateUserId', sql.Int, updateUserId || null)
+    .query(`
+      UPDATE dbo.EV_InspectionPhoto
+      SET IsActive = 0, UpdateDate = GETDATE(), UpdateUserID = @updateUserId
+      WHERE InspectionID = @inspectionId;
+    `)
+
+  // 2. Soft-delete inspection
+  await pool.request()
+    .input('inspectionId', sql.Int, inspectionId)
+    .input('updateUserId', sql.Int, updateUserId || null)
+    .query(`
+      UPDATE dbo.EV_Inspection
+      SET IsActive = 0, UpdateDate = GETDATE(), UpdateUserID = @updateUserId
+      WHERE InspectionID = @inspectionId;
+    `)
+
+  return true
 }
 
 /** ลบรูปภาพ Inspection (Soft delete โดยตั้ง IsActive = 0) */
