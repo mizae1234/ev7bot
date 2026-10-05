@@ -40,7 +40,7 @@ export function exportToExcel({ reportName, periodLabel, headers, rows, fileName
       const cellVal = String(row[colIdx] ?? '')
       return Math.max(max, cellVal.length)
     }, 0)
-    return { wch: Math.max(headerLen, maxDataLen, 12) + 2 }
+    return { wch: Math.min(Math.max(headerLen, maxDataLen, 12) + 2, 70) }
   })
   ws['!cols'] = colWidths
 

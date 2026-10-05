@@ -5,12 +5,25 @@ import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 
+function maskStaffName(name?: string | null): string {
+  if (!name) return '-'
+  const trimmed = name.trim()
+  if (!trimmed) return '-'
+  if (trimmed.includes('@')) return trimmed.split('@')[0].trim()
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) return `คุณ${parts[1]}`
+  return parts[0]
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const search = searchParams.get('search') || ''
+    const startDate = searchParams.get('startDate')?.trim() || ''
+    const endDate = searchParams.get('endDate')?.trim() || ''
 
     if (env.MOCK_MODE) {
       return NextResponse.json({
@@ -26,7 +39,12 @@ export async function GET(req: NextRequest) {
             RegisterNo: 'กข-1234',
             VinNo: 'VIN1234567890',
             Model: 'BYD Atto 3',
-            IsActive: true
+            ProjectType: 'EV7',
+            StatusName: 'พร้อมใช้',
+            SubStatusName: null,
+            CurrentLocation: 'ศูนย์บางนา',
+            IsActive: true,
+            attachments: []
           }
         ],
         pagination: {
@@ -43,14 +61,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
+    const whereConditions: string[] = ['n.IsActive = 1']
+    const countReq = pool.request()
+    const dataReq = pool.request()
+
+    if (search) {
+      const cleanSearch = `%${search.trim()}%`
+      countReq.input('search', sql.NVarChar, cleanSearch)
+      dataReq.input('search', sql.NVarChar, cleanSearch)
+      whereConditions.push(`(
+        i.RegisterNo LIKE @search OR
+        i.VinNo LIKE @search OR
+        n.NoteDetail LIKE @search
+      )`)
+    }
+
+    let start = startDate
+    let end = endDate
+    if (start && end && start > end) {
+      const tmp = start
+      start = end
+      end = tmp
+    }
+
+    if (start) {
+      countReq.input('startDate', sql.Date, start)
+      dataReq.input('startDate', sql.Date, start)
+      whereConditions.push('CAST(n.CreateDate AS DATE) >= @startDate')
+    }
+
+    if (end) {
+      countReq.input('endDate', sql.Date, end)
+      dataReq.input('endDate', sql.Date, end)
+      whereConditions.push('CAST(n.CreateDate AS DATE) <= @endDate')
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`
+
     // First, let's get the total count for pagination
-    let countQuery = `
+    const countQuery = `
       SELECT COUNT(*) AS Total
       FROM dbo.EV_VehicleNote n
       JOIN dbo.EV_InventoryItem i ON n.InventoryItemID = i.InventoryItemID
-      WHERE n.IsActive = 1
+      ${whereClause}
     `
-    let dataQuery = `
+    const dataQuery = `
       SELECT
         n.VehicleNoteID,
         n.InventoryItemID,
@@ -73,25 +128,11 @@ export async function GET(req: NextRequest) {
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
-      WHERE n.IsActive = 1
+      ${whereClause}
+      ORDER BY n.CreateDate DESC
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
     `
-
-    const searchClause = ` AND (
-      i.RegisterNo LIKE @search OR
-      i.VinNo LIKE @search OR
-      n.NoteDetail LIKE @search
-    )`
-
-    const countReq = pool.request()
-    const dataReq = pool.request()
-
-    if (search) {
-      const cleanSearch = `%${search.trim()}%`
-      countReq.input('search', sql.NVarChar, cleanSearch)
-      dataReq.input('search', sql.NVarChar, cleanSearch)
-      countQuery += searchClause
-      dataQuery += searchClause
-    }
 
     // Run Count Query
     const countResult = await countReq.query(countQuery)
@@ -101,12 +142,6 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit
     dataReq.input('offset', sql.Int, offset)
     dataReq.input('limit', sql.Int, limit)
-
-    dataQuery += `
-      ORDER BY n.CreateDate DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @limit ROWS ONLY
-    `
 
     const dataResult = await dataReq.query(dataQuery)
 
@@ -130,32 +165,36 @@ export async function GET(req: NextRequest) {
     if (dataResult.recordset && dataResult.recordset.length > 0) {
       try {
         const noteIds = dataResult.recordset.map((n: any) => n.VehicleNoteID)
-        const attachmentsRes = await pool.request().query(`
-          SELECT 
-            FileAttachmentID,
-            FileName,
-            OriginalFileName,
-            S3Key,
-            FileSize,
-            ContentType,
-            ReferenceID
-          FROM dbo.FileAttachment
-          WHERE ReferenceType = 'VEHICLE_NOTES'
-            AND ReferenceID IN (${noteIds.join(',')})
-        `)
-        for (const att of attachmentsRes.recordset) {
-          const refId = Number(att.ReferenceID)
-          const list = attachmentMap.get(refId) || []
-          list.push({
-            FileAttachmentID: Number(att.FileAttachmentID),
-            fileName: att.FileName,
-            originalFileName: att.OriginalFileName,
-            s3Key: att.S3Key,
-            fileSize: Number(att.FileSize),
-            contentType: att.ContentType,
-            url: `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${att.S3Key}`
-          })
-          attachmentMap.set(refId, list)
+        const chunkSize = 500
+        for (let i = 0; i < noteIds.length; i += chunkSize) {
+          const chunk = noteIds.slice(i, i + chunkSize)
+          const attachmentsRes = await pool.request().query(`
+            SELECT 
+              FileAttachmentID,
+              FileName,
+              OriginalFileName,
+              S3Key,
+              FileSize,
+              ContentType,
+              ReferenceID
+            FROM dbo.FileAttachment
+            WHERE ReferenceType = 'VEHICLE_NOTES'
+              AND ReferenceID IN (${chunk.join(',')})
+          `)
+          for (const att of attachmentsRes.recordset) {
+            const refId = Number(att.ReferenceID)
+            const list = attachmentMap.get(refId) || []
+            list.push({
+              FileAttachmentID: Number(att.FileAttachmentID),
+              fileName: att.FileName,
+              originalFileName: att.OriginalFileName,
+              s3Key: att.S3Key,
+              fileSize: Number(att.FileSize),
+              contentType: att.ContentType,
+              url: `https://${env.SPACES_BUCKET}.${env.SPACES_ENDPOINT.replace('https://', '')}/${att.S3Key}`
+            })
+            attachmentMap.set(refId, list)
+          }
         }
       } catch (attErr) {
         console.error('[Fetch Notes Attachments Error]', attErr)
@@ -168,17 +207,19 @@ export async function GET(req: NextRequest) {
 
       let creatorName = '-'
       if (originalName && lineDisplayName) {
+        const maskedOriginal = maskStaffName(originalName)
+        const maskedLine = maskStaffName(lineDisplayName)
         if (originalName.includes('@')) {
-          creatorName = lineDisplayName
-        } else if (originalName !== lineDisplayName) {
-          creatorName = `${originalName} (${lineDisplayName})`
+          creatorName = maskedLine
+        } else if (maskedOriginal !== maskedLine && maskedLine !== '-') {
+          creatorName = `${maskedOriginal} (${maskedLine})`
         } else {
-          creatorName = originalName
+          creatorName = maskedOriginal
         }
       } else if (lineDisplayName) {
-        creatorName = lineDisplayName
+        creatorName = maskStaffName(lineDisplayName)
       } else if (originalName) {
-        creatorName = originalName
+        creatorName = maskStaffName(originalName)
       }
 
       return {
