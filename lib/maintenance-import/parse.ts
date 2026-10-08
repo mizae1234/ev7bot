@@ -72,8 +72,9 @@ export function parseImportRows(
       errors.push(`ไม่พบคอลัมน์ "${HEADER_ALIASES[field][0]}" ในไฟล์`)
     }
   }
-  if (dataRows.length > IMPORT_CONFIG.maxRows) {
-    errors.push(`จำนวนแถวเกินกำหนด (${dataRows.length} > ${IMPORT_CONFIG.maxRows}) กรุณาแบ่งไฟล์`)
+  const filledRows = dataRows.filter(r => r && r.some(c => cellToString(c) !== '')).length
+  if (filledRows > IMPORT_CONFIG.maxRows) {
+    errors.push(`จำนวนแถวเกินกำหนด (${filledRows} > ${IMPORT_CONFIG.maxRows}) กรุณาแบ่งไฟล์`)
   }
   if (errors.length > 0) return { rows: [], errors }
 

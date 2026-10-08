@@ -7,6 +7,7 @@ import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { MaintenanceImportModal } from '@/components/maintenance/MaintenanceImportModal'
 import { IMPORT_CONFIG } from '@/lib/maintenance-import/config'
+import { downloadImportTemplate } from '@/lib/maintenance-import/template'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -320,6 +321,12 @@ function MaintenanceContent() {
             className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white bg-indigo-500/10 hover:bg-indigo-600 px-3 py-1.5 rounded-xl transition-all duration-200 border border-indigo-500/20 hover:border-indigo-600 shadow-sm hover:shadow-md"
           >
             📤 Import Excel
+          </button>
+          <button
+            onClick={() => downloadImportTemplate().catch(() => alert('ดาวน์โหลด Template ไม่สำเร็จ'))}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600 hover:text-white bg-zinc-500/10 hover:bg-zinc-600 px-3 py-1.5 rounded-xl transition-all duration-200 border border-zinc-500/20 hover:border-zinc-600 shadow-sm hover:shadow-md dark:text-zinc-300"
+          >
+            📄 Template Import
           </button>
         </div>
 

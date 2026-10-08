@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { exportToExcel } from '@/lib/exportExcel'
 import { IMPORT_CONFIG } from '@/lib/maintenance-import/config'
+import { downloadImportTemplate } from '@/lib/maintenance-import/template'
 import {
   IMPORT_STATUS_LABEL,
   type EvaluatedRow,
@@ -184,6 +185,13 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
               <p className="text-xs text-zinc-500">เลือกไฟล์ .xlsx / .xls (สูงสุด {IMPORT_CONFIG.maxRows} แถวต่อครั้ง)</p>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} disabled={busy} className="text-xs" />
               {busy && <p className="text-xs text-zinc-400">กำลังตรวจสอบไฟล์...</p>}
+              <button
+                type="button"
+                onClick={() => downloadImportTemplate().catch(() => setError('ดาวน์โหลด Template ไม่สำเร็จ'))}
+                className="mt-1 text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                📄 ดาวน์โหลด Template (คอลัมน์ที่ต้องกรอกไฮไลท์ไว้ให้แล้ว)
+              </button>
             </div>
           )}
 
