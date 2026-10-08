@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { exportToExcel } from '@/lib/exportExcel'
 import { IMPORT_CONFIG } from '@/lib/maintenance-import/config'
@@ -51,6 +51,14 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<RowFilter>('all')
+  const [showSuccess, setShowSuccess] = useState(false)
+
+  // Auto-dismiss the success dialog; the result view underneath stays open.
+  useEffect(() => {
+    if (!showSuccess) return
+    const timer = setTimeout(() => setShowSuccess(false), IMPORT_CONFIG.successDialogMs)
+    return () => clearTimeout(timer)
+  }, [showSuccess])
 
   if (!open) return null
 
@@ -60,6 +68,7 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
     setResult(null)
     setError(null)
     setFilter('all')
+    setShowSuccess(false)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -117,6 +126,7 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
       const committed = await post('/api/maintenance/import/commit', { ...payload, lineUserId: getLineUserId() })
       setResult(committed)
       setStep('done')
+      setShowSuccess(true)
       if ((committed.summary.imported ?? 0) > 0) onImported()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'นำเข้าไม่สำเร็จ')
@@ -274,6 +284,19 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
           </div>
         </div>
       </div>
+
+      {showSuccess && summary && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={e => { e.stopPropagation(); setShowSuccess(false) }}>
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-2xl">✅</div>
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">นำเข้าเสร็จสิ้น</h3>
+            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+              นำเข้าสำเร็จ {summary.imported ?? 0} รายการ · ข้าม {summary.skipped} รายการ
+              {(summary.failed ?? 0) > 0 ? ` · ผิดพลาด ${summary.failed} รายการ` : ''}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

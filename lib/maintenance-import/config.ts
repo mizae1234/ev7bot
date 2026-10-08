@@ -28,6 +28,8 @@ export const IMPORT_CONFIG = {
   maxRows: 500,
   /** Max values per SQL IN (...) list (SQL Server limit is ~2100 parameters). */
   sqlChunkSize: 500,
+  /** How long the "นำเข้าเสร็จสิ้น" dialog stays before closing itself (ms). */
+  successDialogMs: 2500,
   /** Status of every imported ticket: reported, car not yet in the workshop. */
   initialCarStatusCode: 'STILL_WORK',
   /** Imported file is an accident-claim report. */
