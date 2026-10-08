@@ -617,6 +617,7 @@ export default function QuickReportPage() {
         const tab = params.get('tab')
         const registerNo = params.get('registerNo')
         const maintId = params.get('maintId')
+        const action = params.get('action')
 
         if (tab === 'history') {
           setActiveTab('history')
@@ -663,8 +664,21 @@ export default function QuickReportPage() {
                   setActiveContractNo('')
                 }
 
+                // action=park (e.g. from the /maintenance table): open the "เข้าซ่อม" panel pre-selected
+                // for the vehicle's pending tickets. The user still picks the workshop and saves manually.
+                if (action === 'park') {
+                  const pending = historyList.filter((t: any) => !isMaintComplete(t))
+                  const parkable = pending.filter((t: any) => !['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
+                  if (parkable.length > 0) {
+                    const ticketWithLoc = pending.find((t: any) => t.ServiceLocationCode)
+                    setBulkActionType('park')
+                    setBulkLocation(ticketWithLoc?.ServiceLocationCode || '')
+                    setSelectedBulkTicketIds(pending.map((t: any) => t.MaintenanceItemID))
+                  }
+                }
+
                 // If maintId query parameter is provided, auto-open the edit ticket modal
-                if (maintId) {
+                if (maintId && action !== 'park') {
                   const targetTicket = historyList.find((t: any) => t.MaintenanceItemID === Number(maintId))
                   if (targetTicket) {
                     setEditingTicket(targetTicket)

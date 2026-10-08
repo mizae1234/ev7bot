@@ -91,6 +91,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Build WHERE clause dynamically
+    // STILL_WORK tickets (reported, car not yet in the workshop — e.g. imported claims) belong to
+    // vehicles that are still ON_RENT/AVAILABLE, so that view must not require Status = MAINTENANCE.
+    const isStillWorkView = statusFilter === 'STILL_WORK'
+    const vehicleStatusWhere = isStillWorkView ? '' : ` AND i.Status = 'MAINTENANCE'`
     let statusWhere = ''
     if (statusFilter && statusFilter !== 'all') {
       statusWhere = ` AND m.CarStatusCode = @statusFilter`
@@ -131,14 +135,24 @@ export async function GET(req: NextRequest) {
       itemReq.input('locationFilter', sql.NVarChar, locationFilter)
     }
 
+    // Count of reported-but-not-yet-in-workshop tickets (independent of vehicle status)
+    const stillWorkReq = pool.request()
+
     // Run first 4 queries concurrently for performance optimization
     const [
+      stillWorkResult,
       summaryResult,
       locResult,
       repairByLocResult,
       itemResult,
       problemTypeResult
     ] = await Promise.all([
+      stillWorkReq.query(`
+        SELECT COUNT(*) AS still_work
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND m.CarStatusCode = 'STILL_WORK'
+      `),
       summaryReq.query(`
         WITH LatestTickets AS (
           SELECT 
@@ -250,7 +264,7 @@ export async function GET(req: NextRequest) {
         LEFT JOIN dbo.EV_User cu ON m.CreateUserID = cu.UserID
         LEFT JOIN dbo.EV_User uu ON m.UpdateUserID = uu.UserID
         LEFT JOIN dbo.EV_MsSubStatus loc ON i.CurrentLocation = loc.StatusCode AND loc.Type = 'LOCATION'
-        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE'${statusWhere}${locationWhere}
+        WHERE m.IsActive = 1${vehicleStatusWhere}${statusWhere}${locationWhere}
         ORDER BY 
           CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE','STILL_WORK') THEN 0 ELSE 1 END,
           m.ReportDate DESC
@@ -330,7 +344,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       items,
-      summary: summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 },
+      summary: {
+        ...(summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 }),
+        still_work: stillWorkResult.recordset[0]?.still_work ?? 0,
+      },
       locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
       locationSummary: repairByLocResult.recordset || [],
       problemTypes: problemTypeResult.recordset.map((r: any) => ({

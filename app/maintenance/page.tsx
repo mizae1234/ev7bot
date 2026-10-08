@@ -5,6 +5,8 @@ import useSWR from 'swr'
 import { exportToExcel, formatDateForExcelRaw, ExportButton } from '@/lib/exportExcel'
 import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { MaintenanceImportModal } from '@/components/maintenance/MaintenanceImportModal'
+import { IMPORT_CONFIG } from '@/lib/maintenance-import/config'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -46,7 +48,7 @@ interface MaintenanceItem {
 
 interface MaintenanceData {
   items: MaintenanceItem[]
-  summary: { total: number; in_maintenance: number; complete: number; waiting: number }
+  summary: { total: number; in_maintenance: number; complete: number; waiting: number; still_work?: number }
   locations: string[]
   locationSummary: { Location: string; Count: number }[]
   problemTypes: { code: string; name: string }[]
@@ -90,7 +92,7 @@ const locationMap: Record<string, string> = {
 }
 
 const formatLocation = (code: string | null | undefined): string => {
-  if (!code) return '-'
+  if (!code) return IMPORT_CONFIG.unspecifiedLocationLabel
   return locationMap[code] || code.replace(/_/g, ' ')
 }
 
@@ -108,12 +110,13 @@ function MaintenanceContent() {
     }
   }, [searchParams])
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [showImport, setShowImport] = useState(false)
 
   const params = new URLSearchParams()
   if (statusFilter !== 'all') params.set('status', statusFilter)
   if (locationFilter !== 'all') params.set('location', locationFilter)
 
-  const { data, isLoading, error } = useSWR<MaintenanceData>(
+  const { data, isLoading, error, mutate } = useSWR<MaintenanceData>(
     `/api/maintenance?${params.toString()}`,
     fetcher,
     { refreshInterval: 60_000 }
@@ -213,7 +216,7 @@ function MaintenanceContent() {
 
         {/* Summary Cards */}
         {data?.summary && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <button onClick={() => setStatusFilter('all')}
               className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'all' ? 'border-indigo-500/40 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">ทั้งหมด</p>
@@ -233,6 +236,13 @@ function MaintenanceContent() {
               <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">⏳ รอเข้าซ่อม</p>
               <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
                 {data.summary.waiting} <span className="text-xs font-normal text-rose-500 dark:text-rose-450 ml-0.5">คัน</span>
+              </p>
+            </button>
+            <button onClick={() => setStatusFilter('STILL_WORK')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'STILL_WORK' ? 'border-sky-500/40 bg-sky-500/5 ring-1 ring-sky-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
+              <p className="text-xs text-sky-600 dark:text-sky-400 font-bold">🔵 แจ้งแล้ว ยังไม่เข้าซ่อม</p>
+              <p className="text-2xl font-extrabold text-sky-600 dark:text-sky-400 mt-1">
+                {data.summary.still_work ?? 0} <span className="text-xs font-normal text-sky-500 ml-0.5">ใบ</span>
               </p>
             </button>
           </div>
@@ -305,6 +315,12 @@ function MaintenanceContent() {
             ))}
           </select>
           <ExportButton onClick={handleExport} />
+          <button
+            onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white bg-indigo-500/10 hover:bg-indigo-600 px-3 py-1.5 rounded-xl transition-all duration-200 border border-indigo-500/20 hover:border-indigo-600 shadow-sm hover:shadow-md"
+          >
+            📤 Import Excel
+          </button>
         </div>
 
         {/* Loading */}
@@ -342,7 +358,8 @@ function MaintenanceContent() {
                     <th className="py-3 pr-2">เคส</th>
                     <th className="py-3 pr-2">วันที่แจ้ง</th>
                     <th className="py-3 pr-2">อัปเดตล่าสุด</th>
-                    <th className="py-3 pr-4 text-right">สถานะ</th>
+                    <th className="py-3 pr-2 text-right">สถานะ</th>
+                    <th className="py-3 pr-4 text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-zinc-700 dark:text-zinc-300">
@@ -404,12 +421,22 @@ function MaintenanceContent() {
                               {item.status_text}
                             </span>
                           </td>
+                          <td className="py-3.5 pr-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            {['STILL_WORK', 'WAITING_FOR_MAINTENANCE'].includes(item.status_code) && (item.register_no || item.vin) && (
+                              <a
+                                href={`/liff/quick-report?tab=report&registerNo=${encodeURIComponent(item.register_no || item.vin)}&maintId=${item.id}&action=park`}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-colors dark:text-amber-400"
+                              >
+                                🛠️ เข้าซ่อม
+                              </a>
+                            )}
+                          </td>
                         </tr>
 
                         {/* Expanded Detail Row */}
                         {expandedId === item.id && (
                           <tr className="bg-zinc-50/80 dark:bg-zinc-800/40">
-                            <td colSpan={10} className="px-6 py-5">
+                            <td colSpan={12} className="px-6 py-5">
                               <div className="space-y-4">
                                 {/* Title / ID info */}
                                 <div className="flex items-center gap-3 text-xs font-bold text-zinc-500 dark:text-zinc-450 pb-2 border-b border-zinc-250/60 dark:border-zinc-700/60">
@@ -578,7 +605,7 @@ function MaintenanceContent() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={9} className="py-20 text-center text-zinc-400 dark:text-zinc-500 font-medium">
+                      <td colSpan={12} className="py-20 text-center text-zinc-400 dark:text-zinc-500 font-medium">
                         ไม่พบข้อมูลรายการงานซ่อม
                       </td>
                     </tr>
@@ -589,6 +616,11 @@ function MaintenanceContent() {
           </div>
         )}
       </div>
+      <MaintenanceImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => mutate()}
+      />
     </main>
   )
 }
