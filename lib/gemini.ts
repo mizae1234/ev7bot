@@ -722,7 +722,7 @@ export interface ButterResponse {
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [10000, 20000, 45000] // 10s, 20s, 45s
 
-const GEMINI_MODEL_FULL = 'gemini-3.5-flash'
+const GEMINI_MODEL_FULL = 'gemini-3-flash-preview'
 const GEMINI_MODEL_DEFAULT = 'gemini-3-flash-preview'  // สนทนาปกติ
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite'      // autoclaim only
 
@@ -785,6 +785,16 @@ export async function askButter(
         continue
       }
 
+      // If non-429 error and we didn't try fallback yet, try fallback model
+      if (attempt === 0) {
+        try {
+          console.warn(`[askButter] Primary attempt failed (${message}), retrying with fallback model ${GEMINI_MODEL_DEFAULT}...`)
+          return await _askButterOnce(userMessage, history, userContext, GEMINI_MODEL_DEFAULT)
+        } catch (fallbackErr) {
+          console.error('[askButter Fallback Error]', fallbackErr)
+        }
+      }
+
       // Non-retryable error or max retries exceeded
       break
     }
@@ -809,7 +819,8 @@ export async function askButter(
 async function _askButterOnce(
   userMessage: string,
   history: any[] = [],
-  userContext?: { userId?: string; userName?: string; userRole?: string }
+  userContext?: { userId?: string; userName?: string; userRole?: string },
+  forcedModel?: string
 ): Promise<ButterResponse> {
   const now = new Date()
   const bkkDateStr = new Intl.DateTimeFormat('en-CA', {
@@ -841,8 +852,8 @@ async function _askButterOnce(
 
 เมื่อผู้ใช้งานพูดกำหนดเวลา เช่น "พรุ่งนี้", "วันศุกร์นี้", "อาทิตย์หน้า" หรือวันที่ระบุใดๆ ให้คุณคำนวณหาวันที่ ค.ศ. (ในรูปแบบ YYYY-MM-DD) โดยอ้างอิงและคำนวณจากวันที่ปัจจุบัน ค.ศ. ${bkkDateStr} ด้านบนนี้เสมอ และส่งไปให้เครื่องมือ createTaskNote เสมอ (ตัวอย่างเช่น ถ้าวันนี้คือ วันจันทร์ ค.ศ. 2026-06-15 คำสั่ง "พรุ่งนี้" จะถูกแปลงเป็น "2026-06-16")`
 
-  const selectedModel = selectModel(userMessage)
-  console.log(`[askButter] Model selected: ${selectedModel} for message: "${userMessage.substring(0, 50)}"`) 
+  const selectedModel = forcedModel || selectModel(userMessage)
+  console.log(`[askButter] Model selected: ${selectedModel}${forcedModel ? ' (forced fallback)' : ''} for message: "${userMessage.substring(0, 50)}"`) 
 
   const model = genAI.getGenerativeModel({
     model: selectedModel,
