@@ -83,6 +83,12 @@ const navGroups: NavGroup[] = [
         icon: '🛡️'
       },
       {
+        name: 'ข้อมูลการซื้อประกัน',
+        href: '/insurance-purchase',
+        desc: 'ข้อมูลบริการเสริมประกันรถ Taxi จากระบบ EV7 Core',
+        icon: '🧾'
+      },
+      {
         name: 'ประวัติการเคลื่อนย้ายรถ',
         href: '/vehicle-movement',
         desc: 'ติดตามการเปลี่ยนสถานที่ พิกัดจอด และการย้ายรถ',
