@@ -92,11 +92,11 @@ export function formatDateForExcelRaw(dateStr: string | null): string {
 }
 
 // ─── Reusable Export Button Component ──────────────────────────────
-export function ExportButton({ onClick, label = '📥 Export Excel' }: { onClick: () => void; label?: string }) {
+export function ExportButton({ onClick, label = '📥 Export Excel', className = '' }: { onClick: () => void; label?: string; className?: string }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 px-3 py-1.5 rounded-xl transition-all duration-200 border border-emerald-500/20 hover:border-emerald-600 shadow-sm hover:shadow-md"
+      className={`inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 px-3 py-1.5 rounded-xl transition-all duration-200 border border-emerald-500/20 hover:border-emerald-600 shadow-sm hover:shadow-md ${className}`}
     >
       {label}
     </button>

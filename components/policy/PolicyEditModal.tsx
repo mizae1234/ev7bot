@@ -37,6 +37,7 @@ export function PolicyEditModal({
       setFormData({
         vinNo: record.vinNo,
         registerNo: record.registerNo || '',
+        registerNoDate: record.registerNoDate || '',
         insurancePolicyNo: record.insurancePolicyNo || '',
         insuranceType: record.insuranceType || '',
         insuranceStartDate: record.insuranceStartDate || '',
@@ -134,11 +135,15 @@ export function PolicyEditModal({
     setError(null)
 
     try {
+      // Only send registerNoDate when it was actually changed (avoids touching the vehicle master row)
+      const { registerNoDate, ...rest } = formData
+      const regChanged = (registerNoDate || '') !== (record.registerNoDate || '')
       const res = await fetch('/api/policy', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          ...rest,
+          ...(regChanged ? { registerNoDate: registerNoDate || null } : {}),
           lineUserId
         })
       })
@@ -482,6 +487,27 @@ export function PolicyEditModal({
                     filePath={formData.actFilePath}
                     title="เอกสาร พ.ร.บ."
                     accentColor="purple"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2.5: ข้อมูลการจดทะเบียนรถ (ต่อจาก พ.ร.บ.) */}
+            <div className="space-y-3 p-4 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40">
+              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5 uppercase tracking-wider">
+                <span>🗓️ ข้อมูลการจดทะเบียนรถ</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                    วันที่จดทะเบียน
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.registerNoDate || ''}
+                    onChange={(e) => setFormData({ ...formData, registerNoDate: e.target.value })}
+                    className="w-full text-xs py-2 px-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono"
                   />
                 </div>
               </div>

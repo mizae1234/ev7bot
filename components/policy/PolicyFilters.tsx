@@ -1,5 +1,6 @@
 import React from 'react'
 import { InsuranceMasterType } from '@/lib/policy/policy-types'
+import { ExportButton } from '@/lib/exportExcel'
 
 interface PolicyFiltersProps {
   search: string
@@ -115,44 +116,69 @@ export function PolicyFilters({
     setShowBatchModal(false)
   }
 
+  const hasActiveFilter =
+    !!search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || statusFilter !== 'ALL' ||
+    typeFilter !== 'ALL' || projectFilter !== 'ALL' || projectTypeFilter !== 'ALL' || modelFilter !== 'ALL'
+
+  const clearAll = () => {
+    onSearchChange('')
+    onExpiryFilterChange('ALL')
+    onMissingFilterChange('ALL')
+    onStatusFilterChange('ALL')
+    onTypeFilterChange('ALL')
+    onProjectFilterChange('ALL')
+    if (onProjectTypeFilterChange) onProjectTypeFilterChange('ALL')
+    onModelFilterChange('ALL')
+  }
+
+  // Shared field styles (same look as the insurance-purchase page)
+  const fieldCls =
+    'w-full px-3 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all'
+  const selectCls = (active: boolean) =>
+    `${fieldCls} truncate ${active ? 'border-emerald-400 dark:border-emerald-600 ring-1 ring-emerald-400/40' : ''}`
+  const labelCls = 'block text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mb-1 whitespace-nowrap'
+  const cellCls = 'flex-1 min-w-[150px] lg:min-w-0'
+
   return (
     <div className="flex flex-col gap-3 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-      {/* Top Bar: Search, Multi-VIN Button & Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2 w-full sm:w-auto flex-1 max-w-xl">
-          {/* Main Search Input */}
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onPaste={handleSearchPaste}
-              placeholder="ค้นหา ทะเบียน, VIN, สถานะรถ, สถานที่..."
-              className="w-full pl-10 pr-8 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-            />
-            {search && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                title="ล้างคำค้นหา"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+      {/* Top Bar: Search (stretches) + Multi-VIN, Export, Clear (right aligned) */}
+      <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
+        {/* Main Search Input */}
+        <div className="relative flex-1 min-w-0">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onPaste={handleSearchPaste}
+            placeholder="ค้นหา ทะเบียน, VIN, สถานะรถ, สถานที่..."
+            className={`${fieldCls} pl-10 pr-9`}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 cursor-pointer"
+              title="ล้างคำค้นหา"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
 
+        {/* Right-aligned actions */}
+        <div className="flex flex-wrap items-stretch justify-end gap-2 shrink-0">
           {/* Multi-VIN Batch Button */}
           <button
             type="button"
             onClick={handleOpenBatchModal}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-xl border transition-all shrink-0 cursor-pointer ${
+            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border transition-all shrink-0 cursor-pointer ${
               isMultiSearch
                 ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
                 : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700/60'
@@ -160,38 +186,29 @@ export function PolicyFilters({
             title="ค้นหาทีละหลาย VinNo. จาก Excel"
           >
             <span>📋</span>
-            <span className="hidden md:inline">
-              {isMultiSearch ? `ค้นหา (${activeTokens.length} VinNo.)` : 'ค้นหาทีละหลาย VinNo.'}
-            </span>
-            <span className="md:hidden">
-              {isMultiSearch ? `${activeTokens.length} VinNo.` : 'หลาย VinNo.'}
-            </span>
+            <span>{isMultiSearch ? `ค้นหา (${activeTokens.length} VinNo.)` : 'ค้นหาทีละหลาย VinNo.'}</span>
           </button>
-        </div>
 
-        {/* Action Buttons */}
-        {onExportExcel && (
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+          {/* Export Excel (same style as insurance-purchase page) */}
+          {onExportExcel && (
+            <ExportButton
+              onClick={() => { if (!exportLoading) onExportExcel() }}
+              label={exportLoading ? '⏳ กำลังส่งออก...' : '📥 Export Excel'}
+              className="min-w-[160px] justify-center"
+            />
+          )}
+
+          {/* Clear all filters */}
           <button
             type="button"
-            onClick={onExportExcel}
-            disabled={exportLoading}
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors disabled:opacity-50 cursor-pointer"
+            disabled={!hasActiveFilter}
+            onClick={clearAll}
+            title="ล้างค่าตัวกรองทั้งหมด"
+            className="inline-flex items-center justify-center px-3 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
           >
-            {exportLoading ? (
-              <svg className="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            )}
-            <span>ส่งออก Excel</span>
+            ✕ ล้างค่า
           </button>
         </div>
-        )}
       </div>
 
       {/* Multi-Search Active Badge Banner */}
@@ -227,150 +244,109 @@ export function PolicyFilters({
         </div>
       )}
 
-      {/* Filter Dropdowns */}
-      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
-        {/* 1. Missing / Completeness Filter (ความครบถ้วนของเอกสาร) */}
-        <select
-          value={missingFilter}
-          onChange={(e) => onMissingFilterChange(e.target.value)}
-          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
-            missingFilter !== 'ALL'
-              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 ring-1 ring-rose-400'
-              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
-          }`}
-        >
-          <option value="ALL">ความครบถ้วนของเอกสาร: ทั้งหมด</option>
-          <option value="MISSING_INSURANCE">🛡️ ไม่มีข้อมูลประกันภัย (PLMV)</option>
-          <option value="MISSING_ACT">📜 ไม่มีข้อมูล พ.ร.บ. (PLMC)</option>
-          <option value="MISSING_VEHICLE_TAX">🚗 ไม่มีข้อมูลภาษีรถยนต์</option>
-          <option value="MISSING_METER_TAX">📟 ไม่มีข้อมูลภาษีมิเตอร์</option>
-          <option value="MISSING_ANY">⚪ ขาดเอกสารอย่างใดอย่างหนึ่ง</option>
-          <option value="MISSING_ALL">❌ ไม่มีข้อมูลเอกสารใดๆ เลย</option>
-          <option value="COMPLETE">✅ ข้อมูลเอกสารครบถ้วน</option>
-        </select>
+      {/* Filter Dropdowns (single row on large screens) */}
+      <div className="flex flex-wrap lg:flex-nowrap items-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+        {/* 1. Missing / Completeness Filter */}
+        <div className={cellCls}>
+          <label className={labelCls}>📑 ความครบถ้วนเอกสาร</label>
+          <select value={missingFilter} onChange={(e) => onMissingFilterChange(e.target.value)} className={selectCls(missingFilter !== 'ALL')}>
+            <option value="ALL">ทั้งหมด</option>
+            <option value="MISSING_INSURANCE">🛡️ ไม่มีข้อมูลประกันภัย (PLMV)</option>
+            <option value="MISSING_ACT">📜 ไม่มีข้อมูล พ.ร.บ. (PLMC)</option>
+            <option value="MISSING_VEHICLE_TAX">🚗 ไม่มีข้อมูลภาษีรถยนต์</option>
+            <option value="MISSING_METER_TAX">📟 ไม่มีข้อมูลภาษีมิเตอร์</option>
+            <option value="MISSING_ANY">⚪ ขาดเอกสารอย่างใดอย่างหนึ่ง</option>
+            <option value="MISSING_ALL">❌ ไม่มีข้อมูลเอกสารใดๆ เลย</option>
+            <option value="COMPLETE">✅ ข้อมูลเอกสารครบถ้วน</option>
+          </select>
+        </div>
 
         {/* 2. Vehicle Status Filter */}
-        <select
-          value={statusFilter}
-          onChange={(e) => onStatusFilterChange(e.target.value)}
-          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
-            statusFilter !== 'ALL'
-              ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-400'
-              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
-          }`}
-        >
-          <option value="ALL">สถานะรถ: ทั้งหมด</option>
-          {mainStatuses.length > 0 && (
-            <optgroup label="── สถานะหลัก (Main Status) ──">
-              {mainStatuses.map(s => (
-                <option key={`main_${s.code}`} value={s.code}>
-                  {s.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {statusTypes.length > 0 && (
-            <optgroup label="── สถานะย่อย (Status Type) ──">
-              {statusTypes.map(st => (
-                <option key={`type_${st.code}`} value={st.code}>
-                  {st.label} ({st.code})
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+        <div className={cellCls}>
+          <label className={labelCls}>🚗 สถานะรถ</label>
+          <select value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)} className={selectCls(statusFilter !== 'ALL')}>
+            <option value="ALL">ทั้งหมด</option>
+            {mainStatuses.length > 0 && (
+              <optgroup label="── สถานะหลัก (Main Status) ──">
+                {mainStatuses.map(st => (
+                  <option key={`main_${st.code}`} value={st.code}>{st.label}</option>
+                ))}
+              </optgroup>
+            )}
+            {statusTypes.length > 0 && (
+              <optgroup label="── สถานะย่อย (Status Type) ──">
+                {statusTypes.map(st => (
+                  <option key={`type_${st.code}`} value={st.code}>{st.label} ({st.code})</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
 
         {/* 3. Expiry Status */}
-        <select
-          value={expiryFilter}
-          onChange={(e) => onExpiryFilterChange(e.target.value)}
-          className={`text-xs py-1.5 px-3 rounded-lg border font-medium transition-all ${
-            expiryFilter !== 'ALL'
-              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 ring-1 ring-amber-400'
-              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
-          }`}
-        >
-          <option value="ALL">สถานะวันหมดอายุ: ทั้งหมด</option>
-          <option value="EXPIRING_30">⚠️ ใกล้หมดอายุ (≤ 30 วัน)</option>
-          <option value="EXPIRING_60">🟡 ใกล้หมดอายุ (31-60 วัน)</option>
-          <option value="EXPIRED">🔴 หมดอายุแล้ว (เลยกำหนด)</option>
-          <option value="ACTIVE">🟢 ความคุ้มครองปกติ</option>
-        </select>
+        <div className={cellCls}>
+          <label className={labelCls}>⏳ สถานะวันหมดอายุ</label>
+          <select value={expiryFilter} onChange={(e) => onExpiryFilterChange(e.target.value)} className={selectCls(expiryFilter !== 'ALL')}>
+            <option value="ALL">ทั้งหมด</option>
+            <option value="EXPIRING_30">⚠️ ใกล้หมดอายุ (≤ 30 วัน)</option>
+            <option value="EXPIRING_60">🟡 ใกล้หมดอายุ (31-60 วัน)</option>
+            <option value="EXPIRED">🔴 หมดอายุแล้ว (เลยกำหนด)</option>
+            <option value="ACTIVE">🟢 ความคุ้มครองปกติ</option>
+          </select>
+        </div>
 
         {/* 4. Insurance Type */}
-        <select
-          value={typeFilter}
-          onChange={(e) => onTypeFilterChange(e.target.value)}
-          className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-        >
-          <option value="ALL">ประเภทประกัน: ทั้งหมด</option>
-          {masterTypes.map(m => (
-            <option key={m.typeCode} value={m.typeCode}>
-              {m.typeCode} - {m.typeName}
-            </option>
-          ))}
-        </select>
+        <div className={cellCls}>
+          <label className={labelCls}>🛡️ ประเภทประกัน</label>
+          <select value={typeFilter} onChange={(e) => onTypeFilterChange(e.target.value)} className={selectCls(typeFilter !== 'ALL')}>
+            <option value="ALL">ทั้งหมด</option>
+            {masterTypes.map(m => (
+              <option key={m.typeCode} value={m.typeCode}>{m.typeCode} - {m.typeName}</option>
+            ))}
+          </select>
+        </div>
 
         {/* 5. Project */}
         {projects.length > 0 && (
-          <select
-            value={projectFilter}
-            onChange={(e) => onProjectFilterChange(e.target.value)}
-            className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="ALL">โครงการ: ทั้งหมด</option>
-            {projects.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          <div className={cellCls}>
+            <label className={labelCls}>🏢 โครงการ</label>
+            <select value={projectFilter} onChange={(e) => onProjectFilterChange(e.target.value)} className={selectCls(projectFilter !== 'ALL')}>
+              <option value="ALL">ทั้งหมด</option>
+              {projects.map(pr => (
+                <option key={pr} value={pr}>{pr}</option>
+              ))}
+            </select>
+          </div>
         )}
 
         {/* 5.1 Project Type */}
         {projectTypes && projectTypes.length > 0 && (
-          <select
-            value={projectTypeFilter}
-            onChange={(e) => onProjectTypeFilterChange && onProjectTypeFilterChange(e.target.value)}
-            className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="ALL">ประเภทโครงการ: ทั้งหมด</option>
-            {projectTypes.map(pt => (
-              <option key={pt} value={pt}>{pt}</option>
-            ))}
-          </select>
+          <div className={cellCls}>
+            <label className={labelCls}>🏷️ ประเภทโครงการ</label>
+            <select
+              value={projectTypeFilter}
+              onChange={(e) => onProjectTypeFilterChange && onProjectTypeFilterChange(e.target.value)}
+              className={selectCls(projectTypeFilter !== 'ALL')}
+            >
+              <option value="ALL">ทั้งหมด</option>
+              {projectTypes.map(pt => (
+                <option key={pt} value={pt}>{pt}</option>
+              ))}
+            </select>
+          </div>
         )}
 
         {/* 6. Model */}
         {models.length > 0 && (
-          <select
-            value={modelFilter}
-            onChange={(e) => onModelFilterChange(e.target.value)}
-            className="text-xs py-1.5 px-3 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          >
-            <option value="ALL">รุ่นรถ: ทั้งหมด</option>
-            {models.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Clear Filters button */}
-        {(search || expiryFilter !== 'ALL' || missingFilter !== 'ALL' || statusFilter !== 'ALL' || typeFilter !== 'ALL' || projectFilter !== 'ALL' || projectTypeFilter !== 'ALL' || modelFilter !== 'ALL') && (
-          <button
-            type="button"
-            onClick={() => {
-              onSearchChange('')
-              onExpiryFilterChange('ALL')
-              onMissingFilterChange('ALL')
-              onStatusFilterChange('ALL')
-              onTypeFilterChange('ALL')
-              onProjectFilterChange('ALL')
-              if (onProjectTypeFilterChange) onProjectTypeFilterChange('ALL')
-              onModelFilterChange('ALL')
-            }}
-            className="text-xs py-1 px-2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer"
-          >
-            ล้างตัวกรอง
-          </button>
+          <div className={cellCls}>
+            <label className={labelCls}>🚙 รุ่นรถ</label>
+            <select value={modelFilter} onChange={(e) => onModelFilterChange(e.target.value)} className={selectCls(modelFilter !== 'ALL')}>
+              <option value="ALL">ทั้งหมด</option>
+              {models.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 

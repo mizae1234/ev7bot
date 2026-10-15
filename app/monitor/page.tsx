@@ -9,6 +9,7 @@ import {
   PolicyStatsSummary,
   InsuranceMasterType
 } from '@/lib/policy/policy-types'
+import { fetchAllPolicyRecords } from '@/lib/policy/fetch-all-policies'
 import { formatThaiDate, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 import { PolicyStatsCards } from '@/components/policy/PolicyStatsCards'
 import { PolicyFilters } from '@/components/policy/PolicyFilters'
@@ -148,7 +149,7 @@ function MonitorPageContent() {
   const handleExportExcel = async () => {
     setExportLoading(true)
     try {
-      const query = new URLSearchParams({ page: '1', limit: '5000' })
+      const query = new URLSearchParams()
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
       if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
@@ -158,9 +159,7 @@ function MonitorPageContent() {
       if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
 
-      const res = await fetch(`/api/policy?${query.toString()}`)
-      const data = await res.json()
-      const list: PolicyVehicleRecord[] = data.records || []
+      const list: PolicyVehicleRecord[] = await fetchAllPolicyRecords(query)
 
       const exportRows = list.map((r, idx) => ({
         'ลำดับ': idx + 1,

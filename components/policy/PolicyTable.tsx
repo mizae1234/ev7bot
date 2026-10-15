@@ -2,6 +2,12 @@ import React from 'react'
 import Link from 'next/link'
 import { PolicyVehicleRecord } from '@/lib/policy/policy-types'
 import { formatThaiDate, getExpiryBadge, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
+import {
+  compareInsurance,
+  CONFLICT_LABEL,
+  ServiceBrief,
+  toISODate,
+} from '@/lib/insurance-purchase'
 
 interface PolicyTableProps {
   records: PolicyVehicleRecord[]
@@ -10,6 +16,9 @@ interface PolicyTableProps {
   pageSize?: number
   onOpenHistory: (vinNo: string, registerNo: string | null) => void
   onOpenEdit?: (record: PolicyVehicleRecord) => void
+  // Best insurance-purchase record per VIN (uppercase) from EV7 Core getAllService; omit to hide the column
+  serviceMap?: Record<string, ServiceBrief>
+  serviceLoading?: boolean
 }
 
 const SPACES_CDN = process.env.NEXT_PUBLIC_SPACES_CDN_URL || 'https://space-ev7tracking-prod.sgp1.digitaloceanspaces.com'
@@ -20,8 +29,11 @@ export function PolicyTable({
   page = 1,
   pageSize = 50,
   onOpenHistory,
-  onOpenEdit
+  onOpenEdit,
+  serviceMap,
+  serviceLoading
 }: PolicyTableProps) {
+  const showApi = !!serviceMap || !!serviceLoading
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800">
@@ -47,18 +59,19 @@ export function PolicyTable({
 
   return (
     <div className="overflow-x-auto rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
-      <table className="w-full text-left border-collapse text-xs">
+      <table className="w-full min-w-[1480px] text-left border-collapse text-xs">
         <thead>
           <tr className="border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-400 font-semibold">
             <th className="py-3 px-4 w-12 text-center">ลำดับ</th>
-            <th className="py-3 px-4">ข้อมูลรถ</th>
-            <th className="py-3 px-4">🛡️ ประกันภัยภาคสมัครใจ (PLMV)</th>
-            <th className="py-3 px-4">📜 พ.ร.บ. (PLMC)</th>
+            <th className="py-3 px-4 min-w-[170px] whitespace-nowrap">ข้อมูลรถ</th>
+            <th className="py-3 px-4 min-w-[210px]">🛡️ ประกันภัยภาคสมัครใจ (PLMV)</th>
+            <th className="py-3 px-4 min-w-[190px] whitespace-nowrap">📜 พ.ร.บ. (PLMC)</th>
             <th className="py-3 px-4 whitespace-nowrap">🗓️ วันที่จดทะเบียน</th>
-            <th className="py-3 px-4">🏷️ ภาษีรถประจำปี</th>
-            <th className="py-3 px-4">⏱️ ภาษีมิเตอร์แท็กซี่</th>
+            {showApi && <th className="py-3 px-4 min-w-[240px] whitespace-nowrap">🧾 ข้อมูลซื้อประกัน (EV7 Core)</th>}
+            <th className="py-3 px-4 min-w-[140px] whitespace-nowrap">🏷️ ภาษีรถประจำปี</th>
+            <th className="py-3 px-4 min-w-[150px] whitespace-nowrap">⏱️ ภาษีมิเตอร์แท็กซี่</th>
             <th className="py-3 px-4 min-w-[210px]">🔍 ตรวจรับคืนล่าสุด</th>
-            <th className="py-3 px-4">สถานะรถ / สถานที่</th>
+            <th className="py-3 px-4 min-w-[170px] whitespace-nowrap">สถานะรถ / สถานที่</th>
             {onOpenEdit && <th className="py-3 px-4 text-center">จัดการ</th>}
           </tr>
         </thead>
@@ -69,6 +82,8 @@ export function PolicyTable({
             const actBadge = getExpiryBadge(rec.actStatus, rec.actDaysLeft)
             const taxBadge = getExpiryBadge(rec.vehicleTaxStatus, rec.vehicleTaxDaysLeft)
             const meterBadge = getExpiryBadge(rec.meterTaxStatus, rec.meterTaxDaysLeft)
+            const apiService = serviceMap?.[(rec.vinNo || '').trim().toUpperCase()]
+            const conflict = compareInsurance(rec, apiService)
 
             const insPdfUrl = rec.insuranceFilePath
               ? rec.insuranceFilePath.startsWith('http')
@@ -162,11 +177,11 @@ export function PolicyTable({
                           <span>{rec.insuranceCompany}</span>
                         </div>
                       )}
-                      <div className="text-zinc-500 text-[11px]">
+                      <div className="text-zinc-500 text-[11px] whitespace-nowrap">
                         หมดอายุ: <strong className="text-zinc-800 dark:text-zinc-200">{formatThaiDate(rec.insuranceEndDate)}</strong>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${insBadge.bg}`}>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${insBadge.bg}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${insBadge.dot}`} />
                           {insBadge.label}
                         </span>
@@ -175,7 +190,7 @@ export function PolicyTable({
                             href={insPdfUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold hover:underline"
+                            className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold hover:underline"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -197,11 +212,11 @@ export function PolicyTable({
                       <div className="font-mono text-zinc-700 dark:text-zinc-300">
                         {rec.actPolicyNo}
                       </div>
-                      <div className="text-zinc-500 text-[11px]">
+                      <div className="text-zinc-500 text-[11px] whitespace-nowrap">
                         หมดอายุ: <strong className="text-zinc-800 dark:text-zinc-200">{formatThaiDate(rec.actEndDate)}</strong>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${actBadge.bg}`}>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${actBadge.bg}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${actBadge.dot}`} />
                           {actBadge.label}
                         </span>
@@ -210,7 +225,7 @@ export function PolicyTable({
                             href={actPdfUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold hover:underline"
+                            className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-semibold hover:underline"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -236,20 +251,59 @@ export function PolicyTable({
                   )}
                 </td>
 
+                {/* 4.1 Insurance purchase info from EV7 Core + conflict result */}
+                {showApi && (
+                  <td className="py-3 px-4">
+                    {serviceLoading && !apiService ? (
+                      <span className="text-zinc-400 text-[11px]">กำลังโหลด...</span>
+                    ) : apiService ? (
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="inline-block px-1.5 py-0.5 text-[10px] leading-snug rounded font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40 max-w-[220px]">
+                            {apiService.InsuranceName || 'ไม่ระบุแผน'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-zinc-500 whitespace-nowrap">
+                          เลขที่สัญญาประกัน: <strong className="font-mono text-zinc-800 dark:text-zinc-200">{apiService.ServiceContractNo || '-'}</strong>
+                        </div>
+
+                        <div className="text-[11px] text-zinc-500 whitespace-nowrap">
+                          สิ้นสุดความคุ้มครอง: <strong className="text-zinc-800 dark:text-zinc-200">{formatThaiDate(toISODate(apiService.InsuranceEndDate))}</strong>
+                        </div>
+
+                        {/* Result: same pill style as the other status tags */}
+                        <div className="space-y-1">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${CONFLICT_LABEL[conflict.status].className}`}>
+                            {CONFLICT_LABEL[conflict.status].label}
+                          </span>
+                          {conflict.status === 'PENDING' && apiService.ServiceStatus && (
+                            <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{apiService.ServiceStatus}</div>
+                          )}
+                          {conflict.diffs.length > 0 && (
+                            <div className="text-[11px] text-rose-600 dark:text-rose-400">ต่างที่: {conflict.diffs.join(', ')}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-zinc-400 italic text-[11px] whitespace-nowrap">ไม่มีข้อมูลใน EV7 Core</span>
+                    )}
+                  </td>
+                )}
+
                 {/* 4. Vehicle Tax */}
                 <td className="py-3 px-4">
                   {rec.vehicleTaxEndDate ? (
                     <div className="space-y-1">
-                      <div className="text-zinc-800 dark:text-zinc-200 font-medium">
+                      <div className="text-zinc-800 dark:text-zinc-200 font-medium whitespace-nowrap">
                         {formatThaiDate(rec.vehicleTaxEndDate)}
                       </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${taxBadge.bg}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${taxBadge.bg}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${taxBadge.dot}`} />
                         {taxBadge.label}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-zinc-400 italic text-[11px]">ไม่มีข้อมูลภาษี</span>
+                    <span className="text-zinc-400 italic text-[11px] whitespace-nowrap">ไม่มีข้อมูลภาษี</span>
                   )}
                 </td>
 
@@ -257,16 +311,16 @@ export function PolicyTable({
                 <td className="py-3 px-4">
                   {rec.meterTaxEndDate ? (
                     <div className="space-y-1">
-                      <div className="text-zinc-800 dark:text-zinc-200 font-medium">
+                      <div className="text-zinc-800 dark:text-zinc-200 font-medium whitespace-nowrap">
                         {formatThaiDate(rec.meterTaxEndDate)}
                       </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${meterBadge.bg}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap ${meterBadge.bg}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${meterBadge.dot}`} />
                         {meterBadge.label}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-zinc-400 italic text-[11px]">ไม่มีข้อมูลมิเตอร์</span>
+                    <span className="text-zinc-400 italic text-[11px] whitespace-nowrap">ไม่มีข้อมูลมิเตอร์</span>
                   )}
                 </td>
 
@@ -274,6 +328,12 @@ export function PolicyTable({
                 <td className="py-3 px-4 min-w-[210px]">
                   {rec.latestInspectionId ? (
                     <div className="space-y-1.5">
+                      {/* Inspection date (top) */}
+                      {rec.latestInspectionDate && (
+                        <div className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                          📅 {formatThaiDate(rec.latestInspectionDate)}
+                        </div>
+                      )}
                       {/* Status Badge */}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {rec.latestIsPendingChecklist ? (
@@ -297,11 +357,6 @@ export function PolicyTable({
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                             ✅ สภาพปกติ
-                          </span>
-                        )}
-                        {rec.latestInspectionDate && (
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                            {formatThaiDate(rec.latestInspectionDate)}
                           </span>
                         )}
                       </div>
@@ -357,7 +412,7 @@ export function PolicyTable({
                 {/* 7. Vehicle Status & Location */}
                 <td className="py-3 px-4">
                   <div className="space-y-1">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusStyle}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${statusStyle}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
                       {rec.statusName || rec.status || 'ไม่ระบุ'}
                     </span>

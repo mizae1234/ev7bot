@@ -10,6 +10,7 @@ import {
   InsuranceMasterType,
   InsuranceCompanyOption
 } from '@/lib/policy/policy-types'
+import { fetchAllPolicyRecords } from '@/lib/policy/fetch-all-policies'
 import { formatThaiDate, getInsuranceTypeLabel } from '@/lib/policy/policy-constants'
 import { PolicyStatsCards } from '@/components/policy/PolicyStatsCards'
 import { PolicyFilters } from '@/components/policy/PolicyFilters'
@@ -18,6 +19,13 @@ import { PolicyBatchUpload } from '@/components/policy/PolicyBatchUpload'
 import { PolicyTaxExcelImport } from '@/components/policy/PolicyTaxExcelImport'
 import { PolicyHistoryDrawer } from '@/components/policy/PolicyHistoryDrawer'
 import { PolicyEditModal } from '@/components/policy/PolicyEditModal'
+import {
+  compareInsurance,
+  CONFLICT_LABEL,
+  getCachedServiceMap,
+  ServiceBrief,
+  toISODate
+} from '@/lib/insurance-purchase'
 
 function PolicyPageContent() {
   const [activeTab, setActiveTab] = useState<'LIST' | 'UPLOAD_PDF' | 'IMPORT_EXCEL'>('LIST')
@@ -107,6 +115,20 @@ function PolicyPageContent() {
       .catch(err => console.error('Failed to load master types:', err))
   }, [])
 
+  // Insurance purchase data from getAllService API (for conflict check)
+  const [serviceMap, setServiceMap] = useState<Record<string, ServiceBrief>>({})
+  const [serviceLoading, setServiceLoading] = useState(true)
+  const [serviceError, setServiceError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getCachedServiceMap()
+      .then(map => { if (!cancelled) setServiceMap(map) })
+      .catch(err => { if (!cancelled) setServiceError(err instanceof Error ? err.message : 'โหลดข้อมูล EV7 Core ไม่สำเร็จ') })
+      .finally(() => { if (!cancelled) setServiceLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
   // Fetch Policies
   const fetchPolicies = useCallback(async () => {
     setLoading(true)
@@ -182,11 +204,8 @@ function PolicyPageContent() {
   const handleExportExcel = async () => {
     setExportLoading(true)
     try {
-      // Fetch all matching records without pagination limit
-      const query = new URLSearchParams({
-        page: '1',
-        limit: '5000'
-      })
+      // Fetch all matching records (paged internally so nothing is truncated)
+      const query = new URLSearchParams()
       if (search) query.append('search', search)
       if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
       if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
@@ -196,11 +215,12 @@ function PolicyPageContent() {
       if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
       if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
 
-      const res = await fetch(`/api/policy?${query.toString()}`)
-      const data = await res.json()
-      const list: PolicyVehicleRecord[] = data.records || []
+      const list: PolicyVehicleRecord[] = await fetchAllPolicyRecords(query)
 
-      const exportRows = list.map((r, idx) => ({
+      const exportRows = list.map((r, idx) => {
+        const svc = serviceMap[(r.vinNo || '').trim().toUpperCase()]
+        const cmp = compareInsurance(r, svc)
+        return {
         'ลำดับ': idx + 1,
         'เลขทะเบียน': r.registerNo || 'ไม่มีทะเบียน',
         'เลขตัวถัง (VIN)': r.vinNo,
@@ -221,8 +241,15 @@ function PolicyPageContent() {
         'วันหมดอายุภาษีรถ': formatThaiDate(r.vehicleTaxEndDate),
         'สถานะภาษีรถ': r.vehicleTaxDaysLeft !== null ? (r.vehicleTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.vehicleTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
         'วันหมดอายุภาษีมิเตอร์': formatThaiDate(r.meterTaxEndDate),
-        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล'
-      }))
+        'สถานะภาษีมิเตอร์': r.meterTaxDaysLeft !== null ? (r.meterTaxDaysLeft < 0 ? 'หมดอายุแล้ว' : `เหลือ ${r.meterTaxDaysLeft} วัน`) : 'ไม่มีข้อมูล',
+        'EV7 Core: แผนประกัน': svc?.InsuranceName || '-',
+        'EV7 Core: สถานะการซื้อ': svc?.ServiceStatus || '-',
+        'EV7 Core: วันเริ่มคุ้มครอง': toISODate(svc?.InsuranceStartDate) || '-',
+        'EV7 Core: วันสิ้นสุด': toISODate(svc?.InsuranceEndDate) || '-',
+        'ผลเช็ค Conflict': CONFLICT_LABEL[cmp.status].label.replace(/^\S+\s/, ''),
+        'จุดที่ต่าง': cmp.diffs.join(', ') || '-'
+        }
+      })
 
       const ws = XLSX.utils.json_to_sheet(exportRows)
       const wb = XLSX.utils.book_new()
@@ -334,7 +361,14 @@ function PolicyPageContent() {
             exportLoading={exportLoading}
           />
 
+          {serviceError && (
+            <div className="px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
+              ⚠️ โหลดข้อมูลการซื้อประกันจาก EV7 Core ไม่สำเร็จ ({serviceError}) — ไม่สามารถเช็ค Conflict ได้
+            </div>
+          )}
           <PolicyTable
+            serviceMap={serviceError ? undefined : serviceMap}
+            serviceLoading={serviceLoading}
             records={records}
             loading={loading}
             page={page}

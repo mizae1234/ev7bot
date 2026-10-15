@@ -937,6 +937,8 @@ export async function getPolicyHistoryByVin(vinNo: string): Promise<PolicyLogIte
 export async function updateSinglePolicy(params: {
   vinNo: string
   registerNo?: string | null
+  /** Vehicle registration date (dbo.EV_InventoryItem.RegisterNoDate). undefined = leave unchanged, ''/null = clear */
+  registerNoDate?: string | null
   insurancePolicyNo?: string | null
   insuranceType?: string | null
   insuranceStartDate?: string | null
@@ -959,68 +961,95 @@ export async function updateSinglePolicy(params: {
   const pool = await getMSSQLWritePool()
   if (!pool) throw new Error('Write database connection failed')
 
-  const req = pool.request()
-  req.input('vinNo', sql.VarChar, params.vinNo)
-  req.input('registerNo', sql.VarChar, params.registerNo || null)
-  req.input('insPolicyNo', sql.VarChar, params.insurancePolicyNo || null)
-  req.input('insType', sql.VarChar, params.insuranceType || null)
-  req.input('insStart', sql.Date, params.insuranceStartDate ? new Date(params.insuranceStartDate) : null)
-  req.input('insEnd', sql.Date, params.insuranceEndDate ? new Date(params.insuranceEndDate) : null)
-  req.input('insComp', sql.NVarChar, params.insuranceCompany || null)
-  req.input('insFile', sql.VarChar, params.insuranceFilePath || null)
-  req.input('actPolicyNo', sql.VarChar, params.actPolicyNo || null)
-  req.input('actStart', sql.Date, params.actStartDate ? new Date(params.actStartDate) : null)
-  req.input('actEnd', sql.Date, params.actEndDate ? new Date(params.actEndDate) : null)
-  req.input('actComp', sql.NVarChar, params.actCompany || null)
-  req.input('actFile', sql.VarChar, params.actFilePath || null)
-  req.input('vTaxStart', sql.Date, params.vehicleTaxStartDate ? new Date(params.vehicleTaxStartDate) : null)
-  req.input('vTaxEnd', sql.Date, params.vehicleTaxEndDate ? new Date(params.vehicleTaxEndDate) : null)
-  req.input('vTaxFile', sql.VarChar, params.vehicleTaxFilePath || null)
-  req.input('mTaxStart', sql.Date, params.meterTaxStartDate ? new Date(params.meterTaxStartDate) : null)
-  req.input('mTaxEnd', sql.Date, params.meterTaxEndDate ? new Date(params.meterTaxEndDate) : null)
-  req.input('mTaxFile', sql.VarChar, params.meterTaxFilePath || null)
-  req.input('userId', sql.Int, params.userId || 1)
+  const transaction = new sql.Transaction(pool)
+  await transaction.begin()
 
-  await req.query(`
-    IF EXISTS (SELECT 1 FROM dbo.EV_Policy WHERE VinNo = @vinNo)
-    BEGIN
-      UPDATE dbo.EV_Policy
-      SET RegisterNo = COALESCE(@registerNo, RegisterNo),
-          InsurancePolicyNo = @insPolicyNo,
-          InsuranceType = @insType,
-          InsuranceStartDate = @insStart,
-          InsuranceEndDate = @insEnd,
-          InsuranceCompany = @insComp,
-          InsuranceFilePath = COALESCE(@insFile, InsuranceFilePath),
-          ActPolicyNo = @actPolicyNo,
-          ActStartDate = @actStart,
-          ActEndDate = @actEnd,
-          ActCompany = @actComp,
-          ActFilePath = COALESCE(@actFile, ActFilePath),
-          VehicleTaxStartDate = @vTaxStart,
-          VehicleTaxEndDate = @vTaxEnd,
-          VehicleTaxFilePath = COALESCE(@vTaxFile, VehicleTaxFilePath),
-          MeterTaxStartDate = @mTaxStart,
-          MeterTaxEndDate = @mTaxEnd,
-          MeterTaxFilePath = COALESCE(@mTaxFile, MeterTaxFilePath),
-          UpdateDate = GETDATE(),
-          UpdateUserID = @userId
-      WHERE VinNo = @vinNo;
-    END
-    ELSE
-    BEGIN
-      INSERT INTO dbo.EV_Policy (
-        VinNo, RegisterNo, InsurancePolicyNo, InsuranceType, InsuranceStartDate, InsuranceEndDate, InsuranceCompany, InsuranceFilePath,
-        ActPolicyNo, ActStartDate, ActEndDate, ActCompany, ActFilePath, VehicleTaxStartDate, VehicleTaxEndDate, VehicleTaxFilePath,
-        MeterTaxStartDate, MeterTaxEndDate, MeterTaxFilePath, IsActive, CreateDate, CreateUserID
-      )
-      VALUES (
-        @vinNo, @registerNo, @insPolicyNo, @insType, @insStart, @insEnd, @insComp, @insFile,
-        @actPolicyNo, @actStart, @actEnd, @actComp, @actFile, @vTaxStart, @vTaxEnd, @vTaxFile,
-        @mTaxStart, @mTaxEnd, @mTaxFile, 1, GETDATE(), @userId
-      );
-    END
-  `)
+  try {
+    const req = new sql.Request(transaction)
+    req.input('vinNo', sql.VarChar, params.vinNo)
+    req.input('registerNo', sql.VarChar, params.registerNo || null)
+    req.input('insPolicyNo', sql.VarChar, params.insurancePolicyNo || null)
+    req.input('insType', sql.VarChar, params.insuranceType || null)
+    req.input('insStart', sql.Date, params.insuranceStartDate ? new Date(params.insuranceStartDate) : null)
+    req.input('insEnd', sql.Date, params.insuranceEndDate ? new Date(params.insuranceEndDate) : null)
+    req.input('insComp', sql.NVarChar, params.insuranceCompany || null)
+    req.input('insFile', sql.VarChar, params.insuranceFilePath || null)
+    req.input('actPolicyNo', sql.VarChar, params.actPolicyNo || null)
+    req.input('actStart', sql.Date, params.actStartDate ? new Date(params.actStartDate) : null)
+    req.input('actEnd', sql.Date, params.actEndDate ? new Date(params.actEndDate) : null)
+    req.input('actComp', sql.NVarChar, params.actCompany || null)
+    req.input('actFile', sql.VarChar, params.actFilePath || null)
+    req.input('vTaxStart', sql.Date, params.vehicleTaxStartDate ? new Date(params.vehicleTaxStartDate) : null)
+    req.input('vTaxEnd', sql.Date, params.vehicleTaxEndDate ? new Date(params.vehicleTaxEndDate) : null)
+    req.input('vTaxFile', sql.VarChar, params.vehicleTaxFilePath || null)
+    req.input('mTaxStart', sql.Date, params.meterTaxStartDate ? new Date(params.meterTaxStartDate) : null)
+    req.input('mTaxEnd', sql.Date, params.meterTaxEndDate ? new Date(params.meterTaxEndDate) : null)
+    req.input('mTaxFile', sql.VarChar, params.meterTaxFilePath || null)
+    req.input('userId', sql.Int, params.userId || 1)
 
-  return { success: true }
+    await req.query(`
+      IF EXISTS (SELECT 1 FROM dbo.EV_Policy WHERE VinNo = @vinNo)
+      BEGIN
+        UPDATE dbo.EV_Policy
+        SET RegisterNo = COALESCE(@registerNo, RegisterNo),
+            InsurancePolicyNo = @insPolicyNo,
+            InsuranceType = @insType,
+            InsuranceStartDate = @insStart,
+            InsuranceEndDate = @insEnd,
+            InsuranceCompany = @insComp,
+            InsuranceFilePath = COALESCE(@insFile, InsuranceFilePath),
+            ActPolicyNo = @actPolicyNo,
+            ActStartDate = @actStart,
+            ActEndDate = @actEnd,
+            ActCompany = @actComp,
+            ActFilePath = COALESCE(@actFile, ActFilePath),
+            VehicleTaxStartDate = @vTaxStart,
+            VehicleTaxEndDate = @vTaxEnd,
+            VehicleTaxFilePath = COALESCE(@vTaxFile, VehicleTaxFilePath),
+            MeterTaxStartDate = @mTaxStart,
+            MeterTaxEndDate = @mTaxEnd,
+            MeterTaxFilePath = COALESCE(@mTaxFile, MeterTaxFilePath),
+            UpdateDate = GETDATE(),
+            UpdateUserID = @userId
+        WHERE VinNo = @vinNo;
+      END
+      ELSE
+      BEGIN
+        INSERT INTO dbo.EV_Policy (
+          VinNo, RegisterNo, InsurancePolicyNo, InsuranceType, InsuranceStartDate, InsuranceEndDate, InsuranceCompany, InsuranceFilePath,
+          ActPolicyNo, ActStartDate, ActEndDate, ActCompany, ActFilePath, VehicleTaxStartDate, VehicleTaxEndDate, VehicleTaxFilePath,
+          MeterTaxStartDate, MeterTaxEndDate, MeterTaxFilePath, IsActive, CreateDate, CreateUserID
+        )
+        VALUES (
+          @vinNo, @registerNo, @insPolicyNo, @insType, @insStart, @insEnd, @insComp, @insFile,
+          @actPolicyNo, @actStart, @actEnd, @actComp, @actFile, @vTaxStart, @vTaxEnd, @vTaxFile,
+          @mTaxStart, @mTaxEnd, @mTaxFile, 1, GETDATE(), @userId
+        );
+      END
+    `)
+
+    // Registration date lives on the vehicle master (EV_InventoryItem), not EV_Policy
+    if (params.registerNoDate !== undefined) {
+      const regDate = params.registerNoDate ? new Date(params.registerNoDate) : null
+      if (regDate && isNaN(regDate.getTime())) throw new Error('รูปแบบวันที่จดทะเบียนไม่ถูกต้อง')
+
+      const regReq = new sql.Request(transaction)
+      regReq.input('vinNo', sql.VarChar, params.vinNo)
+      regReq.input('regDate', sql.Date, regDate)
+      regReq.input('userId', sql.Int, params.userId || 1)
+      await regReq.query(`
+        UPDATE dbo.EV_InventoryItem
+        SET RegisterNoDate = @regDate,
+            UpdateDate = GETDATE(),
+            UpdateUserID = @userId
+        WHERE VinNo = @vinNo
+      `)
+    }
+
+    await transaction.commit()
+    return { success: true }
+  } catch (err) {
+    await transaction.rollback().catch(() => undefined)
+    throw err
+  }
 }
