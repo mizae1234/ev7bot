@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { ev7CoreGet } from '@/lib/ev7-core-api'
 import { Pagination } from '@/components/ui/Pagination'
 import { exportToExcel, ExportButton } from '@/lib/exportExcel'
 
@@ -106,13 +107,7 @@ function CaseContractContent() {
     setLoading(true)
     setError(null)
     try {
-      const apiRes = await fetch('https://api-aion.com7tracking.com/api/icare/getAllCase', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer a28dbe832c007c1d99b90e9d422815315dfc6f43a0814de8b4c3b753da5edc5d',
-        },
-      })
+      const apiRes = await ev7CoreGet('getAllCase')
 
       if (!apiRes.ok) {
         throw new Error(`API error: ${apiRes.status}`)
