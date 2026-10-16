@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import { AuthGuard } from '@/components/ui/AuthGuard'
+import { exportToExcel, formatDateForExcelRaw } from '@/lib/exportExcel'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -51,6 +52,7 @@ interface LongestRepairItem {
   CarStatusName: string
   ServiceLocationCode: string
   ReportDate: string
+  MaintenanceStartDate?: string | null
   MaintenanceFinishDate?: string
   DaysActive: number
   FollowUpDetail: string | null
@@ -148,6 +150,8 @@ function MaintenanceDashboardContent() {
   const [readyPickupSearchQuery, setReadyPickupSearchQuery] = useState('')
   type SlaRange = 'all' | '1-5' | '6-10' | '11-15' | '16-30' | '>30'
   const [selectedSlaFilter, setSelectedSlaFilter] = useState<SlaRange>('all')
+  const [slaModalRange, setSlaModalRange] = useState<SlaRange | null>(null)
+  const [modalSearchQuery, setModalSearchQuery] = useState('')
 
   // Separate longestRepairs into ready-to-release and still stuck
   const readyPickupRepairs = longestRepairs.filter(r => r.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
@@ -207,6 +211,91 @@ function MaintenanceDashboardContent() {
       const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
       const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
       return reg.includes(q) || vin.includes(q)
+    })
+  }
+
+  // Raw items for the SLA details modal
+  const modalRawItems = slaModalRange === '1-5'
+    ? d1_5List
+    : slaModalRange === '6-10'
+    ? d6_10List
+    : slaModalRange === '11-15'
+    ? d11_15List
+    : slaModalRange === '16-30'
+    ? d16_30List
+    : slaModalRange === '>30'
+    ? d30_plusList
+    : baseStuckRepairs
+
+  // Filter items in modal by search query
+  const modalItems = modalSearchQuery.trim()
+    ? modalRawItems.filter(r => {
+        const q = modalSearchQuery.toLowerCase().replace(/[\s-]/g, '')
+        const reg = (r.RegisterNo || '').toLowerCase().replace(/[\s-]/g, '')
+        const vin = (r.VinNo || '').toLowerCase().replace(/[\s-]/g, '')
+        const loc = (locationMap[r.ServiceLocationCode] || r.ServiceLocationCode || '').toLowerCase()
+        const issue = (r.IssueTitle || '').toLowerCase()
+        const model = (r.Model || '').toLowerCase()
+        return reg.includes(q) || vin.includes(q) || loc.includes(q) || issue.includes(q) || model.includes(q)
+      })
+    : modalRawItems
+
+  const handleOpenSlaModal = (range: SlaRange) => {
+    setSelectedSlaFilter(range)
+    setSlaModalRange(range)
+    setModalSearchQuery('')
+  }
+
+  const handleExportSla = (itemsToExport: LongestRepairItem[], rangeLabel?: string) => {
+    const rLabel = rangeLabel || (selectedSlaFilter === 'all' ? 'ทุกช่วงเวลา' : selectedSlaFilter === '1-5' ? '1-5 วัน' : selectedSlaFilter === '6-10' ? '6-10 วัน' : selectedSlaFilter === '11-15' ? '11-15 วัน' : selectedSlaFilter === '16-30' ? '16-30 วัน' : '> 30 วัน')
+    const locLabel = selectedLocationFilter ? (locationMap[selectedLocationFilter] || selectedLocationFilter) : 'ทุกสถานที่/อู่'
+
+    exportToExcel({
+      reportName: `รายงาน SLA รถซ่อมคงค้าง (${rLabel})`,
+      periodLabel: `ช่วงเวลา SLA: ${rLabel} | สถานที่: ${locLabel} | จำนวน: ${itemsToExport.length} คัน`,
+      headers: [
+        'ลำดับ',
+        'เลขใบซ่อม',
+        'ทะเบียน',
+        'เลขตัวถัง (VIN)',
+        'รุ่นรถ',
+        'โครงการ',
+        'อาการ/ปัญหาที่แจ้งซ่อม',
+        'สถานะงานซ่อม',
+        'สถานที่ซ่อม/อู่',
+        'ผู้รับผิดชอบ',
+        'วันที่นำรถเข้าซ่อม (Start Date)',
+        'วันที่แจ้งซ่อม (Report Date)',
+        'จำนวนวันค้าง (วัน)',
+        'ช่วงเวลา SLA',
+        'บันทึกติดตามงานล่าสุด'
+      ],
+      rows: itemsToExport.map((item, idx) => {
+        const d = item.DaysActive || 0
+        const bracket = d <= 5 ? '1 - 5 วัน' : d <= 10 ? '6 - 10 วัน' : d <= 15 ? '11 - 15 วัน' : d <= 30 ? '16 - 30 วัน' : '> 30 วัน'
+        const resp = item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' 
+          ? 'EV7/ICI' 
+          : (locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ')
+
+        return [
+          idx + 1,
+          item.MaintenanceItemID ? `#${item.MaintenanceItemID}` : '-',
+          item.RegisterNo || 'ไม่มีทะเบียน',
+          item.VinNo || '-',
+          item.Model || '-',
+          item.Project || '-',
+          item.IssueTitle || '-',
+          item.CarStatusName || item.CarStatusCode || '-',
+          locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ',
+          resp,
+          formatDateForExcelRaw(item.MaintenanceStartDate || null),
+          formatDateForExcelRaw(item.ReportDate),
+          d,
+          bracket,
+          item.FollowUpDetail || '-'
+        ]
+      }),
+      fileName: `SLA_รถซ่อมค้าง_${rLabel.replace(/[\s->]/g, '_')}`
     })
   }
 
@@ -403,12 +492,21 @@ function MaintenanceDashboardContent() {
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  สถิติจำนวนรถที่ค้างซ่อมตามช่วงเวลา (SLA Brackets) นับจากวันที่แจ้งซ่อม • คลิกที่การ์ดเพื่อกรองรายการรถด้านล่าง
+                  สถิติจำนวนรถที่ค้างซ่อมตามช่วงเวลา (SLA Brackets) คำนวณจากวันที่นำรถเข้าซ่อม (Start Date) เป็นหลัก • คลิกที่การ์ดเพื่อกรองรายการรถด้านล่าง
                 </p>
               </div>
 
-              {/* Summary Metrics & Reset */}
+              {/* Summary Metrics & Export & Reset */}
               <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleExportSla(baseStuckRepairs, selectedSlaFilter !== 'all' ? selectedSlaFilter : 'ทั้งหมด')}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 hover:border-emerald-600 px-3 py-2 rounded-2xl transition-all shadow-xs hover:shadow-md cursor-pointer active:scale-95"
+                  title="ดาวน์โหลดไฟล์ Excel รายการรถซ่อมค้าง"
+                >
+                  <span>📥</span>
+                  <span>Export Excel ({baseStuckRepairs.length} คัน)</span>
+                </button>
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-1.5 text-right">
                   <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">เฉลี่ยจอดซ่อม</span>
                   <span className="text-sm font-black text-slate-800 font-mono">{currentSlaAvg} <span className="text-xs font-normal text-slate-500">วัน</span></span>
@@ -481,7 +579,7 @@ function MaintenanceDashboardContent() {
               {/* Bracket 1: 1 - 5 วัน */}
               <button
                 type="button"
-                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '1-5' ? 'all' : '1-5')}
+                onClick={() => handleOpenSlaModal('1-5')}
                 className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
                   selectedSlaFilter === '1-5'
                     ? 'bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.02]'
@@ -514,12 +612,16 @@ function MaintenanceDashboardContent() {
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2 truncate">เพิ่งเข้า / ตรวจเช็คตามเกณฑ์</p>
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                  <span>🔍 ดูรายการ &amp; Export</span>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
               </button>
 
               {/* Bracket 2: 6 - 10 วัน */}
               <button
                 type="button"
-                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '6-10' ? 'all' : '6-10')}
+                onClick={() => handleOpenSlaModal('6-10')}
                 className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
                   selectedSlaFilter === '6-10'
                     ? 'bg-sky-50/90 border-sky-400 ring-2 ring-sky-500 shadow-md scale-[1.02]'
@@ -552,12 +654,16 @@ function MaintenanceDashboardContent() {
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2 truncate">กำลังเสนอราคา / รออนุมัติ</p>
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                  <span>🔍 ดูรายการ &amp; Export</span>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
               </button>
 
               {/* Bracket 3: 11 - 15 วัน */}
               <button
                 type="button"
-                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '11-15' ? 'all' : '11-15')}
+                onClick={() => handleOpenSlaModal('11-15')}
                 className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
                   selectedSlaFilter === '11-15'
                     ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-500 shadow-md scale-[1.02]'
@@ -590,12 +696,16 @@ function MaintenanceDashboardContent() {
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2 truncate">รออะไหล่ / ติดต่ออู่เร่งงาน</p>
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                  <span>🔍 ดูรายการ &amp; Export</span>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
               </button>
 
               {/* Bracket 4: 16 - 30 วัน */}
               <button
                 type="button"
-                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '16-30' ? 'all' : '16-30')}
+                onClick={() => handleOpenSlaModal('16-30')}
                 className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
                   selectedSlaFilter === '16-30'
                     ? 'bg-orange-50/90 border-orange-400 ring-2 ring-orange-500 shadow-md scale-[1.02]'
@@ -628,12 +738,16 @@ function MaintenanceDashboardContent() {
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2 truncate">เกินครึ่งเดือน / เคสหนัก</p>
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                  <span>🔍 ดูรายการ &amp; Export</span>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
               </button>
 
               {/* Bracket 5: > 30 วัน */}
               <button
                 type="button"
-                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '>30' ? 'all' : '>30')}
+                onClick={() => handleOpenSlaModal('>30')}
                 className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
                   selectedSlaFilter === '>30'
                     ? 'bg-rose-50/90 border-rose-400 ring-2 ring-rose-500 shadow-md scale-[1.02]'
@@ -666,6 +780,10 @@ function MaintenanceDashboardContent() {
                   />
                 </div>
                 <p className="text-[10px] text-rose-600/80 font-medium mt-2 truncate">ค้างเกิน 1 เดือน / ติดตามด่วน</p>
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                  <span>🔍 ดูรายการ &amp; Export</span>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
+                </div>
               </button>
             </div>
           </div>
@@ -823,6 +941,15 @@ function MaintenanceDashboardContent() {
                     <p className="text-[10px] text-slate-500 mt-0.5">เรียงลำดับตามวันที่เริ่มเกิดเหตุ/วันที่แจ้งซ่อมคงค้าง</p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleExportSla(filteredLongestRepairs, selectedSlaFilter !== 'all' ? selectedSlaFilter : 'ทั้งหมด')}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 hover:border-emerald-600 px-3 py-1.5 rounded-xl transition-all shadow-xs hover:shadow cursor-pointer active:scale-95"
+                      title="ดาวน์โหลดรายการรถที่กำลังแสดงเป็น Excel"
+                    >
+                      <span>📥</span>
+                      <span>Export ({filteredLongestRepairs.length})</span>
+                    </button>
                     {selectedSlaFilter !== 'all' && (
                       <button
                         onClick={() => setSelectedSlaFilter('all')}
@@ -1092,6 +1219,210 @@ function MaintenanceDashboardContent() {
           </div>
         )}
 
+        {/* SLA Details & Export Modal */}
+        {slaModalRange && (
+          <div 
+            className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+            onClick={() => setSlaModalRange(null)}
+          >
+            <div 
+              className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-50 to-white">
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-2xl">📋</span>
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                      รายการรถซ่อมคงค้าง: ช่วง {slaModalRange === '1-5' ? '1 - 5 วัน' : slaModalRange === '6-10' ? '6 - 10 วัน' : slaModalRange === '11-15' ? '11 - 15 วัน' : slaModalRange === '16-30' ? '16 - 30 วัน' : '> 30 วัน'}
+                    </h3>
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                      slaModalRange === '1-5' ? 'bg-emerald-100 text-emerald-800' :
+                      slaModalRange === '6-10' ? 'bg-sky-100 text-sky-800' :
+                      slaModalRange === '11-15' ? 'bg-amber-100 text-amber-800' :
+                      slaModalRange === '16-30' ? 'bg-orange-100 text-orange-800' :
+                      'bg-rose-100 text-rose-800 animate-pulse'
+                    }`}>
+                      {modalRawItems.length} คัน
+                    </span>
+                    {selectedLocationFilter && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        📍 {locationMap[selectedLocationFilter] || selectedLocationFilter}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    รายการรถยนต์ที่อยู่ระหว่างจอดซ่อมตามเกณฑ์ SLA สามารถค้นหา ตรวจสอบรายละเอียด และดาวน์โหลดไฟล์ Excel ได้
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => handleExportSla(modalRawItems, slaModalRange)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-xl transition-all shadow-sm hover:shadow active:scale-95 cursor-pointer"
+                  >
+                    <span>📥</span>
+                    <span>Export Excel ({modalRawItems.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlaModalRange(null)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Search Bar */}
+              <div className="px-5 sm:px-6 py-3 bg-slate-50/60 border-b border-slate-100 flex items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 text-xs pointer-events-none">🔍</span>
+                  <input
+                    type="text"
+                    value={modalSearchQuery}
+                    onChange={(e) => setModalSearchQuery(e.target.value)}
+                    placeholder="ค้นหาทะเบียน, เลข VIN, รุ่น, อู่ หรือปัญหาในรายการนี้..."
+                    className="w-full text-xs py-2 pl-8 pr-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400 shadow-xs"
+                  />
+                </div>
+                <span className="text-xs text-slate-500 font-medium shrink-0">
+                  แสดง {modalItems.length} จาก {modalRawItems.length} คัน
+                </span>
+              </div>
+
+              {/* Modal Table Content */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+                {modalItems.length > 0 ? (
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
+                            <th className="py-3 px-3.5 text-center w-12">#</th>
+                            <th className="py-3 px-3.5">ทะเบียน / รุ่น</th>
+                            <th className="py-3 px-3.5">เลข VIN / โครงการ</th>
+                            <th className="py-3 px-3.5">อาการที่แจ้งซ่อม</th>
+                            <th className="py-3 px-3.5">สถานที่ซ่อม / อู่</th>
+                            <th className="py-3 px-3.5 text-center">วันเริ่มซ่อม / แจ้งซ่อม</th>
+                            <th className="py-3 px-3.5 text-center">ค้างซ่อม</th>
+                            <th className="py-3 px-3.5 text-center">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {modalItems.map((item, idx) => (
+                            <tr key={item.MaintenanceItemID} className="hover:bg-slate-50/80 transition">
+                              <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                                {idx + 1}
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <a
+                                  href={`/vehicle/${encodeURIComponent(item.RegisterNo || '')}`}
+                                  className="font-mono font-extrabold text-slate-900 hover:text-indigo-600 transition"
+                                >
+                                  {item.RegisterNo || 'ไม่มีทะเบียน'}
+                                </a>
+                                <p className="text-[10.5px] text-slate-500 truncate max-w-[120px]">{item.Model || '-'}</p>
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <span className="font-mono text-[10.5px] text-slate-600 block truncate max-w-[140px]">{item.VinNo || '-'}</span>
+                                <span className="text-[10px] text-slate-400">{item.Project || '-'}</span>
+                              </td>
+                              <td className="py-3 px-3.5 max-w-[200px]">
+                                <p className="font-semibold text-slate-800 truncate" title={item.IssueTitle}>
+                                  {item.IssueTitle}
+                                </p>
+                                {item.FollowUpDetail && (
+                                  <p className="text-[10px] text-slate-500 italic truncate mt-0.5" title={item.FollowUpDetail}>
+                                    💬 {item.FollowUpDetail}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <span className="font-medium text-slate-700">
+                                  {locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 text-center font-mono text-[11px] text-slate-600">
+                                {item.MaintenanceStartDate ? (
+                                  <div>
+                                    <span className="font-bold text-slate-800">{formatThaiDate(item.MaintenanceStartDate)}</span>
+                                    <span className="block text-[10px] text-slate-400 font-sans">แจ้ง: {formatThaiDate(item.ReportDate)}</span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="text-slate-600">{formatThaiDate(item.ReportDate)}</span>
+                                    <span className="block text-[9.5px] text-amber-600 font-sans font-medium">รอระบุวันเริ่มซ่อม</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-3.5 text-center">
+                                <span className={`inline-block font-mono font-black text-xs px-2 py-0.5 rounded-lg border ${
+                                  item.DaysActive > 30 ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                  item.DaysActive >= 16 ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                  item.DaysActive >= 11 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                  item.DaysActive >= 6 ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                  'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {item.DaysActive} วัน
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 text-center">
+                                <a
+                                  href={`/vehicle/${encodeURIComponent(item.RegisterNo || '')}`}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition"
+                                >
+                                  <span>ดูรถ</span>
+                                  <span>→</span>
+                                </a>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <p className="text-3xl mb-2">🔍</p>
+                    <p className="text-sm font-semibold text-slate-600">ไม่พบรายการรถที่ตรงกับคำค้นหา</p>
+                    <p className="text-xs text-slate-400 mt-1">ลองเปลี่ยนคำค้นหา หรือล้างคำค้นหา</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 sm:px-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs font-semibold text-slate-500">
+                  รวมทั้งหมด {modalRawItems.length} คัน
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleExportSla(modalRawItems, slaModalRange)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 hover:border-emerald-600 px-3.5 py-2 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <span>📥</span>
+                    <span>Export Excel ({modalRawItems.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlaModalRange(null)}
+                    className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl transition cursor-pointer"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

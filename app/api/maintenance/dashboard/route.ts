@@ -105,7 +105,8 @@ export async function GET() {
         CarStatusCode: 'IN_MAINTENANCE',
         ServiceLocationCode: 'AION_GI_SALAYA',
         ReportDate: new Date(Date.now() - 15 * 24 * 3600 * 1000).toISOString(),
-        DaysActive: 15,
+        MaintenanceStartDate: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(),
+        DaysActive: 14,
         FollowUpDetail: 'รอผลเคลมกล่องควบคุมจาก Aion Thailand'
       },
       {
@@ -117,7 +118,8 @@ export async function GET() {
         CarStatusCode: 'IN_MAINTENANCE',
         ServiceLocationCode: 'GARAGE_88_CAR',
         ReportDate: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString(),
-        DaysActive: 10,
+        MaintenanceStartDate: new Date(Date.now() - 8 * 24 * 3600 * 1000).toISOString(),
+        DaysActive: 8,
         FollowUpDetail: 'อู่ถอดกระจกเก่าออกแล้ว เตรียมวางกระจกใหม่'
       },
       {
@@ -129,6 +131,7 @@ export async function GET() {
         CarStatusCode: 'WAITING_FOR_MAINTENANCE',
         ServiceLocationCode: 'GARAGE_PERFECTCAR',
         ReportDate: new Date(Date.now() - 8 * 24 * 3600 * 1000).toISOString(),
+        MaintenanceStartDate: null,
         DaysActive: 8,
         FollowUpDetail: 'อยู่ระหว่างประกันคุมราคาประเมินค่าซ่อม'
       }
@@ -289,8 +292,10 @@ export async function GET() {
           m.CarStatusCode,
           m.ServiceLocationCode,
           m.ReportDate,
+          m.MaintenanceStartDate,
           m.FollowUpDetail,
           m.MaintenanceFinishDate,
+          m.CreateDate,
           ROW_NUMBER() OVER (
             PARTITION BY m.InventoryItemID 
             ORDER BY 
@@ -317,14 +322,15 @@ export async function GET() {
         ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
         t.ServiceLocationCode,
         t.ReportDate,
+        t.MaintenanceStartDate,
         t.MaintenanceFinishDate,
-        ISNULL(DATEDIFF(day, t.ReportDate, GETDATE()), 0) AS DaysActive,
+        ISNULL(DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate), GETDATE()), 0) AS DaysActive,
         t.FollowUpDetail
       FROM LatestTickets t
       JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_MsSubStatus sub ON t.CarStatusCode = sub.StatusCode
       WHERE t.rn = 1
-      ORDER BY t.ReportDate ASC
+      ORDER BY COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate) ASC
     `)
 
     // 6. Still Driveable repairs (STILL_WORK status, active tickets, regardless of inventory status)
@@ -337,7 +343,9 @@ export async function GET() {
           m.CarStatusCode,
           m.ServiceLocationCode,
           m.ReportDate,
+          m.MaintenanceStartDate,
           m.FollowUpDetail,
+          m.CreateDate,
           ROW_NUMBER() OVER (
             PARTITION BY m.InventoryItemID 
             ORDER BY 
@@ -363,13 +371,14 @@ export async function GET() {
         ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
         t.ServiceLocationCode,
         t.ReportDate,
-        DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
+        t.MaintenanceStartDate,
+        ISNULL(DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate), GETDATE()), 0) AS DaysActive,
         t.FollowUpDetail
       FROM LatestTickets t
       JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
       LEFT JOIN dbo.EV_MsSubStatus sub ON t.CarStatusCode = sub.StatusCode
       WHERE t.rn = 1 AND t.CarStatusCode = 'STILL_WORK' AND i.IsActive = 1
-      ORDER BY t.ReportDate ASC
+      ORDER BY COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate) ASC
     `)
 
     // Map database results with readable names and merge duplicates
