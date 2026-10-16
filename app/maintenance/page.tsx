@@ -429,7 +429,7 @@ function MaintenanceContent() {
                             </span>
                           </td>
                           <td className="py-3.5 pr-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            {['STILL_WORK', 'WAITING_FOR_MAINTENANCE'].includes(item.status_code) && (item.register_no || item.vin) && (
+                            {item.status_code === 'STILL_WORK' && (item.register_no || item.vin) && (
                               <a
                                 href={`/liff/quick-report?tab=report&registerNo=${encodeURIComponent(item.register_no || item.vin)}&maintId=${item.id}&action=park`}
                                 className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-colors dark:text-amber-400"
