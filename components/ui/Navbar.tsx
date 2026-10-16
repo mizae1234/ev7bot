@@ -33,6 +33,12 @@ const navGroups: NavGroup[] = [
         icon: '🚨'
       },
       {
+        name: 'แดชบอร์ดงานซ่อม (Dashboard)',
+        href: '/maintenance/dashboard',
+        desc: 'ภาพรวมงานซ่อม สถานะอู่ เคสซ่อมนาน และติดตามความคืบหน้า',
+        icon: '📊'
+      },
+      {
         name: 'ศูนย์จัดการงานซ่อม',
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
@@ -171,6 +177,18 @@ export function Navbar() {
     return group.items.some((item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)))
   }
 
+  const checkItemActive = (item: NavItem, group: NavGroup) => {
+    if (pathname === item.href) return true
+    if (item.href === '/') return false
+    if (!pathname.startsWith(item.href + '/')) return false
+    return !group.items.some(
+      (other) =>
+        other.href !== item.href &&
+        other.href.startsWith(item.href) &&
+        (pathname === other.href || pathname.startsWith(other.href + '/'))
+    )
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full bg-gradient-to-r from-emerald-100/90 via-teal-50/95 to-sky-100/90 backdrop-blur-md border-b border-emerald-200/90 shadow-sm transition-all">
       {/* Top Brand Accent Stripe (EV7 Green to Blue) */}
@@ -291,7 +309,7 @@ export function Navbar() {
                         </div>
                         <div className="space-y-1">
                           {group.items.map((item) => {
-                            const isItemActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+                            const isItemActive = checkItemActive(item, group)
 
                             return (
                               <Link
@@ -436,7 +454,7 @@ export function Navbar() {
               </div>
               <div className="space-y-1">
                 {group.items.map((item) => {
-                  const isItemActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+                  const isItemActive = checkItemActive(item, group)
 
                   return (
                     <Link
