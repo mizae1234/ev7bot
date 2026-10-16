@@ -80,6 +80,17 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
   }
 
   // ── Batch lookups ────────────────────────────────────────────────
+  const jobKeys = Array.from(new Set(parsedRows.map(r => r.fields.jobNo.toUpperCase()).filter(Boolean)))
+  let existingJobs = new Set<string>()
+  try {
+    existingJobs = new Set(
+      (await queryIn<{ j: string }>(pool, jobKeys, 'nvarchar', inList =>
+        `SELECT DISTINCT UPPER(LTRIM(RTRIM(InsuranceJobNo))) AS j FROM dbo.EV_MaintenanceItem
+         WHERE UPPER(LTRIM(RTRIM(InsuranceJobNo))) IN (${inList})`,
+      )).map(r => r.j),
+    )
+  } catch { /* column missing: commit rejects the import with a clear message */ }
+
   const claimKeys = Array.from(new Set(parsedRows.map(r => r.fields.claimNumber.toUpperCase()).filter(Boolean)))
   const existingClaims = new Set(
     (await queryIn<{ c: string }>(pool, claimKeys, 'nvarchar', inList =>
@@ -115,11 +126,13 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
   }
 
   // ── Decide row by row (file order) ───────────────────────────────
+  const seenJobs = new Set<string>()
   const seenClaims = new Set<string>()
   const claimedVehicles = new Set<number>()
   const planned: PlannedRow[] = parsedRows.map(parsed => {
     const f = parsed.fields
     const plateKey = normalizePlate(f.registerNo)
+    const jobKey = f.jobNo.toUpperCase()
     const claimKey = f.claimNumber.toUpperCase()
     const faultPartyCode = resolveFaultParty(f.faultSummary)
     const matches = plateKey ? vehiclesByPlate.get(plateKey) || [] : []
@@ -148,9 +161,11 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
 
     const skip = (status: ImportRowStatus, reason: string): PlannedRow => ({ ...base, status, reason })
 
-    if (!claimKey) return skip('SKIP_NO_CLAIM', 'ไม่มีเลขเคลม')
-    if (existingClaims.has(claimKey)) return skip('SKIP_DUPLICATE_CLAIM', `เลขเคลม ${f.claimNumber} มีในระบบแล้ว`)
-    if (seenClaims.has(claimKey)) return skip('SKIP_DUPLICATE_IN_FILE', `เลขเคลม ${f.claimNumber} ซ้ำกับแถวก่อนหน้าในไฟล์`)
+    if (!jobKey) return skip('SKIP_NO_JOB', 'ไม่มีเลขงาน')
+    if (existingJobs.has(jobKey)) return skip('SKIP_DUPLICATE_JOB', `เลขงาน ${f.jobNo} มีในระบบแล้ว`)
+    if (claimKey && existingClaims.has(claimKey)) return skip('SKIP_DUPLICATE_CLAIM', `เลขเคลม ${f.claimNumber} มีในระบบแล้ว`)
+    if (seenJobs.has(jobKey)) return skip('SKIP_DUPLICATE_IN_FILE', `เลขงาน ${f.jobNo} ซ้ำกับแถวก่อนหน้าในไฟล์`)
+    if (claimKey && seenClaims.has(claimKey)) return skip('SKIP_DUPLICATE_IN_FILE', `เลขเคลม ${f.claimNumber} ซ้ำกับแถวก่อนหน้าในไฟล์`)
     if (!plateKey) return skip('SKIP_NO_PLATE', 'ไม่มีทะเบียนรถ')
     if (matches.length === 0) return skip('SKIP_VEHICLE_NOT_FOUND', `ไม่พบทะเบียน ${f.registerNo} ในระบบ`)
     if (matches.length > 1) return skip('SKIP_VEHICLE_AMBIGUOUS', `ทะเบียน ${f.registerNo} ตรงกับรถ ${matches.length} คัน`)
@@ -159,7 +174,8 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
     if (openTicketVehicles.has(vehicle!.InventoryItemID)) return skip('SKIP_OPEN_TICKET', 'รถมีใบซ่อมที่ยังเปิดอยู่')
     if (claimedVehicles.has(vehicle!.InventoryItemID)) return skip('SKIP_OPEN_TICKET_IN_FILE', 'รถคันนี้มีใบจากแถวก่อนหน้าในไฟล์แล้ว')
 
-    seenClaims.add(claimKey)
+    seenJobs.add(jobKey)
+    if (claimKey) seenClaims.add(claimKey)
     claimedVehicles.add(vehicle!.InventoryItemID)
     return base
   })

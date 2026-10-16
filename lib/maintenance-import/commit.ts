@@ -8,6 +8,14 @@ import type { PlannedRow } from './validate'
 export const IMPORT_LOG_TABLE_MISSING =
   'ยังไม่ได้สร้างตาราง EV_MaintenanceImportLog กรุณาให้ DBA รัน sql/Create_EV_MaintenanceImportLog.sql และ GRANT สิทธิ์ให้ user เขียนข้อมูล'
 
+export const JOB_NO_COLUMN_MISSING =
+  'ยังไม่ได้เพิ่มคอลัมน์ InsuranceJobNo ใน EV_MaintenanceItem กรุณาให้ DBA รัน sql/Alter_EV_MaintenanceItem_Add_InsuranceJobNo.sql'
+
+export async function jobNoColumnExists(pool: ConnectionPool): Promise<boolean> {
+  const res = await pool.request().query(`SELECT COL_LENGTH('dbo.EV_MaintenanceItem', 'InsuranceJobNo') AS len`)
+  return res.recordset[0]?.len != null
+}
+
 export async function importLogTableExists(pool: ConnectionPool): Promise<boolean> {
   const res = await pool.request().query(`SELECT OBJECT_ID('dbo.EV_MaintenanceImportLog', 'U') AS id`)
   return res.recordset[0]?.id != null
@@ -65,10 +73,23 @@ export async function commitRows(
       await tx.begin()
 
       // Re-check under lock: a concurrent import / Quick Report may have created it since preview.
-      const dup = await new sql.Request(tx)
-        .input('claim', sql.NVarChar, row.claimNumber)
+      const dupJob = await new sql.Request(tx)
+        .input('job', sql.NVarChar, row.jobNo)
         .query(`SELECT TOP 1 1 AS x FROM dbo.EV_MaintenanceItem WITH (UPDLOCK, HOLDLOCK)
-                WHERE UPPER(LTRIM(RTRIM(ClaimNumber))) = UPPER(@claim)`)
+                WHERE UPPER(LTRIM(RTRIM(InsuranceJobNo))) = UPPER(@job)`)
+      if (dupJob.recordset.length > 0) {
+        await tx.rollback()
+        row.status = 'SKIP_DUPLICATE_JOB'
+        row.reason = `เลขงาน ${row.jobNo} มีในระบบแล้ว`
+        await writeLog(pool.request(), batchId, opts.fileName, row, row.status, row.reason, null, opts.userId)
+        continue
+      }
+      const dup = row.claimNumber
+        ? await new sql.Request(tx)
+            .input('claim', sql.NVarChar, row.claimNumber)
+            .query(`SELECT TOP 1 1 AS x FROM dbo.EV_MaintenanceItem WITH (UPDLOCK, HOLDLOCK)
+                    WHERE UPPER(LTRIM(RTRIM(ClaimNumber))) = UPPER(@claim)`)
+        : { recordset: [] }
       if (dup.recordset.length > 0) {
         await tx.rollback()
         row.status = 'SKIP_DUPLICATE_CLAIM'
@@ -100,7 +121,7 @@ export async function commitRows(
         problemTypeCode: IMPORT_CONFIG.problemTypeCode,
         faultPartyCode: row.faultPartyCode,
         insuranceCode: row.insuranceCode,
-        claimNumber: row.claimNumber,
+        claimNumber: row.claimNumber || null,
         createUserId: opts.userId,
       }
       const ins = await new sql.Request(tx)
@@ -109,13 +130,14 @@ export async function commitRows(
         .execute('dbo.sp_InsertMaintenanceItemJson')
       const maintId: number = ins.output.NewMaintenanceItemID
 
-      // sp_InsertMaintenanceItemJson does not persist ContractNo; set it directly.
-      if (row.contractNo) {
-        await new sql.Request(tx)
-          .input('maintId', sql.Int, maintId)
-          .input('contractNo', sql.NVarChar, row.contractNo)
-          .query('UPDATE dbo.EV_MaintenanceItem SET ContractNo = @contractNo WHERE MaintenanceItemID = @maintId')
-      }
+      // sp_InsertMaintenanceItemJson does not persist ContractNo / InsuranceJobNo; set them directly.
+      await new sql.Request(tx)
+        .input('maintId', sql.Int, maintId)
+        .input('contractNo', sql.NVarChar, row.contractNo || null)
+        .input('job', sql.NVarChar, row.jobNo)
+        .query(`UPDATE dbo.EV_MaintenanceItem
+                SET ContractNo = ISNULL(@contractNo, ContractNo), InsuranceJobNo = @job
+                WHERE MaintenanceItemID = @maintId`)
 
       await writeLog(new sql.Request(tx), batchId, opts.fileName, row, 'IMPORTED', '', maintId, opts.userId)
       await tx.commit()

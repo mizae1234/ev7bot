@@ -2,7 +2,8 @@ import type { ImportField } from './config'
 
 export type ImportRowStatus =
   | 'READY'
-  | 'SKIP_NO_CLAIM'
+  | 'SKIP_NO_JOB'
+  | 'SKIP_DUPLICATE_JOB'
   | 'SKIP_DUPLICATE_CLAIM'
   | 'SKIP_DUPLICATE_IN_FILE'
   | 'SKIP_NO_PLATE'
@@ -16,9 +17,10 @@ export type ImportRowStatus =
 export const IMPORT_STATUS_LABEL: Record<ImportRowStatus, string> = {
   READY: 'พร้อมนำเข้า',
   IMPORTED: 'นำเข้าแล้ว',
-  SKIP_NO_CLAIM: 'ไม่มีเลขเคลม',
+  SKIP_NO_JOB: 'ไม่มีเลขงาน',
+  SKIP_DUPLICATE_JOB: 'เลขงานมีในระบบแล้ว',
   SKIP_DUPLICATE_CLAIM: 'เลขเคลมมีในระบบแล้ว',
-  SKIP_DUPLICATE_IN_FILE: 'เลขเคลมซ้ำในไฟล์',
+  SKIP_DUPLICATE_IN_FILE: 'เลขงานซ้ำในไฟล์',
   SKIP_NO_PLATE: 'ไม่มีทะเบียน',
   SKIP_VEHICLE_NOT_FOUND: 'ไม่พบรถในระบบ',
   SKIP_VEHICLE_AMBIGUOUS: 'ทะเบียนตรงกับรถหลายคัน',

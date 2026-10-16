@@ -3,7 +3,7 @@ import { getMSSQLWritePool } from '@/lib/mssql'
 import { env } from '@/lib/env'
 import { parseImportRows } from '@/lib/maintenance-import/parse'
 import { evaluateRows, summarize, toEvaluatedRow } from '@/lib/maintenance-import/validate'
-import { commitRows, importLogTableExists, IMPORT_LOG_TABLE_MISSING } from '@/lib/maintenance-import/commit'
+import { commitRows, importLogTableExists, IMPORT_LOG_TABLE_MISSING, jobNoColumnExists, JOB_NO_COLUMN_MISSING } from '@/lib/maintenance-import/commit'
 import { resolveImportUser, ImportAuthError } from '@/lib/maintenance-import/user'
 import type { ImportRequestBody, ImportResponse } from '@/lib/maintenance-import/types'
 
@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
 
     if (!(await importLogTableExists(pool))) {
       return NextResponse.json({ error: IMPORT_LOG_TABLE_MISSING }, { status: 500 })
+    }
+    if (!(await jobNoColumnExists(pool))) {
+      return NextResponse.json({ error: JOB_NO_COLUMN_MISSING }, { status: 500 })
     }
 
     const { rows, warnings } = await evaluateRows(pool, parsed.rows)

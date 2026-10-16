@@ -167,7 +167,7 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
           <div>
             <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">📥 นำเข้างานซ่อม/เคลมจาก Excel</h2>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-              เปิดใบแจ้งซ่อมสถานะ “ยังขับใช้งานได้” ให้รถที่ยังไม่มีใบซ่อมเปิดอยู่ · ตรวจซ้ำด้วยเลขเคลม · สถานที่ซ่อม = {IMPORT_CONFIG.unspecifiedLocationLabel}
+              เปิดใบแจ้งซ่อมสถานะ “ยังขับใช้งานได้” ให้รถที่ยังไม่มีใบซ่อมเปิดอยู่ · ตรวจซ้ำด้วยเลขงาน · สถานที่ซ่อม = {IMPORT_CONFIG.unspecifiedLocationLabel}
             </p>
           </div>
           <button onClick={close} className="text-zinc-400 hover:text-zinc-600 text-lg leading-none" aria-label="ปิด">✕</button>
@@ -228,7 +228,7 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-zinc-50 text-zinc-400 dark:bg-zinc-900/50">
                     <tr>
-                      {['แถว', 'เลขเคลม', 'ทะเบียน', 'รุ่น', 'วันที่เกิดเหตุ', 'อาการ', 'ผู้ขับ', 'ฝ่ายผิด', 'สถานที่ซ่อม', 'ผลการตรวจ'].map(h => (
+                      {['แถว', 'เลขงาน', 'เลขเคลม', 'ทะเบียน', 'รุ่น', 'วันที่เกิดเหตุ', 'อาการ', 'ผู้ขับ', 'ฝ่ายผิด', 'สถานที่ซ่อม', 'ผลการตรวจ'].map(h => (
                         <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -237,6 +237,7 @@ export function MaintenanceImportModal({ open, onClose, onImported }: Props) {
                     {visibleRows.map(r => (
                       <tr key={r.rowNo}>
                         <td className="px-3 py-2 text-zinc-400">{r.rowNo}</td>
+                        <td className="px-3 py-2 font-mono">{r.jobNo || '-'}</td>
                         <td className="px-3 py-2 font-mono">{r.claimNumber || '-'}</td>
                         <td className="px-3 py-2 font-mono font-bold">{r.matchedRegisterNo || r.registerNo || '-'}</td>
                         <td className="px-3 py-2">{r.model || '-'}</td>

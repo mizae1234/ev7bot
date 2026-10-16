@@ -21,7 +21,7 @@ export const HEADER_ALIASES = {
 export type ImportField = keyof typeof HEADER_ALIASES
 
 /** Fields the file must contain, otherwise the whole file is rejected. */
-export const REQUIRED_FIELDS: ImportField[] = ['claimNumber', 'registerNo', 'incidentDate', 'issueTitle']
+export const REQUIRED_FIELDS: ImportField[] = ['jobNo', 'registerNo', 'incidentDate', 'issueTitle']
 
 export const IMPORT_CONFIG = {
   /** Max data rows accepted per import. */
@@ -67,7 +67,7 @@ export type FieldLevel = 'required' | 'optional' | 'reference'
 
 /** Template column order (required first). Header text = first alias in HEADER_ALIASES. */
 export const TEMPLATE_COLUMN_ORDER: ImportField[] = [
-  'claimNumber',
+  'jobNo',
   'registerNo',
   'incidentDate',
   'issueTitle',
@@ -75,7 +75,7 @@ export const TEMPLATE_COLUMN_ORDER: ImportField[] = [
   'reporterName',
   'faultSummary',
   'insuranceCompany',
-  'jobNo',
+  'claimNumber',
   'model',
 ]
 
@@ -84,9 +84,9 @@ export const TEMPLATE_COLUMN_ORDER: ImportField[] = [
  * `required` fields come from REQUIRED_FIELDS; `level` only matters for the others.
  */
 export const FIELD_META: Record<ImportField, { level: FieldLevel; description: string; format?: string; example: string }> = {
-  claimNumber: {
+  jobNo: {
     level: 'required',
-    description: 'เลขเคลมของบริษัทประกัน ใช้ตรวจข้อมูลซ้ำ (แถวที่ไม่มีเลขเคลม หรือเลขเคลมมีในระบบแล้ว จะถูกข้าม)',
+    description: 'เลขงานของระบบประกัน เก็บในใบแจ้งซ่อม ใช้ตรวจข้อมูลซ้ำ (แถวที่ไม่มีเลขงาน หรือเลขงานมีในระบบแล้ว จะถูกข้าม)',
     example: 'ME260091815',
   },
   registerNo: {
@@ -125,9 +125,9 @@ export const FIELD_META: Record<ImportField, { level: FieldLevel; description: s
     description: 'บริษัทประกัน ใช้กำหนดรหัสประกัน (ชื่อที่ระบบไม่รู้จักจะเว้นว่างไว้)',
     example: 'ไอแคร์ ประกันภัย จำกัด (มหาชน)',
   },
-  jobNo: {
-    level: 'reference',
-    description: 'เลขงานของระบบประกัน เก็บไว้ใน log การนำเข้าเท่านั้น',
+  claimNumber: {
+    level: 'optional',
+    description: 'เลขเคลมของบริษัทประกัน ถ้ายังไม่มีให้เว้นว่างได้ (ถ้ามีและซ้ำกับที่มีในระบบ แถวนั้นจะถูกข้าม)',
     example: 'ME260091815',
   },
   model: {
