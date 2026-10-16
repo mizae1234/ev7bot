@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMSSQLPool, sql } from '@/lib/mssql'
+import { NextResponse } from 'next/server'
+import { getMSSQLPool } from '@/lib/mssql'
 import { env } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +38,7 @@ const locationMap: Record<string, string> = {
   'AUTOHAUS': 'อู่ Autohaus'
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   if (env.MOCK_MODE) {
     const mockStats = {
       total: 35,
@@ -134,8 +134,20 @@ export async function GET(req: NextRequest) {
       }
     ]
 
+    const mockSlaStats = {
+      d1_5: 5,
+      d6_10: 8,
+      d11_15: 7,
+      d16_30: 6,
+      d30_plus: 4,
+      total: 30,
+      avgDays: 14.2,
+      maxDays: 45
+    }
+
     return NextResponse.json({
       stats: mockStats,
+      slaStats: mockSlaStats,
       locations: mockLocations,
       problemTypes: mockProblemTypes,
       followUps: mockFollowUps,
@@ -306,7 +318,7 @@ export async function GET(req: NextRequest) {
         t.ServiceLocationCode,
         t.ReportDate,
         t.MaintenanceFinishDate,
-        DATEDIFF(day, t.ReportDate, GETDATE()) AS DaysActive,
+        ISNULL(DATEDIFF(day, t.ReportDate, GETDATE()), 0) AS DaysActive,
         t.FollowUpDetail
       FROM LatestTickets t
       JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
@@ -378,16 +390,53 @@ export async function GET(req: NextRequest) {
       Count: row.Count
     }))
 
+    // Calculate SLA Aging stats for stuck repairs
+    const stuckList = longestRepairsResult.recordset.filter(
+      (r: { CarStatusCode?: string }) => r.CarStatusCode !== 'READY_PICKUP_MAINTENANCE'
+    )
+    let d1_5 = 0
+    let d6_10 = 0
+    let d11_15 = 0
+    let d16_30 = 0
+    let d30_plus = 0
+    let totalDays = 0
+    let maxDays = 0
+
+    for (const item of stuckList) {
+      const d = typeof item.DaysActive === 'number' && !isNaN(item.DaysActive) ? Math.max(0, item.DaysActive) : 0
+      if (d <= 5) d1_5++
+      else if (d <= 10) d6_10++
+      else if (d <= 15) d11_15++
+      else if (d <= 30) d16_30++
+      else d30_plus++
+
+      totalDays += d
+      if (d > maxDays) maxDays = d
+    }
+
+    const slaStats = {
+      d1_5,
+      d6_10,
+      d11_15,
+      d16_30,
+      d30_plus,
+      total: stuckList.length,
+      avgDays: stuckList.length > 0 ? Math.round((totalDays / stuckList.length) * 10) / 10 : 0,
+      maxDays
+    }
+
     return NextResponse.json({
       stats: statsResult.recordset[0] || { total: 0, in_maintenance: 0, waiting: 0, complete: 0, on_rent_maintenance: 0, ready_pickup: 0, replacement_maintenance: 0 },
+      slaStats,
       locations: locationsMapped,
       problemTypes: problemTypesMapped,
       followUps: followUpsResult.recordset,
       longestRepairs: longestRepairsResult.recordset,
       stillWorkRepairs: stillWorkRepairsResult.recordset
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
     console.error('Error fetching maintenance dashboard:', err)
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดของระบบ: ' + err.message }, { status: 500 })
+    return NextResponse.json({ error: 'เกิดข้อผิดพลาดของระบบ: ' + errorMsg }, { status: 500 })
   }
 }

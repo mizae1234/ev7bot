@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
-import { LoginProfile } from '@/components/ui/LoginProfile'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -57,8 +56,20 @@ interface LongestRepairItem {
   FollowUpDetail: string | null
 }
 
+interface SLAStats {
+  d1_5: number
+  d6_10: number
+  d11_15: number
+  d16_30: number
+  d30_plus: number
+  total: number
+  avgDays: number
+  maxDays: number
+}
+
 interface MaintenanceDashboardData {
   stats: DashboardStats
+  slaStats?: SLAStats
   locations: LocationStat[]
   problemTypes: ProblemTypeStat[]
   followUps: FollowUpItem[]
@@ -135,6 +146,8 @@ function MaintenanceDashboardContent() {
 
   const [stillWorkSearchQuery, setStillWorkSearchQuery] = useState('')
   const [readyPickupSearchQuery, setReadyPickupSearchQuery] = useState('')
+  type SlaRange = 'all' | '1-5' | '6-10' | '11-15' | '16-30' | '>30'
+  const [selectedSlaFilter, setSelectedSlaFilter] = useState<SlaRange>('all')
 
   // Separate longestRepairs into ready-to-release and still stuck
   const readyPickupRepairs = longestRepairs.filter(r => r.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
@@ -154,10 +167,39 @@ function MaintenanceDashboardContent() {
     })
   }
 
-  // Filter longest repairs if location card is clicked, otherwise show all
-  let filteredLongestRepairs = selectedLocationFilter
+  // Base stuck repairs considering the selected location filter (if any)
+  const baseStuckRepairs = selectedLocationFilter
     ? actualStuckRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
     : actualStuckRepairs
+
+  // Dynamic SLA aging counts based on baseStuckRepairs
+  const d1_5List = baseStuckRepairs.filter(r => (r.DaysActive || 0) <= 5)
+  const d6_10List = baseStuckRepairs.filter(r => (r.DaysActive || 0) >= 6 && (r.DaysActive || 0) <= 10)
+  const d11_15List = baseStuckRepairs.filter(r => (r.DaysActive || 0) >= 11 && (r.DaysActive || 0) <= 15)
+  const d16_30List = baseStuckRepairs.filter(r => (r.DaysActive || 0) >= 16 && (r.DaysActive || 0) <= 30)
+  const d30_plusList = baseStuckRepairs.filter(r => (r.DaysActive || 0) > 30)
+
+  const currentSlaTotal = baseStuckRepairs.length
+  const currentSlaAvg = currentSlaTotal > 0
+    ? Math.round((baseStuckRepairs.reduce((acc, r) => acc + (r.DaysActive || 0), 0) / currentSlaTotal) * 10) / 10
+    : 0
+  const currentSlaMax = currentSlaTotal > 0
+    ? Math.max(...baseStuckRepairs.map(r => r.DaysActive || 0))
+    : 0
+
+  // Filter longest repairs if location card or SLA card is clicked, otherwise show all
+  let filteredLongestRepairs = baseStuckRepairs
+  if (selectedSlaFilter === '1-5') {
+    filteredLongestRepairs = d1_5List
+  } else if (selectedSlaFilter === '6-10') {
+    filteredLongestRepairs = d6_10List
+  } else if (selectedSlaFilter === '11-15') {
+    filteredLongestRepairs = d11_15List
+  } else if (selectedSlaFilter === '16-30') {
+    filteredLongestRepairs = d16_30List
+  } else if (selectedSlaFilter === '>30') {
+    filteredLongestRepairs = d30_plusList
+  }
 
   if (stuckSearchQuery.trim()) {
     const q = stuckSearchQuery.toLowerCase().replace(/[\s-]/g, '')
@@ -339,6 +381,296 @@ function MaintenanceDashboardContent() {
           </div>
         )}
 
+        {/* SLA & Repair Aging Analysis Block */}
+        {!isLoading && !error && (
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
+            {/* Header row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
+                    <span className="text-xl">⏱️</span> วิเคราะห์ระยะเวลาการซ่อมคงค้าง (Repair Aging & SLA Tracking)
+                  </h2>
+                  {selectedLocationFilter && (
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700">
+                      📍 {locationMap[selectedLocationFilter] || selectedLocationFilter}
+                    </span>
+                  )}
+                  {selectedSlaFilter !== 'all' && (
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-1 animate-pulse">
+                      <span>กำลังกรอง: {selectedSlaFilter === '1-5' ? '1-5 วัน' : selectedSlaFilter === '6-10' ? '6-10 วัน' : selectedSlaFilter === '11-15' ? '11-15 วัน' : selectedSlaFilter === '16-30' ? '16-30 วัน' : '> 30 วัน'}</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  สถิติจำนวนรถที่ค้างซ่อมตามช่วงเวลา (SLA Brackets) นับจากวันที่แจ้งซ่อม • คลิกที่การ์ดเพื่อกรองรายการรถด้านล่าง
+                </p>
+              </div>
+
+              {/* Summary Metrics & Reset */}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-1.5 text-right">
+                  <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">เฉลี่ยจอดซ่อม</span>
+                  <span className="text-sm font-black text-slate-800 font-mono">{currentSlaAvg} <span className="text-xs font-normal text-slate-500">วัน</span></span>
+                </div>
+                <div className="bg-rose-50 border border-rose-200 rounded-2xl px-3.5 py-1.5 text-right">
+                  <span className="text-[10px] text-rose-500 font-bold block uppercase tracking-wider">ค้างนานที่สุด</span>
+                  <span className="text-sm font-black text-rose-700 font-mono">{currentSlaMax} <span className="text-xs font-normal text-rose-500">วัน</span></span>
+                </div>
+                {selectedSlaFilter !== 'all' && (
+                  <button
+                    onClick={() => setSelectedSlaFilter('all')}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-2xl transition flex items-center gap-1 cursor-pointer"
+                  >
+                    ✕ ล้างตัวกรอง SLA
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Visual Distribution Bar */}
+            {currentSlaTotal > 0 && (
+              <div className="space-y-1.5">
+                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden flex shadow-inner">
+                  {d1_5List.length > 0 && (
+                    <div
+                      style={{ width: `${(d1_5List.length / currentSlaTotal) * 100}%` }}
+                      className="bg-emerald-500 h-full transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      title={`1-5 วัน: ${d1_5List.length} คัน (${Math.round((d1_5List.length / currentSlaTotal) * 100)}%)`}
+                      onClick={() => setSelectedSlaFilter(selectedSlaFilter === '1-5' ? 'all' : '1-5')}
+                    />
+                  )}
+                  {d6_10List.length > 0 && (
+                    <div
+                      style={{ width: `${(d6_10List.length / currentSlaTotal) * 100}%` }}
+                      className="bg-sky-500 h-full transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      title={`6-10 วัน: ${d6_10List.length} คัน (${Math.round((d6_10List.length / currentSlaTotal) * 100)}%)`}
+                      onClick={() => setSelectedSlaFilter(selectedSlaFilter === '6-10' ? 'all' : '6-10')}
+                    />
+                  )}
+                  {d11_15List.length > 0 && (
+                    <div
+                      style={{ width: `${(d11_15List.length / currentSlaTotal) * 100}%` }}
+                      className="bg-amber-500 h-full transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      title={`11-15 วัน: ${d11_15List.length} คัน (${Math.round((d11_15List.length / currentSlaTotal) * 100)}%)`}
+                      onClick={() => setSelectedSlaFilter(selectedSlaFilter === '11-15' ? 'all' : '11-15')}
+                    />
+                  )}
+                  {d16_30List.length > 0 && (
+                    <div
+                      style={{ width: `${(d16_30List.length / currentSlaTotal) * 100}%` }}
+                      className="bg-orange-500 h-full transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      title={`16-30 วัน: ${d16_30List.length} คัน (${Math.round((d16_30List.length / currentSlaTotal) * 100)}%)`}
+                      onClick={() => setSelectedSlaFilter(selectedSlaFilter === '16-30' ? 'all' : '16-30')}
+                    />
+                  )}
+                  {d30_plusList.length > 0 && (
+                    <div
+                      style={{ width: `${(d30_plusList.length / currentSlaTotal) * 100}%` }}
+                      className="bg-rose-600 h-full transition-all duration-500 hover:opacity-90 cursor-pointer"
+                      title={`> 30 วัน: ${d30_plusList.length} คัน (${Math.round((d30_plusList.length / currentSlaTotal) * 100)}%)`}
+                      onClick={() => setSelectedSlaFilter(selectedSlaFilter === '>30' ? 'all' : '>30')}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5 SLA Cards Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              {/* Bracket 1: 1 - 5 วัน */}
+              <button
+                type="button"
+                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '1-5' ? 'all' : '1-5')}
+                className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+                  selectedSlaFilter === '1-5'
+                    ? 'bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.02]'
+                    : 'bg-slate-50/70 hover:bg-emerald-50/30 border-slate-200 hover:border-emerald-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 inline-block" />
+                    1 - 5 วัน
+                  </span>
+                  {selectedSlaFilter === '1-5' ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">✓ กรอง</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">ปกติ</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                    {d1_5List.length} <span className="text-xs font-normal text-slate-500 font-sans">คัน</span>
+                  </p>
+                  <span className="text-[11px] font-bold text-slate-400 font-mono">
+                    {currentSlaTotal > 0 ? Math.round((d1_5List.length / currentSlaTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-emerald-500 h-full rounded-full transition-all"
+                    style={{ width: currentSlaTotal > 0 ? `${(d1_5List.length / currentSlaTotal) * 100}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 truncate">เพิ่งเข้า / ตรวจเช็คตามเกณฑ์</p>
+              </button>
+
+              {/* Bracket 2: 6 - 10 วัน */}
+              <button
+                type="button"
+                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '6-10' ? 'all' : '6-10')}
+                className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+                  selectedSlaFilter === '6-10'
+                    ? 'bg-sky-50/90 border-sky-400 ring-2 ring-sky-500 shadow-md scale-[1.02]'
+                    : 'bg-slate-50/70 hover:bg-sky-50/30 border-slate-200 hover:border-sky-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0 inline-block" />
+                    6 - 10 วัน
+                  </span>
+                  {selectedSlaFilter === '6-10' ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-600 text-white">✓ กรอง</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800">เริ่มติดตาม</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                    {d6_10List.length} <span className="text-xs font-normal text-slate-500 font-sans">คัน</span>
+                  </p>
+                  <span className="text-[11px] font-bold text-slate-400 font-mono">
+                    {currentSlaTotal > 0 ? Math.round((d6_10List.length / currentSlaTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-sky-500 h-full rounded-full transition-all"
+                    style={{ width: currentSlaTotal > 0 ? `${(d6_10List.length / currentSlaTotal) * 100}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 truncate">กำลังเสนอราคา / รออนุมัติ</p>
+              </button>
+
+              {/* Bracket 3: 11 - 15 วัน */}
+              <button
+                type="button"
+                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '11-15' ? 'all' : '11-15')}
+                className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+                  selectedSlaFilter === '11-15'
+                    ? 'bg-amber-50/90 border-amber-400 ring-2 ring-amber-500 shadow-md scale-[1.02]'
+                    : 'bg-slate-50/70 hover:bg-amber-50/30 border-slate-200 hover:border-amber-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 inline-block" />
+                    11 - 15 วัน
+                  </span>
+                  {selectedSlaFilter === '11-15' ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white">✓ กรอง</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">เริ่มล่าช้า</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                    {d11_15List.length} <span className="text-xs font-normal text-slate-500 font-sans">คัน</span>
+                  </p>
+                  <span className="text-[11px] font-bold text-slate-400 font-mono">
+                    {currentSlaTotal > 0 ? Math.round((d11_15List.length / currentSlaTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all"
+                    style={{ width: currentSlaTotal > 0 ? `${(d11_15List.length / currentSlaTotal) * 100}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 truncate">รออะไหล่ / ติดต่ออู่เร่งงาน</p>
+              </button>
+
+              {/* Bracket 4: 16 - 30 วัน */}
+              <button
+                type="button"
+                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '16-30' ? 'all' : '16-30')}
+                className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+                  selectedSlaFilter === '16-30'
+                    ? 'bg-orange-50/90 border-orange-400 ring-2 ring-orange-500 shadow-md scale-[1.02]'
+                    : 'bg-slate-50/70 hover:bg-orange-50/30 border-slate-200 hover:border-orange-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 inline-block" />
+                    16 - 30 วัน
+                  </span>
+                  {selectedSlaFilter === '16-30' ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-600 text-white">✓ กรอง</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">ล่าช้าสูง</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                    {d16_30List.length} <span className="text-xs font-normal text-slate-500 font-sans">คัน</span>
+                  </p>
+                  <span className="text-[11px] font-bold text-slate-400 font-mono">
+                    {currentSlaTotal > 0 ? Math.round((d16_30List.length / currentSlaTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-orange-500 h-full rounded-full transition-all"
+                    style={{ width: currentSlaTotal > 0 ? `${(d16_30List.length / currentSlaTotal) * 100}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 truncate">เกินครึ่งเดือน / เคสหนัก</p>
+              </button>
+
+              {/* Bracket 5: > 30 วัน */}
+              <button
+                type="button"
+                onClick={() => setSelectedSlaFilter(selectedSlaFilter === '>30' ? 'all' : '>30')}
+                className={`text-left p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden group cursor-pointer ${
+                  selectedSlaFilter === '>30'
+                    ? 'bg-rose-50/90 border-rose-400 ring-2 ring-rose-500 shadow-md scale-[1.02]'
+                    : 'bg-slate-50/70 hover:bg-rose-50/30 border-slate-200 hover:border-rose-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600 shrink-0 inline-block animate-ping" />
+                    &gt; 30 วัน
+                  </span>
+                  {selectedSlaFilter === '>30' ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">✓ กรอง</span>
+                  ) : (
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">วิกฤตเรื้อรัง</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between mt-1">
+                  <p className="text-2xl sm:text-3xl font-black text-rose-700 font-mono">
+                    {d30_plusList.length} <span className="text-xs font-normal text-slate-500 font-sans">คัน</span>
+                  </p>
+                  <span className="text-[11px] font-bold text-rose-500 font-mono">
+                    {currentSlaTotal > 0 ? Math.round((d30_plusList.length / currentSlaTotal) * 100) : 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/80 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-rose-600 h-full rounded-full transition-all"
+                    style={{ width: currentSlaTotal > 0 ? `${(d30_plusList.length / currentSlaTotal) * 100}%` : '0%' }}
+                  />
+                </div>
+                <p className="text-[10px] text-rose-600/80 font-medium mt-2 truncate">ค้างเกิน 1 เดือน / ติดตามด่วน</p>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Main Dashboard Layout */}
         {!isLoading && !error && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -482,12 +814,25 @@ function MaintenanceDashboardContent() {
               <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
                   <div>
-                    <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
                       <span>⚠️</span> รถยนต์ที่อยู่ระหว่างซ่อมค้างนานที่สุด (Stuck Repairs)
+                      <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                        {filteredLongestRepairs.length} คัน
+                      </span>
                     </h2>
                     <p className="text-[10px] text-slate-500 mt-0.5">เรียงลำดับตามวันที่เริ่มเกิดเหตุ/วันที่แจ้งซ่อมคงค้าง</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedSlaFilter !== 'all' && (
+                      <button
+                        onClick={() => setSelectedSlaFilter('all')}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                        title="คลิกเพื่อล้างตัวกรอง SLA"
+                      >
+                        <span>SLA: {selectedSlaFilter === '1-5' ? '1-5 วัน' : selectedSlaFilter === '6-10' ? '6-10 วัน' : selectedSlaFilter === '11-15' ? '11-15 วัน' : selectedSlaFilter === '16-30' ? '16-30 วัน' : '> 30 วัน'}</span>
+                        <span className="text-xs font-bold">✕</span>
+                      </button>
+                    )}
                     <input
                       type="text"
                       value={stuckSearchQuery}
@@ -563,11 +908,15 @@ function MaintenanceDashboardContent() {
                               {item.CarStatusCode === 'STILL_WORK' ? 'ค้างเคส' : 'จอดซ่อม'}
                             </span>
                             <span className={`text-xs sm:text-sm font-black font-mono shrink-0 ${
-                              item.DaysActive >= 14
-                                ? 'text-rose-600'
-                                : item.DaysActive >= 7
+                              item.DaysActive > 30
+                                ? 'text-rose-700 font-extrabold'
+                                : item.DaysActive >= 16
+                                ? 'text-orange-600'
+                                : item.DaysActive >= 11
                                 ? 'text-amber-600'
-                                : 'text-slate-800'
+                                : item.DaysActive >= 6
+                                ? 'text-sky-600'
+                                : 'text-emerald-600'
                             }`}>
                               {item.DaysActive} วัน
                             </span>
