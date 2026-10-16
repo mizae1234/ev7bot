@@ -611,8 +611,7 @@ function MaintenanceDashboardContent() {
                     style={{ width: currentSlaTotal > 0 ? `${(d1_5List.length / currentSlaTotal) * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 truncate">เพิ่งเข้า / ตรวจเช็คตามเกณฑ์</p>
-                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
                   <span>🔍 ดูรายการ &amp; Export</span>
                   <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
                 </div>
@@ -653,8 +652,7 @@ function MaintenanceDashboardContent() {
                     style={{ width: currentSlaTotal > 0 ? `${(d6_10List.length / currentSlaTotal) * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 truncate">กำลังเสนอราคา / รออนุมัติ</p>
-                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
                   <span>🔍 ดูรายการ &amp; Export</span>
                   <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
                 </div>
@@ -695,8 +693,7 @@ function MaintenanceDashboardContent() {
                     style={{ width: currentSlaTotal > 0 ? `${(d11_15List.length / currentSlaTotal) * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 truncate">รออะไหล่ / ติดต่ออู่เร่งงาน</p>
-                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
                   <span>🔍 ดูรายการ &amp; Export</span>
                   <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
                 </div>
@@ -737,8 +734,7 @@ function MaintenanceDashboardContent() {
                     style={{ width: currentSlaTotal > 0 ? `${(d16_30List.length / currentSlaTotal) * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 truncate">เกินครึ่งเดือน / เคสหนัก</p>
-                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
                   <span>🔍 ดูรายการ &amp; Export</span>
                   <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
                 </div>
@@ -762,7 +758,7 @@ function MaintenanceDashboardContent() {
                   {selectedSlaFilter === '>30' ? (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">✓ กรอง</span>
                   ) : (
-                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">วิกฤตเรื้อรัง</span>
+                    <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">วิกฤต</span>
                   )}
                 </div>
                 <div className="flex items-baseline justify-between mt-1">
@@ -779,8 +775,7 @@ function MaintenanceDashboardContent() {
                     style={{ width: currentSlaTotal > 0 ? `${(d30_plusList.length / currentSlaTotal) * 100}%` : '0%' }}
                   />
                 </div>
-                <p className="text-[10px] text-rose-600/80 font-medium mt-2 truncate">ค้างเกิน 1 เดือน / ติดตามด่วน</p>
-                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
+                <div className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-800 flex items-center justify-between mt-3 pt-2 border-t border-slate-200/60">
                   <span>🔍 ดูรายการ &amp; Export</span>
                   <span className="text-xs transition-transform group-hover:translate-x-0.5">→</span>
                 </div>
