@@ -837,6 +837,7 @@ export async function getPortfolioSummary() {
     let onRentOnRoad = 0
     let onRentMaint = 0
     const onRentByProj: Record<string, number> = {}
+    const onRoadByProj: Record<string, number> = {}
 
     // Available
     let availTotal = 0
@@ -908,6 +909,7 @@ export async function getPortfolioSummary() {
         if (sg === 'ปล่อยเช่า') {
           onRentOnRoad += c
           onRentByProj[proj] = (onRentByProj[proj] || 0) + c
+          onRoadByProj[proj] = (onRoadByProj[proj] || 0) + c
         } else if (sg === 'เข้าซ่อม') {
           onRentMaint += c
           onRentByProj[proj] = (onRentByProj[proj] || 0) + c
@@ -933,12 +935,19 @@ export async function getPortfolioSummary() {
     const availLM = availByProj['Line Man'] || 0
     const availGrab = availByProj['Grab'] || 0
     const availOthers = Math.max(0, availTotal - (availEV7 + availLM + availGrab))
+    const availGrandTotal = availTotal + demoCount
 
-    // Normalize OnRent Project keys
+    // Normalize OnRent Project keys (Total Contract)
     const rentEV7 = onRentByProj['EV7'] || 0
     const rentLM = onRentByProj['Line Man'] || 0
     const rentGrab = onRentByProj['Grab'] || 0
     const rentOthers = Math.max(0, onRentTotal - (rentEV7 + rentLM + rentGrab))
+
+    // Normalize OnRoad Project keys (Active On Road)
+    const roadEV7 = onRoadByProj['EV7'] || 0
+    const roadLM = onRoadByProj['Line Man'] || 0
+    const roadGrab = onRoadByProj['Grab'] || 0
+    const roadOthers = Math.max(0, onRentOnRoad - (roadEV7 + roadLM + roadGrab))
 
     // Company breakdown
     let compEV7 = 0
@@ -959,6 +968,11 @@ export async function getPortfolioSummary() {
         grab: rentGrab,
         others: rentOthers,
         byProject: onRentByProj,
+        roadEV7,
+        roadLineMan: roadLM,
+        roadGrab,
+        roadOthers,
+        roadByProject: onRoadByProj,
       },
       onProduction: {
         total: prodTotal,
@@ -969,6 +983,7 @@ export async function getPortfolioSummary() {
       },
       replacement: {
         total: replTotal,
+        activeTotal: replCar + replReadyTotal,
         car: replCar,
         available: replReadyAvail,
         reserved: replReserved,
@@ -985,13 +1000,15 @@ export async function getPortfolioSummary() {
         new: newDefect,
       },
       available: {
-        total: availTotal,
+        total: availGrandTotal,
+        readyTotal: availTotal,
         new: availNew,
         used: availUsed,
+        demo: demoCount,
         ev7: availEV7,
         lineMan: availLM,
         grab: availGrab,
-        others: availOthers,
+        others: availOthers + demoCount,
         byProject: availByProj,
       },
       company: {
@@ -1200,7 +1217,7 @@ export async function getRepairByLocation() {
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-          AND m.CarStatusCode NOT IN ('COMPLETE')
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
         GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY Count DESC
       `)
@@ -1295,7 +1312,7 @@ export async function getMaintenanceOverview() {
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-          AND m.CarStatusCode NOT IN ('COMPLETE')
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
         GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY TicketCount DESC
       `),
@@ -1324,7 +1341,7 @@ export async function getMaintenanceOverview() {
           FROM dbo.EV_MaintenanceItem m
           JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
           WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
-            AND m.CarStatusCode NOT IN ('COMPLETE')
+            AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
         )
         SELECT TOP 10
           t.MaintenanceItemID,

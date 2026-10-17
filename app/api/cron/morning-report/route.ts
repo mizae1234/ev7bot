@@ -274,15 +274,14 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'vertical', spacing: 'xs', contents: [
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '🟢 On Rent (สัญญาเช่า)', size: 'sm', weight: 'bold', color: '#2E7D32', flex: 5 },
-              { type: 'text', text: `${fmt(portfolio.onRent.total)} คัน`, size: 'sm', weight: 'bold', color: '#2E7D32', align: 'end', flex: 4 },
+              { type: 'text', text: '🟢 On Rent (วิ่งงาน)', size: 'sm', weight: 'bold', color: '#2E7D32', flex: 5 },
+              { type: 'text', text: `${fmt(portfolio.onRent.onRoad)} คัน`, size: 'sm', weight: 'bold', color: '#2E7D32', align: 'end', flex: 4 },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• On Road: ${fmt(portfolio.onRent.onRoad)}`, size: 'xxs', color: '#64748b', flex: 5 },
-              { type: 'text', text: `เข้าซ่อม: ${fmt(portfolio.onRent.underMaintenance)}`, size: 'xxs', color: '#E65100', align: 'end', flex: 4 },
+              { type: 'text', text: `• สัญญาเช่ารวม ${fmt(portfolio.onRent.total)} คัน (ในซ่อม ${fmt(portfolio.onRent.underMaintenance)})`, size: 'xxs', color: '#64748b' },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `  EV7 ${fmt(portfolio.onRent.ev7)} | LM ${fmt(portfolio.onRent.lineMan)} | Grab ${fmt(portfolio.onRent.grab)} | อื่นๆ ${fmt(portfolio.onRent.others)}`, size: 'xxs', color: '#94a3b8' },
+              { type: 'text', text: `  EV7 ${fmt(portfolio.onRent.roadEV7 ?? portfolio.onRent.ev7)} | LM ${fmt(portfolio.onRent.roadLineMan ?? portfolio.onRent.lineMan)} | Grab ${fmt(portfolio.onRent.roadGrab ?? portfolio.onRent.grab)} | อื่นๆ ${fmt(portfolio.onRent.roadOthers ?? portfolio.onRent.others)}`, size: 'xxs', color: '#94a3b8' },
             ]},
           ],
         },
@@ -290,11 +289,11 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'vertical', spacing: 'xs', contents: [
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '✅ Available (พร้อมใช้งาน)', size: 'sm', weight: 'bold', color: '#1565C0', flex: 5 },
+              { type: 'text', text: '✅ Available (พร้อมใช้)', size: 'sm', weight: 'bold', color: '#1565C0', flex: 5 },
               { type: 'text', text: `${fmt(portfolio.available.total)} คัน`, size: 'sm', weight: 'bold', color: '#1565C0', align: 'end', flex: 4 },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• รถใหม่ ${fmt(portfolio.available.new)} | มือสอง ${fmt(portfolio.available.used)}`, size: 'xxs', color: '#64748b', flex: 5 },
+              { type: 'text', text: `• รถใหม่ ${fmt(portfolio.available.new)} | มือสอง ${fmt(portfolio.available.used)}${portfolio.available.demo ? ` | Display ${fmt(portfolio.available.demo)}` : ''}`, size: 'xxs', color: '#64748b' },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
               { type: 'text', text: `  EV7 ${fmt(portfolio.available.ev7)} | Grab ${fmt(portfolio.available.grab)} | LM ${fmt(portfolio.available.lineMan)} | อื่นๆ ${fmt(portfolio.available.others)}`, size: 'xxs', color: '#94a3b8' },
@@ -320,11 +319,14 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'vertical', spacing: 'xs', contents: [
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '🔄 Replacement (รถทดแทน)', size: 'sm', weight: 'bold', color: '#E65100', flex: 5 },
-              { type: 'text', text: `${fmt(portfolio.replacement.total)} คัน`, size: 'sm', weight: 'bold', color: '#E65100', align: 'end', flex: 4 },
+              { type: 'text', text: '🔄 Replacement (พร้อม/ใช้งาน)', size: 'sm', weight: 'bold', color: '#E65100', flex: 6 },
+              { type: 'text', text: `${fmt(portfolio.replacement.activeTotal ?? (portfolio.replacement.car + portfolio.replacement.readyTotal))} คัน`, size: 'sm', weight: 'bold', color: '#E65100', align: 'end', flex: 3 },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• ใช้งาน ${fmt(portfolio.replacement.car)} | พร้อม/จอง ${fmt(portfolio.replacement.readyTotal)} | ซ่อม ${fmt(portfolio.replacement.underMaintenance)}`, size: 'xxs', color: '#64748b' },
+              { type: 'text', text: `• ใช้งาน ${fmt(portfolio.replacement.car)} | พร้อม/จอง ${fmt(portfolio.replacement.readyTotal)}`, size: 'xxs', color: '#64748b' },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `  (พอร์ตรวม ${fmt(portfolio.replacement.total)} คัน | ในซ่อม ${fmt(portfolio.replacement.underMaintenance)})`, size: 'xxs', color: '#94a3b8' },
             ]},
           ],
         },
@@ -332,14 +334,14 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'vertical', spacing: 'xs', contents: [
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '🛠️ Maintenance (ซ่อมบำรุงรวม)', size: 'sm', weight: 'bold', color: '#C62828', flex: 5 },
+              { type: 'text', text: '🛠️ Maintenance (ซ่อมบำรุง)', size: 'sm', weight: 'bold', color: '#C62828', flex: 5 },
               { type: 'text', text: `${fmt(portfolio.underMaintenance.total)} คัน`, size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 4 },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRent)} | รอลูกค้ารับ ${fmt(portfolio.underMaintenance.readyPickup || 0)}`, size: 'xxs', color: '#64748b' },
+              { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRentTotal)} คัน (ซ่อม ${fmt(portfolio.underMaintenance.onRent)} | รอลูกค้ารับ ${fmt(portfolio.underMaintenance.readyPickup || 0)})`, size: 'xxs', color: '#64748b' },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• รถใช้แล้ว ${fmt(portfolio.underMaintenance.use)} | รถสำรอง ${fmt(portfolio.underMaintenance.replacement)} | รถใหม่ ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#64748b' },
+              { type: 'text', text: `• รถใหม่ ${fmt(portfolio.underMaintenance.new)} | รถสำรอง ${fmt(portfolio.underMaintenance.replacement)} | มือสอง ${fmt(portfolio.underMaintenance.use)}`, size: 'xxs', color: '#64748b' },
             ]},
           ],
         },

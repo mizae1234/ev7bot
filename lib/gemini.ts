@@ -316,10 +316,10 @@ Note, CreateDate, UpdateDate
   - หากเขียน SQL Query ให้นับทั้งจำนวนใบงาน COUNT(m.MaintenanceItemID) และจำนวนคันรถ COUNT(DISTINCT m.InventoryItemID):
     SELECT ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location, COUNT(m.MaintenanceItemID) AS TicketCount, COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
     FROM dbo.EV_MaintenanceItem m JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-    WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode NOT IN ('COMPLETE')
+    WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
     GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
   - หากค้นหารายการรถในอู่นั้น:
-    SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode NOT IN ('COMPLETE') AND m.ServiceLocationCode LIKE '%ศาลายา%'
+    SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') AND m.ServiceLocationCode LIKE '%ศาลายา%'
 
 ### ถามจำนวนรถพร้อมรับรถ / รถซ่อมเสร็จ รอลูกค้ามารับ (Ready to pickup)
 - รถพร้อมรับรถ (Ready to pickup) คือรถใน EV_InventoryItem (Status = 'MAINTENANCE') ที่มีใบงานค้างสถานะ 'READY_PICKUP_MAINTENANCE' (IsActive = 1) โดยที่ไม่มีใบงานอื่นค้างที่กำลังเข้าซ่อมหรือรอเข้าซ่อมจริง ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
@@ -537,7 +537,7 @@ Note, CreateDate, UpdateDate
   - ยอดเป้าหมายรายเดือน (Monthly Target) ให้เรียกว่า **"เป้าประจำเดือน"** เสมอ (ห้ามตอบว่า "มีทั้งหมด" หรือ "ทั้งหมด" หรือ "แผนทั้งหมด" หรือ "แผนรายวัน")
   - ยอดที่ยังขาดอยู่เพื่อให้ถึงเป้า ให้เรียกว่า **"ขาดอีก"** เสมอ (ห้ามใช้คำว่า "Pending", "อยู่ระหว่างดำเนินการ", "รอส่งมอบ" หรือ "ตามเป้า")
 - เมื่อถูกขอ "สรุปรายงานประจำวัน" หรือ "รายงานประจำวัน" ให้ตอบเป็น 2 ส่วน:
-  ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port แสดง: Total (รถทั้งหมด), On Rent (ทั้งหมด, On Road, Under Maintenance), Available (ทั้งหมด, EV7, Line Man, Grab), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
+  ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary แสดงยอดแบบไม่ซ้ำ: Total (รถทั้งหมด), On Rent (On Road วิ่งงาน, สัญญาเช่ารวม, ในซ่อม), Available (รถใหม่, มือสอง, Display), On Production (Pending, ผลิต, รอรับ GR), Replacement (ใช้งาน, พร้อม/จอง, ซ่อม), Maintenance (รวม: รถเช่า [ซ่อม, รอลูกค้ารับ], รถใหม่, รถสำรอง, มือสอง)
   ส่วนที่ 2: "📅 สรุปประจำวัน" - ใช้ getDeliveryToday + getRepairStatus แสดงข้อมูลปล่อยรถวันนี้ และงานซ่อมวันนี้
 - ⚠️ กฎสำคัญมากเรื่องงานซ่อม: ห้ามนำรายการที่ CarStatusCode = 'COMPLETE' หรือมี MaintenanceFinishDate หรือรถที่ไม่ได้อยู่ในสถานะ i.Status = 'MAINTENANCE' มาตอบเป็นรถค้างซ่อมเด็ดขาด หากต้องการดูประวัติซ่อมเสร็จให้ระบุ CarStatusCode = 'COMPLETE' และหากต้องการดูภาพรวมรถค้างซ่อมให้ใช้ getMaintenanceOverview
 - **การค้นหาข้อมูลรถและเลขทะเบียน (Vehicle & VIN Lookup)**:

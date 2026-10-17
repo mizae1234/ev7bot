@@ -100,9 +100,16 @@ export async function GET(req: NextRequest) {
     if (statusFilter && statusFilter !== 'all') {
       if (statusFilter === 'READY_PICKUP_MAINTENANCE') {
         statusWhere = ` AND m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')`
+      } else if (statusFilter === 'ACTIVE_REPAIR') {
+        statusWhere = ` AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')`
+      } else if (statusFilter === 'PENDING_ALL') {
+        statusWhere = ` AND m.CarStatusCode NOT IN ('COMPLETE')`
       } else {
         statusWhere = ` AND m.CarStatusCode = @statusFilter`
       }
+    } else {
+      // By default (all), return all maintenance tickets for these vehicles including COMPLETE
+      statusWhere = ''
     }
     let locationWhere = ''
     if (locationFilter && locationFilter !== 'all') {
@@ -209,17 +216,20 @@ export async function GET(req: NextRequest) {
           COUNT(*) AS total_tickets,
           SUM(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance_tickets,
           SUM(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting_tickets,
-          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS ready_pickup_tickets
+          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS ready_pickup_tickets,
+          SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS complete_tickets,
+          SUM(CASE WHEN m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END) AS still_work_tickets
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
       `),
       locReq.query(`
         SELECT DISTINCT m.ServiceLocationCode
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode IS NOT NULL AND m.ServiceLocationCode != ''
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' 
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+          AND m.ServiceLocationCode IS NOT NULL AND m.ServiceLocationCode != ''
         ORDER BY m.ServiceLocationCode
       `),
       repairByLocReq.query(`
@@ -311,6 +321,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Dynamic Problem Type Map from Master Table
+    const dynamicProblemTypeMap: Record<string, string> = { ...problemTypeMap }
+    for (const pt of problemTypeResult.recordset) {
+      if (pt.StatusCode && pt.StatusName) {
+        dynamicProblemTypeMap[pt.StatusCode] = pt.StatusName
+      }
+    }
+
     // Map to output
     const items = itemResult.recordset.map((m: Record<string, unknown>) => ({
       id: m.MaintenanceItemID,
@@ -321,7 +339,7 @@ export async function GET(req: NextRequest) {
       issue_title: m.IssueTitle,
       status_code: m.CarStatusCode,
       status_text: mapCode(m.CarStatusCode, carStatusMap),
-      problem_type: mapCode(m.ProblemTypeCode, problemTypeMap),
+      problem_type: mapCode(m.ProblemTypeCode, dynamicProblemTypeMap),
       fault_party: mapCode(m.FaultPartyCode, faultPartyMap),
       car_case: mapCode(m.CarCaseCode, carCaseMap),
       service_location: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),

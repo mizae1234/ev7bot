@@ -103,6 +103,7 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
     // 2. Available
     const availNewItems = items.filter(i => i.TopGroup === 'รถใหม่' && i.SubGroup === 'Ready')
     const availUsedItems = items.filter(i => i.TopGroup === 'รถใช้งานแล้ว' && i.SubGroup === 'Ready')
+    const demoItems = items.filter(i => i.TopGroup === 'อื่นๆ' && (i.SubGroup === 'Demo' || i.VehicleStatus === 'Display'))
     const availUsedByProject: Record<string, number> = {}
     availUsedItems.forEach(i => {
       const p = (i.ProjectType || 'อื่นๆ').trim()
@@ -138,8 +139,7 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
       replReadyDetails[d] = (replReadyDetails[d] || 0) + 1
     })
 
-    // 5. Maintenance (จำแนกแบบหน้า Dashboard ซ่อมบำรุง 5 หมวดหลัก)
-    // 5.1 รถเช่าเข้าซ่อม (344) & 5.2 รถซ่อมเสร็จ รอลูกค้ามารับ (17)
+    // 5. Maintenance (584 คัน: รถใหม่ 12 + รถเช่า 361 + รถสำรอง 68 + รถใช้แล้ว 143)
     const onRentActiveMaintItems = onMaintItems.filter(i => i.LatestCarStatusCode !== 'READY_PICKUP_MAINTENANCE')
     const onRentReadyPickupItems = onMaintItems.filter(i => i.LatestCarStatusCode === 'READY_PICKUP_MAINTENANCE')
 
@@ -155,13 +155,8 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
       rentReadyPickupByProject[p] = (rentReadyPickupByProject[p] || 0) + 1
     })
 
-    // 5.3 รถใช้แล้วเข้าซ่อม (143)
     const maintRecondItems = items.filter(i => i.TopGroup === 'รถใช้งานแล้ว' && i.SubGroup === 'Recondition/Maintenance')
-
-    // 5.4 รถสำรองเข้าซ่อม (68)
     const maintReplCount = replMaintItems.length
-
-    // 5.5 รถใหม่เข้าซ่อม (12)
     const maintNewDefectItems = items.filter(i => i.TopGroup === 'รถใหม่' && i.SubGroup === 'Defect')
 
     // Active on Road
@@ -171,40 +166,43 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
       totalVehicles: items.length,
       activeRoadCount,
       onRent: {
-        total: onRentItems.length,
+        total: onRoadItems.length, // Non-overlapping: 3,336
+        contractTotal: onRentItems.length, // 3,697 (สัญญาเช่ารวมทั้งหมด)
         onRoadCount: onRoadItems.length,
         roadProjects: Object.entries(roadByProject).sort((a, b) => b[1] - a[1]),
-        onMaintCount: onMaintItems.length,
-        maintProjects: Object.entries(maintByProject).sort((a, b) => b[1] - a[1]),
+        onMaintCount: onMaintItems.length, // 361 (ในซ่อม)
       },
       available: {
-        total: availNewItems.length + availUsedItems.length,
+        total: availNewItems.length + availUsedItems.length + demoItems.length, // 156
         newCount: availNewItems.length,
         usedCount: availUsedItems.length,
         usedProjects: Object.entries(availUsedByProject).sort((a, b) => b[1] - a[1]),
+        demoCount: demoItems.length,
       },
       production: {
-        total: pendingItems.length + productionItems.length + waitingGrItems.length,
+        total: pendingItems.length + productionItems.length + waitingGrItems.length, // 1,004
         pendingCount: pendingItems.length,
         productionCount: productionItems.length,
         waitingGrCount: waitingGrItems.length,
       },
       replacement: {
-        total: replItems.length,
+        total: replCarItems.length + replReadyItems.length, // Non-overlapping: 253
+        fleetTotal: replItems.length, // 321 (พอร์ตรถแทนรวมทั้งหมด)
         carCount: replCarItems.length,
         readyCount: replReadyItems.length,
         readyDetails: Object.entries(replReadyDetails).sort((a, b) => b[1] - a[1]),
-        maintCount: replMaintItems.length,
+        maintCount: replMaintItems.length, // 68 (ในซ่อม)
       },
       maintenance: {
-        total: onRentActiveMaintItems.length + onRentReadyPickupItems.length + maintRecondItems.length + maintReplCount + maintNewDefectItems.length,
-        newCount: maintNewDefectItems.length, // 🟡 รถใหม่เข้าซ่อม
-        usedCount: maintRecondItems.length, // 🔴 รถใช้แล้วเข้าซ่อม
-        rentActiveCount: onRentActiveMaintItems.length, // 🔵 รถเช่าเข้าซ่อม
+        total: onRentActiveMaintItems.length + onRentReadyPickupItems.length + maintRecondItems.length + maintReplCount + maintNewDefectItems.length, // 584
+        newCount: maintNewDefectItems.length, // 🟡 รถใหม่: 12
+        rentTotal: onRentActiveMaintItems.length + onRentReadyPickupItems.length, // 🔵 รถเช่ารวม: 361
+        rentActiveCount: onRentActiveMaintItems.length, // ↳ อยู่ระหว่างซ่อม: 344
         rentActiveProjects: Object.entries(rentActiveByProject).sort((a, b) => b[1] - a[1]),
-        readyPickupCount: onRentReadyPickupItems.length, // 🟠 รถซ่อมเสร็จ รอลูกค้ามารับ
+        readyPickupCount: onRentReadyPickupItems.length, // ↳ รอลูกค้ามารับ: 17
         readyPickupProjects: Object.entries(rentReadyPickupByProject).sort((a, b) => b[1] - a[1]),
-        replCount: maintReplCount, // 🟣 รถสำรองเข้าซ่อม
+        replCount: maintReplCount, // 🟣 รถสำรอง: 68
+        usedCount: maintRecondItems.length, // 🔴 รถใช้แล้ว (มือสอง): 143
       }
     }
   }, [items])
@@ -270,10 +268,13 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
               <div className={`w-full ${THEMES.emerald.bg} ${THEMES.emerald.border} border rounded-2xl p-3 text-center shadow-sm`}>
                 <div className="flex items-center justify-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className={`text-xs font-extrabold ${THEMES.emerald.text}`}>On Rent (สัญญาเช่า)</span>
+                  <span className={`text-xs font-extrabold ${THEMES.emerald.text}`}>On Rent (วิ่งงาน)</span>
                 </div>
                 <div className={`text-xl font-black mt-1 ${THEMES.emerald.text}`}>
                   {treeData.onRent.total.toLocaleString()} <span className="text-xs font-normal">คัน</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  สัญญาเช่ารวม {treeData.onRent.contractTotal.toLocaleString()} (ในซ่อม {treeData.onRent.onMaintCount})
                 </div>
               </div>
 
@@ -300,33 +301,6 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
                   {expandedNodes['onrent-onroad'] && (
                     <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/50 space-y-1">
                       {treeData.onRent.roadProjects.map(([proj, count]) => (
-                        <div key={proj} className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 px-1">
-                          <span className="truncate pr-1">{proj}</span>
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">{count.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* On Rent Maint */}
-                <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs">
-                  <div 
-                    onClick={() => toggleNode('onrent-maint')}
-                    className="flex items-center justify-between cursor-pointer hover:opacity-80 transition"
-                  >
-                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1">
-                      <span>• เข้าซ่อม (เช่าติดซ่อม)</span>
-                      <span className="text-[9px] text-zinc-400">{expandedNodes['onrent-maint'] ? '▾' : '▸'}</span>
-                    </span>
-                    <span className="text-xs font-black text-rose-600 dark:text-rose-400">
-                      {treeData.onRent.onMaintCount.toLocaleString()}
-                    </span>
-                  </div>
-
-                  {expandedNodes['onrent-maint'] && (
-                    <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/50 space-y-1">
-                      {treeData.onRent.maintProjects.map(([proj, count]) => (
                         <div key={proj} className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 px-1">
                           <span className="truncate pr-1">{proj}</span>
                           <span className="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">{count.toLocaleString()}</span>
@@ -390,6 +364,16 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
                     </div>
                   )}
                 </div>
+
+                {/* รถจัดแสดง Demo */}
+                {treeData.available.demoCount > 0 && (
+                  <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200">• รถจัดแสดง (Display)</span>
+                    <span className="text-xs font-black text-sky-600 dark:text-sky-400">
+                      {treeData.available.demoCount.toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -440,10 +424,13 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
               <div className={`w-full ${THEMES.amber.bg} ${THEMES.amber.border} border rounded-2xl p-3 text-center shadow-sm`}>
                 <div className="flex items-center justify-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className={`text-xs font-extrabold ${THEMES.amber.text}`}>Replacement (ทดแทน)</span>
+                  <span className={`text-xs font-extrabold ${THEMES.amber.text}`}>Replacement (พร้อม/ใช้งาน)</span>
                 </div>
                 <div className={`text-xl font-black mt-1 ${THEMES.amber.text}`}>
                   {treeData.replacement.total.toLocaleString()} <span className="text-xs font-normal">คัน</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  พอร์ตรถแทนรวม {treeData.replacement.fleetTotal.toLocaleString()} (ในซ่อม {treeData.replacement.maintCount})
                 </div>
               </div>
 
@@ -484,13 +471,6 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
                     </div>
                   )}
                 </div>
-
-                <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200">• เข้าซ่อม</span>
-                  <span className="text-xs font-black text-rose-600 dark:text-rose-400">
-                    {treeData.replacement.maintCount.toLocaleString()}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -510,31 +490,20 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
               {/* Connector */}
               <div className="w-0.5 h-3 bg-zinc-300 dark:bg-zinc-700" />
 
-              {/* Sub branches (แยก 5 กลุ่มตามหน้าซ่อมบำรุง) */}
+              {/* Sub branches (แยกเป็น รถใหม่ รถเช่า รถสำรอง รถใช้แล้ว และย่อยรอลูกค้ามารับข้างในรถเช่า) */}
               <div className="w-full space-y-2">
                 {/* 1. รถใหม่เข้าซ่อม */}
                 <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
                   <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
                     <span>🟡</span>
-                    <span>รถใหม่เข้าซ่อม</span>
+                    <span>รถใหม่</span>
                   </span>
                   <span className="text-xs font-black text-rose-600 dark:text-rose-400">
                     {treeData.maintenance.newCount.toLocaleString()}
                   </span>
                 </div>
 
-                {/* 2. รถใช้แล้วเข้าซ่อม */}
-                <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
-                    <span>🔴</span>
-                    <span>รถใช้แล้วเข้าซ่อม</span>
-                  </span>
-                  <span className="text-xs font-black text-amber-600 dark:text-amber-400">
-                    {treeData.maintenance.usedCount.toLocaleString()}
-                  </span>
-                </div>
-
-                {/* 3. รถเช่าเข้าซ่อม */}
+                {/* 2. รถเช่าเข้าซ่อม (ย่อย อยู่ระหว่างซ่อม & รอลูกค้ามารับ) */}
                 <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs">
                   <div 
                     onClick={() => toggleNode('maint-rent')}
@@ -542,62 +511,91 @@ export default function PortfolioStatusTree({ items }: PortfolioStatusTreeProps)
                   >
                     <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
                       <span>🔵</span>
-                      <span>รถเช่าเข้าซ่อม</span>
+                      <span>รถเช่า</span>
                       <span className="text-[9px] text-zinc-400">{expandedNodes['maint-rent'] ? '▾' : '▸'}</span>
                     </span>
-                    <span className="text-xs font-black text-indigo-650 dark:text-indigo-400">
-                      {treeData.maintenance.rentActiveCount.toLocaleString()}
+                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
+                      {treeData.maintenance.rentTotal.toLocaleString()}
                     </span>
                   </div>
 
-                  {expandedNodes['maint-rent'] && (
-                    <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/50 space-y-1">
-                      {treeData.maintenance.rentActiveProjects.map(([proj, count]) => (
-                        <div key={proj} className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 px-1">
-                          <span className="truncate pr-1">{proj}</span>
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">{count.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  {/* Sub-breakdown: อยู่ระหว่างซ่อม & รอลูกค้ามารับ */}
+                  <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/50 space-y-2 pl-1.5">
+                    {/* ↳ อยู่ระหว่างซ่อม */}
+                    <div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); toggleNode('maint-rent-active') }}
+                        className="flex items-center justify-between cursor-pointer hover:opacity-80 transition text-[10px]"
+                      >
+                        <span className="text-zinc-600 dark:text-zinc-300 font-bold flex items-center gap-1">
+                          <span>↳ อยู่ระหว่างซ่อม</span>
+                          <span className="text-[8px] text-zinc-400">{expandedNodes['maint-rent-active'] ? '▾' : '▸'}</span>
+                        </span>
+                        <span className="font-extrabold text-indigo-650 dark:text-indigo-400">
+                          {treeData.maintenance.rentActiveCount.toLocaleString()}
+                        </span>
+                      </div>
 
-                {/* 4. รถซ่อมเสร็จ รอลูกค้ามารับ */}
-                <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs">
-                  <div 
-                    onClick={() => toggleNode('maint-pickup')}
-                    className="flex items-center justify-between cursor-pointer hover:opacity-80 transition"
-                  >
-                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
-                      <span>🟠</span>
-                      <span>รถซ่อมเสร็จ รอลูกค้ามารับ</span>
-                      <span className="text-[9px] text-zinc-400">{expandedNodes['maint-pickup'] ? '▾' : '▸'}</span>
-                    </span>
-                    <span className="text-xs font-black text-orange-600 dark:text-orange-400">
-                      {treeData.maintenance.readyPickupCount.toLocaleString()}
-                    </span>
+                      {expandedNodes['maint-rent-active'] && (
+                        <div className="mt-1 pl-3 py-1 space-y-0.5 border-l border-zinc-200 dark:border-zinc-700">
+                          {treeData.maintenance.rentActiveProjects.map(([proj, count]) => (
+                            <div key={proj} className="flex items-center justify-between text-[9px] text-zinc-500 dark:text-zinc-400">
+                              <span className="truncate pr-1">{proj}</span>
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">{count.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ↳ รอลูกค้ามารับ */}
+                    <div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); toggleNode('maint-pickup') }}
+                        className="flex items-center justify-between cursor-pointer hover:opacity-80 transition text-[10px]"
+                      >
+                        <span className="text-orange-600 dark:text-orange-400 font-bold flex items-center gap-1">
+                          <span>↳ รอลูกค้ามารับ</span>
+                          <span className="text-[8px] text-zinc-400">{expandedNodes['maint-pickup'] ? '▾' : '▸'}</span>
+                        </span>
+                        <span className="font-extrabold text-orange-600 dark:text-orange-400">
+                          {treeData.maintenance.readyPickupCount.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {expandedNodes['maint-pickup'] && (
+                        <div className="mt-1 pl-3 py-1 space-y-0.5 border-l border-orange-200 dark:border-orange-800">
+                          {treeData.maintenance.readyPickupProjects.map(([proj, count]) => (
+                            <div key={proj} className="flex items-center justify-between text-[9px] text-zinc-500 dark:text-zinc-400">
+                              <span className="truncate pr-1">{proj}</span>
+                              <span className="font-semibold text-zinc-700 dark:text-zinc-300 shrink-0">{count.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  {expandedNodes['maint-pickup'] && (
-                    <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/50 space-y-1">
-                      {treeData.maintenance.readyPickupProjects.map(([proj, count]) => (
-                        <div key={proj} className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 px-1">
-                          <span className="truncate pr-1">{proj}</span>
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200 shrink-0">{count.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                {/* 5. รถสำรองเข้าซ่อม */}
+                {/* 3. รถสำรองเข้าซ่อม */}
                 <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
                   <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
                     <span>🟣</span>
-                    <span>รถสำรองเข้าซ่อม</span>
+                    <span>รถสำรอง</span>
                   </span>
                   <span className="text-xs font-black text-purple-600 dark:text-purple-400">
                     {treeData.maintenance.replCount.toLocaleString()}
+                  </span>
+                </div>
+
+                {/* 4. รถใช้แล้วเข้าซ่อม */}
+                <div className="bg-white/90 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/80 p-2.5 shadow-xs flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
+                    <span>🔴</span>
+                    <span>รถใช้แล้ว (มือสอง)</span>
+                  </span>
+                  <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                    {treeData.maintenance.usedCount.toLocaleString()}
                   </span>
                 </div>
               </div>
