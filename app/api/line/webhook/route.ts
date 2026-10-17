@@ -2819,6 +2819,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               WHERE m.IsActive = 1 
                 AND i.IsActive = 1 
                 AND i.Status = 'MAINTENANCE'
+                AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE')
                 AND m.ServiceLocationCode LIKE @loc
               ORDER BY m.ReportDate DESC
             `)
@@ -2831,7 +2832,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
           const flexMessage = {
             type: 'flex' as const,
-            altText: `🔧 ข้อมูลรถค้างซ่อมที่ ${displayLocation}`,
+            altText: `🔧 ข้อมูลใบงานค้างซ่อมที่ ${displayLocation}`,
             contents: {
               type: 'bubble' as const,
               size: 'mega' as const,
@@ -2848,7 +2849,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   },
                   {
                     type: 'text',
-                    text: `สถานะรถค้างซ่อมทั้งหมดในอู่นี้`,
+                    text: `สถานะใบงานค้างซ่อมทั้งหมดในอู่นี้`,
                     size: 'xs',
                     color: '#D1FAE5',
                     margin: 'xs'
@@ -2864,7 +2865,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 contents: [
                   {
                     type: 'text',
-                    text: `พบรถค้างซ่อมทั้งหมด ${list.length} คัน:`,
+                    text: `พบใบงานค้างซ่อมทั้งหมด ${list.length} ใบงาน:`,
                     size: 'sm',
                     weight: 'bold',
                     color: '#111827'
@@ -2908,7 +2909,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   })) : [
                     {
                       type: 'text',
-                      text: 'ไม่มีรถค้างซ่อมที่อู่นี้ในขณะนี้ 🟢',
+                      text: 'ไม่มีใบงานค้างซ่อมที่อู่นี้ในขณะนี้ 🟢',
                       size: 'sm',
                       color: '#4b5563',
                       margin: 'md',
@@ -2919,12 +2920,30 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     { type: 'separator', margin: 'md' },
                     {
                       type: 'text',
-                      text: `...และคันอื่นๆ อีก ${list.length - 5} คัน`,
+                      text: `...และใบงานอื่นๆ อีก ${list.length - 5} ใบงาน`,
                       size: 'xs',
                       color: '#6b7280',
                       align: 'center'
                     }
-                  ] : [])
+                  ] : []),
+                  { type: 'separator', margin: 'md' },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    backgroundColor: '#f8fafc',
+                    cornerRadius: 'md',
+                    paddingAll: 'sm',
+                    margin: 'sm',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '📌 หมายเหตุ: นับเฉพาะใบงานค้างซ่อมและรอลูกค้ามารับ (ไม่รวมรายการที่ซ่อมเสร็จสิ้น)',
+                        size: 'xxs',
+                        color: '#64748b',
+                        wrap: true
+                      }
+                    ]
+                  }
                 ],
                 paddingAll: 'lg'
               },
@@ -2978,6 +2997,9 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
       const list = (repairs as any).data || []
       const totalCount = (repairs as any).totalCount || 0
+      const totalVehicles = (repairs as any).totalVehicles || 0
+      const inRepairVehicles = (repairs as any).inRepairVehicles || 0
+      const readyPickupCars = (repairs as any).readyPickupCars || 0
 
       const formatLocationName = (loc: string) => {
         if (!loc || loc === 'ไม่ระบุ') return 'ไม่ระบุพื้นที่/อู่'
@@ -3007,13 +3029,28 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               wrap: true
             },
             {
-              type: 'text',
-              text: `${item.Count} คัน`,
-              size: 'sm',
-              weight: 'bold',
-              color: '#C62828',
-              align: 'end',
-              flex: 2
+              type: 'box',
+              layout: 'vertical',
+              flex: 3,
+              contents: [
+                {
+                  type: 'text',
+                  text: `${item.Count} ใบงาน`,
+                  size: 'sm',
+                  weight: 'bold',
+                  color: '#C62828',
+                  align: 'end'
+                },
+                ...(item.VehicleCount ? [
+                  {
+                    type: 'text',
+                    text: `(${item.VehicleCount} คัน)`,
+                    size: 'xxs',
+                    color: '#64748b',
+                    align: 'end'
+                  }
+                ] : [])
+              ]
             }
           ]
         }
@@ -3021,7 +3058,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
 
       const flexMessage = {
         type: 'flex' as const,
-        altText: `🔧 สรุปรถค้างซ่อมแยกตามพื้นที่`,
+        altText: `🔧 สรุปงานซ่อมบำรุงรายพื้นที่`,
         contents: {
           type: 'bubble' as const,
           size: 'mega' as const,
@@ -3029,8 +3066,48 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             type: 'box',
             layout: 'vertical',
             contents: [
-              { type: 'text', text: '🔧 รถค้างซ่อมแยกตามพื้นที่', weight: 'bold', size: 'lg', color: '#ffffff' },
-              { type: 'text', text: `รวมทั้งหมด: ${totalCount} คัน`, size: 'sm', color: '#ffcdd2', margin: 'xs' }
+              { type: 'text', text: '🔧 สรุปงานซ่อมบำรุงรายพื้นที่', weight: 'bold', size: 'lg', color: '#ffffff' },
+              {
+                type: 'text',
+                text: `สถานะรถหลักในระบบ: ทั้งหมด ${totalVehicles} คัน`,
+                size: 'xs',
+                color: '#ffcdd2',
+                margin: 'xs'
+              },
+              {
+                type: 'box',
+                layout: 'horizontal',
+                margin: 'md',
+                spacing: 'sm',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    backgroundColor: '#B71C1C',
+                    cornerRadius: 'md',
+                    paddingAll: 'sm',
+                    flex: 1,
+                    contents: [
+                      { type: 'text', text: '🛠️ ค้างซ่อม (รถหลัก)', size: 'xxs', color: '#ffcdd2', weight: 'bold' },
+                      { type: 'text', text: `${inRepairVehicles} คัน`, size: 'sm', color: '#ffffff', weight: 'bold', margin: 'xs' },
+                      { type: 'text', text: `(รวม ${totalCount} ใบงาน)`, size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    backgroundColor: '#B71C1C',
+                    cornerRadius: 'md',
+                    paddingAll: 'sm',
+                    flex: 1,
+                    contents: [
+                      { type: 'text', text: '🟠 ซ่อมเสร็จรอมารับ', size: 'xxs', color: '#ffcdd2', weight: 'bold' },
+                      { type: 'text', text: `${readyPickupCars} คัน`, size: 'sm', color: '#ffffff', weight: 'bold', margin: 'xs' },
+                      { type: 'text', text: '(พร้อมส่งมอบ)', size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
+                    ]
+                  }
+                ]
+              }
             ],
             backgroundColor: '#C62828',
             paddingAll: 'lg'
@@ -3040,13 +3117,54 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             layout: 'vertical',
             spacing: 'md',
             contents: [
-              { type: 'text', text: '📍 รายชื่อพื้นที่ที่มีรถค้างซ่อมสูงสุด (Top 10)', weight: 'bold', size: 'sm', color: '#1a1a1a' },
+              {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'text', text: '📍 รายชื่อพื้นที่ที่มีงานค้างซ่อมสูงสุด (Top 10)', weight: 'bold', size: 'sm', color: '#1a1a1a' },
+                  { type: 'text', text: '• แยกย่อยตามใบงาน (1 คันอาจระบุไว้หลายสถานที่)', size: 'xxs', color: '#64748b', margin: 'xs' }
+                ]
+              },
               { type: 'separator' },
               ...locationRows,
               ...(list.length > 10 ? [
                 { type: 'separator', margin: 'lg' },
                 { type: 'text', text: `...และพื้นที่อื่นๆ อีก ${list.length - 10} แห่ง`, size: 'xs', color: '#888888', align: 'center', margin: 'md' }
-              ] : [])
+              ] : []),
+              { type: 'separator', margin: 'md' },
+              {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#f8fafc',
+                cornerRadius: 'md',
+                paddingAll: 'sm',
+                margin: 'sm',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '📌 หมายเหตุ:',
+                    size: 'xxs',
+                    weight: 'bold',
+                    color: '#475569'
+                  },
+                  {
+                    type: 'text',
+                    text: `• ยึดสถานะจากตัวรถหลักก่อน: ค้างซ่อม ${inRepairVehicles} คัน | ซ่อมเสร็จรอมารับ ${readyPickupCars} คัน (รวม ${totalVehicles} คัน)`,
+                    size: 'xxs',
+                    color: '#64748b',
+                    wrap: true,
+                    margin: 'xs'
+                  },
+                  {
+                    type: 'text',
+                    text: `• รายชื่อพื้นที่แจกแจงแยกตามใบงาน (${totalCount} ใบงาน): รถ 1 คันอาจระบุไว้หลายสถานที่หากมีการส่งซ่อมต่อเนื่อง`,
+                    size: 'xxs',
+                    color: '#64748b',
+                    wrap: true,
+                    margin: 'xs'
+                  }
+                ]
+              }
             ],
             paddingAll: 'lg'
           },
