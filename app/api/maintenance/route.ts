@@ -37,6 +37,7 @@ const carStatusMap: Record<string, string> = {
   'WAITING_FOR_MAINTENANCE': 'รถจอดรอซ่อม',
   'STILL_WORK': 'รถยังขับใช้งานได้อยู่',
   'READY_PICKUP_MAINTENANCE': 'รถซ่อมเสร็จ รอลูกค้ามารับ',
+  'GARAGE_COMPLETE': 'รถซ่อมเสร็จ รอลูกค้ามารับ',
 }
 
 const mapCode = (code: unknown, map: Record<string, string>): string => {
@@ -97,7 +98,11 @@ export async function GET(req: NextRequest) {
     const vehicleStatusWhere = isStillWorkView ? '' : ` AND i.Status = 'MAINTENANCE'`
     let statusWhere = ''
     if (statusFilter && statusFilter !== 'all') {
-      statusWhere = ` AND m.CarStatusCode = @statusFilter`
+      if (statusFilter === 'READY_PICKUP_MAINTENANCE') {
+        statusWhere = ` AND m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')`
+      } else {
+        statusWhere = ` AND m.CarStatusCode = @statusFilter`
+      }
     }
     let locationWhere = ''
     if (locationFilter && locationFilter !== 'all') {
@@ -138,23 +143,30 @@ export async function GET(req: NextRequest) {
     // Count of reported-but-not-yet-in-workshop tickets (independent of vehicle status)
     const stillWorkReq = pool.request()
 
-    // Run first 4 queries concurrently for performance optimization
+    // Ticket-level summary for maintenance items
+    const ticketSummaryReq = pool.request()
+
+    // Run queries concurrently for performance optimization
     const [
       stillWorkResult,
       summaryResult,
+      ticketSummaryResult,
       locResult,
       repairByLocResult,
       itemResult,
       problemTypeResult
     ] = await Promise.all([
       stillWorkReq.query(`
-        SELECT COUNT(*) AS still_work
+        SELECT 
+          COUNT(*) AS still_work,
+          COUNT(*) AS still_work_tickets,
+          COUNT(DISTINCT m.InventoryItemID) AS still_work_cars
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND m.CarStatusCode = 'STILL_WORK'
       `),
       summaryReq.query(`
-        WITH LatestTickets AS (
+        WITH LatestVehicleTicket AS (
           SELECT 
             m.InventoryItemID,
             m.CarStatusCode,
@@ -163,7 +175,7 @@ export async function GET(req: NextRequest) {
               ORDER BY 
                 CASE 
                   WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
-                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 2
                   WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
                   ELSE 4
                 END ASC,
@@ -176,17 +188,32 @@ export async function GET(req: NextRequest) {
           SELECT 
             i.InventoryItemID,
             i.StatusType,
-            COALESCE(t.CarStatusCode, '') AS LatestCarStatusCode
+            COALESCE(t.CarStatusCode, 'NO_TICKET') AS PrimaryCarStatusCode
           FROM dbo.EV_InventoryItem i
-          LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+          LEFT JOIN LatestVehicleTicket t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
           WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
         )
         SELECT
           COUNT(*) AS total,
-          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType <> 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
+          COUNT(*) AS total_cars,
+          SUM(CASE WHEN PrimaryCarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
+          SUM(CASE WHEN PrimaryCarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance_cars,
           0 AS complete,
-          SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' OR StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting
+          SUM(CASE WHEN PrimaryCarStatusCode = 'WAITING_FOR_MAINTENANCE' OR PrimaryCarStatusCode = 'NO_TICKET' THEN 1 ELSE 0 END) AS waiting,
+          SUM(CASE WHEN PrimaryCarStatusCode = 'WAITING_FOR_MAINTENANCE' OR PrimaryCarStatusCode = 'NO_TICKET' THEN 1 ELSE 0 END) AS waiting_cars,
+          SUM(CASE WHEN PrimaryCarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS ready_pickup_cars
         FROM VehiclesWithStatus
+      `),
+      ticketSummaryReq.query(`
+        SELECT
+          COUNT(*) AS total_tickets,
+          SUM(CASE WHEN m.CarStatusCode = 'IN_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance_tickets,
+          SUM(CASE WHEN m.CarStatusCode = 'WAITING_FOR_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting_tickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS ready_pickup_tickets
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
       `),
       locReq.query(`
         SELECT DISTINCT m.ServiceLocationCode
@@ -196,36 +223,19 @@ export async function GET(req: NextRequest) {
         ORDER BY m.ServiceLocationCode
       `),
       repairByLocReq.query(`
-        WITH LatestTickets AS (
-          SELECT 
-            m.InventoryItemID,
-            m.ServiceLocationCode,
-            m.CarStatusCode,
-            ROW_NUMBER() OVER (
-              PARTITION BY m.InventoryItemID 
-              ORDER BY 
-                CASE 
-                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
-                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
-                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
-                  ELSE 4
-                END ASC,
-                m.MaintenanceItemID DESC
-            ) as rn
-          FROM dbo.EV_MaintenanceItem m
-          JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-          WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
-        )
         SELECT 
-          ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
-          COUNT(*) AS Count
-        FROM LatestTickets
-        WHERE rn = 1
-        GROUP BY ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ')
+          ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+          COUNT(m.MaintenanceItemID) AS Count,
+          COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+        GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY Count DESC
       `),
       itemReq.query(`
-        SELECT TOP 500
+        SELECT TOP 2000
           m.MaintenanceItemID,
           COALESCE(i.RegisterNo, '') AS RegisterNo,
           m.VinNo,
@@ -346,7 +356,8 @@ export async function GET(req: NextRequest) {
       items,
       summary: {
         ...(summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 }),
-        still_work: stillWorkResult.recordset[0]?.still_work ?? 0,
+        ...(ticketSummaryResult.recordset[0] || { total_tickets: 0, in_maintenance_tickets: 0, waiting_tickets: 0, ready_pickup_tickets: 0 }),
+        ...(stillWorkResult.recordset[0] || { still_work: 0, still_work_tickets: 0, still_work_cars: 0 }),
       },
       locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
       locationSummary: repairByLocResult.recordset || [],

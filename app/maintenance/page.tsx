@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { exportToExcel, formatDateForExcelRaw, ExportButton } from '@/lib/exportExcel'
@@ -49,9 +49,26 @@ interface MaintenanceItem {
 
 interface MaintenanceData {
   items: MaintenanceItem[]
-  summary: { total: number; in_maintenance: number; complete: number; waiting: number; still_work?: number }
+  summary: {
+    total: number
+    in_maintenance: number
+    complete: number
+    waiting: number
+    still_work?: number
+    // Reconciled detailed metrics:
+    total_cars?: number
+    total_tickets?: number
+    in_maintenance_cars?: number
+    in_maintenance_tickets?: number
+    waiting_cars?: number
+    waiting_tickets?: number
+    ready_pickup_cars?: number
+    ready_pickup_tickets?: number
+    still_work_cars?: number
+    still_work_tickets?: number
+  }
   locations: string[]
-  locationSummary: { Location: string; Count: number }[]
+  locationSummary: { Location: string; Count: number; VehicleCount?: number }[]
   problemTypes: { code: string; name: string }[]
   fetchedAt: string
 }
@@ -136,13 +153,19 @@ function MaintenanceContent() {
     )
   })
 
+  const uniqueFilteredCarsCount = useMemo(() => {
+    const set = new Set(filteredItems.map(item => item.vin || item.register_no).filter(Boolean))
+    return set.size
+  }, [filteredItems])
+
   const getStatusColor = (code: string) => {
     switch (code) {
       case 'IN_MAINTENANCE': return 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400'
       case 'COMPLETE': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400'
       case 'WAITING_FOR_MAINTENANCE': return 'bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400'
       case 'STILL_WORK': return 'bg-sky-500/10 text-sky-600 border-sky-500/20 dark:bg-sky-500/20 dark:text-sky-400'
-      case 'READY_PICKUP_MAINTENANCE': return 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400'
+      case 'READY_PICKUP_MAINTENANCE':
+      case 'GARAGE_COMPLETE': return 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400'
       default: return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20 dark:bg-zinc-500/20 dark:text-zinc-400'
     }
   }
@@ -212,39 +235,128 @@ function MaintenanceContent() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               รายละเอียดงานซ่อมทั้งหมด สถานที่ซ่อม สถานะ และรถทดแทน
             </p>
+            {data?.summary && (
+              <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
+                  🚗 สถานะรถหลักในระบบ: <strong>{data.summary.total_cars ?? data.summary.total} คัน</strong>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-800 dark:bg-indigo-950/30 dark:border-indigo-800 dark:text-indigo-300">
+                  📋 แยกย่อยตามใบงาน: <strong>{data.summary.total_tickets ?? data.summary.total} ใบงาน</strong>
+                </span>
+                <span className="text-[11px] text-zinc-400 hidden sm:inline">
+                  *(1 คันอาจมีมากกว่า 1 ใบงานหากส่งซ่อมต่อเนื่อง)*
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Summary Cards */}
         {data?.summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <button onClick={() => setStatusFilter('all')}
-              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'all' ? 'border-indigo-500/40 bg-indigo-500/5 ring-1 ring-indigo-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">ทั้งหมด</p>
-              <p className="text-2xl font-extrabold text-zinc-900 dark:text-white mt-1">
-                {data.summary.total} <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400 ml-0.5">คัน</span>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+            {/* Card 1: All */}
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                statusFilter === 'all'
+                  ? 'border-indigo-500/40 bg-indigo-500/5 ring-1 ring-indigo-500/20 shadow-sm'
+                  : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'
+              }`}
+            >
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-bold">🚗 รถในระบบซ่อมทั้งหมด</p>
+              <p className="text-2xl font-black text-zinc-900 dark:text-white mt-1">
+                {data.summary.total_cars ?? data.summary.total} <span className="text-xs font-normal text-zinc-500 ml-0.5">คัน</span>
               </p>
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400">แยกย่อยใบงาน</span>
+                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                  {data.summary.total_tickets ?? data.summary.total} ใบงาน
+                </span>
+              </div>
             </button>
-            <button onClick={() => setStatusFilter('IN_MAINTENANCE')}
-              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'IN_MAINTENANCE' ? 'border-amber-500/40 bg-amber-500/5 ring-1 ring-amber-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold">🔧 กำลังซ่อม</p>
-              <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">
-                {data.summary.in_maintenance} <span className="text-xs font-normal text-amber-500 dark:text-amber-450 ml-0.5">คัน</span>
+
+            {/* Card 2: In Maintenance */}
+            <button
+              onClick={() => setStatusFilter('IN_MAINTENANCE')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                statusFilter === 'IN_MAINTENANCE'
+                  ? 'border-amber-500/40 bg-amber-500/5 ring-1 ring-amber-500/20 shadow-sm'
+                  : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'
+              }`}
+            >
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">🔧 กำลังซ่อม</p>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
+                {data.summary.in_maintenance_cars ?? data.summary.in_maintenance} <span className="text-xs font-normal text-amber-500 ml-0.5">คัน</span>
               </p>
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400">ใบงานกำลังทำ</span>
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  {data.summary.in_maintenance_tickets ?? data.summary.in_maintenance} ใบงาน
+                </span>
+              </div>
             </button>
-            <button onClick={() => setStatusFilter('WAITING_FOR_MAINTENANCE')}
-              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'WAITING_FOR_MAINTENANCE' ? 'border-rose-500/40 bg-rose-500/5 ring-1 ring-rose-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
-              <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">⏳ รอเข้าซ่อม</p>
-              <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
-                {data.summary.waiting} <span className="text-xs font-normal text-rose-500 dark:text-rose-450 ml-0.5">คัน</span>
+
+            {/* Card 3: Waiting */}
+            <button
+              onClick={() => setStatusFilter('WAITING_FOR_MAINTENANCE')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                statusFilter === 'WAITING_FOR_MAINTENANCE'
+                  ? 'border-rose-500/40 bg-rose-500/5 ring-1 ring-rose-500/20 shadow-sm'
+                  : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'
+              }`}
+            >
+              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-bold">⏳ รอเข้าซ่อม</p>
+              <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                {data.summary.waiting_cars ?? data.summary.waiting} <span className="text-xs font-normal text-rose-500 ml-0.5">คัน</span>
               </p>
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400">ใบงานรอเข้าซ่อม</span>
+                <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">
+                  {data.summary.waiting_tickets ?? data.summary.waiting} ใบงาน
+                </span>
+              </div>
             </button>
-            <button onClick={() => setStatusFilter('STILL_WORK')}
-              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${statusFilter === 'STILL_WORK' ? 'border-sky-500/40 bg-sky-500/5 ring-1 ring-sky-500/20' : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'}`}>
-              <p className="text-xs text-sky-600 dark:text-sky-400 font-bold">🔵 แจ้งแล้ว ยังไม่เข้าซ่อม</p>
-              <p className="text-2xl font-extrabold text-sky-600 dark:text-sky-400 mt-1">
-                {data.summary.still_work ?? 0} <span className="text-xs font-normal text-sky-500 ml-0.5">ใบ</span>
+
+            {/* Card 4: Ready Pickup */}
+            <button
+              onClick={() => setStatusFilter('READY_PICKUP_MAINTENANCE')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                statusFilter === 'READY_PICKUP_MAINTENANCE'
+                  ? 'border-orange-500/40 bg-orange-500/5 ring-1 ring-orange-500/20 shadow-sm'
+                  : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'
+              }`}
+            >
+              <p className="text-[11px] text-orange-600 dark:text-orange-400 font-bold">🟠 ซ่อมเสร็จ รอมารับ</p>
+              <p className="text-2xl font-black text-orange-600 dark:text-orange-400 mt-1">
+                {data.summary.ready_pickup_cars ?? 0} <span className="text-xs font-normal text-orange-500 ml-0.5">คัน</span>
               </p>
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400">พร้อมส่งมอบ</span>
+                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                  {data.summary.ready_pickup_tickets ?? 0} ใบงาน
+                </span>
+              </div>
+            </button>
+
+            {/* Card 5: Still Work */}
+            <button
+              onClick={() => setStatusFilter('STILL_WORK')}
+              className={`rounded-2xl border p-4 text-left transition-all duration-200 ${
+                statusFilter === 'STILL_WORK'
+                  ? 'border-sky-500/40 bg-sky-500/5 ring-1 ring-sky-500/20 shadow-sm'
+                  : 'border-zinc-200/80 bg-white/70 dark:border-zinc-800/80 dark:bg-zinc-900/60 hover:border-zinc-300'
+              }`}
+            >
+              <p className="text-[11px] text-sky-600 dark:text-sky-400 font-bold">🔵 แจ้งแล้ว ยังไม่เข้าซ่อม</p>
+              <p className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1">
+                {data.summary.still_work_cars ?? 0} <span className="text-xs font-normal text-sky-500 ml-0.5">คัน</span>
+              </p>
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-400">รถยังขับได้</span>
+                <span className="text-[11px] font-bold text-sky-600 dark:text-sky-400">
+                  {data.summary.still_work_tickets ?? (data.summary.still_work ?? 0)} ใบ
+                </span>
+              </div>
             </button>
           </div>
         )}
@@ -252,9 +364,14 @@ function MaintenanceContent() {
         {/* Repairs by Location */}
         {data?.locationSummary && data.locationSummary.length > 0 && (
           <div className="bg-white/70 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 p-5 shadow-sm backdrop-blur-md">
-            <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-4">
-              📍 รถค้างซ่อมแยกตามอู่/พื้นที่
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
+              <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                📍 งานค้างซ่อมแยกตามอู่/พื้นที่
+              </h2>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                • นับตามจำนวนใบงาน (และจำนวนคันรถจริงที่จอดอยู่ในอู่)
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {data.locationSummary.map((item: any, idx: number) => {
                 const displayLoc = item.Location === 'ไม่ระบุ' ? 'ไม่ระบุพื้นที่/อู่' : item.Location.replace(/_/g, ' ')
@@ -273,9 +390,16 @@ function MaintenanceContent() {
                     <span className="truncate pr-2" title={displayLoc}>
                       {displayLoc}
                     </span>
-                    <span className="font-extrabold text-rose-600 dark:text-rose-400 shrink-0">
-                      {item.Count} <span className="text-[9px] font-normal text-zinc-400">คัน</span>
-                    </span>
+                    <div className="text-right shrink-0">
+                      <span className="font-extrabold text-rose-600 dark:text-rose-400 block leading-tight">
+                        {item.Count} <span className="text-[9px] font-normal text-zinc-400">ใบงาน</span>
+                      </span>
+                      {item.VehicleCount !== undefined && (
+                        <span className="text-[9px] text-zinc-400 block leading-none mt-0.5">
+                          ({item.VehicleCount} คัน)
+                        </span>
+                      )}
+                    </div>
                   </button>
                 )
               })}
@@ -345,10 +469,18 @@ function MaintenanceContent() {
         {/* Table */}
         {data && !isLoading && (
           <div className="rounded-2xl border border-zinc-200/80 bg-white/70 shadow-sm backdrop-blur-md dark:border-zinc-800/80 dark:bg-zinc-900/60 overflow-hidden">
-            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold">
-                แสดง {filteredItems.length} รายการ {statusFilter !== 'all' ? `(สถานะ: ${statusFilter})` : ''} {locationFilter !== 'all' ? `(อู่: ${formatLocation(locationFilter)})` : ''} {problemTypeFilter !== 'all' ? `(ประเภท: ${problemTypeFilter})` : ''}
+            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <p className="text-xs text-zinc-700 dark:text-zinc-300 font-bold">
+                แสดง {filteredItems.length} ใบงาน (จากตัวรถจริง {uniqueFilteredCarsCount} คัน)
+                {statusFilter !== 'all' ? ` • สถานะ: ${statusFilter}` : ''}
+                {locationFilter !== 'all' ? ` • อู่: ${formatLocation(locationFilter)}` : ''}
+                {problemTypeFilter !== 'all' ? ` • ประเภท: ${problemTypeFilter}` : ''}
               </p>
+              {filteredItems.length > uniqueFilteredCarsCount && (
+                <span className="text-[11px] text-zinc-400">
+                  *บางคันมีมากกว่า 1 ใบงาน (เช่น ซ่อมต่อเนื่อง หรือแจ้งหลายอาการ)
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
