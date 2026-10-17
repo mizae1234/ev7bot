@@ -12,6 +12,8 @@ export interface RepairSummary {
   closed: number
   open: number
   openTotal?: number
+  stillWork?: number
+  inRepair?: number
 }
 
 export interface TrendDataPoint {

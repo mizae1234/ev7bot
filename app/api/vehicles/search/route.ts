@@ -22,12 +22,29 @@ export async function GET(req: NextRequest) {
     // Query top 15 matching active vehicles
     let sqlQuery = `
       SELECT TOP 15 
-        i.InventoryItemID, i.VinNo, i.RegisterNo, i.Model, i.Project, i.Status, i.StatusType, i.CurrentLocation,
+        i.InventoryItemID, i.VinNo, i.MotorNo, i.RegisterNo, i.Model, i.Project, i.ProjectType, i.Company, i.Status, i.StatusType, i.CurrentLocation,
         s.DescriptionStatus AS StatusName,
-        sub.DescriptionStatus AS SubStatusName
+        sub.DescriptionStatus AS SubStatusName,
+        rsvInfo.ReplacementReservedType,
+        rsvInfo.ReplacementReservedRemark,
+        vhInfo.ReplacementReadyDetails
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      OUTER APPLY (
+        SELECT TOP 1 
+          rr.Type AS ReplacementReservedType,
+          rr.Remark AS ReplacementReservedRemark
+        FROM dbo.EV_ReplacementReserved rr
+        WHERE rr.VinNo = i.VinNo AND rr.IsActive = 1
+        ORDER BY rr.CreateDate DESC
+      ) rsvInfo
+      OUTER APPLY (
+        SELECT TOP 1 
+          vh.ReplacementReadyDetails
+        FROM dbo.View_VehicleStatusHierarchy vh
+        WHERE vh.VinNo = i.VinNo
+      ) vhInfo
       WHERE i.IsActive = 1
     `
     if (isReplacement) {

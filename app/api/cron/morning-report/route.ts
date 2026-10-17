@@ -336,7 +336,10 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
               { type: 'text', text: `${fmt(portfolio.underMaintenance.total)} คัน`, size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 4 },
             ]},
             { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRent)} | สภาพ ${fmt(portfolio.underMaintenance.use)} | ทดแทน ${fmt(portfolio.underMaintenance.replacement)} | ใหม่ ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#64748b' },
+              { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRent)} | รอลูกค้ารับ ${fmt(portfolio.underMaintenance.readyPickup || 0)}`, size: 'xxs', color: '#64748b' },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: `• รถใช้แล้ว ${fmt(portfolio.underMaintenance.use)} | รถสำรอง ${fmt(portfolio.underMaintenance.replacement)} | รถใหม่ ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#64748b' },
             ]},
           ],
         },
@@ -362,10 +365,28 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
     },
     footer: {
       type: 'box',
-      layout: 'horizontal',
+      layout: 'vertical',
+      spacing: 'sm',
       contents: [
-        { type: 'text', text: `EV7: ${fmt(portfolio.company.ev7)} คัน`, size: 'xxs', color: '#888888' },
-        { type: 'text', text: `GI: ${fmt(portfolio.company.gi)} คัน`, size: 'xxs', color: '#888888', align: 'end' },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          contents: [
+            { type: 'text', text: `EV7: ${fmt(portfolio.company.ev7)} คัน`, size: 'xxs', color: '#888888' },
+            { type: 'text', text: `GI: ${fmt(portfolio.company.gi)} คัน`, size: 'xxs', color: '#888888', align: 'end' },
+          ],
+        },
+        {
+          type: 'button',
+          style: 'primary',
+          height: 'sm',
+          color: '#1565C0',
+          action: {
+            type: 'uri',
+            label: '📊 ดูรายละเอียดเพิ่มเติมบน Dashboard',
+            uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=/dashboard`,
+          },
+        },
       ],
       paddingAll: 'md',
     },

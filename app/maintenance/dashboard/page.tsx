@@ -23,6 +23,7 @@ interface LocationStat {
   LocationCode: string
   LocationName: string
   Count: number
+  TicketCount?: number
 }
 
 interface ProblemTypeStat {
@@ -940,6 +941,11 @@ function MaintenanceDashboardContent() {
                         <div className="text-right shrink-0">
                           <span className="text-base font-black">{loc.Count}</span>
                           <span className="text-[10px] text-slate-450 block leading-none mt-0.5">คัน</span>
+                          {loc.TicketCount !== undefined && (
+                            <span className="text-[10px] text-rose-500 font-bold block leading-none mt-1">
+                              ({loc.TicketCount} ใบ)
+                            </span>
+                          )}
                         </div>
                       </button>
                     )

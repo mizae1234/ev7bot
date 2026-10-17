@@ -58,7 +58,7 @@ CarStatusCode (COMPLETE/IN_MAINTENANCE/WAITING_FOR_MAINTENANCE/STILL_WORK),
 IssueTitle (หัวข้อปัญหา), ProblemTypeCode (ประเภท เช่น อุบัติเหตุ/ผลิตภัณฑ์),
 FaultPartyCode (คนขับ/คู่กรณี/อื่นๆ), CarCaseCode (เคสซ่อมเบา/เคสซ่อมหนัก),
 ServiceLocationCode (สถานที่ซ่อม), InsuranceCode (ประกัน),
-FollowUpDetail, IsActive (bit, หมายเหตุ: งานซ่อมที่ซ่อมเสร็จแล้ว CarStatusCode = 'COMPLETE' จะถูกบันทึกเป็น IsActive = 0 เสมอ ส่วนงานที่ยังซ่อมไม่เสร็จจะมี IsActive = 1)
+FollowUpDetail, IsActive (bit, ⚠️ สำคัญมาก: ในฐานข้อมูลมีรายการที่ CarStatusCode = 'COMPLETE' ทั้งที่เป็น IsActive = 1 และ IsActive = 0 ดังนั้นเมื่อค้นหารถค้างซ่อม ห้ามดูแค่ IsActive = 1 เด็ดขาด ต้องใส่เงื่อนไข m.CarStatusCode NOT IN ('COMPLETE') เสมอ)
 
 ### ตาราง: dbo.EV_ReplacementItem (รถทดแทน)
 คอลัมน์: ReplacementItemID, MaintenanceItemID, VinNo (VIN ของรถทดแทน),
@@ -184,10 +184,19 @@ Note, CreateDate, UpdateDate
 2. **ข้อห้ามเด็ดขาด (Strict Rule)**: ข้อมูลชื่อบริษัทประกันภัยต้องดึงจากคอลัมน์ InsuranceCompany (สำหรับประกันภาคสมัครใจ) หรือ ActCompany (สำหรับ พ.ร.บ.) ในตาราง dbo.EV_Policy เท่านั้น! ห้ามคาดเดาหรือแต่งชื่อบริษัทประกันภัยขึ้นเองเด็ดขาด หากในฐานข้อมูลเป็น NULL ให้แจ้งว่า "ไม่ระบุบริษัทประกัน" หรือระบุเฉพาะเลขกรมธรรม์และวันหมดอายุ
 
 ### ถามสถานะรถตามทะเบียน (เช่น "ทอ-3791 อยู่สถานะอะไร") หรือถามด้วยเลข VIN (เลขตัวถัง)
-1. ดึงข้อมูลหลักจาก EV_InventoryItem ก่อน (รองรับทั้งทะเบียนรถและเลข VIN):
-   SELECT InventoryItemID, VinNo, RegisterNo, Model, Status, StatusType, ProjectType, CurrentLocation FROM EV_InventoryItem WHERE RegisterNo LIKE '%3791%' OR VinNo LIKE '%3791%'
-2. ถ้า Status = 'MAINTENANCE' → ดึง detail จาก EV_MaintenanceItem:
-   SELECT IssueTitle, CarStatusCode, ProblemTypeCode AS ProblemTypeDescription, MaintenanceStartDate, MaintenanceFinishDate, ServiceLocationCode AS ServiceLocation, FollowUpDetail FROM EV_MaintenanceItem WHERE InventoryItemID = <id> AND IsActive = 1
+1. แนะนำให้เรียกใช้ฟังก์ชัน searchVehicle เป็นอันดับแรก — ซึ่งจะคืนข้อมูลตัวรถ สัญญาเช่าปัจจุบัน และ**รายละเอียดงานซ่อมปัจจุบัน** (เลขที่ใบงาน, อาการเสีย, สถานะงานซ่อม, อู่/สถานที่ซ่อม, วันที่เริ่มซ่อม, รถทดแทน) ครบถ้วนทันที
+2. ถ้าต้องการเขียน SQL Query เอง เพื่อดึง detail งานซ่อมจาก EV_MaintenanceItem ให้ยึดเกณฑ์ใบงานปัจจุบันที่ Active และยังไม่เสร็จสิ้น:
+   SELECT TOP 1 MaintenanceItemID, IssueTitle, CarStatusCode, ProblemTypeCode, ServiceLocationCode AS ServiceLocation, MaintenanceStartDate, ReportDate, FollowUpDetail
+   FROM dbo.EV_MaintenanceItem
+   WHERE InventoryItemID = <id> AND IsActive = 1 AND CarStatusCode NOT IN ('COMPLETE')
+   ORDER BY 
+     CASE 
+       WHEN CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+       WHEN CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+       WHEN CarStatusCode = 'STILL_WORK' THEN 3
+       ELSE 4
+     END ASC,
+     MaintenanceItemID DESC
 3. ถ้ามีรถทดแทน → ดึงจาก EV_ReplacementItem:
    SELECT VinNo, ReplacementStartDate, ReplacementReturnDate FROM EV_ReplacementItem WHERE MaintenanceItemID = <id> AND IsActive = 1
 4. ถ้ามีการสอบถามเกี่ยวกับการติดตามผล (Follow up) หรือการอัปเดตงานซ่อมย้อนหลัง → ดึงจาก EV_MaintenanceFollowUp:
@@ -299,10 +308,18 @@ Note, CreateDate, UpdateDate
 ### ถามจำนวนรถ ตามสถานะ
 - นับจาก EV_InventoryItem: SELECT Status, COUNT(*) as Total FROM EV_InventoryItem WHERE IsActive = 1 GROUP BY Status
 
-### ถามจำนวนรถซ่อมค้าง
-- SELECT COUNT(*) FROM EV_MaintenanceItem WHERE CarStatusCode IN ('IN_MAINTENANCE','WAITING_FOR_MAINTENANCE') AND IsActive = 1
-- หากถามเรื่องอู่ซ่อมเฉพาะพื้นที่/เจาะจงสถานที่ (เช่น "ซ่อม ศาลายา", "รถซ่อมที่อู่บางนา") ให้ค้นหาจาก ServiceLocationCode:
-  SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.ServiceLocationCode LIKE '%ศาลายา%'
+### ถามจำนวนรถซ่อมค้าง / ภาพรวมงานซ่อม (Maintenance Dashboard)
+- ⚠️ แนะนำให้เรียกใช้ฟังก์ชัน getMaintenanceOverview เป็นอันดับแรกเสมอ เพื่อให้ได้ข้อมูลจำนวนรถค้างซ่อม, รถกำลังซ่อม, รถรอมารับ, และรายชื่ออู่ที่ตรงกับหน้า Dashboard 100%
+- หากต้องเขียน SQL Query เอง ให้ยึดเกณฑ์เดียวกับ Dashboard: รถต้องอยู่ในสถานะ i.Status = 'MAINTENANCE' AND i.IsActive = 1 และใบงานต้อง m.CarStatusCode NOT IN ('COMPLETE') AND m.IsActive = 1
+- หากถามเรื่องอู่ซ่อมเฉพาะพื้นที่/เจาะจงสถานที่ หรือภาพรวมแต่ละอู่ (เช่น "พระประแดงมีกี่คัน", "ซ่อม ศาลายา", "รถซ่อมที่อู่บางนา"):
+  - แนะนำให้เรียกใช้ getMaintenanceOverview หรือ getRepairByLocation เพื่อดึงยอดตรงกับหน้า Dashboard
+  - หากเขียน SQL Query ให้นับทั้งจำนวนใบงาน COUNT(m.MaintenanceItemID) และจำนวนคันรถ COUNT(DISTINCT m.InventoryItemID):
+    SELECT ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location, COUNT(m.MaintenanceItemID) AS TicketCount, COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
+    FROM dbo.EV_MaintenanceItem m JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+    WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode NOT IN ('COMPLETE')
+    GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
+  - หากค้นหารายการรถในอู่นั้น:
+    SELECT i.RegisterNo, i.Model, m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode FROM EV_MaintenanceItem m JOIN EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE' AND m.CarStatusCode NOT IN ('COMPLETE') AND m.ServiceLocationCode LIKE '%ศาลายา%'
 
 ### ถามจำนวนรถพร้อมรับรถ / รถซ่อมเสร็จ รอลูกค้ามารับ (Ready to pickup)
 - รถพร้อมรับรถ (Ready to pickup) คือรถใน EV_InventoryItem (Status = 'MAINTENANCE') ที่มีใบงานค้างสถานะ 'READY_PICKUP_MAINTENANCE' (IsActive = 1) โดยที่ไม่มีใบงานอื่นค้างที่กำลังเข้าซ่อมหรือรอเข้าซ่อมจริง ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
@@ -322,7 +339,7 @@ Note, CreateDate, UpdateDate
           m.MaintenanceItemID DESC
       ) AS rn
     FROM dbo.EV_MaintenanceItem m
-    WHERE m.IsActive = 1
+    WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
   )
   SELECT COUNT(*) AS ReadyPickupCount
   FROM dbo.EV_InventoryItem i
@@ -522,7 +539,7 @@ Note, CreateDate, UpdateDate
 - เมื่อถูกขอ "สรุปรายงานประจำวัน" หรือ "รายงานประจำวัน" ให้ตอบเป็น 2 ส่วน:
   ส่วนที่ 1: "📊 ภาพรวม Portfolio" - ใช้ getPortfolioSummary ดึงข้อมูลรถทั้ง port แสดง: Total (รถทั้งหมด), On Rent (ทั้งหมด, On Road, Under Maintenance), Available (ทั้งหมด, EV7, Line Man, Grab), On Production (ทั้งหมด, Pending, In Process, Waiting GR), Replacement (ทั้งหมด, Available, Car), Under Maintenance (ทั้งหมด, New, On Rent, Use)
   ส่วนที่ 2: "📅 สรุปประจำวัน" - ใช้ getDeliveryToday + getRepairStatus แสดงข้อมูลปล่อยรถวันนี้ และงานซ่อมวันนี้
-- เฉพาะตาราง dbo.EV_MaintenanceItem (งานซ่อม) รายการที่ซ่อมเสร็จสิ้น (CarStatusCode = 'COMPLETE' หรือมี MaintenanceFinishDate) จะมีสถานะ IsActive = 0 (งานซ่อมค้างจะมี IsActive = 1) ดังนั้น เมื่อเขียน SQL Query เพื่อดึงข้อมูลรถซ่อมเสร็จ หรือประวัติการซ่อมบำรุงที่ปิดเสร็จแล้ว ให้ใช้เงื่อนไข IsActive = 0 แทน IsActive = 1
+- ⚠️ กฎสำคัญมากเรื่องงานซ่อม: ห้ามนำรายการที่ CarStatusCode = 'COMPLETE' หรือมี MaintenanceFinishDate หรือรถที่ไม่ได้อยู่ในสถานะ i.Status = 'MAINTENANCE' มาตอบเป็นรถค้างซ่อมเด็ดขาด หากต้องการดูประวัติซ่อมเสร็จให้ระบุ CarStatusCode = 'COMPLETE' และหากต้องการดูภาพรวมรถค้างซ่อมให้ใช้ getMaintenanceOverview
 - **การค้นหาข้อมูลรถและเลขทะเบียน (Vehicle & VIN Lookup)**:
   - เมื่อมีผู้ใช้สอบถามหาเลขทะเบียน หรือข้อมูลรถจากเลข VIN หรือเลขทะเบียน (รวมถึงเมื่อผู้ใช้ส่งรายการหลาย VIN เข้ามาพร้อมกัน):
     - ให้ค้นหาข้อมูลในตารางสต็อกหลัก dbo.EV_InventoryItem (และสัญญา dbo.EV_RentItem)
@@ -585,6 +602,14 @@ const functionDeclarations: FunctionDeclaration[] = [
           description: 'ชื่อรุ่นรถ เช่น Y Plus 490, ES เป็นต้น ถ้าไม่ระบุจะดูทุกรุ่น',
         },
       },
+    },
+  },
+  {
+    name: 'getMaintenanceOverview',
+    description: 'ดึงข้อมูลภาพรวมรถค้างซ่อมทั้งหมดในระบบ (ตรงกับหน้า Maintenance Dashboard 100%) ทั้งจำนวนรถค้างซ่อมทั้งหมด, รถกำลังซ่อม (In Maintenance), รถซ่อมเสร็จรอมารับ (Ready to Pickup), รถรอเปิดใบงาน, แยกตามประเภทรถ (On-Rent/มือสอง/รถทดแทน), จัดอันดับอู่ซ่อมที่มีรถค้างสูงสุด, และรายการรถที่ค้างซ่อมนานสุด (SLA Aging)',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {},
     },
   },
   {

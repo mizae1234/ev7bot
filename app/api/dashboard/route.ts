@@ -233,8 +233,10 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
 
   // Calculations for summaries
   const deliveryCompleted = filteredDeliveries.filter(d => d.status === 'complete').length
-  const repairClosed = filteredRepairs.filter(r => r.status === 'closed').length
-  const repairOpen = filteredRepairs.filter(r => r.status === 'open' || r.status === 'in_progress').length
+  const repairClosed = filteredRepairs.filter(r => r.status === 'closed' || r.status_code === 'COMPLETE').length
+  const repairStillWork = filteredRepairs.filter(r => r.status_code === 'STILL_WORK').length
+  const repairInRepair = filteredRepairs.filter(r => r.status !== 'closed' && r.status_code !== 'COMPLETE' && r.status_code !== 'STILL_WORK').length
+  const repairOpen = repairStillWork + repairInRepair
 
   // Create 12-month trend dynamically for the selected year
   const monthlyTrendMap: Record<number, { date: string; deliveries: number; completed: number; repairsReported: number; repairsClosed: number }> = {}
@@ -330,6 +332,8 @@ function getMockDashboardData(startDateStr: string, endDateStr: string, yearNum:
       total: filteredRepairs.length,
       closed: repairClosed,
       open: repairOpen,
+      stillWork: repairStillWork,
+      inRepair: repairInRepair,
     },
     trend,
     deliveryList: filteredDeliveries,
@@ -443,8 +447,10 @@ export async function GET(req: NextRequest) {
       repairSummaryRequest.query(`
         SELECT
           COUNT(*) AS total,
-          SUM(CASE WHEN m.MaintenanceFinishDate IS NOT NULL THEN 1 ELSE 0 END) AS closed,
-          SUM(CASE WHEN m.MaintenanceFinishDate IS NULL THEN 1 ELSE 0 END) AS [open],
+          SUM(CASE WHEN m.CarStatusCode = 'COMPLETE' THEN 1 ELSE 0 END) AS closed,
+          SUM(CASE WHEN m.CarStatusCode != 'COMPLETE' THEN 1 ELSE 0 END) AS [open],
+          SUM(CASE WHEN m.CarStatusCode = 'STILL_WORK' THEN 1 ELSE 0 END) AS stillWork,
+          SUM(CASE WHEN m.CarStatusCode NOT IN ('COMPLETE', 'STILL_WORK') THEN 1 ELSE 0 END) AS inRepair,
           (SELECT COUNT(*) FROM dbo.EV_InventoryItem WHERE Status = 'MAINTENANCE' AND IsActive = 1) AS openTotal
         FROM dbo.EV_MaintenanceItem m
         WHERE (m.IsActive = 1 OR m.MaintenanceFinishDate IS NOT NULL)
@@ -710,6 +716,8 @@ export async function GET(req: NextRequest) {
         closed: Number(repairSummaryResult.recordset[0]?.closed || 0),
         open: Number(repairSummaryResult.recordset[0]?.open || 0),
         openTotal: Number(repairSummaryResult.recordset[0]?.openTotal || 0),
+        stillWork: Number(repairSummaryResult.recordset[0]?.stillWork || 0),
+        inRepair: Number(repairSummaryResult.recordset[0]?.inRepair || 0),
       },
       trend,
       deliveryList: (deliveryListResult.recordset || []).map((row: any) => ({

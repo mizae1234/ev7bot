@@ -483,7 +483,6 @@ function DashboardContent() {
                 icon={carIcon}
                 subValue={[
                   { label: 'เสร็จแล้ว', count: data.delivery.completed, color: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20' },
-                  { label: 'เตรียมการ', count: data.delivery.pending, color: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/20' },
                 ]}
               />
               <StatCard
@@ -491,8 +490,9 @@ function DashboardContent() {
                 value={data.repair.total}
                 icon={repairIcon}
                 subValue={[
+                  { label: 'ยังขับได้', count: data.repair.stillWork ?? 0, color: 'bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border border-sky-500/20' },
+                  { label: 'เอาเข้าซ่อม', count: data.repair.inRepair ?? (data.repair.open - (data.repair.stillWork ?? 0)), color: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/20' },
                   { label: 'ปิดงาน', count: data.repair.closed, color: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20' },
-                  { label: 'ค้างซ่อม', count: data.repair.open, color: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/20' },
                 ]}
               />
               <StatCard 

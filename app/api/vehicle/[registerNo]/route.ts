@@ -105,7 +105,12 @@ export async function GET(
         s.DescriptionStatus AS StatusName,
         sub.DescriptionStatus AS SubStatusName,
         mainCarInfo.MainVehicleRegisterNo,
-        mainCarInfo.MainVehicleVin
+        mainCarInfo.MainVehicleVin,
+        rsvInfo.ReplacementReservedType,
+        rsvInfo.ReplacementReservedRemark,
+        rsvInfo.ReplacementReservedTargetVinNo,
+        rsvInfo.ReplacementReservedReleaseDate,
+        vhInfo.ReplacementReadyDetails
       FROM dbo.EV_InventoryItem i
       LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
@@ -124,6 +129,22 @@ export async function GET(
           CASE WHEN am.CarStatusCode NOT IN ('COMPLETE', 'GARAGE_COMPLETE') THEN 0 ELSE 1 END,
           activeRep.ReplacementItemID DESC
       ) mainCarInfo
+      OUTER APPLY (
+        SELECT TOP 1 
+          rr.Type AS ReplacementReservedType,
+          rr.Remark AS ReplacementReservedRemark,
+          rr.TargetVinNo AS ReplacementReservedTargetVinNo,
+          rr.ReleaseDate AS ReplacementReservedReleaseDate
+        FROM dbo.EV_ReplacementReserved rr
+        WHERE rr.VinNo = i.VinNo AND rr.IsActive = 1
+        ORDER BY rr.CreateDate DESC
+      ) rsvInfo
+      OUTER APPLY (
+        SELECT TOP 1 
+          vh.ReplacementReadyDetails
+        FROM dbo.View_VehicleStatusHierarchy vh
+        WHERE vh.VinNo = i.VinNo
+      ) vhInfo
       WHERE (
         REPLACE(REPLACE(i.RegisterNo, ' ', ''), '-', '') LIKE @cleanIdentifier
         OR REPLACE(REPLACE(i.VinNo, ' ', ''), '-', '') LIKE @cleanIdentifier
@@ -615,7 +636,7 @@ export async function GET(
             Remark,
             IsActive
           FROM dbo.EV_ReplacementReserved
-          WHERE TargetVinNo = @targetVin 
+          WHERE (TargetVinNo = @targetVin OR VinNo = @targetVin)
             AND IsActive = 1
             AND ClosedByMaintenanceItemID IS NULL
           ORDER BY CreateDate DESC

@@ -182,7 +182,7 @@ export async function GET() {
                 m.MaintenanceItemID DESC
             ) AS rn
           FROM dbo.EV_MaintenanceItem m
-          WHERE m.IsActive = 1
+          WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
         ),
         VehiclesWithStatus AS (
           SELECT 
@@ -217,31 +217,15 @@ export async function GET() {
 
     // 2. Service Location Breakdown (Only count cars currently in MAINTENANCE status, once per car)
     const locationResult = await pool.request().query(`
-      WITH LatestTickets AS (
-        SELECT 
-          m.InventoryItemID,
-          m.ServiceLocationCode,
-          ROW_NUMBER() OVER (
-            PARTITION BY m.InventoryItemID 
-            ORDER BY 
-              CASE 
-                WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
-                WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
-                WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
-                ELSE 4
-              END ASC,
-              m.MaintenanceItemID DESC
-          ) as rn
-        FROM dbo.EV_MaintenanceItem m
-        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
-        WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
-      )
       SELECT 
-        ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ') AS LocationCode,
-        COUNT(*) AS Count
-      FROM LatestTickets
-      WHERE rn = 1
-      GROUP BY ISNULL(NULLIF(ServiceLocationCode, ''), 'ไม่ระบุ')
+        ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS LocationCode,
+        COUNT(m.MaintenanceItemID) AS TicketCount,
+        COUNT(DISTINCT m.InventoryItemID) AS Count
+      FROM dbo.EV_MaintenanceItem m
+      JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+        AND m.CarStatusCode NOT IN ('COMPLETE')
+      GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
       ORDER BY Count DESC
     `)
 
@@ -265,6 +249,7 @@ export async function GET() {
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+          AND m.CarStatusCode NOT IN ('COMPLETE')
       )
       SELECT 
         ISNULL(NULLIF(ProblemTypeCode, ''), 'ไม่ระบุ') AS ProblemTypeCode,
@@ -322,6 +307,7 @@ export async function GET() {
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+          AND m.CarStatusCode NOT IN ('COMPLETE')
       )
       SELECT 
         t.MaintenanceItemID,

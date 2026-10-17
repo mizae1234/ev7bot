@@ -633,6 +633,31 @@ export async function searchVehicle(params: { keyword: string }) {
   req.input('keyword', sql.NVarChar, `%${params.keyword}%`)
 
   const result = await req.query(`
+    WITH LatestTickets AS (
+      SELECT 
+        m.MaintenanceItemID,
+        m.InventoryItemID,
+        m.IssueTitle,
+        m.CarStatusCode,
+        m.ServiceLocationCode,
+        m.ReportDate,
+        m.MaintenanceStartDate,
+        m.MaintenanceFinishDate,
+        m.FollowUpDetail,
+        ROW_NUMBER() OVER (
+          PARTITION BY m.InventoryItemID 
+          ORDER BY 
+            CASE 
+              WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+              WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+              WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+              ELSE 4
+            END ASC,
+            m.MaintenanceItemID DESC
+        ) as rn
+      FROM dbo.EV_MaintenanceItem m
+      WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
+    )
     SELECT TOP 5
       i.InventoryItemID,
       i.VinNo,
@@ -650,6 +675,15 @@ export async function searchVehicle(params: { keyword: string }) {
       r.ReleaseDate,
       r.ExpectedReleaseDate,
       r.IsActive AS rentActive,
+      m.MaintenanceItemID,
+      m.IssueTitle AS MaintenanceIssueTitle,
+      m.CarStatusCode AS MaintenanceStatusCode,
+      m.ServiceLocationCode AS MaintenanceLocation,
+      m.ReportDate AS MaintenanceReportDate,
+      m.MaintenanceStartDate,
+      m.FollowUpDetail AS MaintenanceFollowUpDetail,
+      rep.VinNo AS ReplacementVinNo,
+      repInv.RegisterNo AS ReplacementRegisterNo,
       CASE 
         WHEN v.RentType IS NOT NULL THEN v.RentType
         WHEN o.RentType IS NOT NULL THEN o.RentType
@@ -661,6 +695,9 @@ export async function searchVehicle(params: { keyword: string }) {
     LEFT JOIN dbo.EV_RentItem r ON i.InventoryItemID = r.InventoryItemID AND r.IsActive = 1
     LEFT JOIN dbo.View_AccumarateReleaseCar v ON r.RentItemID = v.RentItemID
     LEFT JOIN dbo.View_GetOnrentNewOrUse o ON i.VinNo = o.VinNo
+    LEFT JOIN LatestTickets m ON i.InventoryItemID = m.InventoryItemID AND m.rn = 1
+    LEFT JOIN dbo.EV_ReplacementItem rep ON m.MaintenanceItemID = rep.MaintenanceItemID AND rep.IsActive = 1
+    LEFT JOIN dbo.EV_InventoryItem repInv ON rep.VinNo = repInv.VinNo
     WHERE i.VinNo LIKE @keyword
       OR i.RegisterNo LIKE @keyword
       OR i.Model LIKE @keyword
@@ -745,15 +782,42 @@ export async function getPortfolioSummary() {
   try {
     const [hierarchyRes, companyRes] = await Promise.all([
       pool.request().query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.InventoryItemID,
+            m.CarStatusCode,
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) AS rn
+          FROM dbo.EV_MaintenanceItem m
+          WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
+        )
         SELECT 
-          TopGroup, 
-          SubGroup, 
-          LeafNode, 
-          ReplacementReadyDetails,
-          ProjectType,
+          v.TopGroup, 
+          v.SubGroup, 
+          v.LeafNode, 
+          v.ReplacementReadyDetails,
+          v.ProjectType,
+          v.VehicleStatus,
+          v.VehicleStatusType,
+          lt.CarStatusCode AS LatestCarStatusCode,
           COUNT(*) as cnt
-        FROM dbo.View_VehicleStatusHierarchy
-        GROUP BY TopGroup, SubGroup, LeafNode, ReplacementReadyDetails, ProjectType
+        FROM dbo.View_VehicleStatusHierarchy v
+        OUTER APPLY (
+          SELECT TOP 1 InventoryItemID 
+          FROM dbo.EV_InventoryItem inv 
+          WHERE inv.VinNo = v.VinNo AND inv.IsActive = 1
+        ) inv
+        LEFT JOIN LatestTickets lt ON inv.InventoryItemID = lt.InventoryItemID AND lt.rn = 1
+        GROUP BY v.TopGroup, v.SubGroup, v.LeafNode, v.ReplacementReadyDetails, v.ProjectType, v.VehicleStatus, v.VehicleStatusType, lt.CarStatusCode
       `),
       pool.request().query(`
         SELECT 
@@ -796,6 +860,7 @@ export async function getPortfolioSummary() {
 
     // Maintenance
     let maintRecond = 0 // Recondition/Maintenance รถใช้งานแล้ว
+    let readyPickup = 0 // รถซ่อมเสร็จ รอลูกค้ามารับ
 
     // Others
     let demoCount = 0
@@ -827,9 +892,12 @@ export async function getPortfolioSummary() {
         } else if (sg === 'Recondition/Maintenance') {
           maintRecond += c
         } else if (sg === 'Replacement') {
-          if (leaf === 'ถูกใช้งาน') replCar += c
-          else if (leaf === 'เข้าซ่อม') replMaint += c
-          else if (leaf === 'Ready') {
+          const isMaint = leaf === 'เข้าซ่อม' || row.VehicleStatus === 'MAINTENANCE' || (row.VehicleStatusType && row.VehicleStatusType.includes('MAINTENANCE'))
+          if (isMaint) {
+            replMaint += c
+          } else if (leaf === 'ถูกใช้งาน') {
+            replCar += c
+          } else if (leaf === 'Ready') {
             if (rrd === 'พร้อมใช้') replReadyAvail += c
             else if (rrd === 'ถูกจอง (LM)') replReadyRsvLM += c
             else if (rrd === 'ถูกจอง (EV7)') replReadyRsvEV7 += c
@@ -843,6 +911,9 @@ export async function getPortfolioSummary() {
         } else if (sg === 'เข้าซ่อม') {
           onRentMaint += c
           onRentByProj[proj] = (onRentByProj[proj] || 0) + c
+          if (row.LatestCarStatusCode === 'READY_PICKUP_MAINTENANCE') {
+            readyPickup += c
+          }
         }
       } else if (tg === 'อื่นๆ') {
         if (sg === 'WAITING_FOR_GR') prodWaitingGR += c
@@ -906,7 +977,9 @@ export async function getPortfolioSummary() {
       },
       underMaintenance: {
         total: maintTotal,
-        onRent: onRentMaint,
+        onRent: onRentMaint - readyPickup,
+        readyPickup,
+        onRentTotal: onRentMaint,
         use: maintRecond,
         replacement: replMaint,
         new: newDefect,
@@ -1091,7 +1164,7 @@ export async function getRepairByLocation() {
                 m.MaintenanceItemID DESC
             ) AS rn
           FROM dbo.EV_MaintenanceItem m
-          WHERE m.IsActive = 1
+          WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
         ),
         VehiclesWithStatus AS (
           SELECT 
@@ -1118,7 +1191,7 @@ export async function getRepairByLocation() {
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
           AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
       `),
-      // 3. แยกย่อยงานซ่อมตามใบงานรายพื้นที่ (Work Order Level)
+      // 3. แยกย่อยงานซ่อมรายพื้นที่ (นับทั้งจำนวนใบงาน และจำนวนคันรถจริง ตรงกับหน้า Dashboard และหน้ารายละเอียดใบงาน)
       pool.request().query(`
         SELECT 
           ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
@@ -1127,7 +1200,7 @@ export async function getRepairByLocation() {
         FROM dbo.EV_MaintenanceItem m
         JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
         WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
-          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+          AND m.CarStatusCode NOT IN ('COMPLETE')
         GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY Count DESC
       `)
@@ -1155,6 +1228,150 @@ export async function getRepairByLocation() {
   }
 }
 
+// ─── Function: getMaintenanceOverview (Exact logic matching Maintenance Dashboard) ─
+export async function getMaintenanceOverview() {
+  const pool = await getMSSQLPool()
+  if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
+
+  try {
+    const [statsResult, ticketStatsResult, locResult, topStuckResult] = await Promise.all([
+      // 1. สรุปสถานะรถหลัก (Vehicle Level - EV_InventoryItem where Status = 'MAINTENANCE')
+      pool.request().query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.InventoryItemID,
+            m.CarStatusCode,
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) AS rn
+          FROM dbo.EV_MaintenanceItem m
+          WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
+        ),
+        VehiclesWithStatus AS (
+          SELECT 
+            i.InventoryItemID,
+            i.StatusType,
+            t.CarStatusCode AS LatestCarStatusCode
+          FROM dbo.EV_InventoryItem i
+          LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+          WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+        )
+        SELECT
+          COUNT(*) AS totalVehicles,
+          SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 1 ELSE 0 END) AS readyPickupVehicles,
+          SUM(CASE WHEN LatestCarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1 ELSE 0 END) AS inRepairVehicles,
+          SUM(CASE WHEN LatestCarStatusCode IS NULL THEN 1 ELSE 0 END) AS noTicketVehicles,
+          SUM(CASE WHEN StatusType = 'ON_RENT_MAINTENANCE' THEN 1 ELSE 0 END) AS onRentVehicles,
+          SUM(CASE WHEN StatusType = 'USE_MAINTENANCE' THEN 1 ELSE 0 END) AS useVehicles,
+          SUM(CASE WHEN StatusType = 'REPLACEMENT_MAINTENANCE' THEN 1 ELSE 0 END) AS replVehicles,
+          SUM(CASE WHEN StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS newVehicles
+        FROM VehiclesWithStatus
+      `),
+      // 2. สรุปใบงานซ่อมที่ยังเปิดอยู่ (Ticket Level)
+      pool.request().query(`
+        SELECT
+          COUNT(*) AS totalTickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1 ELSE 0 END) AS inRepairTickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS readyPickupTickets
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+      `),
+      // 3. แยกย่อยรายสถานที่/อู่ (นับทั้งจำนวนใบงาน และจำนวนคันรถจริง ตรงกับ Dashboard 100%)
+      pool.request().query(`
+        SELECT 
+          ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
+          COUNT(m.MaintenanceItemID) AS TicketCount,
+          COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode NOT IN ('COMPLETE')
+        GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
+        ORDER BY TicketCount DESC
+      `),
+      // 4. รายการรถค้างซ่อมนานสุด (SLA Aging Top 10)
+      pool.request().query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.MaintenanceItemID,
+            m.InventoryItemID,
+            m.IssueTitle,
+            m.CarStatusCode,
+            m.ServiceLocationCode,
+            m.ReportDate,
+            m.MaintenanceStartDate,
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) as rn
+          FROM dbo.EV_MaintenanceItem m
+          JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+          WHERE m.IsActive = 1 AND i.Status = 'MAINTENANCE' AND i.IsActive = 1
+            AND m.CarStatusCode NOT IN ('COMPLETE')
+        )
+        SELECT TOP 10
+          t.MaintenanceItemID,
+          COALESCE(i.RegisterNo, '') AS RegisterNo,
+          COALESCE(i.VinNo, '') AS VinNo,
+          i.Model,
+          i.ProjectType AS Project,
+          ISNULL(t.IssueTitle, 'รอดำเนินการเปิดใบงานซ่อม') AS IssueTitle,
+          COALESCE(t.CarStatusCode, 'WAITING_FOR_MAINTENANCE') AS CarStatusCode,
+          ISNULL(t.ServiceLocationCode, 'ไม่ระบุ') AS ServiceLocationCode,
+          t.ReportDate,
+          t.MaintenanceStartDate,
+          DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate), GETDATE()) AS DaysActive
+        FROM dbo.EV_InventoryItem i
+        LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+        WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+        ORDER BY DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate), GETDATE()) DESC
+      `)
+    ])
+
+    const stats = statsResult.recordset[0] || {}
+    const ticketStats = ticketStatsResult.recordset[0] || {}
+    const locations = locResult.recordset || []
+    const longestStuck = topStuckResult.recordset || []
+
+    return {
+      totalVehicles: stats.totalVehicles || 0,
+      inRepairVehicles: stats.inRepairVehicles || 0,
+      readyPickupVehicles: stats.readyPickupVehicles || 0,
+      noTicketVehicles: stats.noTicketVehicles || 0,
+      onRentVehicles: stats.onRentVehicles || 0,
+      useVehicles: stats.useVehicles || 0,
+      replVehicles: stats.replVehicles || 0,
+      newVehicles: stats.newVehicles || 0,
+      totalTickets: ticketStats.totalTickets || 0,
+      inRepairTickets: ticketStats.inRepairTickets || 0,
+      readyPickupTickets: ticketStats.readyPickupTickets || 0,
+      locations,
+      longestStuck
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[getMaintenanceOverview] Error:', message)
+    return { error: `ดึงข้อมูลภาพรวมงานซ่อมไม่สำเร็จ: ${message}` }
+  }
+}
+
 // ─── Function registry (for AI dispatch) ───────────────────────────
 export const botFunctions: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
   getDeliveryToday: () => getDeliveryToday(),
@@ -1166,6 +1383,7 @@ export const botFunctions: Record<string, (params: Record<string, unknown>) => P
   getPortfolioSummary: () => getPortfolioSummary(),
   getDeliveryPlanAndActual: (p) => getDeliveryPlanAndActual(p as { date: string }),
   getRepairByLocation: () => getRepairByLocation(),
+  getMaintenanceOverview: () => getMaintenanceOverview(),
   createTaskNote: (p) => createTaskNote({
     vehicleRef: p.vehicleRef as string,
     assigneeName: p.assigneeName as string,

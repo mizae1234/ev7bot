@@ -39,7 +39,7 @@ const navGroups: NavGroup[] = [
         icon: '📊'
       },
       {
-        name: 'ศูนย์จัดการงานซ่อม',
+        name: 'รายละเอียด ใบงานซ่อม',
         href: '/maintenance',
         desc: 'ติดตามงานซ่อมตามศูนย์บริการ/อู่ และสถานะเคส',
         icon: '📋'

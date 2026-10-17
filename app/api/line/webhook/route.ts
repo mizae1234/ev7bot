@@ -2187,7 +2187,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 { type: 'text', text: `${fmt(portfolio.underMaintenance.total)} คัน`, size: 'sm', weight: 'bold', color: '#C62828', align: 'end', flex: 4 },
               ]},
               { type: 'box', layout: 'horizontal', contents: [
-                { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRent)} | สภาพ ${fmt(portfolio.underMaintenance.use)} | ทดแทน ${fmt(portfolio.underMaintenance.replacement)} | ใหม่ ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#64748b' },
+                { type: 'text', text: `• รถเช่า ${fmt(portfolio.underMaintenance.onRent)} | รอลูกค้ารับ ${fmt(portfolio.underMaintenance.readyPickup || 0)}`, size: 'xxs', color: '#64748b' },
+              ]},
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: `• รถใช้แล้ว ${fmt(portfolio.underMaintenance.use)} | รถสำรอง ${fmt(portfolio.underMaintenance.replacement)} | รถใหม่ ${fmt(portfolio.underMaintenance.new)}`, size: 'xxs', color: '#64748b' },
               ]},
             ],
           },
@@ -2209,10 +2212,33 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             ]
           }
         ], paddingAll: 'lg' },
-        footer: { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: `EV7: ${fmt(portfolio.company.ev7)} คัน`, size: 'xxs', color: '#888888' },
-          { type: 'text', text: `GI: ${fmt(portfolio.company.gi)} คัน`, size: 'xxs', color: '#888888', align: 'end' },
-        ], paddingAll: 'md' },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: `EV7: ${fmt(portfolio.company.ev7)} คัน`, size: 'xxs', color: '#888888' },
+                { type: 'text', text: `GI: ${fmt(portfolio.company.gi)} คัน`, size: 'xxs', color: '#888888', align: 'end' },
+              ],
+            },
+            {
+              type: 'button',
+              style: 'primary',
+              height: 'sm',
+              color: '#1565C0',
+              action: {
+                type: 'uri',
+                label: '📊 ดูรายละเอียดเพิ่มเติมบน Dashboard',
+                uri: `https://liff.line.me/${env.NEXT_PUBLIC_LINE_LIFF_ID}?path=/dashboard`,
+              },
+            },
+          ],
+          paddingAll: 'md',
+        },
       }
 
       const activityBubble: any = {
@@ -2937,8 +2963,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
     }
   }
 
-  // ─── Pending Repairs by Location as Flex Message ────────────────
-  if (matchAny(lower, ['ดูรถค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมรายพื้นที่', 'ค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมพื้นที่'])) {
+  if (matchAny(lower, ['ดูรถค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมรายพื้นที่', 'ค้างซ่อมแต่ละพื้นที่', 'ค้างซ่อมพื้นที่', 'ค้างซ่อมทั้งหมด', 'ซ่อมทั้งหมด', 'ดูรถค้างซ่อม', 'รถค้างซ่อม'])) {
     try {
       const { getRepairByLocation } = await import('@/lib/bot-queries')
       const repairs = await getRepairByLocation()

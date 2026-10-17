@@ -13,6 +13,9 @@ interface DbCar {
   StatusName?: string
   SubStatusName?: string
   CurrentLocation?: string | null
+  ReplacementReservedType?: string
+  ReplacementReservedRemark?: string
+  ReplacementReadyDetails?: string
 }
 
 interface ActiveReplacement {
@@ -56,6 +59,22 @@ export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, 
     ? (locationMap.get(currentLocationCode) || currentLocationCode)
     : null
 
+  const isLineManReserved = 
+    carDetails?.ReplacementReadyDetails === 'ถูกจอง (LM)' ||
+    car?.ReplacementReadyDetails === 'ถูกจอง (LM)' ||
+    (carDetails?.ReplacementReservedType && /line|lm|ไลน์/i.test(carDetails.ReplacementReservedType)) ||
+    (carDetails?.ReplacementReservedRemark && /line|lm|ไลน์/i.test(carDetails.ReplacementReservedRemark)) ||
+    (car?.ReplacementReservedType && /line|lm|ไลน์/i.test(car.ReplacementReservedType)) ||
+    (car?.ReplacementReservedRemark && /line|lm|ไลน์/i.test(car.ReplacementReservedRemark)) ||
+    (carDetails?.replacementReserved?.Type && /line|lm|ไลน์/i.test(carDetails.replacementReserved.Type))
+
+  const isReplReserved = 
+    carDetails?.StatusType === 'REPLACEMENT_RESERVED' || 
+    car?.StatusType === 'REPLACEMENT_RESERVED' ||
+    carDetails?.SubStatusName?.includes('ถูกจอง') ||
+    carDetails?.StatusName?.includes('ถูกจอง') ||
+    car?.SubStatusName?.includes('ถูกจอง')
+
   return (
     <div className="flex items-center justify-between bg-slate-50 border border-emerald-300 rounded-2xl p-3">
       <div>
@@ -75,9 +94,17 @@ export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, 
 
         {compact ? (
           /* Dashboard tab: simple one-liner */
-          <p className="text-xxs text-slate-655 mt-1">
-            โครงการ: <span className="font-bold text-emerald-700">{car.Project}</span> | รุ่น: {car.Model}
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <p className="text-xxs text-slate-655">
+              โครงการ: <span className="font-bold text-emerald-700">{car.Project}</span> | รุ่น: {car.Model}
+            </p>
+            {isReplReserved && isLineManReserved && (
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-lime-100/90 border-lime-400 text-lime-900 flex items-center gap-1">
+                <span>🛵</span>
+                <span>ถูกจองไว้ให้ Line Man</span>
+              </span>
+            )}
+          </div>
         ) : (
           /* Full version with status badges */
           <>
@@ -94,22 +121,43 @@ export default function CarInfoCard({ car, carDetails, locationMap, onDeselect, 
               )}
 
               {/* Status Badge */}
-              {carDetails?.StatusName && (() => {
-                const name = carDetails.SubStatusName || carDetails.StatusName
-                const badgeClass = getStatusBadgeClass(name)
-                return (
-                  <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
-                    {name}
-                  </span>
-                )
+              {(() => {
+                if (isReplReserved && isLineManReserved) {
+                  return (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded border bg-lime-50 border-lime-300 text-lime-800 dark:bg-lime-950/40 dark:border-lime-700 dark:text-lime-300 flex items-center gap-1">
+                      <span>🛵</span>
+                      <span>ถูกจองไว้ให้ Line Man</span>
+                    </span>
+                  )
+                }
+
+                const rawName = carDetails?.SubStatusName || carDetails?.StatusName || car.SubStatusName || car.StatusName
+                if (rawName) {
+                  const badgeClass = getStatusBadgeClass(rawName)
+                  return (
+                    <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${badgeClass}`}>
+                      {rawName}
+                    </span>
+                  )
+                }
+                return null
               })()}
 
               {/* StatusType Badge */}
-              {carDetails?.StatusType && (
-                <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
-                  {carDetails.StatusType.replace(/_/g, ' ')}
-                </span>
-              )}
+              {carDetails?.StatusType && (() => {
+                if (carDetails.StatusType === 'REPLACEMENT_RESERVED' && isLineManReserved) {
+                  return (
+                    <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-lime-50 border-lime-300 text-lime-800">
+                      REPLACEMENT RESERVED (LINE MAN)
+                    </span>
+                  )
+                }
+                return (
+                  <span className="px-1.5 py-0.5 text-[8px] font-mono font-bold rounded border bg-indigo-50 border-indigo-200 text-indigo-600">
+                    {carDetails.StatusType.replace(/_/g, ' ')}
+                  </span>
+                )
+              })()}
 
               {/* Replacement Vehicle Badge */}
               {carDetails?.MainVehicleRegisterNo && (

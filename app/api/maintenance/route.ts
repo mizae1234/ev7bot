@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
                 m.MaintenanceItemID DESC
             ) AS rn
           FROM dbo.EV_MaintenanceItem m
-          WHERE m.IsActive = 1
+          WHERE m.IsActive = 1 AND m.CarStatusCode NOT IN ('COMPLETE')
         ),
         VehiclesWithStatus AS (
           SELECT 
