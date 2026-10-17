@@ -737,60 +737,201 @@ export async function runCustomQuery(params: { sqlQuery: string }) {
 }
 
 // ─── Function: getPortfolioSummary (ภาพรวม Portfolio ทั้ง port) ─────
-// ใช้ SP GetEV_HeadlineDashboard เพื่อให้ตัวเลขตรงกับ Dashboard ต้นทาง 100%
+// ใช้ dbo.View_VehicleStatusHierarchy เพื่อให้ตัวเลขตรงกับแดชบอร์ดหลัก 100% (Reconcile ครบทุกโปรเจกต์)
 export async function getPortfolioSummary() {
   const pool = await getMSSQLPool()
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
   try {
-    const result = await pool.request()
-      .input('DateBegin', sql.Date, null)
-      .input('DateEnd', sql.Date, null)
-      .execute('GetEV_HeadlineDashboard')
+    const [hierarchyRes, companyRes] = await Promise.all([
+      pool.request().query(`
+        SELECT 
+          TopGroup, 
+          SubGroup, 
+          LeafNode, 
+          ReplacementReadyDetails,
+          ProjectType,
+          COUNT(*) as cnt
+        FROM dbo.View_VehicleStatusHierarchy
+        GROUP BY TopGroup, SubGroup, LeafNode, ReplacementReadyDetails, ProjectType
+      `),
+      pool.request().query(`
+        SELECT 
+          ISNULL(Company, 'EV7') as Company, 
+          COUNT(*) as cnt
+        FROM dbo.EV_InventoryItem
+        WHERE IsActive = 1
+          AND ISNULL(ProjectType,'') NOT IN ('OTH','Fleet')
+        GROUP BY ISNULL(Company, 'EV7')
+      `)
+    ])
 
-    const row = result.recordset[0]
-    if (!row) return { error: 'SP GetEV_HeadlineDashboard ไม่ส่งข้อมูลกลับมา' }
+    const rows = hierarchyRes.recordset
+    let total = 0
+
+    // On Rent
+    let onRentOnRoad = 0
+    let onRentMaint = 0
+    const onRentByProj: Record<string, number> = {}
+
+    // Available
+    let availTotal = 0
+    let availNew = 0
+    let availUsed = 0
+    const availByProj: Record<string, number> = {}
+
+    // Production & Pending
+    let prodPending = 0
+    let prodInProcess = 0
+    let prodWaitingGR = 0
+    let newDefect = 0
+    let totalNew = 0
+
+    // Replacement
+    let replCar = 0 // ถูกใช้งาน
+    let replReadyAvail = 0 // พร้อมใช้
+    let replReadyRsvLM = 0
+    let replReadyRsvEV7 = 0
+    let replMaint = 0 // เข้าซ่อม
+
+    // Maintenance
+    let maintRecond = 0 // Recondition/Maintenance รถใช้งานแล้ว
+
+    // Others
+    let demoCount = 0
+
+    for (const row of rows) {
+      const c = Number(row.cnt || 0)
+      total += c
+      const tg = row.TopGroup
+      const sg = row.SubGroup
+      const leaf = row.LeafNode
+      const rrd = row.ReplacementReadyDetails
+      const proj = (row.ProjectType || '').trim()
+
+      if (tg === 'รถใหม่') {
+        totalNew += c
+        if (sg === 'Pending (รอเรียกรถลง)') prodPending += c
+        else if (sg === 'Production') prodInProcess += c
+        else if (sg === 'Defect') newDefect += c
+        else if (sg === 'Ready') {
+          availTotal += c
+          availNew += c
+          availByProj[proj] = (availByProj[proj] || 0) + c
+        }
+      } else if (tg === 'รถใช้งานแล้ว') {
+        if (sg === 'Ready') {
+          availTotal += c
+          availUsed += c
+          availByProj[proj] = (availByProj[proj] || 0) + c
+        } else if (sg === 'Recondition/Maintenance') {
+          maintRecond += c
+        } else if (sg === 'Replacement') {
+          if (leaf === 'ถูกใช้งาน') replCar += c
+          else if (leaf === 'เข้าซ่อม') replMaint += c
+          else if (leaf === 'Ready') {
+            if (rrd === 'พร้อมใช้') replReadyAvail += c
+            else if (rrd === 'ถูกจอง (LM)') replReadyRsvLM += c
+            else if (rrd === 'ถูกจอง (EV7)') replReadyRsvEV7 += c
+            else replReadyAvail += c
+          }
+        }
+      } else if (tg === 'ให้เช่า') {
+        if (sg === 'ปล่อยเช่า') {
+          onRentOnRoad += c
+          onRentByProj[proj] = (onRentByProj[proj] || 0) + c
+        } else if (sg === 'เข้าซ่อม') {
+          onRentMaint += c
+          onRentByProj[proj] = (onRentByProj[proj] || 0) + c
+        }
+      } else if (tg === 'อื่นๆ') {
+        if (sg === 'WAITING_FOR_GR') prodWaitingGR += c
+        else if (sg === 'Demo') demoCount += c
+      }
+    }
+
+    const replReserved = replReadyRsvLM + replReadyRsvEV7
+    const replReadyTotal = replReadyAvail + replReserved
+    const replTotal = replCar + replReadyTotal + replMaint
+    const onRentTotal = onRentOnRoad + onRentMaint
+    const prodTotal = prodPending + prodInProcess + prodWaitingGR
+    const maintTotal = onRentMaint + maintRecond + replMaint + newDefect
+
+    // Normalize Available Project keys
+    const availEV7 = availByProj['EV7'] || 0
+    const availLM = availByProj['Line Man'] || 0
+    const availGrab = availByProj['Grab'] || 0
+    const availOthers = Math.max(0, availTotal - (availEV7 + availLM + availGrab))
+
+    // Normalize OnRent Project keys
+    const rentEV7 = onRentByProj['EV7'] || 0
+    const rentLM = onRentByProj['Line Man'] || 0
+    const rentGrab = onRentByProj['Grab'] || 0
+    const rentOthers = Math.max(0, onRentTotal - (rentEV7 + rentLM + rentGrab))
+
+    // Company breakdown
+    let compEV7 = 0
+    let compGI = 0
+    for (const crow of companyRes.recordset) {
+      if (crow.Company === 'GI') compGI = Number(crow.cnt || 0)
+      else compEV7 += Number(crow.cnt || 0)
+    }
 
     return {
-      total: Number(row.TotalVehicle || 0),
+      total,
       onRent: {
-        total: Number(row.OnRentVehicle || 0),
-        onRoad: Number(row.OnRoadVehicle || 0),
-        underMaintenance: Number(row.OnRentMaintenanceVehicle || 0),
+        total: onRentTotal,
+        onRoad: onRentOnRoad,
+        underMaintenance: onRentMaint,
+        ev7: rentEV7,
+        lineMan: rentLM,
+        grab: rentGrab,
+        others: rentOthers,
+        byProject: onRentByProj,
       },
       onProduction: {
-        total: Number(row.OnProductionVehicle || 0),
-        pending: Number(row.OnProductionPendingVehicle || 0),
-        inProcess: Number(row.OnProductionInProcessVehicle || 0),
-        waitingGR: Number(row.OnProductionWaitingForGRVehicle || 0),
+        total: prodTotal,
+        pending: prodPending,
+        inProcess: prodInProcess,
+        waitingGR: prodWaitingGR,
+        totalNewInPort: totalNew,
       },
       replacement: {
-        total: Number(row.ReplacementVehicle || 0),
-        available: Number(row.ReplacementAvailableVehicle || 0),
-        car: Number(row.ReplacementCarVehicle || 0),
+        total: replTotal,
+        car: replCar,
+        available: replReadyAvail,
+        reserved: replReserved,
+        readyTotal: replReadyTotal,
+        underMaintenance: replMaint,
       },
       underMaintenance: {
-        total: Number(row.MaintenanceVehicle || 0),
-        new: Number(row.NewMaintenanceVehicle || 0),
-        onRent: Number(row.OnRentMaintenanceVehicle || 0),
-        use: Number(row.UseMaintenanceVehicle || 0),
+        total: maintTotal,
+        onRent: onRentMaint,
+        use: maintRecond,
+        replacement: replMaint,
+        new: newDefect,
       },
       available: {
-        total: Number(row.AvailableVehicle || 0),
-        ev7: Number(row.AvailableEV7Vehicle || 0),
-        lineMan: Number(row.AvailableLineManVehicle || 0),
-        grab: Number(row.AvailableGrabVehicle || 0),
+        total: availTotal,
+        new: availNew,
+        used: availUsed,
+        ev7: availEV7,
+        lineMan: availLM,
+        grab: availGrab,
+        others: availOthers,
+        byProject: availByProj,
       },
       company: {
-        ev7: Number(row.CompanyEV7 || 0),
-        gi: Number(row.CompanyGI || 0),
+        ev7: compEV7,
+        gi: compGI,
       },
-      active: Number(row.ActiveVehicle || 0),
-      released: Number(row.ReleasedVehicle || 0),
+      demo: demoCount,
+      active: onRentOnRoad + replCar,
+      released: 0,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('[getPortfolioSummary] SP Error:', message)
+    console.error('[getPortfolioSummary] Error:', message)
     return { error: `ดึงข้อมูล Portfolio ไม่สำเร็จ: ${message}` }
   }
 }
