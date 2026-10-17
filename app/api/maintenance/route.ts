@@ -290,9 +290,9 @@ export async function GET(req: NextRequest) {
           m.ReportDate DESC
       `),
       problemTypeReq.query(`
-        SELECT StatusCode, StatusName, DescriptionStatus
+        SELECT Type, StatusCode, StatusName, DescriptionStatus
         FROM dbo.EV_MsSubStatus
-        WHERE Type = 'MAINTENANCE_PROBLEM_TYPE' AND IsActive = 1
+        WHERE Type IN ('MAINTENANCE_PROBLEM_TYPE', 'DAMAGE', 'MAINTENANCE_CAR_STATUS') AND IsActive = 1
         ORDER BY StatusCode
       `)
     ])
@@ -321,12 +321,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Dynamic Problem Type Map from Master Table
+    // Dynamic Maps from Master Table EV_MsSubStatus
     const dynamicProblemTypeMap: Record<string, string> = { ...problemTypeMap }
-    for (const pt of problemTypeResult.recordset) {
-      if (pt.StatusCode && pt.StatusName) {
-        dynamicProblemTypeMap[pt.StatusCode] = pt.StatusName
+    const dynamicCarCaseMap: Record<string, string> = { ...carCaseMap }
+    const dynamicCarStatusMap: Record<string, string> = { ...carStatusMap }
+
+    for (const record of problemTypeResult.recordset) {
+      if (record.StatusCode && record.StatusName) {
+        if (record.Type === 'MAINTENANCE_PROBLEM_TYPE') {
+          dynamicProblemTypeMap[record.StatusCode] = record.StatusName
+        } else if (record.Type === 'DAMAGE') {
+          dynamicCarCaseMap[record.StatusCode] = record.StatusName
+        } else if (record.Type === 'MAINTENANCE_CAR_STATUS') {
+          dynamicCarStatusMap[record.StatusCode] = record.StatusName
+        }
       }
+    }
+
+    const mapCarCase = (code: unknown, map: Record<string, string>): string => {
+      const s = ((code as string) || '').trim()
+      if (!s) return '-'
+      if (map[s]) return map[s]
+      if (s.includes('หนัก') || s === 'DAMAGE_HEAVY') return 'เคสซ่อมหนัก'
+      if (s.includes('เบา') || s === 'DAMAGE_LIGHT') return 'เคสซ่อมเบา'
+      if (s.includes('รุนแรง') || s === 'DAMAGE_TOTAL') return 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม'
+      return s.replace(/_/g, ' ') || '-'
     }
 
     // Map to output
@@ -338,10 +357,10 @@ export async function GET(req: NextRequest) {
       project: m.Project,
       issue_title: m.IssueTitle,
       status_code: m.CarStatusCode,
-      status_text: mapCode(m.CarStatusCode, carStatusMap),
+      status_text: mapCode(m.CarStatusCode, dynamicCarStatusMap),
       problem_type: mapCode(m.ProblemTypeCode, dynamicProblemTypeMap),
       fault_party: mapCode(m.FaultPartyCode, faultPartyMap),
-      car_case: mapCode(m.CarCaseCode, carCaseMap),
+      car_case: mapCarCase(m.CarCaseCode, dynamicCarCaseMap),
       service_location: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
       service_location_code: m.ServiceLocationCode,
       current_location: (m.CarCurrentLocationName as string) || (m.CarCurrentLocation as string) || null,

@@ -8,7 +8,7 @@ import { AuthGuard } from '@/components/ui/AuthGuard'
 import { MaintenanceImportModal } from '@/components/maintenance/MaintenanceImportModal'
 import { IMPORT_CONFIG } from '@/lib/maintenance-import/config'
 import { downloadImportTemplate } from '@/lib/maintenance-import/template'
-import MaintenanceTicketTree from '@/components/maintenance/MaintenanceTicketTree'
+import MaintenanceTicketTree, { getCarCaseCategory } from '@/components/maintenance/MaintenanceTicketTree'
 import MultiLocationTicketsBlock from '@/components/maintenance/MultiLocationTicketsBlock'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -121,6 +121,7 @@ function MaintenanceContent() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [locationFilter, setLocationFilter] = useState('all')
   const [problemTypeFilter, setProblemTypeFilter] = useState('all')
+  const [carCaseFilter, setCarCaseFilter] = useState<'all' | 'HEAVY' | 'LIGHT' | 'TOTAL' | 'UNSPECIFIED'>('all')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -154,6 +155,10 @@ function MaintenanceContent() {
 
   const filteredItems = (data?.items || []).filter(item => {
     if (problemTypeFilter !== 'all' && item.problem_type !== problemTypeFilter) return false
+    if (carCaseFilter !== 'all') {
+      const itemCase = getCarCaseCategory(item.car_case)
+      if (itemCase !== carCaseFilter) return false
+    }
     if (!search) return true
     const s = search.toLowerCase()
     return (
@@ -283,7 +288,7 @@ function MaintenanceContent() {
         </div>
 
         {/* Active Filter Indicator */}
-        {(statusFilter !== 'all' || problemTypeFilter !== 'all') && (
+        {(statusFilter !== 'all' || problemTypeFilter !== 'all' || carCaseFilter !== 'all') && (
           <div className="flex items-center justify-end px-1">
             <div className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/30 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
               <span className="font-semibold">กำลังกรอง:</span>
@@ -298,9 +303,14 @@ function MaintenanceContent() {
                   statusFilter === 'WAITING_FOR_MAINTENANCE' ? 'รอเข้าซ่อม' :
                   statusFilter === 'STILL_WORK' ? 'รถยังขับได้' : statusFilter
                 }` : ''}
+                {carCaseFilter !== 'all' ? ` • เคส: ${
+                  carCaseFilter === 'HEAVY' ? 'ซ่อมหนัก' :
+                  carCaseFilter === 'LIGHT' ? 'ซ่อมเบา' :
+                  carCaseFilter === 'TOTAL' ? 'ไม่คุ้มซ่อม' : 'ไม่ระบุ'
+                }` : ''}
               </span>
               <button
-                onClick={() => { setProblemTypeFilter('all'); setStatusFilter('all'); }}
+                onClick={() => { setProblemTypeFilter('all'); setStatusFilter('all'); setCarCaseFilter('all'); }}
                 className="ml-1 text-zinc-400 hover:text-rose-500 font-bold"
                 title="ล้างตัวกรอง"
               >
@@ -315,10 +325,12 @@ function MaintenanceContent() {
           items={treeItems}
           selectedProblemType={problemTypeFilter}
           selectedStatus={statusFilter}
+          selectedCarCase={carCaseFilter}
           totalCarsCount={data?.summary?.total_cars ?? 584}
-          onSelectFilter={(pt, st) => {
+          onSelectFilter={(pt, st, cc) => {
             setProblemTypeFilter(pt)
             setStatusFilter(st)
+            setCarCaseFilter((cc as any) || 'all')
           }}
         />
 

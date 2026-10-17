@@ -97,10 +97,46 @@ SELECT * FROM dbo.View_VehicleLocationLog WHERE RegisterNo = 'ทอ-3260' ORDER
 ### ตาราง: dbo.EV_PolicyLog (ประวัติและ Audit Log กรมธรรม์ย้อนหลัง)
 คอลัมน์: LogID (PK), VinNo, RegisterNo, DocType ('INSURANCE'/'ACT'/'VEHICLE_TAX'/'METER_TAX'), PolicyType, PolicyTypeName, PolicyNo, StartDate, EndDate, OriginalFileName, FilePath, UploadSource, IsCurrent (1=ฉบับปัจจุบัน, 0=ประวัติเดิม), IsActive, CreateDate
 
-### ตาราง: dbo.EV_MsSubStatus (Master สถานที่/สถานะย่อย)
-เมื่อ Type = 'LOCATION' → เป็นรายการสถานที่จอดรถทั้งหมดในระบบ
-คอลัมน์: StatusCode (รหัส เช่น EV7_YARD_PRAPADAENG, AION_GI_SALAYA), StatusName (ชื่อสถานที่ เช่น "EV7 Yard พระประแดง", "Aion ศาลายา"), Type, IsActive
-ใช้ JOIN กับ EV_InventoryItem.CurrentLocation เพื่อแปลงรหัสเป็นชื่อสถานที่
+### ตาราง: dbo.EV_MsSubStatus (Master สถานที่/สถานะย่อย/ความหมายรหัสมาตรฐานทั้งหมด)
+คอลัมน์: SubStatusID, StatusCode, StatusName (ชื่อภาษาไทย), DescriptionStatus (คำอธิบายความหมาย), Type, IsActive
+⚠️ **ความหมายของรหัสสถานะย่อยและตัวเลือกต่างๆ ให้ดูที่ตารางนี้ตามฟิลด์ Type**:
+1. **Type = 'DAMAGE' (เคสความเสียหาย / ซ่อมหนัก-ซ่อมเบา - CarCaseCode ใน EV_MaintenanceItem)**:
+   - 'DAMAGE_HEAVY' → StatusName: **"เคสซ่อมหนัก"** (DescriptionStatus: "ความเสียหายรุนแรง / ซ่อมหนัก")
+   - 'DAMAGE_LIGHT' → StatusName: **"เคสซ่อมเบา"** (DescriptionStatus: "ความเสียหายเล็กน้อย / ซ่อมเบา")
+   - 'DAMAGE_TOTAL' → StatusName: **"ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม"**
+2. **Type = 'MAINTENANCE_PROBLEM_TYPE' (ประเภทปัญหา - ProblemTypeCode ใน EV_MaintenanceItem)**:
+   - 'ACCIDENT' → "อุบัติเหตุ"
+   - 'PRODUCT' → "ผลิตภัณฑ์"
+   - 'SUPPLIER_REPAIR' → "งานซ่อมจาก Supplier"
+   - 'RECONDITION' → "ปรับสภาพรถ"
+   - 'OTHER_2' → "อื่นๆ"
+3. **Type = 'MAINTENANCE_CAR_STATUS' (สถานะงานซ่อม - CarStatusCode ใน EV_MaintenanceItem)**:
+   - 'WAITING_FOR_MAINTENANCE' → "เข้าซ่อม" (รอเข้าซ่อม)
+   - 'STILL_WORK' → "รถยังขับใช้งานได้อยู่" (มีประวัติเคลม/แจ้งซ่อมแต่รถยังไม่ได้เข้าอู่)
+   - 'IN_MAINTENANCE' → "รถอยู่ระหว่างซ่อม"
+   - 'GARAGE_COMPLETE' → "ซ่อมเสร็จ" (อู่ดำเนินการซ่อมเสร็จแล้ว)
+   - 'COMPLETE' → "ปิดเคส"
+4. **Type = 'STATUS_TYPE_MAINTENANCE' (สถานะย่อยรถที่เข้าซ่อม - StatusType ใน EV_InventoryItem)**:
+   - 'NEW_MAINTENANCE' → "รถใหม่เข้าซ่อม"
+   - 'ON_RENT_MAINTENANCE' → "รถเช่าเข้าซ่อม"
+   - 'USE_MAINTENANCE' → "รถใช้เเล้วเข้าซ่อม"
+   - 'READY_PICKUP_MAINTENANCE' → "รถซ่อมเสร็จ รอลูกค้ามารับ"
+   - 'REPLACEMENT_MAINTENANCE' → "รถสำรองเข้าซ่อม"
+5. **Type = 'FAULT_PARTY' (ฝ่ายที่ผิด - FaultPartyCode ใน EV_MaintenanceItem)**:
+   - 'FAULT_DRIVER' → "คนขับ"
+   - 'FAULT_COUNTERPARTY' → "คู่กรณี"
+   - 'OTHER' → "อื่นๆ"
+6. **Type = 'INSURANCE' (บริษัทประกัน - InsuranceCode ใน EV_MaintenanceItem)**:
+   - 'VIRIYA_INSURANCE' → "วิริยะประกันภัย"
+   - 'MUANGTHAI_INSURANCE' → "เมืองไทยประกันภัย"
+   - 'ICARE_INSURANCE' → "ไอแคร์ประกันภัย"
+7. **Type = 'LOCATION' (สถานที่จอดรถและอู่ซ่อมทั้งหมดในระบบ - ServiceLocationCode และ CurrentLocation)**:
+   - แปลงรหัส StatusCode เป็นชื่อสถานที่ เช่น 'EV7_YARD_PRAPADAENG' ("EV7 Yard พระประแดง"), 'AION_GI_SALAYA' ("Aion ศาลายา"), 'GARAGE_BUNGKHWANG' ("อู่ บึงขวาง") ฯลฯ
+8. **Type = 'RETURN_REASON' (เหตุผลการคืนรถ - ReturnReason ใน EV_Inspection/EV_ReturnItem)**:
+   - 'RETURN_SWITCH_PROVIDER' → "ย้ายค่าย / เปลี่ยนบริษัท"
+   - 'RETURN_REPOSSESSED' → "บริษัทดำเนินการยึดคืนรถ"
+   - 'RETURN_REPLACEMENT_CANCEL' → "คืนรถทดแทนเนื่องจากยกเลิกสัญญา"
+   - 'RETURN_REPLACEMENT_GET_MAIN' → "คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ"
 
 ### ตาราง: dbo.EV_Inspection (การตรวจรับคืนรถ และ การตรวจสภาพ Stock Audit)
 คอลัมน์: InspectionID (PK), VinNo, RegisterNo,
@@ -345,6 +381,35 @@ Note, CreateDate, UpdateDate
   FROM dbo.EV_InventoryItem i
   JOIN RankedTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
   WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1 AND t.CarStatusCode = 'READY_PICKUP_MAINTENANCE'
+
+### ถามเคสความเสียหาย / ซ่อมหนัก ซ่อมเบา (Car Case / Damage)
+- ความหมายของเคสความเสียหายดูที่ dbo.EV_MsSubStatus (Type = 'DAMAGE'):
+  - 'DAMAGE_HEAVY' / 'เคสซ่อมหนัก' = เคสซ่อมหนัก (ความเสียหายรุนแรง / ซ่อมหนัก)
+  - 'DAMAGE_LIGHT' / 'เคสซ่อมเบา' = เคสซ่อมเบา (ความเสียหายเล็กน้อย / ซ่อมเบา)
+  - 'DAMAGE_TOTAL' = ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม
+  - NULL หรือ ค่าว่าง = ไม่ระบุ
+- หากถามสรุปยอดเคสซ่อมหนัก / ซ่อมเบา ของงานค้างซ่อม (active repairs: IN_MAINTENANCE, WAITING_FOR_MAINTENANCE):
+  SELECT 
+    CASE 
+      WHEN m.CarCaseCode IN ('DAMAGE_HEAVY', 'เคสซ่อมหนัก') THEN 'เคสซ่อมหนัก'
+      WHEN m.CarCaseCode IN ('DAMAGE_LIGHT', 'เคสซ่อมเบา') THEN 'เคสซ่อมเบา'
+      WHEN m.CarCaseCode IN ('DAMAGE_TOTAL') THEN 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม'
+      ELSE 'ไม่ระบุ'
+    END AS CarCaseName,
+    COUNT(m.MaintenanceItemID) AS TicketCount,
+    COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
+  FROM dbo.EV_MaintenanceItem m
+  JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+  WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+    AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
+  GROUP BY 
+    CASE 
+      WHEN m.CarCaseCode IN ('DAMAGE_HEAVY', 'เคสซ่อมหนัก') THEN 'เคสซ่อมหนัก'
+      WHEN m.CarCaseCode IN ('DAMAGE_LIGHT', 'เคสซ่อมเบา') THEN 'เคสซ่อมเบา'
+      WHEN m.CarCaseCode IN ('DAMAGE_TOTAL') THEN 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม'
+      ELSE 'ไม่ระบุ'
+    END
+  ORDER BY TicketCount DESC
 
 ### ถามจำนวนรถที่จอดอยู่ตามสถานที่ (เช่น "รถจอดที่วิภา กี่คัน", "รถที่ศาลายา", "รถที่พระประแดง")
 - ข้อมูลสถานที่จอดปัจจุบันอยู่ใน EV_InventoryItem.CurrentLocation ซึ่งเก็บเป็นรหัส (StatusCode)

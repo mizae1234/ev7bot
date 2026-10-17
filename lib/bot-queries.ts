@@ -1251,7 +1251,7 @@ export async function getMaintenanceOverview() {
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
   try {
-    const [statsResult, ticketStatsResult, locResult, topStuckResult] = await Promise.all([
+    const [statsResult, ticketStatsResult, locResult, topStuckResult, carCaseResult] = await Promise.all([
       // 1. สรุปสถานะรถหลัก (Vehicle Level - EV_InventoryItem where Status = 'MAINTENANCE')
       pool.request().query(`
         WITH LatestTickets AS (
@@ -1359,6 +1359,31 @@ export async function getMaintenanceOverview() {
         LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
         WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
         ORDER BY DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate), GETDATE()) DESC
+      `),
+      // 5. สรุปแยกตาม CarCase (เคสความเสียหาย ซ่อมหนัก/ซ่อมเบา) จาก EV_MsSubStatus (Type = 'DAMAGE')
+      pool.request().query(`
+        SELECT 
+          COALESCE(sub.StatusName, CASE 
+            WHEN m.CarCaseCode IN ('DAMAGE_HEAVY', 'เคสซ่อมหนัก') THEN 'เคสซ่อมหนัก'
+            WHEN m.CarCaseCode IN ('DAMAGE_LIGHT', 'เคสซ่อมเบา') THEN 'เคสซ่อมเบา'
+            WHEN m.CarCaseCode IN ('DAMAGE_TOTAL') THEN 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม'
+            ELSE 'ไม่ระบุ'
+          END) AS CarCaseName,
+          COUNT(m.MaintenanceItemID) AS TicketCount,
+          COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_MsSubStatus sub ON m.CarCaseCode = sub.StatusCode AND sub.Type = 'DAMAGE'
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
+        GROUP BY 
+          COALESCE(sub.StatusName, CASE 
+            WHEN m.CarCaseCode IN ('DAMAGE_HEAVY', 'เคสซ่อมหนัก') THEN 'เคสซ่อมหนัก'
+            WHEN m.CarCaseCode IN ('DAMAGE_LIGHT', 'เคสซ่อมเบา') THEN 'เคสซ่อมเบา'
+            WHEN m.CarCaseCode IN ('DAMAGE_TOTAL') THEN 'ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม'
+            ELSE 'ไม่ระบุ'
+          END)
+        ORDER BY TicketCount DESC
       `)
     ])
 
@@ -1366,6 +1391,7 @@ export async function getMaintenanceOverview() {
     const ticketStats = ticketStatsResult.recordset[0] || {}
     const locations = locResult.recordset || []
     const longestStuck = topStuckResult.recordset || []
+    const carCases = carCaseResult.recordset || []
 
     return {
       totalVehicles: stats.totalVehicles || 0,
@@ -1379,6 +1405,7 @@ export async function getMaintenanceOverview() {
       totalTickets: ticketStats.totalTickets || 0,
       inRepairTickets: ticketStats.inRepairTickets || 0,
       readyPickupTickets: ticketStats.readyPickupTickets || 0,
+      carCases,
       locations,
       longestStuck
     }

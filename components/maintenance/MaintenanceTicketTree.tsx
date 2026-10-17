@@ -19,11 +19,21 @@ export interface MaintenanceTreeItem {
   fault_party?: string
 }
 
+export function getCarCaseCategory(rawCase?: string | null): 'HEAVY' | 'LIGHT' | 'TOTAL' | 'UNSPECIFIED' {
+  if (!rawCase) return 'UNSPECIFIED'
+  const c = rawCase.trim()
+  if (c.includes('หนัก') || c === 'DAMAGE_HEAVY') return 'HEAVY'
+  if (c.includes('เบา') || c === 'DAMAGE_LIGHT') return 'LIGHT'
+  if (c.includes('รุนแรง') || c === 'DAMAGE_TOTAL') return 'TOTAL'
+  return 'UNSPECIFIED'
+}
+
 interface MaintenanceTicketTreeProps {
   items: MaintenanceTreeItem[]
   selectedProblemType?: string
   selectedStatus?: string
-  onSelectFilter?: (problemType: string, statusCode: string) => void
+  selectedCarCase?: string
+  onSelectFilter?: (problemType: string, statusCode: string, carCase?: string) => void
   totalCarsCount?: number
 }
 
@@ -162,12 +172,13 @@ export default function MaintenanceTicketTree({
   items,
   selectedProblemType = 'all',
   selectedStatus = 'all',
+  selectedCarCase = 'all',
   onSelectFilter,
   totalCarsCount,
 }: MaintenanceTicketTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
-  // Option: Include ready-to-pickup (ซ่อมเสร็จ รอลูกค้ามารับ) in tree
-  const [includeReadyPickup, setIncludeReadyPickup] = useState<boolean>(true)
+  // Option: Include ready-to-pickup (ซ่อมเสร็จ รอลูกค้ามารับ) in tree - Default to false (เฉพาะค้างซ่อม)
+  const [includeReadyPickup, setIncludeReadyPickup] = useState<boolean>(false)
 
   const toggleNode = (nodeKey: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
@@ -216,20 +227,45 @@ export default function MaintenanceTicketTree({
       return {
         totalTickets: 0,
         totalCars: 0,
+        totalHeavyTickets: 0,
+        totalHeavyCars: 0,
+        totalLightTickets: 0,
+        totalLightCars: 0,
+        totalUnspecifiedTickets: 0,
+        totalUnspecifiedCars: 0,
         types: []
       }
     }
 
     const totalCarsSet = new Set<string>()
+    const totalHeavyCarsSet = new Set<string>()
+    const totalLightCarsSet = new Set<string>()
+    const totalUnspecifiedCarsSet = new Set<string>()
+    let totalHeavyTickets = 0
+    let totalLightTickets = 0
+    let totalUnspecifiedTickets = 0
+
     const typeMap: Record<string, {
       typeName: string
       ticketsCount: number
       carsSet: Set<string>
+      heavyTickets: number
+      heavyCarsSet: Set<string>
+      lightTickets: number
+      lightCarsSet: Set<string>
+      unspecifiedTickets: number
+      unspecifiedCarsSet: Set<string>
       statusMap: Record<string, {
         statusCode: string
         statusName: string
         ticketsCount: number
         carsSet: Set<string>
+        heavyTickets: number
+        heavyCarsSet: Set<string>
+        lightTickets: number
+        lightCarsSet: Set<string>
+        unspecifiedTickets: number
+        unspecifiedCarsSet: Set<string>
         projectCounts: Record<string, number>
         locationCounts: Record<string, number>
       }>
@@ -239,18 +275,46 @@ export default function MaintenanceTicketTree({
       const carKey = (item.vin || item.register_no || String(item.id)).trim()
       totalCarsSet.add(carKey)
 
+      const caseCat = getCarCaseCategory(item.car_case)
+      if (caseCat === 'HEAVY') {
+        totalHeavyTickets++
+        totalHeavyCarsSet.add(carKey)
+      } else if (caseCat === 'LIGHT') {
+        totalLightTickets++
+        totalLightCarsSet.add(carKey)
+      } else {
+        totalUnspecifiedTickets++
+        totalUnspecifiedCarsSet.add(carKey)
+      }
+
       const type = (item.problem_type || 'อื่นๆ').trim()
       if (!typeMap[type]) {
         typeMap[type] = {
           typeName: type,
           ticketsCount: 0,
           carsSet: new Set<string>(),
+          heavyTickets: 0,
+          heavyCarsSet: new Set<string>(),
+          lightTickets: 0,
+          lightCarsSet: new Set<string>(),
+          unspecifiedTickets: 0,
+          unspecifiedCarsSet: new Set<string>(),
           statusMap: {}
         }
       }
 
       typeMap[type].ticketsCount += 1
       typeMap[type].carsSet.add(carKey)
+      if (caseCat === 'HEAVY') {
+        typeMap[type].heavyTickets++
+        typeMap[type].heavyCarsSet.add(carKey)
+      } else if (caseCat === 'LIGHT') {
+        typeMap[type].lightTickets++
+        typeMap[type].lightCarsSet.add(carKey)
+      } else {
+        typeMap[type].unspecifiedTickets++
+        typeMap[type].unspecifiedCarsSet.add(carKey)
+      }
 
       // Normalize status code: merge GARAGE_COMPLETE with READY_PICKUP_MAINTENANCE
       let statusCode = item.status_code || 'WAITING_FOR_MAINTENANCE'
@@ -267,6 +331,12 @@ export default function MaintenanceTicketTree({
           statusName: statusConf.label,
           ticketsCount: 0,
           carsSet: new Set<string>(),
+          heavyTickets: 0,
+          heavyCarsSet: new Set<string>(),
+          lightTickets: 0,
+          lightCarsSet: new Set<string>(),
+          unspecifiedTickets: 0,
+          unspecifiedCarsSet: new Set<string>(),
           projectCounts: {},
           locationCounts: {}
         }
@@ -274,6 +344,16 @@ export default function MaintenanceTicketTree({
 
       typeMap[type].statusMap[statusCode].ticketsCount += 1
       typeMap[type].statusMap[statusCode].carsSet.add(carKey)
+      if (caseCat === 'HEAVY') {
+        typeMap[type].statusMap[statusCode].heavyTickets++
+        typeMap[type].statusMap[statusCode].heavyCarsSet.add(carKey)
+      } else if (caseCat === 'LIGHT') {
+        typeMap[type].statusMap[statusCode].lightTickets++
+        typeMap[type].statusMap[statusCode].lightCarsSet.add(carKey)
+      } else {
+        typeMap[type].statusMap[statusCode].unspecifiedTickets++
+        typeMap[type].statusMap[statusCode].unspecifiedCarsSet.add(carKey)
+      }
 
       // Projects
       const proj = (item.project || 'อื่นๆ').trim()
@@ -303,12 +383,24 @@ export default function MaintenanceTicketTree({
           typeName: t.typeName,
           ticketsCount: t.ticketsCount,
           carsCount: t.carsSet.size,
+          heavyTickets: t.heavyTickets,
+          heavyCarsCount: t.heavyCarsSet.size,
+          lightTickets: t.lightTickets,
+          lightCarsCount: t.lightCarsSet.size,
+          unspecifiedTickets: t.unspecifiedTickets,
+          unspecifiedCarsCount: t.unspecifiedCarsSet.size,
           theme,
           statuses: statuses.map(s => ({
             statusCode: s.statusCode,
             statusName: s.statusName,
             ticketsCount: s.ticketsCount,
             carsCount: s.carsSet.size,
+            heavyTickets: s.heavyTickets,
+            heavyCarsCount: s.heavyCarsSet.size,
+            lightTickets: s.lightTickets,
+            lightCarsCount: s.lightCarsSet.size,
+            unspecifiedTickets: s.unspecifiedTickets,
+            unspecifiedCarsCount: s.unspecifiedCarsSet.size,
             projects: Object.entries(s.projectCounts).sort((a, b) => b[1] - a[1]),
             locations: Object.entries(s.locationCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
           }))
@@ -318,13 +410,19 @@ export default function MaintenanceTicketTree({
     return {
       totalTickets: scopedItems.length,
       totalCars: totalCarsSet.size,
+      totalHeavyTickets,
+      totalHeavyCars: totalHeavyCarsSet.size,
+      totalLightTickets,
+      totalLightCars: totalLightCarsSet.size,
+      totalUnspecifiedTickets,
+      totalUnspecifiedCars: totalUnspecifiedCarsSet.size,
       types
     }
   }, [scopedItems])
 
   if (!items || items.length === 0) return null
 
-  const isFilteringActive = selectedProblemType !== 'all' || selectedStatus !== 'all'
+  const isFilteringActive = selectedProblemType !== 'all' || selectedStatus !== 'all' || selectedCarCase !== 'all'
 
   return (
     <div className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm backdrop-blur-md space-y-5">
@@ -341,7 +439,7 @@ export default function MaintenanceTicketTree({
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            จำแนกตามประเภทใบงาน (อุบัติเหตุ, ผลิตภัณฑ์, ปรับสภาพ ฯลฯ) และสถานะการซ่อมบำรุง • คลิกที่การ์ดเพื่อกรองตาราง
+            จำแนกตามประเภทใบงาน, สถานะซ่อมบำรุง และเคสซ่อมหนัก/ซ่อมเบา • คลิกที่การ์ดหรือเคสเพื่อกรองตาราง
           </p>
         </div>
 
@@ -375,11 +473,11 @@ export default function MaintenanceTicketTree({
           {/* Reset filter button if active */}
           {isFilteringActive && onSelectFilter && (
             <button
-              onClick={() => onSelectFilter('all', 'all')}
+              onClick={() => onSelectFilter('all', 'all', 'all')}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800 text-xs font-bold transition"
             >
               <span>✕</span>
-              <span>ล้างตัวกรอง ({selectedProblemType !== 'all' ? selectedProblemType : ''} {selectedStatus !== 'all' ? selectedStatus : ''})</span>
+              <span>ล้างตัวกรอง ({selectedProblemType !== 'all' ? selectedProblemType : ''} {selectedStatus !== 'all' ? selectedStatus : ''} {selectedCarCase !== 'all' ? (selectedCarCase === 'HEAVY' ? 'ซ่อมหนัก' : selectedCarCase === 'LIGHT' ? 'ซ่อมเบา' : 'ไม่ระบุ') : ''})</span>
             </button>
           )}
 
@@ -399,7 +497,7 @@ export default function MaintenanceTicketTree({
           {/* Root Node */}
           <div className="flex flex-col items-center">
             <div 
-              onClick={() => onSelectFilter?.('all', 'all')}
+              onClick={() => onSelectFilter?.('all', 'all', 'all')}
               className={`cursor-pointer group relative bg-gradient-to-r from-zinc-800 to-zinc-950 dark:from-zinc-100 dark:to-zinc-300 text-white dark:text-zinc-900 rounded-2xl px-6 py-2.5 text-center shadow-md border transition-all hover:scale-102 ${
                 !isFilteringActive
                   ? 'border-indigo-400 ring-2 ring-indigo-400/40 shadow-indigo-500/10'
@@ -421,6 +519,26 @@ export default function MaintenanceTicketTree({
                 {includeReadyPickup
                   ? 'รวมรถซ่อมเสร็จ รอลูกค้ามารับ'
                   : 'เฉพาะรายการค้างซ่อม (กำลังซ่อม + รอเข้าซ่อม)'}
+              </div>
+
+              {/* Root Car Case Summary Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 mt-2 pt-2 border-t border-zinc-700/50 text-[10px]">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                  <span>ซ่อมหนัก: {treeData.totalHeavyTickets} ใบ</span>
+                  <span className="text-[9px] opacity-75 font-normal">({treeData.totalHeavyCars} คัน)</span>
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>ซ่อมเบา: {treeData.totalLightTickets} ใบ</span>
+                  <span className="text-[9px] opacity-75 font-normal">({treeData.totalLightCars} คัน)</span>
+                </span>
+                {treeData.totalUnspecifiedTickets > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-zinc-700/50 text-zinc-300 border border-zinc-600/30">
+                    <span>ไม่ระบุเคส: {treeData.totalUnspecifiedTickets} ใบ</span>
+                    <span className="text-[9px] opacity-75 font-normal">({treeData.totalUnspecifiedCars} คัน)</span>
+                  </span>
+                )}
               </div>
             </div>
 
@@ -451,7 +569,7 @@ export default function MaintenanceTicketTree({
 
                   {/* Problem Type Header Card */}
                   <div 
-                    onClick={() => onSelectFilter?.(isTypeSelected ? 'all' : typeGroup.typeName, 'all')}
+                    onClick={() => onSelectFilter?.(isTypeSelected ? 'all' : typeGroup.typeName, 'all', 'all')}
                     className={`w-full cursor-pointer transition-all duration-200 rounded-2xl p-3 text-center border shadow-xs hover:scale-101 ${
                       typeGroup.theme.bg
                     } ${
@@ -479,6 +597,27 @@ export default function MaintenanceTicketTree({
                       <span>•</span>
                       <span className="font-semibold text-zinc-700 dark:text-zinc-300">{pct}%</span>
                     </div>
+
+                    {/* Pillar Car Case Split Badges */}
+                    <div className="flex flex-wrap items-center justify-center gap-1 mt-1.5 pt-1.5 border-t border-black/5 dark:border-white/10 text-[9px] font-bold">
+                      {typeGroup.heavyTickets > 0 && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
+                          <span className="w-1 h-1 rounded-full bg-rose-500" />
+                          <span>หนัก {typeGroup.heavyTickets}</span>
+                        </span>
+                      )}
+                      {typeGroup.lightTickets > 0 && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                          <span className="w-1 h-1 rounded-full bg-amber-500" />
+                          <span>เบา {typeGroup.lightTickets}</span>
+                        </span>
+                      )}
+                      {typeGroup.unspecifiedTickets > 0 && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-zinc-500 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-800/80 border border-zinc-200/50">
+                          <span>ไม่ระบุ {typeGroup.unspecifiedTickets}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Connector to status sub-branches */}
@@ -501,7 +640,7 @@ export default function MaintenanceTicketTree({
                       return (
                         <div
                           key={statusItem.statusCode}
-                          onClick={() => onSelectFilter?.(typeGroup.typeName, isStatusSelected ? 'all' : statusItem.statusCode)}
+                          onClick={() => onSelectFilter?.(typeGroup.typeName, isStatusSelected ? 'all' : statusItem.statusCode, 'all')}
                           className={`cursor-pointer transition-all duration-150 bg-white/95 dark:bg-zinc-800/90 rounded-xl border p-2.5 shadow-xs hover:border-zinc-400 dark:hover:border-zinc-600 ${
                             isStatusSelected
                               ? 'ring-2 ring-indigo-500 border-indigo-400 bg-indigo-50/20 dark:bg-indigo-950/30'
@@ -524,6 +663,53 @@ export default function MaintenanceTicketTree({
                             </div>
                           </div>
 
+                          {/* Car Case Interactive Badges */}
+                          <div className="flex items-center gap-1 my-1.5 flex-wrap">
+                            {statusItem.heavyTickets > 0 && (
+                              <span 
+                                onClick={(e) => {
+                                  if (onSelectFilter) {
+                                    e.stopPropagation()
+                                    onSelectFilter(typeGroup.typeName, statusItem.statusCode, selectedCarCase === 'HEAVY' ? 'all' : 'HEAVY')
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                                  selectedCarCase === 'HEAVY' && selectedProblemType === typeGroup.typeName && selectedStatus === statusItem.statusCode
+                                    ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-400'
+                                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                                }`}
+                                title="คลิกเพื่อกรองเฉพาะเคสซ่อมหนัก"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                <span>ซ่อมหนัก: {statusItem.heavyTickets}</span>
+                              </span>
+                            )}
+                            {statusItem.lightTickets > 0 && (
+                              <span 
+                                onClick={(e) => {
+                                  if (onSelectFilter) {
+                                    e.stopPropagation()
+                                    onSelectFilter(typeGroup.typeName, statusItem.statusCode, selectedCarCase === 'LIGHT' ? 'all' : 'LIGHT')
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                                  selectedCarCase === 'LIGHT' && selectedProblemType === typeGroup.typeName && selectedStatus === statusItem.statusCode
+                                    ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-400'
+                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
+                                }`}
+                                title="คลิกเพื่อกรองเฉพาะเคสซ่อมเบา"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                <span>ซ่อมเบา: {statusItem.lightTickets}</span>
+                              </span>
+                            )}
+                            {statusItem.unspecifiedTickets > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/60">
+                                <span>ไม่ระบุ: {statusItem.unspecifiedTickets}</span>
+                              </span>
+                            )}
+                          </div>
+
                           {/* Car count & Expand toggle */}
                           <div className="flex items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 pt-1 border-t border-zinc-100 dark:border-zinc-700/40">
                             <span>{statusItem.carsCount} คัน</span>
@@ -531,18 +717,57 @@ export default function MaintenanceTicketTree({
                             <button
                               type="button"
                               onClick={(e) => toggleNode(nodeKey, e)}
-                              className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5"
+                              className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 font-medium"
                             >
-                              <span>{isExpanded ? 'ย่อ' : 'ดูโครงการ'}</span>
+                              <span>{isExpanded ? 'ย่อ' : 'ดูรายละเอียด'}</span>
                               <span className="text-[8px]">{isExpanded ? '▲' : '▼'}</span>
                             </button>
                           </div>
 
-                          {/* Expanded Details: Projects & Workshops */}
+                          {/* Expanded Details: Car Case, Projects & Workshops */}
                           {isExpanded && (
                             <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-700/60 space-y-2 text-[10px]">
-                              {/* Projects */}
+                              {/* Car Case Section */}
                               <div>
+                                <div className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                                  เคสความเสียหาย (Car Case):
+                                </div>
+                                <div className="space-y-0.5">
+                                  {statusItem.heavyTickets > 0 && (
+                                    <div className="flex items-center justify-between text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded-md bg-rose-500/5">
+                                      <span className="flex items-center gap-1 font-medium">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                        <span>เคสซ่อมหนัก</span>
+                                      </span>
+                                      <span className="font-bold text-rose-600 dark:text-rose-400">
+                                        {statusItem.heavyTickets} ใบ ({statusItem.heavyCarsCount} คัน)
+                                      </span>
+                                    </div>
+                                  )}
+                                  {statusItem.lightTickets > 0 && (
+                                    <div className="flex items-center justify-between text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded-md bg-amber-500/5">
+                                      <span className="flex items-center gap-1 font-medium">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                        <span>เคสซ่อมเบา</span>
+                                      </span>
+                                      <span className="font-bold text-amber-600 dark:text-amber-400">
+                                        {statusItem.lightTickets} ใบ ({statusItem.lightCarsCount} คัน)
+                                      </span>
+                                    </div>
+                                  )}
+                                  {statusItem.unspecifiedTickets > 0 && (
+                                    <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 px-1.5 py-0.5 rounded-md">
+                                      <span>• ไม่ระบุเคส</span>
+                                      <span className="font-bold text-zinc-700 dark:text-zinc-300">
+                                        {statusItem.unspecifiedTickets} ใบ ({statusItem.unspecifiedCarsCount} คัน)
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Projects Section */}
+                              <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-700/40">
                                 <div className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
                                   แยกตามโครงการ:
                                 </div>
