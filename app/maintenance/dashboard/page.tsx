@@ -16,6 +16,7 @@ interface DashboardStats {
   on_rent_maintenance?: number
   ready_pickup?: number
   replacement_maintenance?: number
+  total_tickets?: number
 }
 
 interface LocationStat {
@@ -393,7 +394,12 @@ function MaintenanceDashboardContent() {
               <p className="text-3xl font-black text-slate-900 mt-1.5">
                 {stats.total} <span className="text-xs font-normal text-slate-500">คัน</span>
               </p>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-4 overflow-hidden">
+              <div className="mt-1 flex items-center gap-1">
+                <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                  {stats.total_tickets || stats.total} ใบงาน
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 h-1.5 rounded-full mt-3 overflow-hidden">
                 <div className="bg-slate-400 h-full rounded-full" style={{ width: '100%' }} />
               </div>
             </div>

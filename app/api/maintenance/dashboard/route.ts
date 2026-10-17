@@ -164,44 +164,56 @@ export async function GET() {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
-    const statsResult = await pool.request().query(`
-      WITH LatestTickets AS (
-        SELECT 
-          m.InventoryItemID,
-          m.CarStatusCode,
-          ROW_NUMBER() OVER (
-            PARTITION BY m.InventoryItemID 
-            ORDER BY 
-              CASE 
-                WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
-                WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
-                WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
-                ELSE 4
-              END ASC,
-              m.MaintenanceItemID DESC
-          ) AS rn
+    const [statsResult, ticketStatsResult] = await Promise.all([
+      pool.request().query(`
+        WITH LatestTickets AS (
+          SELECT 
+            m.InventoryItemID,
+            m.CarStatusCode,
+            ROW_NUMBER() OVER (
+              PARTITION BY m.InventoryItemID 
+              ORDER BY 
+                CASE 
+                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
+                  WHEN m.CarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 2
+                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
+                  ELSE 4
+                END ASC,
+                m.MaintenanceItemID DESC
+            ) AS rn
+          FROM dbo.EV_MaintenanceItem m
+          WHERE m.IsActive = 1
+        ),
+        VehiclesWithStatus AS (
+          SELECT 
+            i.InventoryItemID,
+            i.StatusType,
+            COALESCE(t.CarStatusCode, '') AS LatestCarStatusCode
+          FROM dbo.EV_InventoryItem i
+          LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
+          WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+        )
+        SELECT
+          SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 1 ELSE 0 END) AS ready_pickup,
+          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting,
+          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'USE_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
+          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'ON_RENT_MAINTENANCE' THEN 1 ELSE 0 END) AS on_rent_maintenance,
+          SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'REPLACEMENT_MAINTENANCE' THEN 1 ELSE 0 END) AS replacement_maintenance,
+          (SELECT COUNT(*) FROM dbo.EV_MaintenanceItem WHERE CarStatusCode = 'COMPLETE') AS complete,
+          COUNT(*) AS total
+        FROM VehiclesWithStatus
+      `),
+      pool.request().query(`
+        SELECT
+          COUNT(*) AS total_tickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1 ELSE 0 END) AS in_maintenance_tickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS ready_pickup_tickets
         FROM dbo.EV_MaintenanceItem m
-        WHERE m.IsActive = 1
-      ),
-      VehiclesWithStatus AS (
-        SELECT 
-          i.InventoryItemID,
-          i.StatusType,
-          COALESCE(t.CarStatusCode, '') AS LatestCarStatusCode
-        FROM dbo.EV_InventoryItem i
-        LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
-        WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
-      )
-      SELECT
-        SUM(CASE WHEN LatestCarStatusCode = 'READY_PICKUP_MAINTENANCE' THEN 1 ELSE 0 END) AS ready_pickup,
-        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'NEW_MAINTENANCE' THEN 1 ELSE 0 END) AS waiting,
-        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'USE_MAINTENANCE' THEN 1 ELSE 0 END) AS in_maintenance,
-        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'ON_RENT_MAINTENANCE' THEN 1 ELSE 0 END) AS on_rent_maintenance,
-        SUM(CASE WHEN LatestCarStatusCode <> 'READY_PICKUP_MAINTENANCE' AND StatusType = 'REPLACEMENT_MAINTENANCE' THEN 1 ELSE 0 END) AS replacement_maintenance,
-        (SELECT COUNT(*) FROM dbo.EV_MaintenanceItem WHERE CarStatusCode = 'COMPLETE') AS complete,
-        COUNT(*) AS total
-      FROM VehiclesWithStatus
-    `)
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+      `)
+    ])
 
     // 2. Service Location Breakdown (Only count cars currently in MAINTENANCE status, once per car)
     const locationResult = await pool.request().query(`
@@ -434,15 +446,27 @@ export async function GET() {
       maxDays
     }
 
-    return NextResponse.json({
-      stats: statsResult.recordset[0] || { total: 0, in_maintenance: 0, waiting: 0, complete: 0, on_rent_maintenance: 0, ready_pickup: 0, replacement_maintenance: 0 },
-      slaStats,
-      locations: locationsMapped,
-      problemTypes: problemTypesMapped,
-      followUps: followUpsResult.recordset,
-      longestRepairs: longestRepairsResult.recordset,
-      stillWorkRepairs: stillWorkRepairsResult.recordset
-    })
+    return NextResponse.json(
+      {
+        stats: {
+          ...(statsResult.recordset[0] || { total: 0, in_maintenance: 0, waiting: 0, complete: 0, on_rent_maintenance: 0, ready_pickup: 0, replacement_maintenance: 0 }),
+          ...(ticketStatsResult.recordset[0] || { total_tickets: 0, in_maintenance_tickets: 0, ready_pickup_tickets: 0 }),
+        },
+        slaStats,
+        locations: locationsMapped,
+        problemTypes: problemTypesMapped,
+        followUps: followUpsResult.recordset,
+        longestRepairs: longestRepairsResult.recordset,
+        stillWorkRepairs: stillWorkRepairsResult.recordset
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    )
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err)
     console.error('Error fetching maintenance dashboard:', err)

@@ -352,21 +352,30 @@ export async function GET(req: NextRequest) {
       update_user_name: m.UpdateUserFirstName ? `${m.UpdateUserFirstName} ${m.UpdateUserLastName || ''}`.trim() : null,
     }))
 
-    return NextResponse.json({
-      items,
-      summary: {
-        ...(summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 }),
-        ...(ticketSummaryResult.recordset[0] || { total_tickets: 0, in_maintenance_tickets: 0, waiting_tickets: 0, ready_pickup_tickets: 0 }),
-        ...(stillWorkResult.recordset[0] || { still_work: 0, still_work_tickets: 0, still_work_cars: 0 }),
+    return NextResponse.json(
+      {
+        items,
+        summary: {
+          ...(summaryResult.recordset[0] || { total: 0, in_maintenance: 0, complete: 0, waiting: 0 }),
+          ...(ticketSummaryResult.recordset[0] || { total_tickets: 0, in_maintenance_tickets: 0, waiting_tickets: 0, ready_pickup_tickets: 0 }),
+          ...(stillWorkResult.recordset[0] || { still_work: 0, still_work_tickets: 0, still_work_cars: 0 }),
+        },
+        locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
+        locationSummary: repairByLocResult.recordset || [],
+        problemTypes: problemTypeResult.recordset.map((r: any) => ({
+          code: r.StatusCode,
+          name: r.StatusName || r.DescriptionStatus || r.StatusCode,
+        })),
+        fetchedAt: new Date().toISOString(),
       },
-      locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
-      locationSummary: repairByLocResult.recordset || [],
-      problemTypes: problemTypeResult.recordset.map((r: any) => ({
-        code: r.StatusCode,
-        name: r.StatusName || r.DescriptionStatus || r.StatusCode,
-      })),
-      fetchedAt: new Date().toISOString(),
-    })
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    )
   } catch (error) {
     console.error('[Maintenance API Error]', error)
     return NextResponse.json({ error: 'Failed to fetch maintenance data' }, { status: 500 })
