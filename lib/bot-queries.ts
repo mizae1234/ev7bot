@@ -931,7 +931,7 @@ export async function getRepairByLocation() {
   if (!pool) return { error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }
 
   try {
-    const [kpiResult, locResult] = await Promise.all([
+    const [kpiResult, ticketKpiResult, locResult] = await Promise.all([
       // 1. สรุประดับรถหลักในระบบ (Vehicle Level - EV_InventoryItem)
       pool.request().query(`
         WITH LatestVehicleTicket AS (
@@ -966,51 +966,36 @@ export async function getRepairByLocation() {
           SUM(CASE WHEN PrimaryCarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS readyPickupVehicles
         FROM VehiclesWithStatus
       `),
-      // 2. แยกย่อยงานซ่อมตามใบงานรายพื้นที่ (Work Order Level)
+      // 2. สรุประดับใบงานทั้งหมดของรถในสถานะซ่อม (Ticket Level)
       pool.request().query(`
-        WITH LatestVehicleTicket AS (
-          SELECT 
-            m.InventoryItemID,
-            m.CarStatusCode,
-            ROW_NUMBER() OVER (
-              PARTITION BY m.InventoryItemID 
-              ORDER BY 
-                CASE 
-                  WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1
-                  WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 2
-                  WHEN m.CarStatusCode = 'STILL_WORK' THEN 3
-                  ELSE 4
-                END ASC,
-                m.MaintenanceItemID DESC
-            ) AS rn
-          FROM dbo.EV_MaintenanceItem m
-          WHERE m.IsActive = 1
-        ),
-        VehiclesWithStatus AS (
-          SELECT 
-            i.InventoryItemID,
-            COALESCE(t.CarStatusCode, 'NO_TICKET') AS PrimaryCarStatusCode
-          FROM dbo.EV_InventoryItem i
-          LEFT JOIN LatestVehicleTicket t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
-          WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
-        )
+        SELECT
+          COUNT(*) AS totalTickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE') THEN 1 ELSE 0 END) AS inRepairTickets,
+          SUM(CASE WHEN m.CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE') THEN 1 ELSE 0 END) AS readyPickupTickets
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
+      `),
+      // 3. แยกย่อยงานซ่อมตามใบงานรายพื้นที่ (Work Order Level)
+      pool.request().query(`
         SELECT 
           ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ') AS Location,
           COUNT(m.MaintenanceItemID) AS Count,
           COUNT(DISTINCT m.InventoryItemID) AS VehicleCount
         FROM dbo.EV_MaintenanceItem m
-        JOIN VehiclesWithStatus v ON m.InventoryItemID = v.InventoryItemID
-        WHERE m.IsActive = 1 
-          AND v.PrimaryCarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'NO_TICKET')
-          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        WHERE m.IsActive = 1 AND i.IsActive = 1 AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE', 'READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')
         GROUP BY ISNULL(NULLIF(m.ServiceLocationCode, ''), 'ไม่ระบุ')
         ORDER BY Count DESC
       `)
     ])
 
     const kpi = kpiResult.recordset[0] || { totalVehicles: 0, inRepairVehicles: 0, readyPickupVehicles: 0 }
+    const ticketKpi = ticketKpiResult.recordset[0] || { totalTickets: 0, inRepairTickets: 0, readyPickupTickets: 0 }
     const data = locResult.recordset
-    const totalRepairTickets = data.reduce((sum: number, item: any) => sum + (item.Count || 0), 0)
+    const totalRepairTickets = ticketKpi.totalTickets || data.reduce((sum: number, item: any) => sum + (item.Count || 0), 0)
 
     return {
       data,
@@ -1019,6 +1004,8 @@ export async function getRepairByLocation() {
       totalVehicles: kpi.totalVehicles || 0,
       inRepairVehicles: kpi.inRepairVehicles || 0,
       readyPickupCars: kpi.readyPickupVehicles || 0,
+      inRepairTickets: ticketKpi.inRepairTickets || 0,
+      readyPickupTickets: ticketKpi.readyPickupTickets || 0,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

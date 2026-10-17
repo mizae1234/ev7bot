@@ -3069,7 +3069,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               { type: 'text', text: '🔧 สรุปงานซ่อมบำรุงรายพื้นที่', weight: 'bold', size: 'lg', color: '#ffffff' },
               {
                 type: 'text',
-                text: `สถานะรถหลักในระบบ: ทั้งหมด ${totalVehicles} คัน`,
+                text: `สถานะรถหลักในระบบ: ${totalVehicles} คัน (รวม ${totalCount} ใบงาน)`,
                 size: 'xs',
                 color: '#ffcdd2',
                 margin: 'xs'
@@ -3090,7 +3090,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     contents: [
                       { type: 'text', text: '🛠️ ค้างซ่อม (รถหลัก)', size: 'xxs', color: '#ffcdd2', weight: 'bold' },
                       { type: 'text', text: `${inRepairVehicles} คัน`, size: 'sm', color: '#ffffff', weight: 'bold', margin: 'xs' },
-                      { type: 'text', text: `(รวม ${totalCount} ใบงาน)`, size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
+                      { type: 'text', text: `(${(repairs as any).inRepairTickets || 0} ใบงาน)`, size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
                     ]
                   },
                   {
@@ -3103,7 +3103,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     contents: [
                       { type: 'text', text: '🟠 ซ่อมเสร็จรอมารับ', size: 'xxs', color: '#ffcdd2', weight: 'bold' },
                       { type: 'text', text: `${readyPickupCars} คัน`, size: 'sm', color: '#ffffff', weight: 'bold', margin: 'xs' },
-                      { type: 'text', text: '(พร้อมส่งมอบ)', size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
+                      { type: 'text', text: `(${(repairs as any).readyPickupTickets || 0} ใบงาน)`, size: 'xxs', color: '#ffcdd2', margin: 'xxs' }
                     ]
                   }
                 ]
