@@ -1079,7 +1079,7 @@ function getGuideBubble() {
               },
               contents: [
                 { type: 'text', text: '3. สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#FF6D00', flex: 4 },
-                { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบในเดือนนี้', size: 'xs', color: '#666666', wrap: true, flex: 6 }
+                { type: 'text', text: 'ดูสถิติส่งมอบประจำเดือนนี้', size: 'xs', color: '#666666', wrap: true, flex: 6 }
               ]
             },
             {
@@ -1631,7 +1631,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   },
                   {
                     type: 'text',
-                    text: 'ดูสถิติการส่งมอบ แผนงาน และประวัติปล่อยรถเช่า',
+                    text: 'ดูสถิติการส่งมอบ และประวัติปล่อยรถเช่า',
                     size: 'xs',
                     color: '#DBEAFE',
                     margin: 'xs'
@@ -1660,7 +1660,7 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                         },
                         contents: [
                           { type: 'text', text: '📅 สรุปส่งมอบประจำเดือน', size: 'xs', weight: 'bold', color: '#2563EB', flex: 6 },
-                          { type: 'text', text: 'ดูเปรียบเทียบแผนส่งมอบรถ', size: 'xs', color: '#888888', align: 'end', flex: 4 }
+                          { type: 'text', text: 'ดูสถิติส่งมอบรถ', size: 'xs', color: '#888888', align: 'end', flex: 4 }
                         ]
                       }
                     ]
@@ -1940,19 +1940,9 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         const planRows: any[] = []
         for (const proj of Object.keys(comparison)) {
           const models = comparison[proj]
-          const totalActual = models.ES.actual + models.Y490.actual + models.Y410.actual;
-          const totalPlan = models.ES.plan + models.Y490.plan + models.Y410.plan;
+          const totalActual = models.ES.actual + models.Y490.actual + models.Y410.actual
 
-          if (totalPlan > 0 || totalActual > 0) {
-            let totalColor = '#1a1a1a'
-            if (totalActual >= totalPlan && totalPlan > 0) {
-              totalColor = '#2E7D32' // green
-            } else if (totalActual < totalPlan && totalActual > 0) {
-              totalColor = '#E65100' // orange
-            } else if (totalActual === 0 && totalPlan > 0) {
-              totalColor = '#C62828' // red
-            }
-
+          if (totalActual > 0) {
             planRows.push({
               type: 'box',
               layout: 'horizontal',
@@ -1967,10 +1957,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                 },
                 {
                   type: 'text',
-                  text: dailyOnly ? `${totalActual}` : `${totalActual}/${totalPlan}`,
+                  text: `${totalActual} คัน`,
                   size: 'xs',
                   weight: 'bold',
-                  color: totalColor,
+                  color: '#2E7D32',
                   align: 'end',
                   flex: 3
                 }
@@ -1978,17 +1968,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             })
 
             for (const model of ['ES', 'Y490', 'Y410'] as const) {
-              const { plan, actual } = models[model]
-              if (plan > 0 || actual > 0) {
-                let valColor = '#555555'
-                if (actual >= plan && plan > 0) {
-                  valColor = '#2E7D32'
-                } else if (actual < plan && actual > 0) {
-                  valColor = '#E65100'
-                } else if (actual === 0 && plan > 0) {
-                  valColor = '#C62828'
-                }
-
+              const { actual } = models[model]
+              if (actual > 0) {
                 planRows.push({
                   type: 'box',
                   layout: 'horizontal',
@@ -2003,9 +1984,9 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     },
                     {
                       type: 'text',
-                      text: dailyOnly ? `${actual}` : `${actual}/${plan}`,
+                      text: `${actual} คัน`,
                       size: 'xs',
-                      color: valColor,
+                      color: '#555555',
                       align: 'end',
                       flex: 3
                     }
@@ -2065,10 +2046,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               },
               {
                 type: 'text',
-                text: dailyOnly ? `${item.completed}` : `${item.completed}/${item.total}`,
+                text: `${item.completed} คัน`,
                 size: 'xs',
                 weight: 'bold',
-                color: valColor,
+                color: '#2E7D32',
                 align: 'end',
                 flex: 3
               }
@@ -2245,10 +2226,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           { type: 'text', text: '🚛 ส่งมอบรถใหม่', weight: 'bold', size: 'sm', color: '#1565C0' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan.newPlanTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
-            { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
@@ -2263,10 +2240,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
           // Used Delivery Section
           { type: 'text', text: '🚗 ปล่อยรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
           { type: 'box', layout: 'horizontal', spacing: 'md', contents: [
-            { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan.usedPlanTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
@@ -2394,23 +2367,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
         for (const proj of Object.keys(comparison)) {
           const models = comparison[proj]
           for (const model of ['ES', 'Y490', 'Y410'] as const) {
-            const { plan, actual } = models[model]
-            if (plan > 0 || actual > 0) {
-              let valColor = '#1a1a1a'
-              let textVal = ''
-              if (plan > 0) {
-                textVal = `${actual}/${plan}`
-                if (actual >= plan) {
-                  valColor = '#2E7D32' // green (target met)
-                } else if (actual > 0) {
-                  valColor = '#E65100' // orange (in progress/shortfall)
-                } else {
-                  valColor = '#C62828' // red (not started)
-                }
-              } else {
-                textVal = `${actual} คัน`
-              }
-
+            const { actual } = models[model]
+            if (actual > 0) {
               planRows.push({
                 type: 'box',
                 layout: 'horizontal',
@@ -2424,10 +2382,10 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   },
                   {
                     type: 'text',
-                    text: textVal,
+                    text: `${actual} คัน`,
                     size: 'xs',
                     weight: 'bold',
-                    color: valColor,
+                    color: '#2E7D32',
                     align: 'end',
                     flex: 3
                   }
@@ -2476,15 +2434,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   type: 'box',
                   layout: 'vertical',
                   contents: [
-                    { type: 'text', text: String(newVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                    { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
-                  ],
-                  flex: 1
-                },
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  contents: [
                     { type: 'text', text: String(newVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
                     { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
                   ],
@@ -2498,21 +2447,12 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
                   ],
                   flex: 1
-                },
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  contents: [
-                    { type: 'text', text: String(newVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                    { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
-                  ],
-                  flex: 1
                 }
               ]
             },
             ...(newPlanRows.length > 0 ? [
               { type: 'separator', margin: 'md' },
-              { type: 'text', text: '📋 เทียบแผนส่งมอบ รถใหม่ (จริง/แผน)', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
+              { type: 'text', text: '📋 รายละเอียดส่งมอบ รถใหม่ รายโครงการ', weight: 'bold', size: 'xs', color: '#555555', margin: 'xs' },
               ...newPlanRows
             ] : []),
 
@@ -2529,15 +2469,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   type: 'box',
                   layout: 'vertical',
                   contents: [
-                    { type: 'text', text: String(usedVehicles.planTotal), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-                    { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' }
-                  ],
-                  flex: 1
-                },
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  contents: [
                     { type: 'text', text: String(usedVehicles.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
                     { type: 'text', text: 'ส่งมอบสะสม', size: 'xxs', color: '#888888', align: 'center' }
                   ],
@@ -2549,15 +2480,6 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                   contents: [
                     { type: 'text', text: String(usedVehicles.pendingActual ?? 0), size: 'xl', weight: 'bold', color: '#EF6C00', align: 'center' },
                     { type: 'text', text: 'รอดำเนินการ', size: 'xxs', color: '#888888', align: 'center' }
-                  ],
-                  flex: 1
-                },
-                {
-                  type: 'box',
-                  layout: 'vertical',
-                  contents: [
-                    { type: 'text', text: String(usedVehicles.pending), size: 'xl', weight: 'bold', color: '#757575', align: 'center' },
-                    { type: 'text', text: 'ขาดอีก', size: 'xxs', color: '#888888', align: 'center' }
                   ],
                   flex: 1
                 }

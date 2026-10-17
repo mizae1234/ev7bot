@@ -68,19 +68,9 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
   const planRows: any[] = []
   for (const proj of Object.keys(comparison)) {
     const models = comparison[proj]
-    const totalActual = models.ES.actual + models.Y490.actual + models.Y410.actual;
-    const totalPlan = models.ES.plan + models.Y490.plan + models.Y410.plan;
+    const totalActual = models.ES.actual + models.Y490.actual + models.Y410.actual
 
-    if (totalPlan > 0 || totalActual > 0) {
-      let totalColor = '#1a1a1a'
-      if (totalActual >= totalPlan && totalPlan > 0) {
-        totalColor = '#2E7D32' // green
-      } else if (totalActual < totalPlan && totalActual > 0) {
-        totalColor = '#E65100' // orange
-      } else if (totalActual === 0 && totalPlan > 0) {
-        totalColor = '#C62828' // red
-      }
-
+    if (totalActual > 0) {
       planRows.push({
         type: 'box',
         layout: 'horizontal',
@@ -95,10 +85,10 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
           },
           {
             type: 'text',
-            text: dailyOnly ? `${totalActual}` : `${totalActual}/${totalPlan}`,
+            text: `${totalActual} คัน`,
             size: 'xs',
             weight: 'bold',
-            color: totalColor,
+            color: '#2E7D32',
             align: 'end',
             flex: 3
           }
@@ -106,17 +96,8 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
       })
 
       for (const model of ['ES', 'Y490', 'Y410'] as const) {
-        const { plan, actual } = models[model]
-        if (plan > 0 || actual > 0) {
-          let valColor = '#555555'
-          if (actual >= plan && plan > 0) {
-            valColor = '#2E7D32'
-          } else if (actual < plan && actual > 0) {
-            valColor = '#E65100'
-          } else if (actual === 0 && plan > 0) {
-            valColor = '#C62828'
-          }
-
+        const { actual } = models[model]
+        if (actual > 0) {
           planRows.push({
             type: 'box',
             layout: 'horizontal',
@@ -131,9 +112,9 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
               },
               {
                 type: 'text',
-                text: dailyOnly ? `${actual}` : `${actual}/${plan}`,
+                text: `${actual} คัน`,
                 size: 'xs',
-                color: valColor,
+                color: '#555555',
                 align: 'end',
                 flex: 3
               }
@@ -193,10 +174,10 @@ function buildBreakdownBox(headerText: string, breakdown: any[], dailyOnly = fal
         },
         {
           type: 'text',
-          text: dailyOnly ? `${item.completed}` : `${item.completed}/${item.total}`,
+          text: `${item.completed} คัน`,
           size: 'xs',
           weight: 'bold',
-          color: valColor,
+          color: '#2E7D32',
           align: 'end',
           flex: 3
         }
@@ -414,10 +395,6 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
             { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan?.newPlanTotal ?? 0), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
-            { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(newDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
             ], flex: 1 },
@@ -434,10 +411,6 @@ function buildFlexMessage(dateStr: string, portfolio: any, delivery: any, repair
         { type: 'text', text: '🚗 ปล่อยรถมือสอง', weight: 'bold', size: 'sm', color: '#8E24AA' },
         {
           type: 'box', layout: 'horizontal', spacing: 'md', contents: [
-            { type: 'box', layout: 'vertical', contents: [
-              { type: 'text', text: String(monthlyPlan?.usedPlanTotal ?? 0), size: 'xl', weight: 'bold', color: '#1a1a1a', align: 'center' },
-              { type: 'text', text: 'เป้าประจำเดือน', size: 'xxs', color: '#888888', align: 'center' },
-            ], flex: 1 },
             { type: 'box', layout: 'vertical', contents: [
               { type: 'text', text: String(usedDeliverySummary.completed), size: 'xl', weight: 'bold', color: '#2E7D32', align: 'center' },
               { type: 'text', text: `ส่งมอบ (${reportDateShort})`, size: 'xxs', color: '#888888', align: 'center' },
