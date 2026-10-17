@@ -294,7 +294,7 @@ export async function GET() {
       ORDER BY f.CreateDate DESC
     `)
 
-    // 5. Longest active repairs (Stuck repairs) (Only show cars currently in MAINTENANCE status, once per car)
+    // 5. Longest active repairs (Stuck repairs) (All 584 cars currently in MAINTENANCE status, once per car)
     const longestRepairsResult = await pool.request().query(`
       WITH LatestTickets AS (
         SELECT 
@@ -329,20 +329,25 @@ export async function GET() {
         COALESCE(i.VinNo, '') AS VinNo,
         i.Model,
         i.ProjectType AS Project,
-        t.IssueTitle,
-        t.CarStatusCode,
-        ISNULL(sub.StatusName, t.CarStatusCode) AS CarStatusName,
-        t.ServiceLocationCode,
+        ISNULL(t.IssueTitle, 'รอดำเนินการเปิดใบงานซ่อม') AS IssueTitle,
+        COALESCE(t.CarStatusCode, i.StatusType, 'WAITING_FOR_MAINTENANCE') AS CarStatusCode,
+        ISNULL(sub.StatusName, CASE WHEN t.CarStatusCode IS NULL THEN 'รอเปิดใบงานซ่อม' ELSE t.CarStatusCode END) AS CarStatusName,
+        ISNULL(t.ServiceLocationCode, 'ไม่ระบุ') AS ServiceLocationCode,
         t.ReportDate,
         t.MaintenanceStartDate,
         t.MaintenanceFinishDate,
-        ISNULL(DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate), GETDATE()), 0) AS DaysActive,
-        t.FollowUpDetail
-      FROM LatestTickets t
-      JOIN dbo.EV_InventoryItem i ON t.InventoryItemID = i.InventoryItemID
+        ISNULL(DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate), GETDATE()), 0) AS DaysActive,
+        t.FollowUpDetail,
+        CASE 
+          WHEN t.MaintenanceStartDate IS NOT NULL THEN 'START_DATE'
+          WHEN t.ReportDate IS NOT NULL THEN 'REPORT_DATE'
+          ELSE 'VEHICLE_DATE'
+        END AS SlaDateType
+      FROM dbo.EV_InventoryItem i
+      LEFT JOIN LatestTickets t ON i.InventoryItemID = t.InventoryItemID AND t.rn = 1
       LEFT JOIN dbo.EV_MsSubStatus sub ON t.CarStatusCode = sub.StatusCode
-      WHERE t.rn = 1
-      ORDER BY COALESCE(t.MaintenanceStartDate, t.ReportDate, t.CreateDate) ASC
+      WHERE i.Status = 'MAINTENANCE' AND i.IsActive = 1
+      ORDER BY COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate) ASC
     `)
 
     // 6. Still Driveable repairs (STILL_WORK status, active tickets, regardless of inventory status)
@@ -415,6 +420,10 @@ export async function GET() {
     const stuckList = longestRepairsResult.recordset.filter(
       (r: { CarStatusCode?: string }) => r.CarStatusCode !== 'READY_PICKUP_MAINTENANCE'
     )
+    const readyPickupList = longestRepairsResult.recordset.filter(
+      (r: { CarStatusCode?: string }) => r.CarStatusCode === 'READY_PICKUP_MAINTENANCE'
+    )
+
     let d1_5 = 0
     let d6_10 = 0
     let d11_15 = 0
@@ -422,6 +431,10 @@ export async function GET() {
     let d30_plus = 0
     let totalDays = 0
     let maxDays = 0
+
+    let startDateCount = 0
+    let reportDateCount = 0
+    let vehicleDateCount = 0
 
     for (const item of stuckList) {
       const d = typeof item.DaysActive === 'number' && !isNaN(item.DaysActive) ? Math.max(0, item.DaysActive) : 0
@@ -433,6 +446,10 @@ export async function GET() {
 
       totalDays += d
       if (d > maxDays) maxDays = d
+
+      if (item.SlaDateType === 'START_DATE') startDateCount++
+      else if (item.SlaDateType === 'REPORT_DATE') reportDateCount++
+      else vehicleDateCount++
     }
 
     const slaStats = {
@@ -443,7 +460,13 @@ export async function GET() {
       d30_plus,
       total: stuckList.length,
       avgDays: stuckList.length > 0 ? Math.round((totalDays / stuckList.length) * 10) / 10 : 0,
-      maxDays
+      maxDays,
+      startDateCount,
+      reportDateCount,
+      vehicleDateCount,
+      stuckTotal: stuckList.length,
+      readyPickupTotal: readyPickupList.length,
+      allVehiclesTotal: longestRepairsResult.recordset.length,
     }
 
     return NextResponse.json(

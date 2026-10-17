@@ -43,7 +43,7 @@ interface FollowUpItem {
 }
 
 interface LongestRepairItem {
-  MaintenanceItemID: number
+  MaintenanceItemID: number | null
   RegisterNo: string
   VinNo: string
   Model: string
@@ -57,6 +57,7 @@ interface LongestRepairItem {
   MaintenanceFinishDate?: string
   DaysActive: number
   FollowUpDetail: string | null
+  SlaDateType?: 'START_DATE' | 'REPORT_DATE' | 'VEHICLE_DATE'
 }
 
 interface SLAStats {
@@ -68,6 +69,12 @@ interface SLAStats {
   total: number
   avgDays: number
   maxDays: number
+  startDateCount?: number
+  reportDateCount?: number
+  vehicleDateCount?: number
+  stuckTotal?: number
+  readyPickupTotal?: number
+  allVehiclesTotal?: number
 }
 
 interface MaintenanceDashboardData {
@@ -104,7 +111,7 @@ const locationMap: Record<string, string> = {
   'AUTOHAUS': 'อู่ Autohaus'
 }
 
-function formatThaiDate(dateStr: string) {
+function formatThaiDate(dateStr: string, includeTime = false) {
   if (!dateStr) return '-'
   try {
     // SQL Server stores Bangkok time directly — use UTC methods to avoid double +7 offset
@@ -113,6 +120,9 @@ function formatThaiDate(dateStr: string) {
     const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
     const month = months[d.getUTCMonth()]
     const year = d.getUTCFullYear() + 543
+    if (!includeTime) {
+      return `${day} ${month} ${year}`
+    }
     const hour = d.getUTCHours().toString().padStart(2, '0')
     const minute = d.getUTCMinutes().toString().padStart(2, '0')
     return `${day} ${month} ${year} ${hour}:${minute}`
@@ -150,13 +160,22 @@ function MaintenanceDashboardContent() {
   const [stillWorkSearchQuery, setStillWorkSearchQuery] = useState('')
   const [readyPickupSearchQuery, setReadyPickupSearchQuery] = useState('')
   type SlaRange = 'all' | '1-5' | '6-10' | '11-15' | '16-30' | '>30'
+  type SlaScope = 'stuck' | 'ready' | 'all'
   const [selectedSlaFilter, setSelectedSlaFilter] = useState<SlaRange>('all')
+  const [slaScope, setSlaScope] = useState<SlaScope>('stuck')
   const [slaModalRange, setSlaModalRange] = useState<SlaRange | null>(null)
   const [modalSearchQuery, setModalSearchQuery] = useState('')
 
   // Separate longestRepairs into ready-to-release and still stuck
   const readyPickupRepairs = longestRepairs.filter(r => r.CarStatusCode === 'READY_PICKUP_MAINTENANCE')
   const actualStuckRepairs = longestRepairs.filter(r => r.CarStatusCode !== 'READY_PICKUP_MAINTENANCE')
+
+  // Scoped list based on user selection in SLA block
+  const scopedRepairs = slaScope === 'stuck' 
+    ? actualStuckRepairs 
+    : slaScope === 'ready' 
+    ? readyPickupRepairs 
+    : longestRepairs
 
   // Filter ready to release repairs
   let filteredReadyPickupRepairs = selectedLocationFilter
@@ -172,10 +191,15 @@ function MaintenanceDashboardContent() {
     })
   }
 
-  // Base stuck repairs considering the selected location filter (if any)
+  // Base stuck repairs considering the selected location filter (if any) and SLA scope
   const baseStuckRepairs = selectedLocationFilter
-    ? actualStuckRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
-    : actualStuckRepairs
+    ? scopedRepairs.filter(r => r.ServiceLocationCode === selectedLocationFilter || (selectedLocationFilter === 'ไม่ระบุ' && !r.ServiceLocationCode))
+    : scopedRepairs
+
+  // Date type counts
+  const countStartDate = baseStuckRepairs.filter(r => r.SlaDateType === 'START_DATE').length
+  const countReportDate = baseStuckRepairs.filter(r => r.SlaDateType === 'REPORT_DATE').length
+  const countVehicleDate = baseStuckRepairs.filter(r => r.SlaDateType === 'VEHICLE_DATE').length
 
   // Dynamic SLA aging counts based on baseStuckRepairs
   const d1_5List = baseStuckRepairs.filter(r => (r.DaysActive || 0) <= 5)
@@ -250,10 +274,11 @@ function MaintenanceDashboardContent() {
   const handleExportSla = (itemsToExport: LongestRepairItem[], rangeLabel?: string) => {
     const rLabel = rangeLabel || (selectedSlaFilter === 'all' ? 'ทุกช่วงเวลา' : selectedSlaFilter === '1-5' ? '1-5 วัน' : selectedSlaFilter === '6-10' ? '6-10 วัน' : selectedSlaFilter === '11-15' ? '11-15 วัน' : selectedSlaFilter === '16-30' ? '16-30 วัน' : '> 30 วัน')
     const locLabel = selectedLocationFilter ? (locationMap[selectedLocationFilter] || selectedLocationFilter) : 'ทุกสถานที่/อู่'
+    const scopeLabel = slaScope === 'stuck' ? 'เฉพาะรถอยู่ระหว่างซ่อม' : slaScope === 'ready' ? 'เฉพาะรถซ่อมเสร็จรอลูกค้ารับ' : 'รวมรถซ่อมทั้งหมด'
 
     exportToExcel({
       reportName: `รายงาน SLA รถซ่อมคงค้าง (${rLabel})`,
-      periodLabel: `ช่วงเวลา SLA: ${rLabel} | สถานที่: ${locLabel} | จำนวน: ${itemsToExport.length} คัน`,
+      periodLabel: `ช่วงเวลา SLA: ${rLabel} | ขอบเขต: ${scopeLabel} | สถานที่: ${locLabel} | จำนวน: ${itemsToExport.length} คัน | หมายเหตุ: คำนวณจาก Start Date หากไม่มีจะใช้ Report Date แทน`,
       headers: [
         'ลำดับ',
         'เลขใบซ่อม',
@@ -267,6 +292,7 @@ function MaintenanceDashboardContent() {
         'ผู้รับผิดชอบ',
         'วันที่นำรถเข้าซ่อม (Start Date)',
         'วันที่แจ้งซ่อม (Report Date)',
+        'เกณฑ์วันที่ใช้คำนวณ SLA',
         'จำนวนวันค้าง (วัน)',
         'ช่วงเวลา SLA',
         'บันทึกติดตามงานล่าสุด'
@@ -277,10 +303,15 @@ function MaintenanceDashboardContent() {
         const resp = item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' 
           ? 'EV7/ICI' 
           : (locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ')
+        const dateTypeLabel = item.SlaDateType === 'START_DATE'
+          ? 'วันที่เริ่มซ่อม (Start Date)'
+          : item.SlaDateType === 'REPORT_DATE'
+          ? 'วันที่แจ้งซ่อม (Report Date - ไม่มีวันเริ่ม)'
+          : 'วันที่รับรถ (รอเปิดใบงานซ่อม)'
 
         return [
           idx + 1,
-          item.MaintenanceItemID ? `#${item.MaintenanceItemID}` : '-',
+          item.MaintenanceItemID ? `#${item.MaintenanceItemID}` : 'รอเปิดใบงาน',
           item.RegisterNo || 'ไม่มีทะเบียน',
           item.VinNo || '-',
           item.Model || '-',
@@ -290,7 +321,8 @@ function MaintenanceDashboardContent() {
           locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ',
           resp,
           formatDateForExcelRaw(item.MaintenanceStartDate || null),
-          formatDateForExcelRaw(item.ReportDate),
+          formatDateForExcelRaw(item.ReportDate || null),
+          dateTypeLabel,
           d,
           bracket,
           item.FollowUpDetail || '-'
@@ -498,7 +530,7 @@ function MaintenanceDashboardContent() {
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  สถิติจำนวนรถที่ค้างซ่อมตามช่วงเวลา (SLA Brackets) คำนวณจากวันที่นำรถเข้าซ่อม (Start Date) เป็นหลัก • คลิกที่การ์ดเพื่อกรองรายการรถด้านล่าง
+                  สถิติจำนวนรถที่ค้างซ่อมตามช่วงเวลา (SLA Brackets) คำนวณจากวันที่นำรถเข้าซ่อม (Start Date) เป็นหลัก หากไม่มีวันที่เริ่มซ่อมจะคำนวณจากวันที่แจ้งซ่อม (Report Date) แทนโดยอัตโนมัติ • คลิกที่การ์ดเพื่อกรองรายการรถด้านล่าง
                 </p>
               </div>
 
@@ -528,6 +560,83 @@ function MaintenanceDashboardContent() {
                   >
                     ✕ ล้างตัวกรอง SLA
                   </button>
+                )}
+              </div>
+            </div>
+
+            {/* Reconcile & Scope Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
+              {/* Scope Switcher Tabs */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center gap-1">
+                  <span>🎯</span> ขอบเขตรถ:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSlaScope('stuck')}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                    slaScope === 'stuck'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  รถค้างซ่อม ({actualStuckRepairs.length} คัน)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSlaScope('ready')}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                    slaScope === 'ready'
+                      ? 'bg-orange-500 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  ซ่อมเสร็จ รอลูกค้ารับ ({readyPickupRepairs.length} คัน)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSlaScope('all')}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer ${
+                    slaScope === 'all'
+                      ? 'bg-slate-800 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  รวมรถซ่อมทั้งหมด ({longestRepairs.length} คัน)
+                </button>
+              </div>
+
+              {/* Reconcile Breakdown note */}
+              <div className="text-[11px] text-slate-600 flex items-center gap-1.5 flex-wrap bg-white border border-slate-200 px-3 py-1 rounded-xl">
+                <span className="font-extrabold text-indigo-700">📊 Reconcile:</span>
+                <span>ค้างซ่อม <strong>{actualStuckRepairs.length}</strong> คัน</span>
+                <span className="text-slate-300">+</span>
+                <span>ซ่อมเสร็จรอลูกค้ารับ <strong>{readyPickupRepairs.length}</strong> คัน</span>
+                <span className="text-slate-300">=</span>
+                <span className="font-extrabold text-slate-900">รวมทั้งหมด {longestRepairs.length} คัน</span>
+                <span className="text-slate-400 font-normal">({stats.total_tickets || 748} ใบงาน)</span>
+              </div>
+            </div>
+
+            {/* Date Calculation Method Explanatory Banner */}
+            <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] bg-amber-50/60 border border-amber-200/60 rounded-xl px-3.5 py-2 text-amber-900">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm">💡</span>
+                <span>
+                  <strong>เกณฑ์การคำนวณวัน:</strong> คำนวณจาก <strong>วันที่เริ่มซ่อม (Start Date)</strong> เป็นหลัก · หากไม่มีวันที่เริ่มซ่อมจะคำนวณจาก <strong>วันที่แจ้งซ่อม (Report Date)</strong> แทนโดยอัตโนมัติ
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[10.5px] font-mono text-amber-800 shrink-0">
+                <span className="bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+                  ใช้วันเริ่มซ่อม: <strong>{countStartDate}</strong> คัน
+                </span>
+                <span className="bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+                  ใช้วันแจ้งซ่อม: <strong>{countReportDate}</strong> คัน
+                </span>
+                {countVehicleDate > 0 && (
+                  <span className="bg-white/80 px-2 py-0.5 rounded border border-amber-200">
+                    รอเปิดใบงาน: <strong>{countVehicleDate}</strong> คัน
+                  </span>
                 )}
               </div>
             </div>
@@ -1019,6 +1128,18 @@ function MaintenanceDashboardContent() {
                               ผู้รับผิดชอบ: <strong className={item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' ? 'text-indigo-650 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 text-[9px]' : 'text-emerald-650'}>{item.CarStatusCode === 'READY_PICKUP_MAINTENANCE' || item.CarStatusCode === 'STILL_WORK' ? 'EV7/ICI' : (locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ')}</strong>
                             </span>
 
+                            {/* Date criteria inline */}
+                            <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">|</span>
+                            <span className="text-[10px] text-slate-500 hidden sm:inline">
+                              {item.SlaDateType === 'START_DATE' && item.MaintenanceStartDate ? (
+                                <span>เริ่ม: <strong className="text-slate-700">{formatThaiDate(item.MaintenanceStartDate)}</strong></span>
+                              ) : item.ReportDate ? (
+                                <span>แจ้ง: <strong className="text-slate-700">{formatThaiDate(item.ReportDate)}</strong> <span className="text-amber-700 text-[9px] font-semibold">(ใช้วันแจ้งซ่อม)</span></span>
+                              ) : (
+                                <span className="text-slate-400">รอเปิดใบงาน</span>
+                              )}
+                            </span>
+
                             {/* Latest follow-up inline */}
                             {item.FollowUpDetail && (
                               <>
@@ -1166,7 +1287,7 @@ function MaintenanceDashboardContent() {
                         <span className="absolute -left-[19.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border-2 border-white group-hover:bg-amber-400 transition" />
                         
                         <div className="flex justify-between text-slate-450">
-                          <span className="font-mono">{formatThaiDate(log.CreateDate)}</span>
+                          <span className="font-mono">{formatThaiDate(log.CreateDate, true)}</span>
                           <span className="font-bold text-slate-600">{log.CreateUserName}</span>
                         </div>
                         
@@ -1351,15 +1472,25 @@ function MaintenanceDashboardContent() {
                                 </span>
                               </td>
                               <td className="py-3 px-3.5 text-center font-mono text-[11px] text-slate-600">
-                                {item.MaintenanceStartDate ? (
+                                {item.SlaDateType === 'START_DATE' && item.MaintenanceStartDate ? (
                                   <div>
                                     <span className="font-bold text-slate-800">{formatThaiDate(item.MaintenanceStartDate)}</span>
-                                    <span className="block text-[10px] text-slate-400 font-sans">แจ้ง: {formatThaiDate(item.ReportDate)}</span>
+                                    <span className="block text-[9.5px] text-emerald-700 font-sans font-medium">✓ ใช้วันเริ่มซ่อม</span>
+                                    {item.ReportDate && (
+                                      <span className="block text-[9px] text-slate-400 font-sans">แจ้ง: {formatThaiDate(item.ReportDate)}</span>
+                                    )}
+                                  </div>
+                                ) : item.ReportDate ? (
+                                  <div>
+                                    <span className="font-bold text-slate-800">{formatThaiDate(item.ReportDate)}</span>
+                                    <span className="inline-block mt-0.5 text-[9px] font-sans font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                      ใช้วันที่แจ้งซ่อม (รอระบุวันเริ่ม)
+                                    </span>
                                   </div>
                                 ) : (
                                   <div>
-                                    <span className="text-slate-600">{formatThaiDate(item.ReportDate)}</span>
-                                    <span className="block text-[9.5px] text-amber-600 font-sans font-medium">รอระบุวันเริ่มซ่อม</span>
+                                    <span className="text-slate-600 font-sans text-[10px]">รอเปิดใบงานซ่อม</span>
+                                    <span className="block text-[8.5px] text-slate-400 font-sans">คำนวณจากวันรับรถ</span>
                                   </div>
                                 )}
                               </td>
