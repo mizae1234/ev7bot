@@ -906,9 +906,48 @@ GROUP BY ProjectType
 เก็บข้อมูลคำแปลและรายละเอียดของสถานะหลักรถยนต์
 * **คอลัมน์สำคัญ**: `StatusCode` (PK, รหัสสถานะหลัก เช่น PRODUCTION, AVAILABLE, ON_RENT, MAINTENANCE, REPLACEMENT, WAITING_FOR_GR), `StatusName` (ชื่อภาษาอังกฤษ เช่น In Process Production, Available, On Rent), `DescriptionStatus` (ชื่อคำอธิบายภาษาไทย เช่น อยู่ระหว่างการผลิต, รถใหม่พร้อมส่ง, อยู่ระหว่างเช่า, อยู่ระหว่างซ่อม)
 
-### 11.8 ตาราง: `dbo.EV_MsSubStatus` (มาสเตอร์สถานะย่อยรถยนต์)
-เก็บข้อมูลคำแปลและรายละเอียดของสถานะย่อยของรถยนต์ เพื่อใช้ตรวจสอบความแตกต่าง เช่น รถใหม่ (AVAILABLE) หรือ รถใช้แล้ว/รถเก่า (AVAILABLE_USE)
-* **คอลัมน์สำคัญ**: `SubStatusID` (PK, varchar), `StatusCode` (รหัสสถานะย่อย เช่น AVAILABLE, AVAILABLE_USE, RESERVE, NEW_MAINTENANCE, USE_MAINTENANCE), `StatusName` (ชื่ออังกฤษ เช่น Available New, Available Use, Reserve), `DescriptionStatus` (ชื่อคำอธิบายภาษาไทย เช่น รถใหม่ยังไม่ทำสัญญา, รถใช้เเล้วยังไม่ทำสัญญา, รถที่ถูกจอง), `Type` (ประเภท เช่น STATUS_TYPE_AVAILABLE, STATUS_TYPE_MAINTENANCE), `IsActive` (bit)
+### 11.8 ตาราง: `dbo.EV_MsSubStatus` (มาสเตอร์สถานะย่อยและรหัสมาตรฐานทั้งหมด)
+เก็บข้อมูลคำแปลและรายละเอียดของสถานะย่อยของรถยนต์และใบงานซ่อม โดยแยกตามฟิลด์ `Type`:
+* **คอลัมน์สำคัญ**: `SubStatusID` (PK, varchar), `StatusCode` (รหัสสถานะ), `StatusName` (ชื่อแสดงผลภาษาไทย/อังกฤษ), `DescriptionStatus` (คำอธิบายความหมายภาษาไทย), `Type` (หมวดหมู่), `IsActive` (bit)
+* **หมวดหมู่สำคัญ (Type)**:
+  1. **`DAMAGE` (เคสความเสียหาย / ซ่อมหนัก-ซ่อมเบา - CarCaseCode ใน EV_MaintenanceItem)**:
+     - `DAMAGE_HEAVY` → StatusName: **"เคสซ่อมหนัก"** (DescriptionStatus: "ความเสียหายรุนแรง / ซ่อมหนัก")
+     - `DAMAGE_LIGHT` → StatusName: **"เคสซ่อมเบา"** (DescriptionStatus: "ความเสียหายเล็กน้อย / ซ่อมเบา")
+     - `DAMAGE_TOTAL` → StatusName: **"ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม"**
+  2. **`MAINTENANCE_PROBLEM_TYPE` (ประเภทปัญหา - ProblemTypeCode ใน EV_MaintenanceItem)**:
+     - `ACCIDENT` → "อุบัติเหตุ"
+     - `PRODUCT` → "ผลิตภัณฑ์"
+     - `SUPPLIER_REPAIR` → "งานซ่อมจาก Supplier"
+     - `RECONDITION` → "ปรับสภาพรถ"
+     - `OTHER_2` → "อื่นๆ"
+  3. **`MAINTENANCE_CAR_STATUS` (สถานะงานซ่อม - CarStatusCode ใน EV_MaintenanceItem)**:
+     - `WAITING_FOR_MAINTENANCE` → "เข้าซ่อม" (รอเข้าซ่อม)
+     - `STILL_WORK` → "รถยังขับใช้งานได้อยู่" (มีประวัติเคลมแต่รถยังไม่ได้เข้าอู่)
+     - `IN_MAINTENANCE` → "รถอยู่ระหว่างซ่อม"
+     - `GARAGE_COMPLETE` → "ซ่อมเสร็จ" (อู่ซ่อมเสร็จแล้ว)
+     - `COMPLETE` → "ปิดเคส"
+  4. **`STATUS_TYPE_MAINTENANCE` (สถานะย่อยรถที่เข้าซ่อม - StatusType ใน EV_InventoryItem)**:
+     - `NEW_MAINTENANCE` → "รถใหม่เข้าซ่อม"
+     - `ON_RENT_MAINTENANCE` → "รถเช่าเข้าซ่อม"
+     - `USE_MAINTENANCE` → "รถใช้เเล้วเข้าซ่อม"
+     - `READY_PICKUP_MAINTENANCE` → "รถซ่อมเสร็จ รอลูกค้ามารับ"
+     - `REPLACEMENT_MAINTENANCE` → "รถสำรองเข้าซ่อม"
+  5. **`FAULT_PARTY` (ฝ่ายที่ผิด - FaultPartyCode ใน EV_MaintenanceItem)**:
+     - `FAULT_DRIVER` → "คนขับ"
+     - `FAULT_COUNTERPARTY` → "คู่กรณี"
+     - `OTHER` → "อื่นๆ"
+  6. **`INSURANCE` (บริษัทประกัน - InsuranceCode ใน EV_MaintenanceItem)**:
+     - `VIRIYA_INSURANCE` → "วิริยะประกันภัย"
+     - `MUANGTHAI_INSURANCE` → "เมืองไทยประกันภัย"
+     - `ICARE_INSURANCE` → "ไอแคร์ประกันภัย"
+  7. **`LOCATION` (สถานที่จอดรถและอู่ซ่อมทั้งหมดในระบบ - ServiceLocationCode และ CurrentLocation)**:
+     - รายการอู่และจุดจอด 41 แห่ง เช่น `EV7_YARD_PRAPADAENG` ("EV7 Yard พระประแดง"), `AION_GI_SALAYA` ("Aion ศาลายา"), `GARAGE_BUNGKHWANG` ("อู่ บึงขวาง") ฯลฯ
+  8. **`RETURN_REASON` (เหตุผลการคืนรถ - ReturnReason ใน EV_Inspection/EV_ReturnItem)**:
+     - `RETURN_SWITCH_PROVIDER` → "ย้ายค่าย / เปลี่ยนบริษัท"
+     - `RETURN_REPOSSESSED` → "บริษัทดำเนินการยึดคืนรถ"
+     - `RETURN_REPLACEMENT_CANCEL` → "คืนรถทดแทนเนื่องจากยกเลิกสัญญา"
+     - `RETURN_REPLACEMENT_GET_MAIN` → "คืนรถทดแทนเนื่องจากรถหลักซ่อมเสร็จ"
+  9. **`STATUS_TYPE_AVAILABLE`**: `AVAILABLE` (รถใหม่พร้อมส่ง), `AVAILABLE_USE` (รถมือสองพร้อมส่ง), `RESERVE` (รถที่ถูกจอง)
 
 ### 11.9 ตารางข้อมูลระบบ LINE Bot & Admin Portal (PostgreSQL via Prisma)
 ใช้จัดเก็บสถานะบอต การบันทึกปัญหา การลงทะเบียน และ Log การสนทนา
@@ -992,6 +1031,33 @@ GROUP BY ProjectType
       ```
   * **หลีกเลี่ยงชื่อคอลัมน์ทับซ้อน (Column Naming Conflicts/Shadowing)**:
     เนื่องจากตารางใบแจ้งซ่อม `EV_MaintenanceItem` มีคอลัมน์ชื่อ `CarStatusCode` (เช่น STILL_WORK, IN_MAINTENANCE) หากมีการเชื่อมกับตาราง `EV_InventoryItem` เพื่อดึงสถานะตัวรถ (เช่น MAINTENANCE, ON_RENT) ให้ตั้งชื่อนามแฝง (Alias) ของสถานะตัวรถเป็นอย่างอื่น เช่น `i.Status AS CarInventoryStatusCode` แทนการใช้ `CarStatusCode` เพื่อไม่ให้เขียนทับค่าสถานะการซ่อมใน Object ผลลัพธ์
+
+  * **กฎการจำแนกสังกัดบริษัท (Company Classification Logic: EV7 vs GI)**:
+    ในการจัดกลุ่มรถยนต์เข้าสังกัดบริษัท (EV7 หรือ GI) ให้ใช้เกณฑ์มาตรฐานดังนี้:
+    1. **Demo** → บริษัท **`GI`**
+    2. **Waiting for GR** (`Status = 'WAITING_FOR_GR'`) → บริษัท **`GI`**
+    3. **Production Pending ทั้งหมด** (`Status = 'PRODUCTION'` ที่ยังรอดำเนินการ) → บริษัท **`GI`**
+    4. **นอกเหนือจาก 3 กลุ่มข้างต้นทั้งหมด** → บริษัท **`EV7`**
+
+  * **โครงสร้างและนิยามการนับใบงานซ่อม (Maintenance Ticket Structure & Active Repairs)**:
+    1. **เฉพาะค้างซ่อม (Active Repairs - ค่าเริ่มต้น Default View ของ Ticket Tree)**:
+       - นับเฉพาะใบงานที่กำลังซ่อมหรือรอซ่อมจริง: `CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')`
+       - ปัจจุบันมี 727 ใบงาน (ครอบคลุมรถยนต์ในอู่ 584 คัน)
+    2. **ซ่อมเสร็จ รอลูกค้ามารับ (Ready to Pickup)**:
+       - ใบงานที่อู่ซ่อมเสร็จแล้วหรือรอลูกค้ามารับ: `CarStatusCode IN ('READY_PICKUP_MAINTENANCE', 'GARAGE_COMPLETE')`
+       - มีจำนวน 27 ใบงาน
+    3. **ยอดรวมใบงานสำหรับรถที่ Status = 'MAINTENANCE'**:
+       - รวมทั้งหมด 754 ใบงาน (727 ค้างซ่อม + 27 รอมารับ)
+    4. **รถยังขับใช้งานได้อยู่ (Still Work)**:
+       - มีประวัติแจ้งซ่อม/เคลม แต่รถยังไม่ได้นำเข้าจอดที่อู่: `CarStatusCode = 'STILL_WORK'` (ตัวรถอาจมีสถานะเป็น `ON_RENT` หรือ `AVAILABLE`)
+    5. **ปิดเคสแล้ว (Complete)**:
+       - ใบงานที่ดำเนินการซ่อมและส่งมอบเสร็จสิ้นแล้ว: `CarStatusCode = 'COMPLETE'` (ในฐานข้อมูลทั้งหมดมีกว่า 3,600+ รายการ)
+    6. **การจำแนกเคสความเสียหาย (CarCase - ซ่อมหนัก / ซ่อมเบา)**:
+       - ให้อ้างอิงความหมายจาก `dbo.EV_MsSubStatus` (`Type = 'DAMAGE'`) เสมอ:
+         - `DAMAGE_HEAVY` หรือ 'เคสซ่อมหนัก' → **เคสซ่อมหนัก** (ความเสียหายรุนแรง / ซ่อมหนัก)
+         - `DAMAGE_LIGHT` หรือ 'เคสซ่อมเบา' → **เคสซ่อมเบา** (ความเสียหายเล็กน้อย / ซ่อมเบา)
+         - `DAMAGE_TOTAL` → **ความเสียหายรุนแรง ไม่คุ้มค่าต่อการซ่อม**
+         - NULL หรือค่าว่าง → **ไม่ระบุ**
 
 ---
 

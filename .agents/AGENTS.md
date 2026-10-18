@@ -14,3 +14,12 @@
   - **License Plate Normalization**: เมื่อบันทึกหรือค้นหาทะเบียนรถ ให้ normalize ให้อยู่ในฟอร์แมตมาตรฐาน `[หมวดตัวอักษร]-[ตัวเลข]` เสมอ (เช่น `ทอ-1234`, `1กก-1234`) เพื่อให้การค้นหาจับคู่เข้า-ออกเป็นมาตรฐานเดียวกัน
   - **New Car Tracking (รถใหม่ไม่มีทะเบียน)**: รถใหม่ที่ไม่มีทะเบียนจะบันทึกเป็น `VehicleRef = 'รถใหม่'` โดยใช้ระบบ `QuantityIn` (จำนวนเข้า) และ `QuantityOut` (จำนวนออก) ใน 1 เรคคอร์ด และเมื่อมีรถใหม่ออก ให้ใช้ตรรกะ FIFO (First-In, First-Out) ค้นหาเรคคอร์ดเข้าที่เก่าสุดที่ยังมีรถเหลืออยู่ในลานมาตัดยอดออก
 - **TASK_NOTES_PERMISSIONS**: การสร้างงาน (`createTaskNote`), การปิดงาน (`completeTaskNote`), และการดูรายการงานค้าง (`listTaskNotes`) ถูกจำกัดสิทธิ์ให้ดำเนินการและตอบคำถามได้เฉพาะผู้ใช้งานที่มีสิทธิ์ `ADMIN` หรือ `SUPER_ADMIN` เท่านั้น ผู้ใช้ทั่วไป (`USER` หรืออื่นๆ) จะไม่ได้รับอนุญาต
+- **COMPANY_CLASSIFICATION**: การจำแนกสังกัดบริษัทของรถยนต์ (Company) ให้ยึดเกณฑ์มาตรฐาน:
+  - **Demo** = `GI`
+  - **Waiting for GR** (`Status = 'WAITING_FOR_GR'`) = `GI`
+  - **Production Pending ทั้งหมด** (`Status = 'PRODUCTION'` และรอดำเนินการ) = `GI`
+  - **นอกนั้นทั้งหมด** = `EV7`
+- **MAINTENANCE_TICKETS_RULES**:
+  - **Default View**: โครงสร้างจำแนกใบงานซ่อม (Ticket Tree) ค่าเริ่มต้นต้องแสดง **เฉพาะค้างซ่อม (Active Repairs)** ซึ่งคือใบงานที่กำลังซ่อมหรือรอเข้าซ่อม (`CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')`) เท่านั้น ไม่รวมรถเสร็จรอมารับ (Ready to pickup) จนกว่าจะเปิดสวิตช์รวม
+  - **Car Case Breakdown**: การจำแนกเคสความเสียหาย (CarCase) ซ่อมหนัก/ซ่อมเบา ให้อ้างอิงความหมายจาก `dbo.EV_MsSubStatus` (`Type = 'DAMAGE'`) เสมอ (`DAMAGE_HEAVY` = เคสซ่อมหนัก, `DAMAGE_LIGHT` = เคสซ่อมเบา, `DAMAGE_TOTAL` = ไม่คุ้มค่าต่อการซ่อม)
+
