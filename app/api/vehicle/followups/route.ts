@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
       LEFT JOIN dbo.EV_MsSubStatus curLoc ON i.CurrentLocation = curLoc.StatusCode AND curLoc.Type = 'LOCATION'
       LEFT JOIN dbo.EV_MsSubStatus maintStatus ON m.CarStatusCode = maintStatus.StatusCode AND maintStatus.Type = 'MAINTENANCE_CAR_STATUS'
-      LEFT JOIN dbo.CM_StatusMaster servLoc ON m.ServiceLocationCode = servLoc.StatusCode AND servLoc.StatusGroup = 'SERVICE_LOCATION'
+      LEFT JOIN dbo.EV_MsSubStatus servLoc ON m.ServiceLocationCode = servLoc.StatusCode AND servLoc.Type = 'LOCATION'
       ${whereClause}
       ORDER BY f.CreateDate DESC, f.MaintenanceFollowUpID DESC
       OFFSET @offset ROWS

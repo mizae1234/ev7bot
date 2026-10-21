@@ -257,13 +257,15 @@ function VehicleNotesContent() {
       const notesData = await notesRes.json()
       if (!notesData.success) throw new Error(notesData.error || 'เกิดข้อผิดพลาดในการดึงข้อมูลบันทึกตัวรถ')
 
-      let followUpList: VehicleFollowUp[] = []
-      if (followUpsRes.ok) {
-        const followUpsData = await followUpsRes.json()
-        if (followUpsData.success && Array.isArray(followUpsData.followUps)) {
-          followUpList = followUpsData.followUps
-        }
+      if (!followUpsRes.ok) {
+        const errJson = await followUpsRes.json().catch(() => ({}))
+        throw new Error(errJson.error || 'ไม่สามารถดึงข้อมูลการติดตาม (Follow-up) เพื่อส่งออกได้')
       }
+      const followUpsData = await followUpsRes.json()
+      if (!followUpsData.success) {
+        throw new Error(followUpsData.error || 'เกิดข้อผิดพลาดในการดึงข้อมูลการติดตาม (Follow-up)')
+      }
+      const followUpList: VehicleFollowUp[] = followUpsData.followUps || []
 
       const exportList: VehicleNote[] = notesData.vehicleNotes || []
       if (exportList.length === 0 && followUpList.length === 0) {
