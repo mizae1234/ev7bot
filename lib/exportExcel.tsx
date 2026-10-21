@@ -1,12 +1,25 @@
 'use client'
 import * as XLSX from 'xlsx'
 
-interface ExportOptions {
+export interface ExportOptions {
   reportName: string           // ชื่อรายงาน เช่น "รายการงานซ่อม"
   periodLabel: string          // ช่วงเวลา เช่น "12 มิ.ย. 2569" หรือ "1 มิ.ย. - 12 มิ.ย. 2569"
   headers: string[]            // ชื่อคอลัมน์ภาษาไทย
   rows: (string | number | null | undefined)[][] // ข้อมูลแต่ละแถว
   fileName?: string            // ชื่อไฟล์ (ไม่ต้องมี .xlsx)
+}
+
+export interface SheetConfig {
+  sheetName?: string           // ชื่อ Sheet (ไม่เกิน 31 ตัวอักษร)
+  reportName: string           // หัวข้อรายงาน เช่น "บันทึกข้อมูลรถ (Vehicle Notes)"
+  periodLabel: string          // ช่วงเวลา เช่น "12 มิ.ย. 2569"
+  headers: string[]            // ชื่อคอลัมน์
+  rows: (string | number | null | undefined)[][] // ข้อมูลแต่ละแถว
+}
+
+export interface MultiSheetExportOptions {
+  fileName?: string            // ชื่อไฟล์ (ไม่ต้องมี .xlsx)
+  sheets: SheetConfig[]        // รายการ Sheet ทั้งหมดที่ต้องการส่งออก
 }
 
 const formatExportDatetime = () => {
@@ -17,10 +30,8 @@ const formatExportDatetime = () => {
   })
 }
 
-export function exportToExcel({ reportName, periodLabel, headers, rows, fileName }: ExportOptions) {
-  const exportTime = formatExportDatetime()
-
-  // Build data with header info rows
+function buildWorksheet(sheet: SheetConfig, exportTime: string) {
+  const { reportName, periodLabel, headers, rows } = sheet
   const data: (string | number | null | undefined)[][] = [
     [`รายงาน: ${reportName}`],
     [`ช่วงเวลา: ${periodLabel}`],
@@ -55,10 +66,35 @@ export function exportToExcel({ reportName, periodLabel, headers, rows, fileName
     ]
   }
 
+  return ws
+}
+
+export function exportToExcel({ reportName, periodLabel, headers, rows, fileName }: ExportOptions) {
+  const exportTime = formatExportDatetime()
+  const ws = buildWorksheet({ sheetName: reportName, reportName, periodLabel, headers, rows }, exportTime)
+
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, reportName.substring(0, 31)) // Sheet name max 31 chars
+  const safeSheetName = reportName.replace(/[\\/?*:[\]]/g, '').substring(0, 31)
+  XLSX.utils.book_append_sheet(wb, ws, safeSheetName)
 
   const safeName = (fileName || reportName).replace(/[^a-zA-Z0-9ก-๙_\- ]/g, '').replace(/\s+/g, '_')
+  const dateStr = new Date().toISOString().split('T')[0]
+  XLSX.writeFile(wb, `${safeName}_${dateStr}.xlsx`)
+}
+
+export function exportToExcelMultiSheet({ fileName, sheets }: MultiSheetExportOptions) {
+  const exportTime = formatExportDatetime()
+  const wb = XLSX.utils.book_new()
+
+  for (const sheet of sheets) {
+    const ws = buildWorksheet(sheet, exportTime)
+    const rawSheetName = sheet.sheetName || sheet.reportName
+    const cleanSheetName = rawSheetName.replace(/[\\/?*:[\]]/g, '').substring(0, 31)
+    XLSX.utils.book_append_sheet(wb, ws, cleanSheetName)
+  }
+
+  const baseFileName = fileName || (sheets[0]?.reportName ?? 'Export')
+  const safeName = baseFileName.replace(/[^a-zA-Z0-9ก-๙_\- ]/g, '').replace(/\s+/g, '_')
   const dateStr = new Date().toISOString().split('T')[0]
   XLSX.writeFile(wb, `${safeName}_${dateStr}.xlsx`)
 }

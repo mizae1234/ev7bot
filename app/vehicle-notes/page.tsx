@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Pagination } from '@/components/ui/Pagination'
 import { AuthGuard } from '@/components/ui/AuthGuard'
 import { LoginProfile } from '@/components/ui/LoginProfile'
-import { exportToExcel } from '@/lib/exportExcel'
+import { exportToExcelMultiSheet } from '@/lib/exportExcel'
 
 interface VehicleNote {
   VehicleNoteID: number
@@ -30,6 +30,29 @@ interface VehicleNote {
     contentType: string
     url: string
   }[]
+}
+
+interface VehicleFollowUp {
+  MaintenanceFollowUpID: number
+  MaintenanceItemID: number
+  FollowUpDate: string | null
+  FollowUpDetail: string
+  CreateDate: string
+  CreateUserID: number | null
+  CreateUserName: string
+  IssueTitle: string
+  CarStatusCode: string
+  MaintenanceStatusName: string
+  ServiceLocationCode: string
+  ServiceLocationName: string
+  RegisterNo: string | null
+  VinNo: string
+  Model: string
+  ProjectType: string
+  CarStatusName: string | null
+  SubStatusName: string | null
+  CurrentLocation: string | null
+  IsActive: boolean
 }
 
 interface GroupedVehicleNotes {
@@ -225,13 +248,25 @@ function VehicleNotesContent() {
       if (startDate) params.set('startDate', startDate)
       if (endDate) params.set('endDate', endDate)
 
-      const res = await fetch(`/api/vehicle/notes?${params.toString()}`)
-      if (!res.ok) throw new Error('ไม่สามารถดึงข้อมูลเพื่อส่งออกได้')
-      const data = await res.json()
-      if (!data.success) throw new Error(data.error || 'เกิดข้อผิดพลาดในการดึงข้อมูล')
+      const [notesRes, followUpsRes] = await Promise.all([
+        fetch(`/api/vehicle/notes?${params.toString()}`),
+        fetch(`/api/vehicle/followups?${params.toString()}`)
+      ])
 
-      const exportList: VehicleNote[] = data.vehicleNotes || []
-      if (exportList.length === 0) {
+      if (!notesRes.ok) throw new Error('ไม่สามารถดึงข้อมูลบันทึกตัวรถเพื่อส่งออกได้')
+      const notesData = await notesRes.json()
+      if (!notesData.success) throw new Error(notesData.error || 'เกิดข้อผิดพลาดในการดึงข้อมูลบันทึกตัวรถ')
+
+      let followUpList: VehicleFollowUp[] = []
+      if (followUpsRes.ok) {
+        const followUpsData = await followUpsRes.json()
+        if (followUpsData.success && Array.isArray(followUpsData.followUps)) {
+          followUpList = followUpsData.followUps
+        }
+      }
+
+      const exportList: VehicleNote[] = notesData.vehicleNotes || []
+      if (exportList.length === 0 && followUpList.length === 0) {
         alert('ไม่มีข้อมูลที่ตรงกับเงื่อนไขตัวกรองสำหรับส่งออก')
         return
       }
@@ -247,7 +282,8 @@ function VehicleNotesContent() {
         periodLabel = `ถึง ${formatDisplayDate(endDate)}`
       }
 
-      const rows = exportList.map((item, index) => {
+      // Sheet 1: Vehicle Notes
+      const noteRows = exportList.map((item, index) => {
         const attachmentStr = (item.attachments && item.attachments.length > 0)
           ? item.attachments.map(a => a.originalFileName || a.fileName).join(', ')
           : '-'
@@ -268,7 +304,7 @@ function VehicleNotesContent() {
         ]
       })
 
-      const headers = [
+      const noteHeaders = [
         'ลำดับ',
         'วันที่-เวลาบันทึก',
         'ทะเบียนรถ',
@@ -283,16 +319,78 @@ function VehicleNotesContent() {
         'ไฟล์แนบ'
       ]
 
+      // Status mapping dictionary for Maintenance Car Status
+      const carStatusMap: Record<string, string> = {
+        IN_MAINTENANCE: 'กำลังซ่อม',
+        WAITING_FOR_MAINTENANCE: 'รอเข้าซ่อม',
+        READY_PICKUP_MAINTENANCE: 'ซ่อมเสร็จ (รอมารับ)',
+        GARAGE_COMPLETE: 'อู่ซ่อมเสร็จ (รอยืนยัน)',
+        STILL_WORK: 'ใช้งานต่อได้ (รอซ่อม)',
+        COMPLETE: 'เสร็จสิ้น'
+      }
+
+      // Sheet 2: Maintenance Follow-up
+      const followUpRows = followUpList.map((item, index) => {
+        const maintStatus = carStatusMap[item.CarStatusCode] || item.MaintenanceStatusName || item.CarStatusCode || '-'
+        const servLoc = item.ServiceLocationName ? item.ServiceLocationName.replace(/_/g, ' ') : '-'
+
+        return [
+          index + 1,
+          formatDateTh(item.CreateDate || item.FollowUpDate),
+          item.RegisterNo || 'ยังไม่มีทะเบียน',
+          item.VinNo || '-',
+          item.ProjectType || '-',
+          item.Model || '-',
+          item.MaintenanceItemID ? `#${item.MaintenanceItemID}` : '-',
+          item.IssueTitle || '-',
+          maintStatus,
+          servLoc,
+          item.CarStatusName || '-',
+          item.CurrentLocation || '-',
+          maskStaffName(item.CreateUserName),
+          item.FollowUpDetail || '-'
+        ]
+      })
+
+      const followUpHeaders = [
+        'ลำดับ',
+        'วันที่-เวลาติดตาม',
+        'ทะเบียนรถ',
+        'เลขตัวถัง (VIN)',
+        'โครงการ',
+        'รุ่นรถ',
+        'เลขที่ใบงาน',
+        'อาการที่แจ้งซ่อม',
+        'สถานะงานซ่อม',
+        'อู่/สถานที่ซ่อม',
+        'สถานะรถปัจจุบัน',
+        'สถานที่ปัจจุบันของรถ',
+        'ผู้บันทึกติดตามผล',
+        'รายละเอียดการติดตามผล (Follow-up)'
+      ]
+
       const fileDateRange = startDate && endDate
         ? (startDate === endDate ? startDate : `${startDate}_to_${endDate}`)
         : (startDate || endDate || 'all')
 
-      exportToExcel({
-        reportName: 'ประวัติการบันทึกข้อมูลรถ (Vehicle Notes)',
-        periodLabel,
-        headers,
-        rows,
-        fileName: `Vehicle_Notes_${fileDateRange}`
+      exportToExcelMultiSheet({
+        fileName: `Vehicle_Notes_and_Followup_${fileDateRange}`,
+        sheets: [
+          {
+            sheetName: 'บันทึกข้อมูลรถ (Notes)',
+            reportName: 'ประวัติการบันทึกข้อมูลรถ (Vehicle Notes)',
+            periodLabel,
+            headers: noteHeaders,
+            rows: noteRows
+          },
+          {
+            sheetName: 'การติดตามผล (Follow-up)',
+            reportName: 'ประวัติการติดตามผลงานซ่อม (Maintenance Follow-up)',
+            periodLabel,
+            headers: followUpHeaders,
+            rows: followUpRows
+          }
+        ]
       })
     } catch (err: any) {
       console.error('[Export Excel Error]', err)
@@ -365,9 +463,9 @@ function VehicleNotesContent() {
 
             <button
               onClick={handleExportExcel}
-              disabled={exporting || total === 0}
+              disabled={exporting}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white transition shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              title="ส่งออกข้อมูลเป็นไฟล์ Excel"
+              title="ส่งออกข้อมูลเป็นไฟล์ Excel (บันทึกตัวรถ & ติดตามผล)"
             >
               <span>{exporting ? '⏳' : '📥'}</span>
               <span>{exporting ? 'กำลังส่งออก...' : 'ส่งออก Excel'}</span>

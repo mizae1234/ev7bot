@@ -1,0 +1,267 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getMSSQLWritePool, sql } from '@/lib/mssql'
+import { prisma } from '@/lib/prisma'
+import { env } from '@/lib/env'
+
+export const dynamic = 'force-dynamic'
+
+function maskStaffName(name?: string | null): string {
+  if (!name) return '-'
+  const trimmed = name.trim()
+  if (!trimmed) return '-'
+  if (trimmed.includes('@')) return trimmed.split('@')[0].trim()
+  const parts = trimmed.split(/\s+/)
+  if (parts.length === 0) return '-'
+  if (parts[0] === 'คุณ' && parts.length > 1) return `คุณ${parts[1]}`
+  return parts[0]
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = parseInt(searchParams.get('limit') || '50', 10)
+    const search = searchParams.get('search') || ''
+    const startDate = searchParams.get('startDate')?.trim() || ''
+    const endDate = searchParams.get('endDate')?.trim() || ''
+
+    if (env.MOCK_MODE) {
+      return NextResponse.json({
+        success: true,
+        followUps: [
+          {
+            MaintenanceFollowUpID: 1,
+            MaintenanceItemID: 101,
+            FollowUpDate: new Date().toISOString(),
+            FollowUpDetail: 'MOCK FOLLOWUP: กำลังรออะไหล่ไฟหน้า คาดว่าจะเข้าวันศุกร์นี้ @คุณ สมชาย',
+            CreateDate: new Date().toISOString(),
+            CreateUserID: 1,
+            CreateUserName: 'คุณ สมชาย',
+            IssueTitle: 'ไฟหน้าแตกจากอุบัติเหตุ',
+            CarStatusCode: 'IN_MAINTENANCE',
+            MaintenanceStatusName: 'กำลังซ่อม',
+            ServiceLocationCode: 'GARAGE_01',
+            ServiceLocationName: 'อู่ศาลายา',
+            RegisterNo: 'กข-1234',
+            VinNo: 'VIN1234567890',
+            Model: 'BYD Atto 3',
+            ProjectType: 'EV7',
+            CarStatusName: 'ส่งซ่อม',
+            SubStatusName: null,
+            CurrentLocation: 'อู่ศาลายา',
+            IsActive: true
+          }
+        ],
+        pagination: {
+          page,
+          limit,
+          total: 1,
+          totalPages: 1
+        }
+      })
+    }
+
+    const pool = await getMSSQLWritePool()
+    if (!pool) {
+      return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
+    }
+
+    const whereConditions: string[] = ['f.IsActive = 1']
+    const countReq = pool.request()
+    const dataReq = pool.request()
+
+    if (search) {
+      const cleanSearch = `%${search.trim()}%`
+      countReq.input('search', sql.NVarChar, cleanSearch)
+      dataReq.input('search', sql.NVarChar, cleanSearch)
+      whereConditions.push(`(
+        i.RegisterNo LIKE @search OR
+        i.VinNo LIKE @search OR
+        f.FollowUpDetail LIKE @search OR
+        m.IssueTitle LIKE @search
+      )`)
+    }
+
+    let start = startDate
+    let end = endDate
+    if (start && end && start > end) {
+      const tmp = start
+      start = end
+      end = tmp
+    }
+
+    if (start) {
+      countReq.input('startDate', sql.Date, start)
+      dataReq.input('startDate', sql.Date, start)
+      whereConditions.push('CAST(COALESCE(f.FollowUpDate, f.CreateDate) AS DATE) >= @startDate')
+    }
+
+    if (end) {
+      countReq.input('endDate', sql.Date, end)
+      dataReq.input('endDate', sql.Date, end)
+      whereConditions.push('CAST(COALESCE(f.FollowUpDate, f.CreateDate) AS DATE) <= @endDate')
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) AS Total
+      FROM dbo.EV_MaintenanceFollowUp f
+      JOIN dbo.EV_MaintenanceItem m ON f.MaintenanceItemID = m.MaintenanceItemID
+      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      ${whereClause}
+    `
+
+    // Data query
+    const dataQuery = `
+      SELECT
+        f.MaintenanceFollowUpID,
+        f.MaintenanceItemID,
+        f.FollowUpDate,
+        f.FollowUpDetail,
+        f.CreateDate,
+        f.CreateUserID,
+        f.IsActive,
+        m.IssueTitle,
+        m.CarStatusCode,
+        COALESCE(maintStatus.DescriptionStatus, maintStatus.StatusName, m.CarStatusCode) AS MaintenanceStatusName,
+        m.ServiceLocationCode,
+        COALESCE(servLoc.StatusName, m.ServiceLocationCode) AS ServiceLocationName,
+        COALESCE(i.RegisterNo, '') AS RegisterNo,
+        i.VinNo,
+        i.Model,
+        i.ProjectType,
+        s.DescriptionStatus AS CarStatusName,
+        sub.DescriptionStatus AS SubStatusName,
+        curLoc.StatusName AS CurrentLocationName,
+        i.CurrentLocation AS LocationCode,
+        ISNULL(NULLIF(u.FirstName + ' ' + ISNULL(u.LastName, ''), ''), u.UserName) AS CreateUserName
+      FROM dbo.EV_MaintenanceFollowUp f
+      JOIN dbo.EV_MaintenanceItem m ON f.MaintenanceItemID = m.MaintenanceItemID
+      LEFT JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+      LEFT JOIN dbo.EV_User u ON f.CreateUserID = u.UserID
+      LEFT JOIN dbo.EV_MsStatus s ON i.Status = s.StatusCode
+      LEFT JOIN dbo.EV_MsSubStatus sub ON i.StatusType = sub.StatusCode AND sub.Type LIKE 'STATUS_TYPE_%'
+      LEFT JOIN dbo.EV_MsSubStatus curLoc ON i.CurrentLocation = curLoc.StatusCode AND curLoc.Type = 'LOCATION'
+      LEFT JOIN dbo.EV_MsSubStatus maintStatus ON m.CarStatusCode = maintStatus.StatusCode AND maintStatus.Type = 'MAINTENANCE_CAR_STATUS'
+      LEFT JOIN dbo.CM_StatusMaster servLoc ON m.ServiceLocationCode = servLoc.StatusCode AND servLoc.StatusGroup = 'SERVICE_LOCATION'
+      ${whereClause}
+      ORDER BY f.CreateDate DESC, f.MaintenanceFollowUpID DESC
+      OFFSET @offset ROWS
+      FETCH NEXT @limit ROWS ONLY
+    `
+
+    // Run Count Query
+    const countResult = await countReq.query(countQuery)
+    const total = countResult.recordset[0]?.Total || 0
+
+    // Add Pagination
+    const offset = (page - 1) * limit
+    dataReq.input('offset', sql.Int, offset)
+    dataReq.input('limit', sql.Int, limit)
+
+    const dataResult = await dataReq.query(dataQuery)
+
+    // Resolve creator names from PostgreSQL
+    const regMap = new Map<number, string>()
+    try {
+      const registrations = await prisma.lineRegistration.findMany({
+        select: { ev7UserId: true, displayName: true }
+      })
+      for (const reg of registrations) {
+        if (reg.ev7UserId && reg.displayName) {
+          regMap.set(Number(reg.ev7UserId), reg.displayName)
+        }
+      }
+    } catch (pgErr) {
+      console.warn('[Vehicle Followups API] PostgreSQL unavailable for name resolution, skipping:', (pgErr as Error).message)
+    }
+
+    interface RawFollowUpRecord {
+      MaintenanceFollowUpID: number
+      MaintenanceItemID: number
+      FollowUpDate: string | null
+      FollowUpDetail: string | null
+      CreateDate: string
+      CreateUserID: number | null
+      CreateUserName: string | null
+      IssueTitle: string | null
+      CarStatusCode: string | null
+      MaintenanceStatusName: string | null
+      ServiceLocationCode: string | null
+      ServiceLocationName: string | null
+      RegisterNo: string | null
+      VinNo: string | null
+      Model: string | null
+      ProjectType: string | null
+      CarStatusName: string | null
+      SubStatusName: string | null
+      CurrentLocationName: string | null
+      LocationCode: string | null
+      IsActive: boolean
+    }
+
+    const followUps = ((dataResult.recordset as RawFollowUpRecord[]) || []).map((f) => {
+      const originalName = (f.CreateUserName || '').trim()
+      const lineDisplayName = f.CreateUserID ? regMap.get(Number(f.CreateUserID)) : null
+
+      let creatorName = '-'
+      if (originalName && lineDisplayName) {
+        const maskedOriginal = maskStaffName(originalName)
+        const maskedLine = maskStaffName(lineDisplayName)
+        if (originalName.includes('@')) {
+          creatorName = maskedLine
+        } else if (maskedOriginal !== maskedLine && maskedLine !== '-') {
+          creatorName = `${maskedOriginal} (${maskedLine})`
+        } else {
+          creatorName = maskedOriginal
+        }
+      } else if (lineDisplayName) {
+        creatorName = maskStaffName(lineDisplayName)
+      } else if (originalName) {
+        creatorName = maskStaffName(originalName)
+      }
+
+      return {
+        MaintenanceFollowUpID: f.MaintenanceFollowUpID,
+        MaintenanceItemID: f.MaintenanceItemID,
+        FollowUpDate: f.FollowUpDate,
+        FollowUpDetail: f.FollowUpDetail,
+        CreateDate: f.CreateDate,
+        CreateUserID: f.CreateUserID,
+        CreateUserName: creatorName,
+        IssueTitle: f.IssueTitle || '-',
+        CarStatusCode: f.CarStatusCode || '-',
+        MaintenanceStatusName: f.MaintenanceStatusName || f.CarStatusCode || '-',
+        ServiceLocationCode: f.ServiceLocationCode || '-',
+        ServiceLocationName: f.ServiceLocationName || f.ServiceLocationCode || '-',
+        RegisterNo: f.RegisterNo || null,
+        VinNo: f.VinNo || '-',
+        Model: f.Model || '-',
+        ProjectType: f.ProjectType || '-',
+        CarStatusName: f.CarStatusName || null,
+        SubStatusName: f.SubStatusName || null,
+        CurrentLocation: f.CurrentLocationName || f.LocationCode || null,
+        IsActive: f.IsActive
+      }
+    })
+
+    const totalPages = Math.ceil(total / limit)
+
+    return NextResponse.json({
+      success: true,
+      followUps,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    })
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.error('[Get Vehicle Followups Error]', err)
+    return NextResponse.json({ error: `เกิดข้อผิดพลาดในการดึงข้อมูลการติดตาม: ${errorMsg}` }, { status: 500 })
+  }
+}
