@@ -1,5 +1,5 @@
 # Stage 1: Install dependencies
-FROM node:20-alpine AS deps
+FROM node:22.23.4-alpine AS deps
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -11,7 +11,7 @@ RUN npm ci
 RUN npx prisma generate
 
 # Stage 2: Build application
-FROM node:20-alpine AS builder
+FROM node:22.23.4-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -22,7 +22,7 @@ RUN cat next.config.mjs
 RUN npm run build
 
 # Stage 3: Production runner
-FROM node:20-alpine AS runner
+FROM node:22.23.4-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
