@@ -38,8 +38,6 @@ export const IMPORT_CONFIG = {
   unspecifiedLocationLabel: 'ยังไม่ระบุสถานที่',
   /** Used when สรุปความประมาท is neither driver nor counterparty. */
   fallbackFaultPartyCode: 'OTHER',
-  /** Ticket statuses that count as closed (vehicle may receive a new ticket). */
-  closedCarStatusCodes: ['COMPLETE', 'GARAGE_COMPLETE'],
   /** EV_MsSubStatus.Type values used to validate mapped codes. */
   masterTypes: {
     faultParty: 'FAULT_PARTY',

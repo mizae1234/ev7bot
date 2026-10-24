@@ -60,7 +60,6 @@ export async function commitRows(
   opts: { fileName?: string; userId: number },
 ): Promise<{ batchId: string }> {
   const batchId = randomUUID()
-  const closedList = IMPORT_CONFIG.closedCarStatusCodes.map(c => `'${c}'`).join(',')
 
   for (const row of rows) {
     if (row.status !== 'READY') {
@@ -94,17 +93,6 @@ export async function commitRows(
         await tx.rollback()
         row.status = 'SKIP_DUPLICATE_CLAIM'
         row.reason = `เลขเคลม ${row.claimNumber} มีในระบบแล้ว`
-        await writeLog(pool.request(), batchId, opts.fileName, row, row.status, row.reason, null, opts.userId)
-        continue
-      }
-      const open = await new sql.Request(tx)
-        .input('invId', sql.Int, row.inventoryItemId!)
-        .query(`SELECT TOP 1 1 AS x FROM dbo.EV_MaintenanceItem WITH (UPDLOCK, HOLDLOCK)
-                WHERE InventoryItemID = @invId AND IsActive = 1 AND ISNULL(CarStatusCode, '') NOT IN (${closedList})`)
-      if (open.recordset.length > 0) {
-        await tx.rollback()
-        row.status = 'SKIP_OPEN_TICKET'
-        row.reason = 'รถมีใบซ่อมที่ยังเปิดอยู่'
         await writeLog(pool.request(), batchId, opts.fileName, row, row.status, row.reason, null, opts.userId)
         continue
       }

@@ -111,13 +111,6 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
   }
 
   const inventoryIds = vehicles.map(v => v.InventoryItemID)
-  const closedList = IMPORT_CONFIG.closedCarStatusCodes.map(c => `'${c}'`).join(',') // config constants, not user input
-  const openTicketVehicles = new Set(
-    (await queryIn<{ InventoryItemID: number }>(pool, inventoryIds, 'int', inList =>
-      `SELECT DISTINCT InventoryItemID FROM dbo.EV_MaintenanceItem
-       WHERE IsActive = 1 AND ISNULL(CarStatusCode, '') NOT IN (${closedList}) AND InventoryItemID IN (${inList})`,
-    )).map(r => r.InventoryItemID),
-  )
   const contractByVehicle = new Map<number, string>()
   for (const r of await queryIn<{ InventoryItemID: number; ContractNo: string }>(pool, inventoryIds, 'int', inList =>
     `SELECT InventoryItemID, ContractNo FROM dbo.EV_RentItem WHERE IsActive = 1 AND InventoryItemID IN (${inList})`,
@@ -128,7 +121,6 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
   // ── Decide row by row (file order) ───────────────────────────────
   const seenJobs = new Set<string>()
   const seenClaims = new Set<string>()
-  const claimedVehicles = new Set<number>()
   const planned: PlannedRow[] = parsedRows.map(parsed => {
     const f = parsed.fields
     const plateKey = normalizePlate(f.registerNo)
@@ -171,12 +163,9 @@ export async function evaluateRows(pool: ConnectionPool, parsedRows: ParsedRow[]
     if (matches.length > 1) return skip('SKIP_VEHICLE_AMBIGUOUS', `ทะเบียน ${f.registerNo} ตรงกับรถ ${matches.length} คัน`)
     if (!parsed.incidentDateIso) return skip('ERROR', `รูปแบบวันที่เกิดเหตุไม่ถูกต้อง: "${parsed.raw['วันที่เกิดเหตุ'] ?? ''}"`)
     if (!f.issueTitle) return skip('ERROR', 'ไม่มีลักษณะการเกิดเหตุ')
-    if (openTicketVehicles.has(vehicle!.InventoryItemID)) return skip('SKIP_OPEN_TICKET', 'รถมีใบซ่อมที่ยังเปิดอยู่')
-    if (claimedVehicles.has(vehicle!.InventoryItemID)) return skip('SKIP_OPEN_TICKET_IN_FILE', 'รถคันนี้มีใบจากแถวก่อนหน้าในไฟล์แล้ว')
 
     seenJobs.add(jobKey)
     if (claimKey) seenClaims.add(claimKey)
-    claimedVehicles.add(vehicle!.InventoryItemID)
     return base
   })
 
