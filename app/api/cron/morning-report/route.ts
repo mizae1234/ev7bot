@@ -81,7 +81,8 @@ function buildComparisonBox(headerText: string, plans: any[], actuals: any[], da
             size: 'xs',
             weight: 'bold',
             color: '#1a1a1a',
-            flex: 5
+            flex: 5,
+            wrap: true
           },
           {
             type: 'text',
@@ -170,7 +171,8 @@ function buildBreakdownBox(headerText: string, breakdown: any[], dailyOnly = fal
           text: `• ${item.project} (${item.model})`,
           size: 'xs',
           color: '#555555',
-          flex: 5
+          flex: 5,
+          wrap: true
         },
         {
           type: 'text',

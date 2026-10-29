@@ -2406,7 +2406,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
                     text: `• ${proj} (${model})`,
                     size: 'xs',
                     color: '#555555',
-                    flex: 5
+                    flex: 5,
+                    wrap: true
                   },
                   {
                     type: 'text',
@@ -2544,7 +2545,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
               text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
               size: 'xs',
               color: '#555555',
-              flex: 6
+              flex: 6,
+              wrap: true
             },
             {
               type: 'text',
@@ -2669,7 +2671,8 @@ async function handleChat(text: string, lower: string, userId: string, replyToke
             text: `• ${r.reason || 'ไม่ระบุเหตุผล'}`,
             size: 'xs',
             color: '#555555',
-            flex: 6
+            flex: 6,
+            wrap: true
           },
           {
             type: 'text',
