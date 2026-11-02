@@ -34,6 +34,7 @@ interface VehicleNotesSectionProps {
   sourceProcess?: string | null
   refDocNo?: string | null
   initialNoteText?: string
+  initialNoteKey?: number
 }
 
 // SQL Server stores Bangkok time directly — mssql driver serializes as UTC (Z suffix).
@@ -60,16 +61,17 @@ export function VehicleNotesSection({
   lineUserId: propLineUserId,
   sourceProcess,
   refDocNo,
-  initialNoteText = ''
+  initialNoteText = '',
+  initialNoteKey = 0
 }: VehicleNotesSectionProps) {
   const [notes, setNotes] = useState<VehicleNote[]>([])
   const [noteText, setNoteText] = useState('')
-  
+
   useEffect(() => {
     if (initialNoteText) {
       setNoteText(initialNoteText)
     }
-  }, [initialNoteText])
+  }, [initialNoteText, initialNoteKey])
 
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)

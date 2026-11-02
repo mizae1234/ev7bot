@@ -119,6 +119,7 @@ export function AuditChecklistForm({
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [mode, setMode] = useState<'QC' | 'AUDIT'>(propInspectionMode || 'QC')
   const [initialNoteText, setInitialNoteText] = useState('')
+  const [noteInsertKey, setNoteInsertKey] = useState(0)
   const [currentStep, setCurrentStep] = useState(0)
   const [stepSaving, setStepSaving] = useState(false)
   const stepIndicatorRef = useRef<HTMLDivElement>(null)
@@ -306,6 +307,7 @@ export function AuditChecklistForm({
     })
 
     setInitialNoteText(lines.join('\n'))
+    setNoteInsertKey(k => k + 1)
   }
 
   const effectiveAssessment = mode === 'QC' ? qcAssessment : (propAutoAssessment || '')
@@ -826,8 +828,14 @@ export function AuditChecklistForm({
                       <button
                         type="button"
                         onClick={() => {
-                          const summaryText = `พบจุดเสียหาย:\n` + effectiveDamagedItems.map((item, idx) => `${idx + 1}. ${item.label} (${item.valueLabel})`).join('\n')
-                          onRemarkChange((summaryText + '\n' + remark).trim())
+                          const reg = activeVehicle.registerNo || activeVehicle.vinNo
+                          const summaryText = [
+                            reg,
+                            'พบจุดเสียหาย:',
+                            ...effectiveDamagedItems.map((item, idx) => `${idx + 1}. ${item.label} (${item.valueLabel})`),
+                          ].join('\n')
+                          setInitialNoteText(summaryText)
+                          setNoteInsertKey(k => k + 1)
                         }}
                         className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[9px] active:scale-95 transition"
                       >
@@ -876,6 +884,7 @@ export function AuditChecklistForm({
                   lineUserId={lineUserId}
                   sourceProcess={mode === 'QC' ? 'VEHICLE_QC' : 'VEHICLE_AUDIT'}
                   initialNoteText={initialNoteText}
+                  initialNoteKey={noteInsertKey}
                 />
               </div>
             )}
