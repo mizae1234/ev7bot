@@ -27,6 +27,8 @@ import {
   toISODate
 } from '@/lib/insurance-purchase'
 
+const ZIP_CHUNK_SIZE = 100
+
 function PolicyPageContent() {
   const [activeTab, setActiveTab] = useState<'LIST' | 'UPLOAD_PDF' | 'IMPORT_EXCEL'>('LIST')
 
@@ -66,6 +68,7 @@ function PolicyPageContent() {
 
   const [loading, setLoading] = useState(true)
   const [exportLoading, setExportLoading] = useState(false)
+  const [zipProgress, setZipProgress] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
@@ -263,6 +266,75 @@ function PolicyPageContent() {
     }
   }
 
+  // Bulk download PLMV / PLMC PDFs as ZIP (all records matching current filters)
+  const handleDownloadZip = async (docType: 'PLMV' | 'PLMC') => {
+    if (zipProgress) return
+    setZipProgress('กำลังรวบรวมรายการ...')
+    try {
+      const query = new URLSearchParams()
+      if (search) query.append('search', search)
+      if (expiryFilter !== 'ALL') query.append('expiryFilter', expiryFilter)
+      if (missingFilter !== 'ALL') query.append('missingFilter', missingFilter)
+      if (statusFilter !== 'ALL') query.append('statusFilter', statusFilter)
+      if (typeFilter !== 'ALL') query.append('typeFilter', typeFilter)
+      if (projectFilter !== 'ALL') query.append('projectFilter', projectFilter)
+      if (projectTypeFilter !== 'ALL') query.append('projectTypeFilter', projectTypeFilter)
+      if (modelFilter !== 'ALL') query.append('modelFilter', modelFilter)
+
+      const list = await fetchAllPolicyRecords(query)
+      const pathOf = (r: PolicyVehicleRecord) => (docType === 'PLMV' ? r.insuranceFilePath : r.actFilePath)
+      const docLabel = docType === 'PLMV' ? 'ประกันภัยภาคสมัครใจ (PLMV)' : 'พ.ร.บ. (PLMC)'
+      const items = list
+        .filter(r => !!pathOf(r))
+        .map(r => ({ vinNo: r.vinNo, registerNo: r.registerNo, path: pathOf(r) as string }))
+
+      if (items.length === 0) {
+        alert(`ไม่พบไฟล์ PDF ${docLabel} ในรายการที่กรองอยู่`)
+        return
+      }
+
+      const chunks: typeof items[] = []
+      for (let i = 0; i < items.length; i += ZIP_CHUNK_SIZE) chunks.push(items.slice(i, i + ZIP_CHUNK_SIZE))
+
+      const missing = list.length - items.length
+      const ok = confirm(
+        `พบไฟล์ ${docType} ${items.length} ไฟล์` +
+        (missing > 0 ? ` (อีก ${missing} คันไม่มีไฟล์)` : '') +
+        `\nจะดาวน์โหลดเป็น ZIP ${chunks.length} ไฟล์ (ไฟล์ละไม่เกิน ${ZIP_CHUNK_SIZE} PDF)\nดำเนินการต่อหรือไม่?`
+      )
+      if (!ok) return
+
+      const stamp = new Date().toISOString().slice(0, 10)
+      for (let i = 0; i < chunks.length; i++) {
+        setZipProgress(`กำลังสร้าง ZIP ${i + 1}/${chunks.length}...`)
+        const res = await fetch('/api/policy/download-zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: docType, items: chunks[i] })
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => null)
+          throw new Error(err?.error || `ดาวน์โหลดไม่สำเร็จ (${res.status})`)
+        }
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = chunks.length > 1 ? `${docType}_${stamp}_part${i + 1}of${chunks.length}.zip` : `${docType}_${stamp}.zip`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
+        await new Promise(r => setTimeout(r, 500))
+      }
+    } catch (err) {
+      console.error('Download ZIP failed:', err)
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดาวน์โหลด ZIP')
+    } finally {
+      setZipProgress(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Top Header */}
@@ -359,6 +431,8 @@ function PolicyPageContent() {
             statuses={vehicleStatuses}
             onExportExcel={handleExportExcel}
             exportLoading={exportLoading}
+            onDownloadZip={handleDownloadZip}
+            zipProgress={zipProgress}
           />
 
           {serviceError && (

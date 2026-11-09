@@ -29,6 +29,8 @@ interface PolicyFiltersProps {
   } | { code: string; label: string }[]
   onExportExcel?: () => void
   exportLoading?: boolean
+  onDownloadZip?: (docType: 'PLMV' | 'PLMC') => void
+  zipProgress?: string | null
 }
 
 export function PolicyFilters({
@@ -54,8 +56,22 @@ export function PolicyFilters({
   models,
   statuses,
   onExportExcel,
-  exportLoading
+  exportLoading,
+  onDownloadZip,
+  zipProgress
 }: PolicyFiltersProps) {
+  const [zipMenuOpen, setZipMenuOpen] = React.useState(false)
+  const zipMenuRef = React.useRef<HTMLDivElement>(null)
+
+  // Close the download menu when clicking outside of it
+  React.useEffect(() => {
+    if (!zipMenuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (zipMenuRef.current && !zipMenuRef.current.contains(e.target as Node)) setZipMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [zipMenuOpen])
   const [showBatchModal, setShowBatchModal] = React.useState(false)
   const [batchInputText, setBatchInputText] = React.useState('')
 
@@ -196,6 +212,34 @@ export function PolicyFilters({
               label={exportLoading ? '⏳ กำลังส่งออก...' : '📥 Export Excel'}
               className="min-w-[160px] justify-center"
             />
+          )}
+
+          {/* Bulk download PDFs (ZIP) of the chosen type for all records matching the filters */}
+          {onDownloadZip && (
+            <div ref={zipMenuRef} className="relative inline-flex items-stretch">
+              <ExportButton
+                onClick={() => { if (!zipProgress) setZipMenuOpen(o => !o) }}
+                label={zipProgress ? `⏳ ${zipProgress}` : '📦 ดาวน์โหลด PDF (ZIP) ▾'}
+                className="min-w-[190px] justify-center"
+              />
+              {zipMenuOpen && !zipProgress && (
+                <div className="absolute right-0 top-full mt-1 z-30 w-64 p-1 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-lg">
+                  {([
+                    ['PLMV', '🛡️ ประกันภัยภาคสมัครใจ (PLMV)'],
+                    ['PLMC', '📜 พ.ร.บ. (PLMC)']
+                  ] as const).map(([code, label]) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => { setZipMenuOpen(false); onDownloadZip(code) }}
+                      className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg text-zinc-700 dark:text-zinc-200 hover:bg-emerald-50 dark:hover:bg-zinc-800 cursor-pointer"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Clear all filters */}
