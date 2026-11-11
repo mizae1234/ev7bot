@@ -33,6 +33,7 @@ interface MaintenanceItem {
   incident_date: string | null
   start_date: string | null
   finish_date: string | null
+  expected_finish_date: string | null
   return_date: string | null
   follow_up: string | null
   replacements: { vin: string; register_no: string | null; start_date: string | null }[]
@@ -225,7 +226,7 @@ function MaintenanceContent() {
     exportToExcel({
       reportName: 'รายการงานซ่อมทั้งหมด',
       periodLabel: `สถานะ: ${statusLabel} | อู่: ${locLabel} | ประเภท: ${typeLabel}`,
-      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ตำแหน่งปัจจุบันของรถ', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข', 'วันที่อัปเดตล่าสุด'],
+      headers: ['ทะเบียน', 'เลขตัวถัง (VIN)', 'รุ่น', 'โครงการ', 'อาการ', 'สถานที่ซ่อม', 'ผู้รับผิดชอบตามงาน', 'ตำแหน่งปัจจุบันของรถ', 'ประเภทปัญหา', 'เคส', 'ผู้รับผิดชอบ', 'ประกัน', 'วันแจ้ง', 'วันเกิดเหตุ', 'วันเริ่มซ่อม', 'วันที่คาดว่าจะซ่อมเสร็จ', 'วันซ่อมเสร็จ', 'วันรับคืน', 'สถานะ', 'รถทดแทน', 'หมายเหตุ', 'ผู้สร้าง', 'ผู้แก้ไข', 'วันที่อัปเดตล่าสุด'],
       rows: filteredItems.map(item => [
         item.register_no || '-',
         item.vin,
@@ -247,6 +248,7 @@ function MaintenanceContent() {
         formatDateForExcelRaw(item.report_date),
         formatDateForExcelRaw(item.incident_date),
         formatDateForExcelRaw(item.start_date),
+        formatDateForExcelRaw(item.expected_finish_date),
         formatDateForExcelRaw(item.finish_date),
         formatDateForExcelRaw(item.return_date),
         item.status_text,
@@ -746,6 +748,10 @@ function MaintenanceContent() {
                                     <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.start_date)}</span>
                                   </div>
 
+                                  <div>
+                                    <span className="text-zinc-450 font-bold block mb-1">🏁 วันที่คาดว่าจะซ่อมเสร็จ (Expected):</span>
+                                    <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.expected_finish_date)}</span>
+                                  </div>
                                   <div>
                                     <span className="text-zinc-450 font-bold block mb-1">📅 วันซ่อมเสร็จ (Finish):</span>
                                     <span className="text-zinc-800 dark:text-zinc-200">{formatDateTh(item.finish_date)}</span>

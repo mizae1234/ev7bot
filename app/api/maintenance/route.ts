@@ -262,6 +262,7 @@ export async function GET(req: NextRequest) {
           m.IncidentDate,
           m.MaintenanceStartDate,
           m.MaintenanceFinishDate,
+          m.ExpectedFinishDate,
           m.MaintenanceReturnDate,
           m.FollowUpDetail,
           m.DriverName,
@@ -369,6 +370,7 @@ export async function GET(req: NextRequest) {
       incident_date: m.IncidentDate,
       start_date: m.MaintenanceStartDate,
       finish_date: m.MaintenanceFinishDate,
+      expected_finish_date: m.ExpectedFinishDate,
       return_date: m.MaintenanceReturnDate,
       follow_up: m.FollowUpDetail,
       replacements: (replacements[(m.MaintenanceItemID as number)] || []).map(r => ({

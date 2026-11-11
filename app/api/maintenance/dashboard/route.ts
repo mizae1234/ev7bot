@@ -292,6 +292,7 @@ export async function GET() {
           m.MaintenanceStartDate,
           m.FollowUpDetail,
           m.MaintenanceFinishDate,
+          m.ExpectedFinishDate,
           m.CreateDate,
           ROW_NUMBER() OVER (
             PARTITION BY m.InventoryItemID 
@@ -322,6 +323,7 @@ export async function GET() {
         t.ReportDate,
         t.MaintenanceStartDate,
         t.MaintenanceFinishDate,
+        t.ExpectedFinishDate,
         ISNULL(DATEDIFF(day, COALESCE(t.MaintenanceStartDate, t.ReportDate, i.UpdateDate, i.CreateDate), GETDATE()), 0) AS DaysActive,
         t.FollowUpDetail,
         CASE 

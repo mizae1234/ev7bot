@@ -69,6 +69,7 @@ interface MaintenanceInfo {
   IncidentDate: string | null
   MaintenanceStartDate: string | null
   MaintenanceFinishDate: string | null
+  ExpectedFinishDate: string | null
   MaintenanceReturnDate: string | null
   CarStatusCode: string
   CarStatusDescription: string
@@ -359,6 +360,7 @@ function VehicleDetailContent() {
                 <InfoItem label="กรณีรถ" value={activeMaint.CarCase || '-'} />
                 <InfoItem label="สถานที่ซ่อม" value={activeMaint.ServiceLocation || '-'} />
                 <InfoItem label="วันเริ่มซ่อม" value={formatDate(activeMaint.MaintenanceStartDate)} />
+                <InfoItem label="คาดว่าจะซ่อมเสร็จ" value={formatDate(activeMaint.ExpectedFinishDate)} />
                 <InfoItem label="ซ่อมเสร็จ" value={formatDate(activeMaint.MaintenanceFinishDate)} />
                 <InfoItem label="สถานะใบแจ้งซ่อม" value={activeMaint.CarStatusDescription || '-'} />
                 <InfoItem label="คนขับ (Driver)" value={activeMaint.DriverName || '-'} />
@@ -455,6 +457,7 @@ function VehicleDetailContent() {
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">กรณีรถ: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.CarCase || '-'}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">ประกัน: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.Insurance || '-'}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">เริ่มซ่อม: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.MaintenanceStartDate)}</span></span>
+                      <span className="text-zinc-550 dark:text-zinc-400 font-normal">คาดว่าจะซ่อมเสร็จ: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.ExpectedFinishDate)}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">ซ่อมเสร็จ: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.MaintenanceFinishDate)}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">วันรับรถคืน: <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{formatDate(m.MaintenanceReturnDate)}</span></span>
                       <span className="text-zinc-550 dark:text-zinc-400 font-normal">คนขับ (Driver): <span className="text-zinc-800 dark:text-zinc-200 font-semibold">{m.DriverName || '-'}</span></span>

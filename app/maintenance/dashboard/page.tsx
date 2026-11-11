@@ -56,6 +56,7 @@ interface LongestRepairItem {
   ReportDate: string
   MaintenanceStartDate?: string | null
   MaintenanceFinishDate?: string
+  ExpectedFinishDate?: string | null
   DaysActive: number
   FollowUpDetail: string | null
   SlaDateType?: 'START_DATE' | 'REPORT_DATE' | 'VEHICLE_DATE'
@@ -292,6 +293,7 @@ function MaintenanceDashboardContent() {
         'สถานที่ซ่อม/อู่',
         'ผู้รับผิดชอบ',
         'วันที่นำรถเข้าซ่อม (Start Date)',
+        'วันที่คาดว่าจะซ่อมเสร็จ',
         'วันที่แจ้งซ่อม (Report Date)',
         'เกณฑ์วันที่ใช้คำนวณ SLA',
         'จำนวนวันค้าง (วัน)',
@@ -322,6 +324,7 @@ function MaintenanceDashboardContent() {
           locationMap[item.ServiceLocationCode] || item.ServiceLocationCode || 'ไม่ระบุ',
           resp,
           formatDateForExcelRaw(item.MaintenanceStartDate || null),
+          formatDateForExcelRaw(item.ExpectedFinishDate || null),
           formatDateForExcelRaw(item.ReportDate || null),
           dateTypeLabel,
           d,
@@ -1439,6 +1442,7 @@ function MaintenanceDashboardContent() {
                             <th className="py-3 px-3.5">อาการที่แจ้งซ่อม</th>
                             <th className="py-3 px-3.5">สถานที่ซ่อม / อู่</th>
                             <th className="py-3 px-3.5 text-center">วันเริ่มซ่อม / แจ้งซ่อม</th>
+                            <th className="py-3 px-3.5 text-center">คาดว่าเสร็จ</th>
                             <th className="py-3 px-3.5 text-center">ค้างซ่อม</th>
                             <th className="py-3 px-3.5 text-center">จัดการ</th>
                           </tr>
@@ -1498,6 +1502,15 @@ function MaintenanceDashboardContent() {
                                     <span className="text-slate-600 font-sans text-[10px]">รอเปิดใบงานซ่อม</span>
                                     <span className="block text-[8.5px] text-slate-400 font-sans">คำนวณจากวันรับรถ</span>
                                   </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-3.5 text-center font-mono text-[11px] text-slate-700">
+                                {item.ExpectedFinishDate ? (
+                                  <span className={`font-bold ${new Date(item.ExpectedFinishDate).getTime() < Date.now() ? 'text-rose-600' : ''}`}>
+                                    {formatThaiDate(item.ExpectedFinishDate)}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
                                 )}
                               </td>
                               <td className="py-3 px-3.5 text-center">
