@@ -19,7 +19,7 @@ const carStatusMap: Record<string, string> = {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, contractNo, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate, isRepossessed, repossessDate, repossessLocation, repossessRemark, rentItemId } = body
+    const { maintenanceId, inventoryItemId: bodyInventoryItemId, carStatusCode, followUpDetail, serviceLocationCode, serviceLocationName, startDate, expectedFinishDate, finishDate, lineUserId, deletedAttachmentIds, driverName, incidentDate, issueTitle, problemTypeCode, faultPartyCode, carCaseCode, insuranceCode, claimNumber, contractNo, isLastPending, hasReplacement, replacementVin, replacementLocation, replacementStartDate, returnDate, rootCause, fixAction, currentLocation, replacementReturnDate, isRepossessed, repossessDate, repossessLocation, repossessRemark, rentItemId } = body
 
     if (!maintenanceId && !bodyInventoryItemId) {
       return NextResponse.json({ error: 'ไม่พบรหัสใบแจ้งซ่อม หรือรหัสครุภัณฑ์ (InventoryItemID)' }, { status: 400 })
@@ -623,6 +623,22 @@ export async function POST(req: NextRequest) {
         console.log(`[Start Maintenance] MaintenanceItemID=${maintenanceId}: set IN_MAINTENANCE, StartDate=${startDate}, Location=${serviceLocationCode}`)
       } catch (startErr) {
         console.error('[Start Maintenance Update Error]', startErr)
+      }
+
+      // วันที่คาดว่าจะซ่อมเสร็จ (แยก query เพื่อไม่ให้กระทบการเริ่มซ่อมหากยังไม่ได้เพิ่มคอลัมน์)
+      if (expectedFinishDate) {
+        try {
+          const estReq = pool.request()
+          estReq.input('maintId', sql.Int, maintenanceId)
+          estReq.input('estDate', sql.NVarChar, toMssqlDate(expectedFinishDate))
+          await estReq.query(`
+            UPDATE dbo.EV_MaintenanceItem
+            SET ExpectedFinishDate = @estDate
+            WHERE MaintenanceItemID = @maintId
+          `)
+        } catch (estErr) {
+          console.error('[Estimated Finish Date Update Error]', estErr)
+        }
       }
     }
 

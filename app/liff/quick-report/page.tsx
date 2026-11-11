@@ -44,6 +44,7 @@ interface MaintenanceTicket {
   ReportDate: string
   IncidentDate: string
   CarStatusCode?: string
+  ExpectedFinishDate?: string | null
   CarStatusDescription: string
   IssueTitle: string
   ServiceLocation: string
@@ -430,6 +431,7 @@ export default function QuickReportPage() {
     const now = new Date()
     return now.toISOString().slice(0, 16)
   })
+  const [bulkExpectedFinishDate, setBulkExpectedFinishDate] = useState('')
   const [bulkFinishDate, setBulkFinishDate] = useState(() => {
     const now = new Date()
     return now.toISOString().slice(0, 16)
@@ -776,6 +778,11 @@ export default function QuickReportPage() {
       }
     }
 
+    if (type === 'start' && !bulkExpectedFinishDate) {
+      alert('กรุณาระบุวันที่คาดว่าจะซ่อมเสร็จ')
+      return
+    }
+
     if (type === 'close_case') {
       setCloseFormSubmitted(true)
       if (!closeFinishDate) {
@@ -829,9 +836,10 @@ export default function QuickReportPage() {
         } else if (type === 'start') {
           payload.carStatusCode = 'IN_MAINTENANCE'
           payload.startDate = bulkStartDate
+          payload.expectedFinishDate = bulkExpectedFinishDate
           payload.serviceLocationCode = bulkLocation
           payload.serviceLocationName = locName
-          payload.followUpDetail = `ระบบอัพเดต : เริ่มซ่อม ณ อู่: ${locName} เมื่อวันที่: ${formatLiffTime(bulkStartDate)}`
+          payload.followUpDetail = `ระบบอัพเดต : เริ่มซ่อม ณ อู่: ${locName} เมื่อวันที่: ${formatLiffTime(bulkStartDate)}` + (bulkExpectedFinishDate ? ` (คาดว่าซ่อมเสร็จ: ${formatLiffTime(bulkExpectedFinishDate)})` : '')
         } else if (type === 'complete') {
           payload.carStatusCode = 'COMPLETE'
           payload.finishDate = bulkFinishDate
@@ -2389,6 +2397,7 @@ export default function QuickReportPage() {
                           setSelectedBulkTicketIds(nextType ? pendingTickets.map(t => t.MaintenanceItemID) : [])
                           const now = new Date()
                           setBulkStartDate(now.toISOString().slice(0, 16))
+                          setBulkExpectedFinishDate('')
                         }}
                         className={`font-bold px-2 py-1 rounded-xl text-[10px] transition active:scale-95 whitespace-nowrap border ${
                           pendingTickets.every(t => ['GARAGE_COMPLETE', 'READY_PICKUP_MAINTENANCE'].includes(t.CarStatusCode || ''))
@@ -2536,6 +2545,17 @@ export default function QuickReportPage() {
                         </div>
 
                         <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">🏁 วันที่คาดว่าจะซ่อมเสร็จ <span className="text-rose-500">*</span></label>
+                          <input
+                            type="datetime-local"
+                            value={bulkExpectedFinishDate}
+                            min={bulkStartDate}
+                            onChange={(e) => setBulkExpectedFinishDate(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-rose-500 font-bold"
+                          />
+                        </div>
+
+                        <div>
                           <label className="text-[10px] font-bold text-slate-500 block mb-1">📍 เลือกอู่ที่ซ่อม</label>
                           <select
                             value={bulkLocation}
@@ -2595,6 +2615,21 @@ export default function QuickReportPage() {
                             className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-855 focus:outline-none focus:border-emerald-500 font-bold"
                           />
                         </div>
+
+                        {(() => {
+                          const expectedDates = pendingTickets
+                            .filter(t => selectedBulkTicketIds.includes(t.MaintenanceItemID) && t.ExpectedFinishDate)
+                            .map(t => t.ExpectedFinishDate as string)
+                          if (expectedDates.length === 0) return null
+                          return (
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-1">🏁 วันที่คาดว่าจะซ่อมเสร็จ</label>
+                              <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 font-bold">
+                                {Array.from(new Set(expectedDates.map(formatLiffTime))).join(' , ')}
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </div>
 
                       <div className="flex gap-2 pt-1">

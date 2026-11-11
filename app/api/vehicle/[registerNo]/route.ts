@@ -217,7 +217,7 @@ export async function GET(
       maintReq.query(`
         SELECT
           m.MaintenanceItemID, m.ReportDate, m.IncidentDate,
-          m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate,
+          m.MaintenanceStartDate, m.MaintenanceFinishDate, m.MaintenanceReturnDate, m.ExpectedFinishDate,
           m.IssueTitle, m.CarStatusCode, m.ServiceLocationCode, m.IsActive,
           m.InsuranceCode, m.DriverName, m.RegisterNo, m.VinNo, m.RootCauseFound, m.FixAction,
           m.ProblemTypeCode, m.FaultPartyCode, m.CarCaseCode, m.ClaimNumber, m.ContractNo,
