@@ -67,14 +67,14 @@ export function Pagination({
               onClick={() => onPageChange(1)}
               className={`h-8 w-8 rounded-xl font-semibold transition-all ${
                 currentPage === 1
-                  ? 'bg-indigo-650 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
               }`}
             >
               1
             </button>
             {getPageNumbers()[0] > 2 && (
-              <span className="px-1 text-zinc-400 dark:text-zinc-650">...</span>
+              <span className="px-1 text-zinc-400 dark:text-zinc-600">...</span>
             )}
           </>
         )}
@@ -85,7 +85,7 @@ export function Pagination({
             onClick={() => onPageChange(p)}
             className={`h-8 w-8 rounded-xl font-semibold transition-all ${
               currentPage === p
-                ? 'bg-indigo-650 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
             }`}
           >
@@ -96,13 +96,13 @@ export function Pagination({
         {getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
           <>
             {getPageNumbers()[getPageNumbers().length - 1] < totalPages - 1 && (
-              <span className="px-1 text-zinc-400 dark:text-zinc-650">...</span>
+              <span className="px-1 text-zinc-400 dark:text-zinc-600">...</span>
             )}
             <button
               onClick={() => onPageChange(totalPages)}
               className={`h-8 w-8 rounded-xl font-semibold transition-all ${
                 currentPage === totalPages
-                  ? 'bg-indigo-650 text-white shadow-sm'
+                  ? 'bg-indigo-600 text-white shadow-sm'
                   : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
               }`}
             >

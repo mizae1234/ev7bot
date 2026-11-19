@@ -91,6 +91,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' }, { status: 500 })
     }
 
+    // Check whether ExpectedFinishDate column exists on current DB to prevent SQL compile error
+    const colCheckRes = await pool.request().query(`
+      SELECT COL_LENGTH('dbo.EV_MaintenanceItem', 'ExpectedFinishDate') AS HasExpectedFinishDate
+    `)
+    const hasExpectedFinishDate = colCheckRes.recordset[0]?.HasExpectedFinishDate != null
+    const expectedFinishSelect = hasExpectedFinishDate
+      ? 'm.ExpectedFinishDate,'
+      : 'CAST(NULL AS DATETIME) AS ExpectedFinishDate,'
+
     // Build WHERE clause dynamically
     // STILL_WORK tickets (reported, car not yet in the workshop — e.g. imported claims) belong to
     // vehicles that are still ON_RENT/AVAILABLE, so that view must not require Status = MAINTENANCE.
@@ -153,6 +162,9 @@ export async function GET(req: NextRequest) {
     // Ticket-level summary for maintenance items
     const ticketSummaryReq = pool.request()
 
+    // Active replacement cars (run concurrently instead of sequential N-param query)
+    const replReq = pool.request()
+
     // Run queries concurrently for performance optimization
     const [
       stillWorkResult,
@@ -161,7 +173,8 @@ export async function GET(req: NextRequest) {
       locResult,
       repairByLocResult,
       itemResult,
-      problemTypeResult
+      problemTypeResult,
+      replResult
     ] = await Promise.all([
       stillWorkReq.query(`
         SELECT 
@@ -262,7 +275,7 @@ export async function GET(req: NextRequest) {
           m.IncidentDate,
           m.MaintenanceStartDate,
           m.MaintenanceFinishDate,
-          m.ExpectedFinishDate,
+          ${expectedFinishSelect}
           m.MaintenanceReturnDate,
           m.FollowUpDetail,
           m.DriverName,
@@ -293,39 +306,29 @@ export async function GET(req: NextRequest) {
       problemTypeReq.query(`
         SELECT Type, StatusCode, StatusName, DescriptionStatus
         FROM dbo.EV_MsSubStatus
-        WHERE Type IN ('MAINTENANCE_PROBLEM_TYPE', 'DAMAGE', 'MAINTENANCE_CAR_STATUS') AND IsActive = 1
+        WHERE Type IN ('MAINTENANCE_PROBLEM_TYPE', 'DAMAGE', 'MAINTENANCE_CAR_STATUS', 'LOCATION') AND IsActive = 1
         ORDER BY StatusCode
-      `)
-    ])
-
-
-
-    // Get replacement cars for items
-    const maintIds = itemResult.recordset.map((m: { MaintenanceItemID: number }) => m.MaintenanceItemID)
-    let replacements: Record<number, { VinNo: string; RegisterNo: string | null; ReplacementStartDate: string | null }[]> = {}
-
-    if (maintIds.length > 0) {
-      const replReq = pool.request()
-      const idList = maintIds.map((_: number, i: number) => `@rid${i}`).join(',')
-      maintIds.forEach((id: number, i: number) => {
-        replReq.input(`rid${i}`, sql.Int, id)
-      })
-      const replResult = await replReq.query(`
+      `),
+      replReq.query(`
         SELECT r.MaintenanceItemID, r.VinNo, i.RegisterNo, r.ReplacementStartDate
         FROM dbo.EV_ReplacementItem r
         LEFT JOIN dbo.EV_InventoryItem i ON r.VinNo = i.VinNo
-        WHERE r.MaintenanceItemID IN (${idList}) AND r.IsActive = 1
+        WHERE r.IsActive = 1 AND r.MaintenanceItemID IS NOT NULL
       `)
-      for (const r of replResult.recordset) {
-        if (!replacements[r.MaintenanceItemID]) replacements[r.MaintenanceItemID] = []
-        replacements[r.MaintenanceItemID].push(r)
-      }
+    ])
+
+    // Map active replacement cars by MaintenanceItemID
+    const replacements: Record<number, { VinNo: string; RegisterNo: string | null; ReplacementStartDate: string | null }[]> = {}
+    for (const r of replResult.recordset) {
+      if (!replacements[r.MaintenanceItemID]) replacements[r.MaintenanceItemID] = []
+      replacements[r.MaintenanceItemID].push(r)
     }
 
     // Dynamic Maps from Master Table EV_MsSubStatus
     const dynamicProblemTypeMap: Record<string, string> = { ...problemTypeMap }
     const dynamicCarCaseMap: Record<string, string> = { ...carCaseMap }
     const dynamicCarStatusMap: Record<string, string> = { ...carStatusMap }
+    const dynamicLocationMap: Record<string, string> = {}
 
     for (const record of problemTypeResult.recordset) {
       if (record.StatusCode && record.StatusName) {
@@ -335,6 +338,8 @@ export async function GET(req: NextRequest) {
           dynamicCarCaseMap[record.StatusCode] = record.StatusName
         } else if (record.Type === 'MAINTENANCE_CAR_STATUS') {
           dynamicCarStatusMap[record.StatusCode] = record.StatusName
+        } else if (record.Type === 'LOCATION') {
+          dynamicLocationMap[record.StatusCode] = record.StatusName
         }
       }
     }
@@ -362,7 +367,9 @@ export async function GET(req: NextRequest) {
       problem_type: mapCode(m.ProblemTypeCode, dynamicProblemTypeMap),
       fault_party: mapCode(m.FaultPartyCode, faultPartyMap),
       car_case: mapCarCase(m.CarCaseCode, dynamicCarCaseMap),
-      service_location: ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '),
+      service_location: m.ServiceLocationCode
+        ? (dynamicLocationMap[m.ServiceLocationCode as string] || ((m.ServiceLocationCode as string) || '-').replace(/_/g, ' '))
+        : '-',
       service_location_code: m.ServiceLocationCode,
       current_location: (m.CarCurrentLocationName as string) || (m.CarCurrentLocation as string) || null,
       insurance: mapCode(m.InsuranceCode, insuranceMap),
@@ -400,11 +407,14 @@ export async function GET(req: NextRequest) {
           ...(stillWorkResult.recordset[0] || { still_work: 0, still_work_tickets: 0, still_work_cars: 0 }),
         },
         locations: locResult.recordset.map((r: { ServiceLocationCode: string }) => r.ServiceLocationCode),
+        locationNames: dynamicLocationMap,
         locationSummary: repairByLocResult.recordset || [],
-        problemTypes: problemTypeResult.recordset.map((r: any) => ({
-          code: r.StatusCode,
-          name: r.StatusName || r.DescriptionStatus || r.StatusCode,
-        })),
+        problemTypes: problemTypeResult.recordset
+          .filter((r: { Type: string }) => r.Type === 'MAINTENANCE_PROBLEM_TYPE')
+          .map((r: { StatusCode: string; StatusName?: string; DescriptionStatus?: string }) => ({
+            code: r.StatusCode,
+            name: r.StatusName || r.DescriptionStatus || r.StatusCode,
+          })),
         fetchedAt: new Date().toISOString(),
       },
       {

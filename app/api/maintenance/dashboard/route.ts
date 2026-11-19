@@ -280,6 +280,14 @@ export async function GET() {
     `)
 
     // 5. Longest active repairs (Stuck repairs) (All 584 cars currently in MAINTENANCE status, once per car)
+    const colCheckRes = await pool.request().query(`
+      SELECT COL_LENGTH('dbo.EV_MaintenanceItem', 'ExpectedFinishDate') AS HasExpectedFinishDate
+    `)
+    const hasExpectedFinishDate = colCheckRes.recordset[0]?.HasExpectedFinishDate != null
+    const mExpectedFinishCol = hasExpectedFinishDate
+      ? 'm.ExpectedFinishDate,'
+      : 'CAST(NULL AS DATETIME) AS ExpectedFinishDate,'
+
     const longestRepairsResult = await pool.request().query(`
       WITH LatestTickets AS (
         SELECT 
@@ -292,7 +300,7 @@ export async function GET() {
           m.MaintenanceStartDate,
           m.FollowUpDetail,
           m.MaintenanceFinishDate,
-          m.ExpectedFinishDate,
+          ${mExpectedFinishCol}
           m.CreateDate,
           ROW_NUMBER() OVER (
             PARTITION BY m.InventoryItemID 
