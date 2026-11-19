@@ -198,18 +198,6 @@ function DailyCompletedHeaderComponent({
           <div className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl border border-zinc-200/80 dark:border-zinc-700">
             <button
               type="button"
-              onClick={() => onChangeViewMode('calendar')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                viewMode === 'calendar'
-                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
-              }`}
-            >
-              <span>📅</span>
-              <span>ปฏิทินรายเดือน</span>
-            </button>
-            <button
-              type="button"
               onClick={() => onChangeViewMode('matrix')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 viewMode === 'matrix'
@@ -219,6 +207,18 @@ function DailyCompletedHeaderComponent({
             >
               <span>📊</span>
               <span>ตารางเทียบสาขา</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeViewMode('calendar')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                viewMode === 'calendar'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'
+              }`}
+            >
+              <span>📅</span>
+              <span>ปฏิทินรายเดือน</span>
             </button>
           </div>
 

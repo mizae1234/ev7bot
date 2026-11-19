@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
       items: [],
       branches: [],
       problemTypes: [],
+      pendingSummary: [],
       fetchedAt: new Date().toISOString(),
     })
   }
@@ -72,8 +73,9 @@ export async function GET(req: NextRequest) {
     itemsReq.input('endDate', sql.VarChar(19), nextMonthStartStr)
 
     const masterLocReq = pool.request()
+    const pendingReq = pool.request()
 
-    const [itemsResult, masterLocResult] = await Promise.all([
+    const [itemsResult, masterLocResult, pendingResult] = await Promise.all([
       itemsReq.query(`
         SELECT
           m.MaintenanceItemID,
@@ -125,6 +127,29 @@ export async function GET(req: NextRequest) {
         FROM dbo.EV_MsSubStatus
         WHERE Type IN ('LOCATION', 'MAINTENANCE_PROBLEM_TYPE') AND IsActive = 1
         ORDER BY StatusName
+      `),
+      pendingReq.query(`
+        SELECT
+          ISNULL(NULLIF(LTRIM(RTRIM(m.ServiceLocationCode)), ''), 'UNSPECIFIED') AS ServiceLocationCode,
+          locSub.StatusName AS ServiceLocationName,
+          ISNULL(NULLIF(LTRIM(RTRIM(m.ProblemTypeCode)), ''), 'UNSPECIFIED') AS ProblemTypeCode,
+          probSub.StatusName AS ProblemTypeName,
+          COUNT(m.MaintenanceItemID) AS PendingCount
+        FROM dbo.EV_MaintenanceItem m
+        JOIN dbo.EV_InventoryItem i ON m.InventoryItemID = i.InventoryItemID
+        LEFT JOIN dbo.EV_MsSubStatus locSub
+          ON LTRIM(RTRIM(m.ServiceLocationCode)) = locSub.StatusCode AND locSub.Type = 'LOCATION' AND locSub.IsActive = 1
+        LEFT JOIN dbo.EV_MsSubStatus probSub
+          ON LTRIM(RTRIM(m.ProblemTypeCode)) = probSub.StatusCode AND probSub.Type = 'MAINTENANCE_PROBLEM_TYPE' AND probSub.IsActive = 1
+        WHERE m.IsActive = 1
+          AND i.IsActive = 1
+          AND i.Status = 'MAINTENANCE'
+          AND m.CarStatusCode IN ('IN_MAINTENANCE', 'WAITING_FOR_MAINTENANCE')
+        GROUP BY
+          ISNULL(NULLIF(LTRIM(RTRIM(m.ServiceLocationCode)), ''), 'UNSPECIFIED'),
+          locSub.StatusName,
+          ISNULL(NULLIF(LTRIM(RTRIM(m.ProblemTypeCode)), ''), 'UNSPECIFIED'),
+          probSub.StatusName
       `),
     ])
 
@@ -192,9 +217,26 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    const pendingSummary = pendingResult.recordset.map((r: Record<string, unknown>) => {
+      const locCode = (r.ServiceLocationCode as string) || 'UNSPECIFIED'
+      const locName = resolveLocationName(locCode, r.ServiceLocationName as string | null)
+      const probCode = (r.ProblemTypeCode as string) || 'UNSPECIFIED'
+      const probName = resolveProblemTypeName(probCode, r.ProblemTypeName as string | null)
+      branchNameMap[locCode] = locName
+      problemNameMap[probCode] = probName
+      return {
+        location_code: locCode,
+        location_name: locName,
+        problem_type_code: probCode,
+        problem_type: probName,
+        count: Number(r.PendingCount) || 0,
+      }
+    })
+
     const allKnownCodes = new Set<string>([
       ...Object.keys(masterLocNameMap),
       ...Object.keys(branchCountMap),
+      ...pendingSummary.map(p => p.location_code),
     ])
 
     const branches = Array.from(allKnownCodes)
@@ -213,6 +255,7 @@ export async function GET(req: NextRequest) {
     const allKnownProblemCodes = new Set<string>([
       ...Object.keys(masterProbNameMap),
       ...Object.keys(problemCountMap),
+      ...pendingSummary.map(p => p.problem_type_code),
     ])
 
     const problemTypes = Array.from(allKnownProblemCodes)
@@ -235,6 +278,7 @@ export async function GET(req: NextRequest) {
         items,
         branches,
         problemTypes,
+        pendingSummary,
         fetchedAt: new Date().toISOString(),
       },
       {

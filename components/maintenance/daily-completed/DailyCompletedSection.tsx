@@ -5,7 +5,11 @@ import useSWR from 'swr'
 import { exportToExcelMultiSheet, formatDateForExcelRaw } from '@/lib/exportExcel'
 import { DailyCompletedHeader } from './DailyCompletedHeader'
 import { DailyCompletedCalendar } from './DailyCompletedCalendar'
-import { DailyCompletedMatrix } from './DailyCompletedMatrix'
+import {
+  DailyCompletedMatrix,
+  type MatrixBranchRow,
+  type MatrixProblemSubRow,
+} from './DailyCompletedMatrix'
 import { DailyCompletedDateDetail } from './DailyCompletedDateDetail'
 import {
   THAI_MONTHS_FULL,
@@ -35,7 +39,7 @@ function DailyCompletedSectionComponent() {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number>(todayInfo.year)
   const [selectedMonth, setSelectedMonth] = useState<number>(todayInfo.month)
-  const [viewMode, setViewMode] = useState<DailyViewMode>('calendar')
+  const [viewMode, setViewMode] = useState<DailyViewMode>('matrix')
   const [completionScope, setCompletionScope] = useState<CompletionScope>('all')
   const [selectedProblemType, setSelectedProblemType] = useState<string>('all')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
@@ -89,14 +93,18 @@ function DailyCompletedSectionComponent() {
     setSelectedDate(null)
   }, [])
 
-  const handleSelectMatrixCell = useCallback((branchCode: string, dateKey: string) => {
+  const handleSelectMatrixCell = useCallback((branchCode: string, dateKey: string, problemCode?: string) => {
     setSelectedBranch(branchCode)
     setSelectedDate(dateKey)
+    if (problemCode) {
+      setSelectedProblemType(problemCode)
+    }
   }, [])
 
   const rawItems = useMemo(() => data?.items || [], [data?.items])
   const allBranches = useMemo(() => data?.branches || [], [data?.branches])
   const allProblemTypes = useMemo(() => data?.problemTypes || [], [data?.problemTypes])
+  const rawPendingSummary = useMemo(() => data?.pendingSummary || [], [data?.pendingSummary])
 
   // Step 1: Items filtered by completionScope
   const scopeFilteredItems = useMemo(() => {
@@ -248,38 +256,161 @@ function DailyCompletedSectionComponent() {
   )
 
   const matrixData = useMemo(() => {
-    const targetBranches =
-      selectedBranch !== 'all'
-        ? branchOptions.filter(b => b.code === selectedBranch)
-        : hideZeroBranches
-        ? branchOptions.filter(b => b.count > 0)
-        : branchOptions
+    // 1. Aggregate pending items by branch -> problemType
+    const scopedPending = rawPendingSummary.filter(p => {
+      if (selectedProblemType !== 'all' && p.problem_type_code !== selectedProblemType) return false
+      if (selectedBranch !== 'all' && p.location_code !== selectedBranch) return false
+      return true
+    })
 
+    const pendingByBranch: Record<string, Record<string, { name: string; count: number }>> = {}
+    const grandPendingTypeMap: Record<string, { name: string; count: number }> = {}
+    let grandPendingTotal = 0
+
+    for (const p of scopedPending) {
+      if (p.count <= 0) continue
+      if (!pendingByBranch[p.location_code]) pendingByBranch[p.location_code] = {}
+      if (!pendingByBranch[p.location_code][p.problem_type_code]) {
+        pendingByBranch[p.location_code][p.problem_type_code] = { name: p.problem_type, count: 0 }
+      }
+      pendingByBranch[p.location_code][p.problem_type_code].count += p.count
+
+      if (!grandPendingTypeMap[p.problem_type_code]) {
+        grandPendingTypeMap[p.problem_type_code] = { name: p.problem_type, count: 0 }
+      }
+      grandPendingTypeMap[p.problem_type_code].count += p.count
+      grandPendingTotal += p.count
+    }
+
+    // 2. Aggregate completed items by branch -> day & problemType -> day
     const dayMatrix: Record<string, Record<number, number>> = {}
+    const completedByBranchType: Record<
+      string,
+      Record<string, { name: string; total: number; countsByDay: Record<number, number> }>
+    > = {}
+    const grandCompletedTypeMap: Record<
+      string,
+      { name: string; total: number; countsByDay: Record<number, number> }
+    > = {}
     const dailyTotals: Record<number, number> = {}
 
     for (const item of filteredItems) {
+      const loc = item.service_location_code
+      const pCode = item.problem_type_code
       const dayNum = parseInt(item.finish_date_key.split('-')[2] || '0', 10)
-      if (!dayNum) continue
-      if (!dayMatrix[item.service_location_code]) dayMatrix[item.service_location_code] = {}
-      dayMatrix[item.service_location_code][dayNum] =
-        (dayMatrix[item.service_location_code][dayNum] || 0) + 1
-      dailyTotals[dayNum] = (dailyTotals[dayNum] || 0) + 1
+
+      if (!dayMatrix[loc]) dayMatrix[loc] = {}
+      if (dayNum) {
+        dayMatrix[loc][dayNum] = (dayMatrix[loc][dayNum] || 0) + 1
+        dailyTotals[dayNum] = (dailyTotals[dayNum] || 0) + 1
+      }
+
+      if (!completedByBranchType[loc]) completedByBranchType[loc] = {}
+      if (!completedByBranchType[loc][pCode]) {
+        completedByBranchType[loc][pCode] = { name: item.problem_type, total: 0, countsByDay: {} }
+      }
+      completedByBranchType[loc][pCode].total += 1
+      if (dayNum) {
+        completedByBranchType[loc][pCode].countsByDay[dayNum] =
+          (completedByBranchType[loc][pCode].countsByDay[dayNum] || 0) + 1
+      }
+
+      if (!grandCompletedTypeMap[pCode]) {
+        grandCompletedTypeMap[pCode] = { name: item.problem_type, total: 0, countsByDay: {} }
+      }
+      grandCompletedTypeMap[pCode].total += 1
+      if (dayNum) {
+        grandCompletedTypeMap[pCode].countsByDay[dayNum] =
+          (grandCompletedTypeMap[pCode].countsByDay[dayNum] || 0) + 1
+      }
     }
 
-    const rows = targetBranches.map(b => {
+    // 3. Build rows for candidate branches
+    const candidateBranches =
+      selectedBranch !== 'all'
+        ? branchOptions.filter(b => b.code === selectedBranch)
+        : branchOptions
+
+    const allBuiltRows: MatrixBranchRow[] = candidateBranches.map(b => {
       const countsByDay = dayMatrix[b.code] || {}
+      const branchPendMap = pendingByBranch[b.code] || {}
+      const branchCompMap = completedByBranchType[b.code] || {}
+
+      const pendingTotal = Object.values(branchPendMap).reduce((sum, x) => sum + x.count, 0)
+
+      const subProblemCodes = new Set<string>([
+        ...Object.keys(branchPendMap),
+        ...Object.keys(branchCompMap),
+      ])
+
+      const subRows: MatrixProblemSubRow[] = Array.from(subProblemCodes)
+        .map(pCode => ({
+          problemCode: pCode,
+          problemName: branchCompMap[pCode]?.name || branchPendMap[pCode]?.name || pCode,
+          pendingCount: branchPendMap[pCode]?.count || 0,
+          completedTotal: branchCompMap[pCode]?.total || 0,
+          countsByDay: branchCompMap[pCode]?.countsByDay || {},
+        }))
+        .filter(sr => sr.pendingCount > 0 || sr.completedTotal > 0)
+        .sort((a, b) => {
+          if (b.completedTotal !== a.completedTotal) return b.completedTotal - a.completedTotal
+          if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount
+          return a.problemName.localeCompare(b.problemName, 'th')
+        })
+
       return {
         code: b.code,
         name: b.name,
+        pendingTotal,
         total: b.count,
         activeDays: Object.keys(countsByDay).length,
         countsByDay,
+        subRows,
       }
     })
 
-    return { rows, dailyTotals }
-  }, [branchOptions, selectedBranch, hideZeroBranches, filteredItems])
+    const rows = (
+      selectedBranch !== 'all'
+        ? allBuiltRows
+        : hideZeroBranches
+        ? allBuiltRows.filter(r => r.total > 0 || r.pendingTotal > 0)
+        : allBuiltRows
+    ).sort((a, b) => {
+      if (b.total !== a.total) return b.total - a.total
+      if (b.pendingTotal !== a.pendingTotal) return b.pendingTotal - a.pendingTotal
+      if (a.code === 'UNSPECIFIED') return 1
+      if (b.code === 'UNSPECIFIED') return -1
+      return a.name.localeCompare(b.name, 'th')
+    })
+
+    const allGrandProblemCodes = new Set<string>([
+      ...Object.keys(grandPendingTypeMap),
+      ...Object.keys(grandCompletedTypeMap),
+    ])
+
+    const grandSubRows: MatrixProblemSubRow[] = Array.from(allGrandProblemCodes)
+      .map(pCode => ({
+        problemCode: pCode,
+        problemName:
+          grandCompletedTypeMap[pCode]?.name || grandPendingTypeMap[pCode]?.name || pCode,
+        pendingCount: grandPendingTypeMap[pCode]?.count || 0,
+        completedTotal: grandCompletedTypeMap[pCode]?.total || 0,
+        countsByDay: grandCompletedTypeMap[pCode]?.countsByDay || {},
+      }))
+      .filter(sr => sr.pendingCount > 0 || sr.completedTotal > 0)
+      .sort((a, b) => {
+        if (b.completedTotal !== a.completedTotal) return b.completedTotal - a.completedTotal
+        if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount
+        return a.problemName.localeCompare(b.problemName, 'th')
+      })
+
+    return {
+      rows,
+      dailyTotals,
+      grandPendingTotal,
+      grandSubRows,
+    }
+  }, [rawPendingSummary, selectedProblemType, selectedBranch, filteredItems, branchOptions, hideZeroBranches])
 
   const handleExportExcel = useCallback(() => {
     const monthTitle = `${THAI_MONTHS_FULL[selectedMonth - 1]} ${selectedYear + 543}`
@@ -293,18 +424,46 @@ function DailyCompletedSectionComponent() {
         : problemTypeOptions.find(p => p.code === selectedProblemType)?.name || selectedProblemType
 
     const dayHeaders = Array.from({ length: daysInMonth }, (_, i) => String(i + 1).padStart(2, '0'))
-    const matrixHeaders = ['ลำดับ', 'สาขา / อู่ซ่อม', 'รวมเดือน (ใบงาน)', 'จำนวนวันที่มีงานปิด', ...dayHeaders]
-    const matrixRows: (string | number)[][] = matrixData.rows.map((r, idx) => [
-      idx + 1,
-      r.name,
-      r.total,
-      r.activeDays,
-      ...Array.from({ length: daysInMonth }, (_, i) => r.countsByDay[i + 1] || 0),
-    ])
+    const matrixHeaders = [
+      'ลำดับ',
+      'สาขา / อู่ซ่อม',
+      'ประเภทงานซ่อม',
+      'ยอดค้างปัจจุบัน (ใบงาน)',
+      'รวมเดือนซ่อมเสร็จ (ใบงาน)',
+      'จำนวนวันที่มีงานปิด',
+      ...dayHeaders,
+    ]
+    const matrixRows: (string | number)[][] = []
+
+    matrixData.rows.forEach((r, idx) => {
+      matrixRows.push([
+        idx + 1,
+        r.name,
+        'รวมทุกประเภท',
+        r.pendingTotal,
+        r.total,
+        r.activeDays,
+        ...Array.from({ length: daysInMonth }, (_, i) => r.countsByDay[i + 1] || 0),
+      ])
+
+      for (const sr of r.subRows) {
+        matrixRows.push([
+          '',
+          `   └ ${r.name}`,
+          sr.problemName,
+          sr.pendingCount,
+          sr.completedTotal,
+          Object.keys(sr.countsByDay).length,
+          ...Array.from({ length: daysInMonth }, (_, i) => sr.countsByDay[i + 1] || 0),
+        ])
+      }
+    })
 
     matrixRows.push([
       '',
       'รวมทุกสาขารายวัน',
+      'รวมทั้งหมด',
+      matrixData.grandPendingTotal,
       filteredItems.length,
       Object.keys(matrixData.dailyTotals).length,
       ...Array.from({ length: daysInMonth }, (_, i) => matrixData.dailyTotals[i + 1] || 0),
@@ -394,7 +553,7 @@ function DailyCompletedSectionComponent() {
           onClick={() => setIsCollapsed(c => !c)}
           className="px-3 py-1.5 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 transition shrink-0"
         >
-          {isCollapsed ? '▼ แสดงปฏิทินปิดงาน' : '▲ ย่อส่วนนี้'}
+          {isCollapsed ? '▼ แสดงตารางสรุปปิดงาน' : '▲ ย่อส่วนนี้'}
         </button>
       </div>
 
@@ -462,8 +621,11 @@ function DailyCompletedSectionComponent() {
               startDayOfWeek={startDayOfWeek}
               rows={matrixData.rows}
               dailyTotals={matrixData.dailyTotals}
+              grandPendingTotal={matrixData.grandPendingTotal}
               grandTotal={filteredItems.length}
+              grandSubRows={matrixData.grandSubRows}
               selectedBranch={selectedBranch}
+              selectedProblemType={selectedProblemType}
               selectedDate={selectedDate}
               hideZeroBranches={hideZeroBranches}
               onToggleHideZeroBranches={setHideZeroBranches}

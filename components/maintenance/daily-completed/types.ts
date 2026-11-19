@@ -34,12 +34,21 @@ export interface ProblemTypeOption {
   count: number
 }
 
+export interface PendingSummaryItem {
+  location_code: string
+  location_name: string
+  problem_type_code: string
+  problem_type: string
+  count: number
+}
+
 export interface DailyCompletedResponse {
   year: number
   month: number // 1-12
   items: CompletedMaintenanceItem[]
   branches: BranchOption[]
   problemTypes: ProblemTypeOption[]
+  pendingSummary?: PendingSummaryItem[]
   fetchedAt: string
 }
 
